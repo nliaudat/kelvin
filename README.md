@@ -61,16 +61,47 @@ kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 | Paranoid | 5      | 10,000,000| 10,000          | ~10s       |
 | Maximum  | 10     | 100,000,000| 100,000        | ~2min      |
 
+## Documentation
+
+- **[Academic Citations](documentation/citations.md)** — Full academic context for every component of Kelvin, organized by pipeline stage. Each citation includes a summary of its relevance.
+- **[Proof of Concept](documentation/proof_of_concept.md)** — Test results, benchmarks, and verification that Kelvin works as a functional cryptosystem.
+- **[Threat Model](THREAT_MODEL.md)** — Attacker capabilities, security boundaries, and comparison with existing KDFs.
+- **[REFERENCES.bib](REFERENCES.bib)** — Complete BibTeX bibliography for LaTeX integration.
+
 ## References
 
-See [REFERENCES.bib](REFERENCES.bib) for the full BibTeX bibliography. Key references include:
+Kelvin builds on foundational work across numerical analysis, chaos theory, and cryptography:
 
-- **Verlet (1967)** — Original leapfrog integration method
-- **Benettin et al. (1980)** — Lyapunov exponent computation
-- **Wolf et al. (1985)** — Shadow orbit method for Lyapunov estimation
-- **Bernstein (2008)** — ChaCha20 stream cipher specification
-- **NIST FIPS PUB 202 (2015)** — SHA3-512 standard
-- **CryptoChaos (Harvard, 2025)** — Related chaos-based cryptographic framework
+### Fixed-Point Arithmetic & Numerical Methods
+- **Goldberg (1991)** — Floating-point non-determinism motivates Kelvin's Q32.64 fixed-point arithmetic [doi:10.1145/103162.103163]
+- **Verlet (1967)** — Original leapfrog integration method [doi:10.1103/PhysRev.159.98]
+- **Hairer, Lubich & Wanner (2006)** — Symplectic integrator theory (Springer, ISBN 978-3-540-30666-5)
+
+### Chaos Theory & Lyapunov Exponents
+- **Benettin et al. (1980)** — Lyapunov exponent computation algorithm [doi:10.1007/BF02128236]
+- **Wolf et al. (1985)** — Shadow orbit method for Lyapunov estimation [doi:10.1016/0167-2789(85)90011-9]
+- **Sano & Sawada (1985)** — Alternative Lyapunov estimation method [doi:10.1103/PhysRevLett.55.1082]
+
+### N-Body Gravitational Simulation
+- **Wisdom & Holman (1991)** — Symplectic maps for the n-body problem [doi:10.1086/115978]
+- **Murray & Dermott (1999)** — Solar System Dynamics (Cambridge University Press)
+
+### Cryptographic Hash Functions
+- **NIST FIPS PUB 202 (2015)** — SHA3-512 standard [doi:10.6028/NIST.FIPS.202]
+- **Bertoni et al. (2013)** — Keccak sponge construction [doi:10.1007/978-3-642-38348-9_19]
+
+### Stream Ciphers
+- **Bernstein (2008)** — ChaCha20 specification (SASC 2008)
+- **Nir & Langley (2018)** — ChaCha20 IETF standard (RFC 8439) [doi:10.17487/RFC8439]
+
+### Related Work
+- **CryptoChaos (Harvard, 2025)** — Hybrid chaos-based cryptographic framework
+
+### Security & Side Channels
+- **Koeune & Standaert (2005)** — Side-channel attack methodology [doi:10.1007/11554578_3]
+
+### Reproducibility
+- **Gent (2017)** — Recomputation Manifesto [doi:10.1145/3105966]
 
 ## License
 
