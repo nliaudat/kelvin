@@ -1,4 +1,5 @@
 # Kelvin — Orbital Chaos KDF Cryptosystem
+Project Name: kelvin (KDF from n-body Lyapunov Instability Naturally)
 
 **EXPERIMENTAL — NOT FOR PRODUCTION USE.**
 
