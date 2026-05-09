@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "kelvin-core",
+    "kelvin-kdf",
+    "kelvin-stream",
+    "kelvin",
+    "kelvin-cli",
+    "kelvin-ffi",
+]
+resolver = "2"

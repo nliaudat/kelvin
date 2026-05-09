@@ -1,0 +1,17 @@
+[package]
+name = "kelvin-core"
+version = "0.1.0"
+edition = "2021"
+description = "Fixed-point math and n-body simulation engine for Kelvin cryptosystem"
+
+[lib]
+name = "kelvin_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"], optional = true }
+serde_json = { version = "1.0", optional = true }
+
+[features]
+default = []
+serde = ["dep:serde", "dep:serde_json"]

@@ -1,0 +1,15 @@
+[package]
+name = "kelvin-cli"
+version = "0.1.0"
+edition = "2021"
+description = "CLI tool for Kelvin cryptosystem"
+
+[[bin]]
+name = "kelvin"
+path = "src/main.rs"
+
+[dependencies]
+kelvin = { path = "../kelvin" }
+clap = { version = "4.0", features = ["derive"] }
+serde_json = "1.0"
+indicatif = "0.17"

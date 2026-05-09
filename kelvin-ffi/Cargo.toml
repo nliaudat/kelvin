@@ -1,0 +1,13 @@
+[package]
+name = "kelvin-ffi"
+version = "0.1.0"
+edition = "2021"
+description = "C FFI bindings for Kelvin cryptosystem"
+
+[lib]
+name = "kelvin_ffi"
+path = "src/lib.rs"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+kelvin = { path = "../kelvin", features = ["serde"] }

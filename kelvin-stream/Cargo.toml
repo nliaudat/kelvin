@@ -1,0 +1,13 @@
+[package]
+name = "kelvin-stream"
+version = "0.1.0"
+edition = "2021"
+description = "Stream cipher integration for Kelvin cryptosystem"
+
+[lib]
+name = "kelvin_stream"
+path = "src/lib.rs"
+
+[dependencies]
+chacha20 = "0.9"
+zeroize = { version = "1.6", features = ["zeroize_derive"] }
