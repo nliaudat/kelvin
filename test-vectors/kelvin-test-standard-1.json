@@ -1,0 +1,11 @@
+{
+  "description": "Standard level, short plaintext (3 bodies)",
+  "level": "Standard",
+  "config_json": "{\n  \"bodies\": [\n    {\n      \"mass\": 18446744073709551616,\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 18446744073709551616,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 110680464442257309696,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 27670116110564327424,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 4896710557980672,\n        \"z\": 4611686018427387904\n      }\n    }\n  ],\n  \"total_steps\": 50,\n  \"reseed_interval\": 10,\n  \"dt\": 17592186044416,\n  \"softening\": 17592186044416\n}",
+  "plaintext_hex": "48656c6c6f2c204b656c76696e21205468697320697320612074657374206f6620746865206f72626974616c206368616f73204b44462063727970746f73797374656d2e",
+  "ciphertext_hex": "eb9c26a4ae10a16846c280ee7d1f9e4b85befbbe23b40abccddf0a1ef463f6f2c9b4ffbd04bb4a276a968a2268b3805cd355c1ec4e37ff2750d5794138efbcbee7b57199",
+  "keystream_hex": "a3f94ac8c13c812323aef687133ebe1fedd7889e4ac72addedab6f6d80439994e9c097d824d4384503e2eb4e48d0e83dbc26e1a70a71df4422ac0935579cc5cd93d01cb7",
+  "num_bodies": 3,
+  "total_steps": 50,
+  "generation_time_s": 0.0269226
+}
