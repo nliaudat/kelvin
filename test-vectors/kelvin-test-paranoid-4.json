@@ -1,0 +1,11 @@
+{
+  "description": "Paranoid level, short plaintext (5 bodies)",
+  "level": "Paranoid",
+  "config_json": "{\n  \"bodies\": [\n    {\n      \"mass\": 18446744073709551616,\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 13835058055282163712,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 129127208515966861312,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 18446744073709551616,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 110680464442257309696,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 4611686018427387904,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 73786976294838206464,\n        \"z\": 4611686018427387904\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 55340232221128654848,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": -55340232221128654848,\n        \"z\": 0\n      }\n    }\n  ],\n  \"total_steps\": 50,\n  \"reseed_interval\": 10,\n  \"dt\": 17592186044416,\n  \"softening\": 17592186044416\n}",
+  "plaintext_hex": "48656c6c6f2c204b656c76696e21205468697320697320612074657374206f6620746865206f72626974616c206368616f73204b44462063727970746f73797374656d2e",
+  "ciphertext_hex": "2203a0d9d50ff1b17fdc18e7d724ea79faf507e27c838413a54ba162bd50da27cd0448b98b523b97658bbdbef17c3376bcb6ac137fb56fff86fccbe7708cec662c187a9c",
+  "keystream_hex": "6a66ccb5ba23d1fa1ab06e8eb905ca2d929c74c215f0a472853fc411c970b541ed7020dcab3d49f50cffdcd2d11f5b17d3c58c583bf34f9cf485bb931fff9515587d17b2",
+  "num_bodies": 5,
+  "total_steps": 50,
+  "generation_time_s": 0.0912671
+}

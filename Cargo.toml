@@ -6,5 +6,7 @@ members = [
     "kelvin",
     "kelvin-cli",
     "kelvin-ffi",
+    "kelvin-test-server",
+    "kelvin-test-client",
 ]
 resolver = "2"

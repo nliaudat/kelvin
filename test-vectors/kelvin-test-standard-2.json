@@ -1,0 +1,11 @@
+{
+  "description": "Standard level, empty plaintext (3 bodies)",
+  "level": "Standard",
+  "config_json": "{\n  \"bodies\": [\n    {\n      \"mass\": 18446744073709551616,\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 18446744073709551616,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 110680464442257309696,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 27670116110564327424,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 4896710557980672,\n        \"z\": 4611686018427387904\n      }\n    }\n  ],\n  \"total_steps\": 50,\n  \"reseed_interval\": 10,\n  \"dt\": 17592186044416,\n  \"softening\": 17592186044416\n}",
+  "plaintext_hex": "",
+  "ciphertext_hex": "",
+  "keystream_hex": "",
+  "num_bodies": 3,
+  "total_steps": 50,
+  "generation_time_s": 0.0274172
+}
