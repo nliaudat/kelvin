@@ -16,7 +16,7 @@
 
 use alloc::vec::Vec;
 use sha3::{Digest, Sha3_512};
-use kelvin_core::{Fixed, OrbitalBody};
+use kelvin_core::OrbitalBody;
 
 /// Extract a 64-byte seed from the orbital state using SHA3-512.
 ///
@@ -62,6 +62,7 @@ pub fn extract_seed(
 /// Extract a seed of arbitrary length from the orbital state.
 ///
 /// Uses SHA3-512 in counter mode to generate the requested number of bytes.
+#[allow(dead_code)]
 pub fn extract_seed_extended(
     bodies: &[OrbitalBody],
     step: u64,

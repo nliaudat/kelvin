@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use core::fmt;
 
 use kelvin_core::{Fixed, OrbitalBody, Vec3};
-use kelvin_core::{MIN_BODIES, MAX_BODIES, DEFAULT_STEPS, DEFAULT_RESEED_INTERVAL};
+use kelvin_core::{MIN_BODIES, MAX_BODIES, DEFAULT_RESEED_INTERVAL};
 
 /// Orbital configuration — the shared secret.
 ///

@@ -30,6 +30,15 @@ pub struct ChaChaStream {
     max_bytes: u64,
 }
 
+impl core::fmt::Debug for ChaChaStream {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("ChaChaStream")
+            .field("position", &self.position)
+            .field("max_bytes", &self.max_bytes)
+            .finish()
+    }
+}
+
 impl ChaChaStream {
     /// Create a new ChaCha20 stream cipher.
     ///

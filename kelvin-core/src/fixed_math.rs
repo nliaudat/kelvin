@@ -289,11 +289,10 @@ impl Div for Fixed {
         // Actually, (a << 64) = a2 * 2^128 + a1 * 2^96 + a0 * 2^64
         // We process from high to low: a2, a1, a0, then 0 (for the fractional part)
         
-        let mut rem = 0i128;
-        let mut result = 0i128;
+        let mut rem = a2;
+        let mut result;
         
         // Process a2 (at position 2^128)
-        rem = a2;
         let q2 = rem / b;
         rem = rem % b;
         result = q2; // q2 is at position 2^64 in the final result
