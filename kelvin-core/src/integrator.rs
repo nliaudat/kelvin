@@ -6,6 +6,21 @@
 //! 3. Kick:   v ← v + a' * dt/2
 //!
 //! This is symplectic (energy-conserving) and time-reversible.
+//!
+//! ## References
+//!
+//! - Verlet, L. (1967). "Computer 'Experiments' on Classical Fluids. I.
+//!   Thermodynamical Properties of Lennard-Jones Molecules." *Physical
+//!   Review*, 159(1), 98–103. doi:10.1103/PhysRev.159.98
+//!   — Original Verlet (leapfrog) integration method.
+//! - Hairer, E., Lubich, C., & Wanner, G. (2006). *Geometric Numerical
+//!   Integration: Structure-Preserving Algorithms for Ordinary Differential
+//!   Equations* (2nd ed.). Springer.
+//!   — Theoretical foundation for symplectic integrators.
+//! - Wisdom, J., & Holman, M. (1991). "Symplectic Maps for the N-Body
+//!   Problem." *The Astronomical Journal*, 102(4), 1528–1538.
+//!   doi:10.1086/115978
+//!   — Symplectic integration for n-body gravitational systems.
 
 extern crate alloc;
 use alloc::vec::Vec;

@@ -1,0 +1,42 @@
+# ==============================================================================
+# Kelvin Clippy Configuration
+# ==============================================================================
+# Strict linting rules for academic-grade Rust code.
+# See: https://doc.rust-lang.org/clippy/
+
+# ---- Security & Correctness ----
+
+# Disallow floating-point arithmetic (Kelvin uses fixed-point only)
+disallowed-methods = [
+    "f32::abs", "f32::acos", "f32::asin", "f32::atan", "f32::atan2",
+    "f32::cbrt", "f32::ceil", "f32::cos", "f32::cosh", "f32::exp",
+    "f32::exp2", "f32::exp_m1", "f32::floor", "f32::fract", "f32::hypot",
+    "f32::ln", "f32::ln_1p", "f32::log", "f32::log10", "f32::log2",
+    "f32::mul_add", "f32::powf", "f32::powi", "f32::recip", "f32::round",
+    "f32::sin", "f32::sinh", "f32::sqrt", "f32::tan", "f32::tanh",
+    "f32::to_degrees", "f32::to_radians", "f32::trunc",
+    "f64::abs", "f64::acos", "f64::asin", "f64::atan", "f64::atan2",
+    "f64::cbrt", "f64::ceil", "f64::cos", "f64::cosh", "f64::exp",
+    "f64::exp2", "f64::exp_m1", "f64::floor", "f64::fract", "f64::hypot",
+    "f64::ln", "f64::ln_1p", "f64::log", "f64::log10", "f64::log2",
+    "f64::mul_add", "f64::powf", "f64::powi", "f64::recip", "f64::round",
+    "f64::sin", "f64::sinh", "f64::sqrt", "f64::tan", "f64::tanh",
+    "f64::to_degrees", "f64::to_radians", "f64::trunc",
+]
+
+# ---- Complexity ----
+
+cognitive-complexity-threshold = 25
+too-many-arguments-threshold = 7
+too-many-lines-threshold = 500
+
+# ---- Documentation ----
+
+# Require documentation on all public items
+missing-docs-in-crate-items = "deny"
+
+# ---- Style ----
+
+# Ensure all unsafe blocks have safety comments
+# (Kelvin forbids unsafe code, but this catches any exceptions)
+# unsafe-code = { level = "deny", priority = 1 }

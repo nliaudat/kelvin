@@ -3,6 +3,7 @@ name = "kelvin-core"
 version = "0.1.0"
 edition = "2021"
 description = "Fixed-point math and n-body simulation engine for Kelvin cryptosystem"
+license = "CC-BY-NC-SA-4.0"
 
 [lib]
 name = "kelvin_core"

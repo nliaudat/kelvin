@@ -17,9 +17,23 @@
 //! ## no-std support
 //!
 //! This crate is `no_std` compatible. It has no runtime dependencies.
+//!
+//! ## References
+//!
+//! - Goldberg, D. (1991). "What Every Computer Scientist Should Know About
+//!   Floating-Point Arithmetic." *ACM Computing Surveys*, 23(1), 5–48.
+//! - Verlet, L. (1967). "Computer 'Experiments' on Classical Fluids."
+//!   *Physical Review*, 159(1), 98–103.
+//! - Hairer, E., Lubich, C., & Wanner, G. (2006). *Geometric Numerical
+//!   Integration* (2nd ed.). Springer.
+//! - Wisdom, J., & Holman, M. (1991). "Symplectic Maps for the N-Body
+//!   Problem." *The Astronomical Journal*, 102(4), 1528–1538.
+//! - Murray, C. D., & Dermott, S. F. (1999). *Solar System Dynamics*.
+//!   Cambridge University Press.
 
 #![no_std]
 #![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
 mod fixed_math;

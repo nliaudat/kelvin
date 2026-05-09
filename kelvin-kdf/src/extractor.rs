@@ -2,6 +2,17 @@
 //!
 //! Extracts a 64-byte seed from the current orbital state by hashing
 //! the positions, velocities, and masses of all bodies.
+//!
+//! ## References
+//!
+//! - National Institute of Standards and Technology. (2015). "SHA-3
+//!   Standard: Permutation-Based Hash and Extendable-Output Functions."
+//!   FIPS PUB 202. doi:10.6028/NIST.FIPS.202
+//!   — SHA3-512 specification used for entropy extraction.
+//! - Bertoni, G., Daemen, J., Peeters, M., & Van Assche, G. (2013).
+//!   "Keccak." *Advances in Cryptology — EUROCRYPT 2013*, 313–314.
+//!   doi:10.1007/978-3-642-38348-9_19
+//!   — Keccak sponge construction underlying SHA3-512.
 
 use alloc::vec::Vec;
 use sha3::{Digest, Sha3_512};

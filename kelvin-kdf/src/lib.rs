@@ -11,8 +11,18 @@
 //! ## Security
 //!
 //! **EXPERIMENTAL — NOT FOR PRODUCTION USE.**
+//!
+//! ## References
+//!
+//! - Benettin et al. (1980). "Lyapunov Characteristic Exponents for Smooth
+//!   Dynamical Systems." *Meccanica*, 15, 9–20.
+//! - Wolf et al. (1985). "Determining Lyapunov Exponents from a Time Series."
+//!   *Physica D*, 16(3), 285–317.
+//! - NIST FIPS PUB 202 (2015). "SHA-3 Standard."
+//! - Bernstein (2008). "ChaCha, a Variant of Salsa20." *SASC 2008*.
 
 #![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
 extern crate alloc;

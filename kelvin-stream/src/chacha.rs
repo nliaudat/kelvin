@@ -1,4 +1,16 @@
 //! ChaCha20 stream cipher wrapper with rekeying support.
+//!
+//! ## References
+//!
+//! - Bernstein, D. J. (2008). "ChaCha, a Variant of Salsa20." *Workshop
+//!   Record of SASC 2008: The State of the Art of Stream Ciphers*.
+//!   — Original ChaCha20 specification.
+//! - Nir, Y., & Langley, A. (2018). "ChaCha20 and Poly1305 for IETF
+//!   Protocols." RFC 8439. doi:10.17487/RFC8439
+//!   — ChaCha20 IETF standard with test vectors.
+//! - Bernstein, D. J. (2008). "The Salsa20 Family of Stream Ciphers."
+//!   *New Stream Cipher Designs*, 84–97. doi:10.1007/978-3-540-68351-3_6
+//!   — Predecessor to ChaCha20, design rationale.
 
 use crate::traits::StreamCipher;
 use chacha20::{

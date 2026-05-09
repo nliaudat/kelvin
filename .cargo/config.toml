@@ -1,0 +1,40 @@
+# ==============================================================================
+# Kelvin Cargo Configuration
+# ==============================================================================
+# Academic-grade Rust compilation settings for reproducible builds.
+# See: https://doc.rust-lang.org/cargo/reference/config.html
+
+[target.'cfg(all())']
+# Optimize for performance (academic benchmarks)
+# Note: LTO is set in Cargo.toml profiles instead of here to avoid
+# conflicts with proc-macro crates (e.g., zeroize_derive, serde_derive).
+rustflags = [
+    "-C", "opt-level=3",
+    "-C", "target-cpu=native",
+    "-C", "codegen-units=1",
+    "-C", "embed-bitcode=yes",
+]
+
+[profile.release]
+# Release profile for benchmarks and production
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = "symbols"
+debug = false
+
+[profile.bench]
+# Benchmark profile inherits from release
+inherits = "release"
+debug = 1
+
+[profile.test]
+# Test profile with debug info for test failures
+opt-level = 2
+debug = 1
+
+[env]
+# Ensure deterministic builds across platforms
+CARGO_INCREMENTAL = "0"
+RUST_BACKTRACE = "1"

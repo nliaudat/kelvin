@@ -11,6 +11,14 @@
 //! **EXPERIMENTAL — NOT FOR PRODUCTION USE.** This is an experimental
 //! cryptosystem that has not undergone formal cryptanalysis.
 //!
+//! ## Related Work
+//!
+//! - CryptoChaos (Harvard University, 2025): A hybrid chaos-based
+//!   cryptographic framework combining deterministic chaos with X25519
+//!   Diffie-Hellman key exchange and SHA3-256 hashing. Demonstrates
+//!   academic interest in chaos-based cryptography for post-quantum
+//!   applications.
+//!
 //! ## Example
 //!
 //! ```rust,ignore

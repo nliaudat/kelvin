@@ -9,8 +9,14 @@
 //! ## Security
 //!
 //! **EXPERIMENTAL — NOT FOR PRODUCTION USE.**
+//!
+//! ## References
+//!
+//! - Bernstein, D. J. (2008). "ChaCha, a Variant of Salsa20." *SASC 2008*.
+//! - Nir, Y., & Langley, A. (2018). RFC 8439. doi:10.17487/RFC8439
 
 #![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
 mod chacha;

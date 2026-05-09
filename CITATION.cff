@@ -1,0 +1,80 @@
+cff-version: 1.2.0
+message: "If you use Kelvin in academic work, please cite this software."
+title: "Kelvin: Orbital Chaos KDF Cryptosystem"
+authors:
+  - family-names: Liaudat
+    given-names: Nicolas
+    orcid: ""
+    affiliation: ""
+version: 0.1.0
+date-released: 2025
+repository-code: "https://github.com/nliaudat/kelvin"
+license: "CC-BY-NC-SA-4.0"
+keywords:
+  - cryptography
+  - key-derivation-function
+  - n-body-simulation
+  - chaos-theory
+  - post-quantum
+  - rust
+abstract: "Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines Q32.64 fixed-point arithmetic, a symplectic Verlet integrator, Lyapunov time estimation, SHA3-512 entropy extraction, and a ChaCha20 stream cipher."
+references:
+  - type: article
+    authors:
+      - family-names: Verlet
+        given-names: Loup
+    title: "Computer 'Experiments' on Classical Fluids. I. Thermodynamical Properties of Lennard-Jones Molecules"
+    journal: "Physical Review"
+    volume: 159
+    number: 1
+    pages: "98--103"
+    year: 1967
+  - type: article
+    authors:
+      - family-names: Benettin
+        given-names: Giancarlo
+      - family-names: Galgani
+        given-names: Luigi
+      - family-names: Giorgilli
+        given-names: Antonio
+      - family-names: Strelcyn
+        given-names: Jean-Marie
+    title: "Lyapunov Characteristic Exponents for Smooth Dynamical Systems and for Hamiltonian Systems"
+    journal: "Meccanica"
+    volume: 15
+    pages: "9--20"
+    year: 1980
+  - type: article
+    authors:
+      - family-names: Wolf
+        given-names: Alan
+      - family-names: Swift
+        given-names: Jack B.
+      - family-names: Swinney
+        given-names: Harry L.
+      - family-names: Vastano
+        given-names: John A.
+    title: "Determining Lyapunov Exponents from a Time Series"
+    journal: "Physica D"
+    volume: 16
+    number: 3
+    pages: "285--317"
+    year: 1985
+  - type: inproceedings
+    authors:
+      - family-names: Bernstein
+        given-names: Daniel J.
+    title: "ChaCha, a Variant of Salsa20"
+    booktitle: "Workshop Record of SASC 2008"
+    year: 2008
+  - type: techreport
+    authors:
+      - name: "National Institute of Standards and Technology"
+    title: "SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions"
+    number: "FIPS PUB 202"
+    year: 2015
+  - type: misc
+    authors:
+      - name: "Harvard University"
+    title: "CryptoChaos: A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications"
+    year: 2025

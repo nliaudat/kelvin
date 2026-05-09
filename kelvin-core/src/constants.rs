@@ -1,6 +1,12 @@
 //! Physical constants for the orbital simulation.
 //!
 //! All values are in AU-solar mass-year units.
+//!
+//! ## References
+//!
+//! - Murray, C. D., & Dermott, S. F. (1999). *Solar System Dynamics*.
+//!   Cambridge University Press.
+//!   — Reference for gravitational constant G = 4π² in AU³/(M☉·yr²).
 
 use crate::Fixed;
 

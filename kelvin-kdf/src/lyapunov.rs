@@ -3,6 +3,23 @@
 //! The Lyapunov time is the timescale over which nearby trajectories diverge
 //! exponentially. It determines the maximum safe simulation time before
 //! the orbital state becomes unpredictable (and thus useful for key derivation).
+//!
+//! ## References
+//!
+//! - Benettin, G., Galgani, L., Giorgilli, A., & Strelcyn, J.-M. (1980).
+//!   "Lyapunov Characteristic Exponents for Smooth Dynamical Systems and
+//!   for Hamiltonian Systems; A Method for Computing All of Them."
+//!   *Meccanica*, 15(1), 9–20. doi:10.1007/BF02128236
+//!   — Standard algorithm for computing Lyapunov exponents, adapted for
+//!     Kelvin's shadow orbit method.
+//! - Wolf, A., Swift, J. B., Swinney, H. L., & Vastano, J. A. (1985).
+//!   "Determining Lyapunov Exponents from a Time Series." *Physica D:
+//!   Nonlinear Phenomena*, 16(3), 285–317. doi:10.1016/0167-2789(85)90011-9
+//!   — Shadow orbit method for Lyapunov estimation.
+//! - Sano, M., & Sawada, Y. (1985). "Measurement of the Lyapunov Spectrum
+//!   from a Chaotic Time Series." *Physical Review Letters*, 55(10),
+//!   1082–1085. doi:10.1103/PhysRevLett.55.1082
+//!   — Alternative Lyapunov estimation method.
 
 use alloc::vec::Vec;
 use core::fmt;

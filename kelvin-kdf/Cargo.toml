@@ -3,6 +3,7 @@ name = "kelvin-kdf"
 version = "0.1.0"
 edition = "2021"
 description = "Key derivation layer for Kelvin cryptosystem"
+license = "CC-BY-NC-SA-4.0"
 
 [lib]
 name = "kelvin_kdf"

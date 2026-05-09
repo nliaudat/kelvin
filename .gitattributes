@@ -1,0 +1,35 @@
+# ==============================================================================
+# Kelvin Git Attributes
+# ==============================================================================
+# Language detection for academic tools and GitHub.
+
+# Rust source files
+*.rs text diff=rust
+
+# Cargo files
+Cargo.toml text diff=toml
+Cargo.lock text diff=toml
+
+# Markdown documentation
+*.md text diff=markdown
+
+# BibTeX bibliography
+*.bib text
+
+# CITATION.cff
+CITATION.cff text
+
+# Binary files (no diff)
+*.png binary
+*.jpg binary
+*.ico binary
+
+# Lock file (generated, no diff)
+Cargo.lock -diff
+
+# Line endings
+* text=auto eol=lf
+
+# Linguist overrides for GitHub language detection
+*.bib linguist-language=BibTeX
+CITATION.cff linguist-language=YAML

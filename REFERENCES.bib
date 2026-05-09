@@ -1,0 +1,223 @@
+% ==============================================================================
+% KELVIN: Orbital Chaos KDF Cryptosystem — Bibliography
+% ==============================================================================
+% This file contains all academic references cited in the Kelvin source code.
+% Format: BibTeX. Use with any LaTeX/BibTeX processor.
+% ==============================================================================
+
+% ---- Fixed-Point Arithmetic & Numerical Methods ----
+
+@article{goldberg1991floating,
+  author    = {David Goldberg},
+  title     = {What Every Computer Scientist Should Know About Floating-Point
+               Arithmetic},
+  journal   = {ACM Computing Surveys},
+  volume    = {23},
+  number    = {1},
+  pages     = {5--48},
+  year      = {1991},
+  doi       = {10.1145/103162.103163},
+  note      = {Motivates the use of fixed-point arithmetic for
+               cross-platform determinism in Kelvin}
+}
+
+@article{verlet1967computer,
+  author    = {Loup Verlet},
+  title     = {Computer ``Experiments'' on Classical Fluids. I. Thermodynamical
+               Properties of Lennard-Jones Molecules},
+  journal   = {Physical Review},
+  volume    = {159},
+  number    = {1},
+  pages     = {98--103},
+  year      = {1967},
+  doi       = {10.1103/PhysRev.159.98},
+  note      = {Original Verlet (leapfrog) integration method used in Kelvin}
+}
+
+@book{hairer2003geometric,
+  author    = {Ernst Hairer and Christian Lubich and Gerhard Wanner},
+  title     = {Geometric Numerical Integration: Structure-Preserving Algorithms
+               for Ordinary Differential Equations},
+  edition   = {2nd},
+  series    = {Springer Series in Computational Mathematics},
+  volume    = {31},
+  publisher = {Springer},
+  year      = {2006},
+  isbn      = {978-3-540-30666-5},
+  note      = {Theoretical foundation for symplectic integrators in Kelvin}
+}
+
+% ---- Chaos Theory & Lyapunov Exponents ----
+
+@article{benettin1980lyapunov,
+  author    = {Giancarlo Benettin and Luigi Galgani and Antonio Giorgilli and
+               Jean-Marie Strelcyn},
+  title     = {Lyapunov Characteristic Exponents for Smooth Dynamical Systems
+               and for Hamiltonian Systems; A Method for Computing All of Them},
+  journal   = {Meccanica},
+  volume    = {15},
+  number    = {1},
+  pages     = {9--20},
+  year      = {1980},
+  doi       = {10.1007/BF02128236},
+  note      = {Standard algorithm for computing Lyapunov exponents,
+               adapted for Kelvin's shadow orbit method}
+}
+
+@article{wolf1985determining,
+  author    = {Alan Wolf and Jack B. Swift and Harry L. Swinney and John A.
+               Vastano},
+  title     = {Determining Lyapunov Exponents from a Time Series},
+  journal   = {Physica D: Nonlinear Phenomena},
+  volume    = {16},
+  number    = {3},
+  pages     = {285--317},
+  year      = {1985},
+  doi       = {10.1016/0167-2789(85)90011-9},
+  note      = {Shadow orbit method for Lyapunov estimation in Kelvin}
+}
+
+@article{sano1985measurement,
+  author    = {Masaki Sano and Yasuji Sawada},
+  title     = {Measurement of the Lyapunov Spectrum from a Chaotic Time Series},
+  journal   = {Physical Review Letters},
+  volume    = {55},
+  number    = {10},
+  pages     = {1082--1085},
+  year      = {1985},
+  doi       = {10.1103/PhysRevLett.55.1082},
+  note      = {Alternative Lyapunov estimation method, referenced for
+               comparison with Kelvin's shadow orbit approach}
+}
+
+% ---- N-Body Gravitational Simulation ----
+
+@article{wisdom1991symplectic,
+  author    = {Jack Wisdom and Matthew Holman},
+  title     = {Symplectic Maps for the N-Body Problem},
+  journal   = {The Astronomical Journal},
+  volume    = {102},
+  number    = {4},
+  pages     = {1528--1538},
+  year      = {1991},
+  doi       = {10.1086/115978},
+  note      = {Symplectic integration for n-body gravitational systems,
+               theoretical basis for Kelvin's integrator}
+}
+
+@book{murray1999solar,
+  author    = {Carl D. Murray and Stanley F. Dermott},
+  title     = {Solar System Dynamics},
+  publisher = {Cambridge University Press},
+  year      = {1999},
+  isbn      = {978-0-521-57597-3},
+  note      = {Reference for orbital mechanics, AU scaling, and
+               gravitational constants used in Kelvin}
+}
+
+% ---- Cryptographic Hash Functions ----
+
+@techreport{nist2015sha3,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {{SHA-3} Standard: Permutation-Based Hash and Extendable-Output
+                 Functions},
+  institution = {U.S. Department of Commerce},
+  number      = {FIPS PUB 202},
+  year        = {2015},
+  doi         = {10.6028/NIST.FIPS.202},
+  note        = {SHA3-512 specification used for entropy extraction in Kelvin}
+}
+
+@inproceedings{bertoni2013keccak,
+  author    = {Guido Bertoni and Joan Daemen and Micha{\"e}l Peeters and
+               Gilles Van Assche},
+  title     = {Keccak},
+  booktitle = {Advances in Cryptology -- {EUROCRYPT} 2013},
+  pages     = {313--314},
+  year      = {2013},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-642-38348-9_19},
+  note      = {Keccak sponge construction underlying Kelvin's SHA3-512
+               entropy extraction}
+}
+
+% ---- Stream Ciphers ----
+
+@inproceedings{bernstein2008chacha,
+  author    = {Daniel J. Bernstein},
+  title     = {ChaCha, a Variant of {Salsa20}},
+  booktitle = {Workshop Record of {SASC} 2008: The State of the Art of Stream
+               Ciphers},
+  year      = {2008},
+  note      = {Original ChaCha20 specification, used as Kelvin's
+               Phase 2 stream cipher}
+}
+
+@techreport{nir2018chacha,
+  author      = {Yoav Nir and Adam Langley},
+  title       = {{ChaCha20} and {Poly1305} for {IETF} Protocols},
+  institution = {Internet Engineering Task Force},
+  number      = {RFC 8439},
+  year        = {2018},
+  doi         = {10.17487/RFC8439},
+  note        = {ChaCha20 IETF standard, test vectors used in Kelvin}
+}
+
+% ---- Post-Quantum Cryptography & Chaos-Based Crypto ----
+
+@misc{liaudat2025kelvin,
+  author    = {Nicolas Liaudat},
+  title     = {{Kelvin}: Orbital Chaos {KDF} Cryptosystem},
+  year      = {2025},
+  howpublished = {\url{https://github.com/nliaudat/kelvin}},
+  note      = {This implementation}
+}
+
+@misc{cryptochaos2025,
+  author    = {{Harvard University}},
+  title     = {{CryptoChaos}: A Hybrid Chaos-Based Cryptographic Framework
+               for Post-Quantum Secure Communications},
+  year      = {2025},
+  note      = {Related work: hybrid chaos-crypto framework combining
+               deterministic chaos with X25519 and SHA3-256}
+}
+
+@article{bernstein2009salsa20,
+  author    = {Daniel J. Bernstein},
+  title     = {The {Salsa20} Family of Stream Ciphers},
+  journal   = {New Stream Cipher Designs},
+  pages     = {84--97},
+  year      = {2008},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-540-68351-3_6},
+  note      = {Predecessor to ChaCha20, referenced for design rationale}
+}
+
+% ---- Security & Side Channels ----
+
+@article{koeune2006timing,
+  author    = {Fran{\c{c}}ois Koeune and Fran{\c{c}}ois-Xavier Standaert},
+  title     = {A Tutorial on Physical Security and Side-Channel Attacks},
+  journal   = {Foundations of Security Analysis and Design III},
+  pages     = {78--108},
+  year      = {2005},
+  publisher = {Springer},
+  doi       = {10.1007/11554578_3},
+  note      = {Side-channel attack methodology relevant to Kelvin's
+               constant-time requirements}
+}
+
+% ---- Software Engineering & Reproducibility ----
+
+@article{gent2017reproducibility,
+  author    = {Ian P. Gent},
+  title     = {The Recomputation Manifesto},
+  journal   = {Communications of the ACM},
+  volume    = {60},
+  number    = {8},
+  pages     = {44--51},
+  year      = {2017},
+  doi       = {10.1145/3105966},
+  note      = {Motivates Kelvin's deterministic build and cross-platform
+               test vector verification}
+}

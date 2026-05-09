@@ -36,21 +36,20 @@ let config = OrbitalConfig::new(
             Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
         ),
     ],
-    10000,       // total steps
-    1000,        // reseed interval
-    Fixed::from_raw(1 << 44), // dt
-    Fixed::from_raw(1 << 44), // softening
+    1_000_000,  // total simulation steps
+    10_000,     // reseed interval
+    Fixed::from_raw(1 << 44),  // time step (~1e-6 years)
+    Fixed::from_raw(1 << 44),  // softening factor
 )?;
 
-// 2. Initialize (runs Lyapunov estimation + initial simulation)
+// 2. Create Kelvin instance (runs simulation + Lyapunov estimation)
 let mut k = Kelvin::new(config)?;
 
-// 3. Encrypt
-let mut data = b"Hello, Kelvin!".to_vec();
+// 3. Encrypt/decrypt (XOR with keystream)
+let mut data = b"Hello, world!".to_vec();
 k.encrypt(&mut data)?;
-
-// 4. Decrypt
 k.decrypt(&mut data)?;
+assert_eq!(&data, b"Hello, world!");
 ```
 
 ## Security Levels
@@ -61,6 +60,30 @@ k.decrypt(&mut data)?;
 | Paranoid | 5      | 10,000,000| 10,000          | ~10s       |
 | Maximum  | 10     | 100,000,000| 100,000        | ~2min      |
 
+## References
+
+See [REFERENCES.bib](REFERENCES.bib) for the full BibTeX bibliography. Key references include:
+
+- **Verlet (1967)** — Original leapfrog integration method
+- **Benettin et al. (1980)** — Lyapunov exponent computation
+- **Wolf et al. (1985)** — Shadow orbit method for Lyapunov estimation
+- **Bernstein (2008)** — ChaCha20 stream cipher specification
+- **NIST FIPS PUB 202 (2015)** — SHA3-512 standard
+- **CryptoChaos (Harvard, 2025)** — Related chaos-based cryptographic framework
+
 ## License
 
-Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License. See [LICENCE](https://github.com/nliaudat/kelvin/blob/main/licence.md) for details.
+Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License. See [licence.md](licence.md) for details.
+
+## Citation
+
+If you use Kelvin in academic work, please cite:
+
+```bibtex
+@misc{liaudat2025kelvin,
+  author    = {Nicolas Liaudat},
+  title     = {{Kelvin}: Orbital Chaos {KDF} Cryptosystem},
+  year      = {2025},
+  howpublished = {\url{https://github.com/nliaudat/kelvin}}
+}
+```
