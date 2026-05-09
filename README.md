@@ -1,4 +1,9 @@
 # Kelvin — Orbital Chaos KDF Cryptosystem
+Project Name: kelvin (KDF from n-body Lyapunov Instability Naturally)
+**K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability**K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
+*A chaotic 3D n-body gravitational key derivation system*
+*Three bodies. Infinite chaos...*
+================================================================================
 
 **EXPERIMENTAL — NOT FOR PRODUCTION USE.**
 

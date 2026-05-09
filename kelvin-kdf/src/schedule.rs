@@ -7,7 +7,6 @@
 //! - Safe step limit (from Lyapunov estimation)
 //! - Bytes encrypted per key (to prevent overuse)
 
-use alloc::vec::Vec;
 use sha3::{Digest, Sha3_512};
 
 /// State of the key schedule.

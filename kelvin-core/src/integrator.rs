@@ -126,6 +126,7 @@ pub fn simulate(
 /// E = KE + PE
 /// KE = Σ 0.5 * m_i * v_i²
 /// PE = -Σ_{i<j} G * m_i * m_j / |r_ij|
+#[allow(dead_code)]
 pub fn total_energy(bodies: &[OrbitalBody]) -> Fixed {
     let mut kinetic = Fixed::ZERO;
     let mut potential = Fixed::ZERO;
@@ -148,6 +149,7 @@ pub fn total_energy(bodies: &[OrbitalBody]) -> Fixed {
 }
 
 /// Compute total linear momentum of the system.
+#[allow(dead_code)]
 pub fn total_momentum(bodies: &[OrbitalBody]) -> Vec3 {
     let mut p = Vec3::ZERO;
     for body in bodies {
@@ -157,6 +159,7 @@ pub fn total_momentum(bodies: &[OrbitalBody]) -> Vec3 {
 }
 
 /// Compute center of mass position.
+#[allow(dead_code)]
 pub fn center_of_mass(bodies: &[OrbitalBody]) -> Vec3 {
     let mut total_mass = Fixed::ZERO;
     let mut weighted_pos = Vec3::ZERO;

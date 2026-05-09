@@ -5,9 +5,10 @@
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
 
-use kelvin::{Kelvin, KelvinError, OrbitalConfig};
+use kelvin::{Kelvin, OrbitalConfig};
 
 /// Opaque handle to a Kelvin context.
+#[derive(Debug)]
 pub struct KelvinCtx {
     inner: Kelvin,
 }

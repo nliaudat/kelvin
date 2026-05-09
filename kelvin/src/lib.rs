@@ -55,8 +55,11 @@ use kelvin_kdf::LyapunovEstimator;
 /// 3. Run orbital simulation
 /// 4. Extract seeds via SHA3-512
 /// 5. Generate keystream via ChaCha20
+#[derive(Debug)]
 pub struct Kelvin {
+    #[allow(dead_code)]
     config: OrbitalConfig,
+    #[allow(dead_code)]
     bodies: Vec<OrbitalBody>,
     schedule: KeySchedule,
     stream: ChaChaStream,

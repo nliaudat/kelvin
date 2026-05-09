@@ -54,6 +54,7 @@ pub struct LyapunovResult {
 ///
 /// Runs multiple perturbed copies of the orbital simulation and measures
 /// the divergence rate.
+#[derive(Debug)]
 pub struct LyapunovEstimator<'a> {
     /// Reference bodies (initial conditions).
     reference: &'a [OrbitalBody],

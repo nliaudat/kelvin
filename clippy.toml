@@ -33,7 +33,7 @@ too-many-lines-threshold = 500
 # ---- Documentation ----
 
 # Require documentation on all public items
-missing-docs-in-crate-items = "deny"
+missing-docs-in-crate-items = true
 
 # ---- Style ----
 
