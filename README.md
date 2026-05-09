@@ -63,4 +63,4 @@ k.decrypt(&mut data)?;
 
 ## License
 
-MIT
+Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License. See [LICENCE](https://github.com/nliaudat/kelvin/blob/main/licence.md) for details.
