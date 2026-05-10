@@ -148,12 +148,22 @@ mod tests {
             Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
             Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
         );
+        let planet3 = OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        );
+        let planet4 = OrbitalBody::new(
+            Fixed::from_raw(1 << 51),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+        );
         
         OrbitalConfig::new(
-            vec![sun, planet1, planet2],
+            vec![sun, planet1, planet2, planet3, planet4],
             50,
             10,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         ).unwrap()

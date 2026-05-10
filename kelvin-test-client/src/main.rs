@@ -290,7 +290,7 @@ fn run_self_test() -> Result<(), String> {
     println!("Running built-in determinism self-test...");
     println!();
 
-    // Create a simple 3-body configuration
+    // Create a simple 5-body configuration
     let bodies = vec![
         OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
         OrbitalBody::new(
@@ -310,6 +310,16 @@ fn run_self_test() -> Result<(), String> {
                 Fixed::from_raw(4896710557980672i128),
                 Fixed::from_raw(1 << 62),
             ),
+        ),
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        ),
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
         ),
     ];
 

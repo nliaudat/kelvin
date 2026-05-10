@@ -17,7 +17,17 @@ fn test_system() -> Vec<OrbitalBody> {
         Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
         Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
     );
-    vec![sun, planet1, planet2]
+    let planet3 = OrbitalBody::new(
+        Fixed::from_raw(1 << 52),
+        Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+        Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+    );
+    let planet4 = OrbitalBody::new(
+        Fixed::from_raw(1 << 51),
+        Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+        Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+    );
+    vec![sun, planet1, planet2, planet3, planet4]
 }
 
 /// Compute Hamming distance between two byte slices.
@@ -38,7 +48,7 @@ fn test_chaos_avalanche() {
     // 1.0 = 2^64, so 10^-10 ≈ 2^30.8 ≈ 1 << 31
     bodies_pert[1].position.x += Fixed::from_raw(1 << 31);
 
-    let dt = Fixed::from_raw(1 << 44); // Some dt
+    let dt = kelvin_core::DEFAULT_DT;
     let softening = Fixed::from_raw(1 << 44); // Some softening
     let steps = 10_000;
 

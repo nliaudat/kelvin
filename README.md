@@ -52,9 +52,9 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 
 4. **Seed extraction** — After simulation, the final orbital state is hashed with SHA3-512 using domain separation. This produces a cryptographically strong seed that is uniformly distributed and independent of the raw orbital coordinates.
 
-5. **Key schedule** — The seed drives a deterministic key schedule that generates a sequence of ChaCha20 keys and nonces. The schedule automatically reseeds at configurable intervals to limit the keystream generated from any single orbital state.
+5. **Key schedule** — The seed drives a deterministic key schedule that generates a continuous **Orbital Keystream**. The schedule automatically reseeds at configurable intervals by advancing the simulation, ensuring that the keystream remains tightly coupled to the physical evolution of the system.
 
-6. **Encryption/Decryption** — Data is encrypted by XORing with the ChaCha20 keystream. Decryption is identical to encryption (XOR is its own inverse). Two independent Kelvin instances with the same configuration produce identical keystreams, enabling round-trip encryption and decryption.
+6. **Encryption/Decryption** — Data is encrypted by XORing with the **Orbital One-Time Pad**. This produces a ciphertext that is computationally irreducible, resting on the fundamental unpredictability of the n-body problem. Decryption is the exact inverse operation, requiring the identical initial orbital configuration.
 
 ## Architecture
 
@@ -74,6 +74,14 @@ kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 | Standard | 3      | 1,000,000 | 39.478...   | 1,000           | ~1s        |
 | Paranoid | 5      | 10,000,000| Negotiable  | 10,000          | ~10s       |
 | Maximum  | 10     | 100,000,000| Negotiable | 100,000         | ~2min      |
+
+## Interactive 3D Visualization
+
+Try the Kelvin orbital key generator in your browser:
+
+<iframe src="examples/orbital_visualizer.html" width="100%" height="600" style="border: 1px solid #0f0; border-radius: 8px; background: #0a0a1a;" allowfullscreen></iframe>
+
+*Drag to rotate, scroll to zoom, Space to pause. Load a `key.json` file to configure custom initial conditions.*
 
 ## Documentation
 

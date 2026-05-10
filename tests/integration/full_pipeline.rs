@@ -1,10 +1,10 @@
 //! Full pipeline integration test.
 //!
-//! Tests the complete encrypt/decrypt round-trip with a 3-body system.
+//! Tests the complete encrypt/decrypt round-trip with a 5-body system.
 
 use kelvin::{Kelvin, OrbitalConfig, Fixed, Vec3, OrbitalBody};
 
-fn three_body_config() -> OrbitalConfig {
+fn five_body_config() -> OrbitalConfig {
     let sun = OrbitalBody::new(
         Fixed::ONE,
         Vec3::ZERO,
@@ -20,18 +20,28 @@ fn three_body_config() -> OrbitalConfig {
         Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
         Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
     );
+    let planet3 = OrbitalBody::new(
+        Fixed::from_raw(1 << 52),
+        Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+        Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+    );
+    let planet4 = OrbitalBody::new(
+        Fixed::from_raw(1 << 51),
+        Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+        Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+    );
     OrbitalConfig::new(
-        vec![sun, planet1, planet2],
+        vec![sun, planet1, planet2, planet3, planet4],
         10000,
         1000,
-        Fixed::from_raw(1 << 44),
+        kelvin_core::DEFAULT_DT,
         Fixed::from_raw(1 << 44),
     ).unwrap()
 }
 
 #[test]
 fn test_full_pipeline_round_trip() {
-    let config = three_body_config();
+    let config = five_body_config();
     let mut k = Kelvin::new(config).unwrap();
 
     let mut data = b"This is a secret message from the Kelvin cryptosystem!".to_vec();
@@ -46,7 +56,7 @@ fn test_full_pipeline_round_trip() {
 
 #[test]
 fn test_multiple_blocks() {
-    let config = three_body_config();
+    let config = five_body_config();
     let mut k = Kelvin::new(config).unwrap();
 
     let mut data = vec![0xABu8; 1024];
@@ -61,7 +71,7 @@ fn test_multiple_blocks() {
 
 #[test]
 fn test_empty_data() {
-    let config = three_body_config();
+    let config = five_body_config();
     let mut k = Kelvin::new(config).unwrap();
 
     let mut data: Vec<u8> = vec![];
@@ -71,8 +81,8 @@ fn test_empty_data() {
 
 #[test]
 fn test_deterministic_encryption() {
-    let config1 = three_body_config();
-    let config2 = three_body_config();
+    let config1 = five_body_config();
+    let config2 = five_body_config();
     let mut k1 = Kelvin::new(config1).unwrap();
     let mut k2 = Kelvin::new(config2).unwrap();
 
@@ -87,7 +97,7 @@ fn test_deterministic_encryption() {
 
 #[test]
 fn test_bytes_processed() {
-    let config = three_body_config();
+    let config = five_body_config();
     let mut k = Kelvin::new(config).unwrap();
 
     assert_eq!(k.bytes_processed(), 0);
@@ -101,7 +111,7 @@ fn test_bytes_processed() {
 
 #[test]
 fn test_remaining_safe_bytes() {
-    let config = three_body_config();
+    let config = five_body_config();
     let k = Kelvin::new(config).unwrap();
     assert!(k.remaining_safe_bytes() > 0);
 }

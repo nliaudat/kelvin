@@ -41,7 +41,7 @@ mod decrypt;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, Vec3, OrbitalBody, DEFAULT_G};
-pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, OrbitalKeyPair, AsymmetricError};
+pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, extract_seed_extended, OrbitalKeyPair, AsymmetricError};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
@@ -100,8 +100,10 @@ impl Kelvin {
         // Run initial simulation
         simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
 
-        // Extract initial seed
-        let seed = extract_seed(&bodies, config.total_steps, b"kelvin-orbital-state-v1");
+        // Extract initial 320-byte seed (5× SHA3-512 for enhanced entropy)
+        let seed_vec = extract_seed_extended(&bodies, config.total_steps, b"kelvin-orbital-state-v1", 320);
+        let mut seed = [0u8; 320];
+        seed.copy_from_slice(&seed_vec);
 
         // Create key schedule
         let mut schedule = KeySchedule::new(
@@ -159,8 +161,10 @@ impl Kelvin {
         // Run initial simulation
         simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
 
-        // Extract initial seed
-        let seed = extract_seed(&bodies, config.total_steps, b"kelvin-orbital-state-v1");
+        // Extract initial 320-byte seed (5× SHA3-512 for enhanced entropy)
+        let seed_vec = extract_seed_extended(&bodies, config.total_steps, b"kelvin-orbital-state-v1", 320);
+        let mut seed = [0u8; 320];
+        seed.copy_from_slice(&seed_vec);
 
         // Create key schedule
         let mut schedule = KeySchedule::new(
@@ -241,11 +245,21 @@ mod tests {
             Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
             Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
         );
+        let planet3 = OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        );
+        let planet4 = OrbitalBody::new(
+            Fixed::from_raw(1 << 51),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+        );
         OrbitalConfig::new(
-            vec![sun, planet1, planet2],
-            50,  // Use fewer steps to stay within Lyapunov time
+            vec![sun, planet1, planet2, planet3, planet4],
+            200,  // Use enough steps to exceed Lyapunov horizon
             10,
-            Fixed::from_raw(1 << 44), // ~1e-6
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44), // ~1e-6
             kelvin_core::DEFAULT_G,
         ).unwrap()

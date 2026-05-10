@@ -62,7 +62,6 @@ pub fn extract_seed(
 /// Extract a seed of arbitrary length from the orbital state.
 ///
 /// Uses SHA3-512 in counter mode to generate the requested number of bytes.
-#[allow(dead_code)]
 pub fn extract_seed_extended(
     bodies: &[OrbitalBody],
     step: u64,
