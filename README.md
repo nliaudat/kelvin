@@ -1,6 +1,10 @@
 # Kelvin — Orbital Chaos KDF Cryptosystem
 ### **Backronym:** **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
-### *A chaotic 3D n-body gravitational key derivation system*
+### *An n-body simulation based Key Derivation Function*
+
+[Proof of Concept](documentation/proof_of_concept.md) | [Usage Guide](documentation/usage.md) | [Quantum Analysis](documentation/quantum_analysis.md)
+
+---
 ### *Three bodies. Infinite chaos...*
 ================================================================================
 
@@ -30,9 +34,9 @@ Key innovations include:
 
 - **Lyapunov time as a security parameter** — The Lyapunov time quantifies the horizon beyond which the system becomes truly unpredictable. Kelvin's shadow orbit method estimates this horizon and rejects configurations that would produce unreliable keystreams, providing a rigorous bound on the security margin.
 
-- **Domain-separated SHA3-512 extraction** — Raw orbital coordinates are not uniformly distributed. Kelvin uses SHA3-512 with domain-specific context strings to extract cryptographically uniform seed material, preventing any leakage of the orbital state into the keystream.
+- **Entropy Extraction past the Lyapunov Horizon** — To ensure maximum uncertainty, Kelvin requires that the total simulation steps exceed the estimated Lyapunov time. This guarantees that the extractable entropy is fully randomized and decoupled from the initial configuration secrets.
 
-- **Asymmetric Identity (Curve25519)** — Kelvin is the first n-body cryptosystem to bridge the gap between chaotic dynamics and Elliptic Curve Cryptography. By applying **512-bit wide reduction** to the orbital state, it derives perfectly uniform Curve25519 key pairs. This allows a shared chaotic configuration to serve as both a symmetric encryption key and an asymmetric identity.
+- **Asymmetric Identity (Curve25519)** — Kelvin bridges chaotic dynamics and ECC. By applying **512-bit wide reduction** to the orbital state, it derives uniform Curve25519 key pairs. This allows a shared chaotic configuration to serve as both a symmetric encryption key and an asymmetric identity.
 
 - **Negotiable physical constants** — Kelvin supports a dynamic gravitational constant ($G$), allowing communicating parties to initialize their chaotic environment with unique physical laws. This increases the configuration space and prevents pre-computation attacks based on fixed gravitational models. Strict validation bounds ($1.0 \le G \le 1000.0$) ensure the system remains within a chaotic yet numerically stable regime.
 

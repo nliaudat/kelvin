@@ -9,13 +9,13 @@ pub enum KelvinError {
     #[error("invalid configuration: {0}")]
     InvalidConfig(String),
 
-    /// Lyapunov time insufficient for requested steps.
-    #[error("insufficient Lyapunov time: requested {requested} steps, safe {safe}")]
-    InsufficientLyapunovTime {
+    /// Orbital simulation did not reach the chaotic regime.
+    #[error("insufficient chaos: requested {requested} steps, but Lyapunov horizon is at {horizon}")]
+    InsufficientChaos {
         /// Number of simulation steps requested.
         requested: u64,
-        /// Maximum safe steps based on Lyapunov estimation.
-        safe: u64,
+        /// Step at which chaos (unpredictability) is reached.
+        horizon: u64,
     },
 
     /// Orbital simulation time exhausted.

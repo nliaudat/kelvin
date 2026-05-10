@@ -123,6 +123,12 @@ The integration of Curve25519 allows for **Asymmetric Identity Verification**. F
 
 Wide reduction ensures that the 512-bit chaotic output is mapped to the 256-bit scalar space with **zero bias**, preserving the entropy of the simulation.
 
+### 4.5 Chaotic Regime Enforcement
+Kelvin enforces a mandatory **Lyapunov Horizon Check** during initialization.
+- **Rule**: `total_steps >= safe_steps` (the horizon of unpredictability).
+- **Security Goal**: This ensures that key material is extracted only after the simulation has reached the chaotic regime, where the state is maximally decoupled from the initial configuration secrets. Extracting before this horizon would result in lower entropy.
+- **Implementation**: The library rejects configurations where the requested steps are less than the estimated Lyapunov time.
+
 ### 4.3 Memory Safety
 
 All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at compile time. This eliminates entire classes of vulnerabilities (buffer overflows, use-after-free, etc.).

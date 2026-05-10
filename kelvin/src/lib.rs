@@ -40,7 +40,7 @@ mod encrypt;
 mod decrypt;
 
 pub use error::KelvinError;
-pub use kelvin_core::{Fixed, Vec3, OrbitalBody};
+pub use kelvin_core::{Fixed, Vec3, OrbitalBody, DEFAULT_G};
 pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, OrbitalKeyPair, AsymmetricError};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
@@ -87,10 +87,10 @@ impl Kelvin {
         );
         let result = lyapunov.estimate(1000, config.total_steps)?;
 
-        if config.total_steps > result.safe_steps {
-            return Err(KelvinError::InsufficientLyapunovTime {
+        if config.total_steps < result.safe_steps {
+            return Err(KelvinError::InsufficientChaos {
                 requested: config.total_steps,
-                safe: result.safe_steps,
+                horizon: result.safe_steps,
             });
         }
 
@@ -146,10 +146,10 @@ impl Kelvin {
         );
         let result = lyapunov.estimate(1000, config.total_steps)?;
 
-        if config.total_steps > result.safe_steps {
-            return Err(KelvinError::InsufficientLyapunovTime {
+        if config.total_steps < result.safe_steps {
+            return Err(KelvinError::InsufficientChaos {
                 requested: config.total_steps,
-                safe: result.safe_steps,
+                horizon: result.safe_steps,
             });
         }
 
