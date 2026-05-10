@@ -22,5 +22,11 @@
 mod chacha;
 mod traits;
 
+#[cfg(feature = "aes-ni")]
+mod aes_ctr;
+
 pub use chacha::ChaChaStream;
 pub use traits::StreamCipher;
+
+#[cfg(feature = "aes-ni")]
+pub use aes_ctr::AesCtrStream;

@@ -1,7 +1,7 @@
 //! Stream cipher trait for the Kelvin cryptosystem.
 
 /// Trait for stream ciphers used in the Kelvin cryptosystem.
-pub trait StreamCipher {
+pub trait StreamCipher: core::fmt::Debug {
     /// XOR data in-place with the keystream.
     ///
     /// This is the core encryption/decryption operation.

@@ -11,8 +11,9 @@ use crate::Fixed;
 use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
 
 /// 3D vector with fixed-point components.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "zeroize", derive(zeroize::Zeroize))]
 pub struct Vec3 {
     /// X component.
     pub x: Fixed,
@@ -155,8 +156,9 @@ impl Neg for Vec3 {
 /// - mass:      16 bytes
 /// - position:  48 bytes (3 × i128)
 /// - velocity:  48 bytes (3 × i128)
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "zeroize", derive(zeroize::Zeroize))]
 pub struct OrbitalBody {
     /// Mass in solar masses.
     pub mass: Fixed,

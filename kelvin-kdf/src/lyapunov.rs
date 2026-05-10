@@ -186,8 +186,33 @@ impl<'a> LyapunovEstimator<'a> {
             max_steps
         };
 
-        // Safe steps = Lyapunov time / 10 (conservative)
-        let safe_steps = (lyapunov_time_steps / 10).max(1).min(max_steps);
+        // Compute variance and standard deviation of divergences
+        let mut sq_diff = Fixed::ZERO;
+        for div in &divergences {
+            let diff = if *div > avg_divergence {
+                *div - avg_divergence
+            } else {
+                avg_divergence - *div
+            };
+            sq_diff += diff * diff;
+        }
+        let variance = sq_diff / Fixed::from_int(divergences.len() as i64);
+        let std_dev = variance.sqrt();
+
+        // Calculate dynamic safety margin factor
+        // Base margin is 10. We increase it based on relative uncertainty (std_dev / avg_divergence).
+        let margin_factor = if avg_divergence > Fixed::ZERO {
+            let relative_std_dev = std_dev / avg_divergence;
+            // factor = 10 + relative_std_dev * 50
+            let factor_fixed = Fixed::from_int(10) + relative_std_dev * Fixed::from_int(50);
+            let factor = factor_fixed.to_raw() >> 64;
+            if factor < 10 { 10 } else { factor as u64 }
+        } else {
+            10
+        };
+
+        // Safe steps = Lyapunov time / dynamic_margin_factor
+        let safe_steps = (lyapunov_time_steps / margin_factor).max(1).min(max_steps);
 
         // Determine confidence
         let confidence = if shadow_steps >= 10000 {

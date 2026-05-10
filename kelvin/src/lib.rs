@@ -44,6 +44,9 @@ pub use kelvin_core::{Fixed, Vec3, OrbitalBody};
 pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
+#[cfg(feature = "aes-ni")]
+pub use kelvin_stream::AesCtrStream;
+
 use kelvin_core::simulate;
 use kelvin_kdf::LyapunovEstimator;
 
@@ -62,7 +65,7 @@ pub struct Kelvin {
     #[allow(dead_code)]
     bodies: Vec<OrbitalBody>,
     schedule: KeySchedule,
-    stream: ChaChaStream,
+    stream: Box<dyn StreamCipher>,
     bytes_processed: u64,
 }
 
@@ -111,8 +114,66 @@ impl Kelvin {
         let (key, nonce) = schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
 
-        // Create stream cipher
-        let stream = ChaChaStream::new(key, nonce);
+        // Create stream cipher (ChaChaStream takes a 12-byte nonce)
+        let mut chacha_nonce = [0u8; 12];
+        chacha_nonce.copy_from_slice(&nonce[..12]);
+        let stream = Box::new(ChaChaStream::new(key, chacha_nonce));
+
+        Ok(Kelvin {
+            config,
+            bodies,
+            schedule,
+            stream,
+            bytes_processed: 0,
+        })
+    }
+
+    /// Create a new Kelvin instance using the hardware-accelerated AES-256-CTR fallback.
+    ///
+    /// Available when the `aes-ni` feature is enabled.
+    #[cfg(feature = "aes-ni")]
+    pub fn new_aes(config: OrbitalConfig) -> Result<Self, KelvinError> {
+        // Validate config
+        config.validate()?;
+
+        // Estimate Lyapunov time
+        let lyapunov = LyapunovEstimator::new(
+            &config.bodies,
+            config.dt,
+            config.softening,
+        );
+        let result = lyapunov.estimate(1000, config.total_steps)?;
+
+        if config.total_steps > result.safe_steps {
+            return Err(KelvinError::InsufficientLyapunovTime {
+                requested: config.total_steps,
+                safe: result.safe_steps,
+            });
+        }
+
+        // Clone bodies for simulation
+        let mut bodies = config.bodies.clone();
+
+        // Run initial simulation
+        simulate(&mut bodies, config.total_steps, config.dt, config.softening);
+
+        // Extract initial seed
+        let seed = extract_seed(&bodies, config.total_steps, b"kelvin-orbital-state-v1");
+
+        // Create key schedule
+        let mut schedule = KeySchedule::new(
+            seed,
+            config.total_steps,
+            config.reseed_interval,
+            result.safe_steps,
+        );
+
+        // Get first key
+        let (key, nonce) = schedule.next_key()
+            .ok_or(KelvinError::SeedExhausted)?;
+
+        // Create stream cipher (AesCtrStream takes a 16-byte nonce)
+        let stream = Box::new(AesCtrStream::new(key, nonce));
 
         Ok(Kelvin {
             config,

@@ -33,6 +33,7 @@ const SCALE: i128 = 1 << 64;
 /// Range: approximately [-4.29e9, 4.29e9] with ~5.4e-20 precision.
 #[derive(Copy, Clone, Debug, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "zeroize", derive(zeroize::Zeroize))]
 pub struct Fixed(i128);
 
 impl Fixed {
@@ -258,67 +259,28 @@ impl Div for Fixed {
         }
         let a = self.0;
         let b = rhs.0;
-        // Compute (a << 64) / b using long division to avoid overflow.
-        //
-        // We split a into 32-bit chunks: a = a2 * 2^64 + a1 * 2^32 + a0
-        // Then (a << 64) / b = (a2 * 2^128 + a1 * 2^96 + a0 * 2^64) / b
-        //
-        // Using long division:
-        //   remainder = 0
-        //   for each chunk from high to low:
-        //     remainder = remainder * 2^32 + chunk
-        //     result_chunk = remainder / b
-        //     remainder = remainder % b
-        //
-        // We process 3 chunks (a2, a1, a0) to get the full (a << 64) / b result.
-        // a2 = upper 32 bits of a (bits 95..64)
-        // a1 = bits 63..32 of a
-        // a0 = bits 31..0 of a
+        
+        let sign = (a < 0) ^ (b < 0);
+        let a_abs = a.unsigned_abs();
+        let b_abs = b.unsigned_abs();
 
-        // Extract 32-bit chunks from a (which is in Q32.64 format)
-        // a = a2 * 2^64 + a1 * 2^32 + a0
-        let a2 = (a >> 64) as u32 as i128; // bits 95..64 (sign-extended)
-        let a1 = ((a >> 32) as u32) as i128; // bits 63..32
-        let a0 = (a as u32) as i128; // bits 31..0
+        let mut quotient: u128 = a_abs / b_abs;
+        let mut remainder: u128 = a_abs % b_abs;
 
-        // Long division: compute (a2 * 2^64 + a1 * 2^32 + a0) * 2^64 / b
-        // = (a2 * 2^128 + a1 * 2^96 + a0 * 2^64) / b
-        
-        // Start with remainder = 0
-        // Process a2 (which is at position 2^64 in the original a, but we're computing a << 64)
-        // Actually, (a << 64) = a2 * 2^128 + a1 * 2^96 + a0 * 2^64
-        // We process from high to low: a2, a1, a0, then 0 (for the fractional part)
-        
-        let mut rem = a2;
-        let mut result;
-        
-        // Process a2 (at position 2^128)
-        let q2 = rem / b;
-        rem %= b;
-        result = q2; // q2 is at position 2^64 in the final result
-        
-        // Process a1 (at position 2^96, which is 2^32 in the result)
-        rem = (rem << 32) + a1;
-        let q1 = rem / b;
-        rem %= b;
-        result = (result << 32) + q1;
-        
-        // Process a0 (at position 2^64, which is 2^0 in the result)
-        rem = (rem << 32) + a0;
-        let q0 = rem / b;
-        rem %= b;
-        result = (result << 32) + q0;
-        
-        // Process the fractional part (we need 64 bits of fraction)
-        // rem is the remainder after processing all of a's bits
-        // We need to continue dividing to get 64 fractional bits
-        // Each iteration gives us 32 bits of fraction
-        for _ in 0..2 {
-            rem <<= 32;
-            let q = rem / b;
-            rem %= b;
-            result = (result << 32) + q;
+        for _ in 0..64 {
+            remainder <<= 1;
+            quotient = quotient.wrapping_shl(1);
+            if remainder >= b_abs {
+                remainder -= b_abs;
+                quotient |= 1;
+            }
         }
+
+        let result = if sign {
+            -(quotient as i128)
+        } else {
+            quotient as i128
+        };
         
         Fixed(result)
     }
