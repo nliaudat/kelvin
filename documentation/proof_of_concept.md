@@ -89,9 +89,9 @@ All 93 unit tests pass across the four core crates:
 |-------|-------|--------|
 | kelvin | 1 | ✅ PASS |
 | kelvin-core | 51 | ✅ PASS |
-| kelvin-kdf | 32 | ✅ PASS |
+| kelvin-kdf | 36 | ✅ PASS |
 | kelvin-stream | 9 | ✅ PASS |
-| **Total** | **93** | **✅ ALL PASS** |
+| **Total** | **97** | **✅ ALL PASS** |
 
 ---
 
@@ -112,8 +112,16 @@ This proves that the orbital simulation operates in the chaotic regime, where sm
 The Verlet integrator is inherently sequential — step N+1 requires the output of step N. This means:
 
 - **No parallelization advantage**: An attacker with 1,000 cores cannot simulate 1,000 steps faster than a single core.
-- **No closed-form solution**: The n-body problem (N ≥ 3) has no known analytical solution.
-- **No precomputation advantage**: Each `OrbitalConfig` produces a unique keystream; precomputed tables are useless.
+- **No closed-form solution**: The n-body problem ($N \ge 3$) has no known analytical solution. Kelvin strictly enforces $N \ge 3$ to prevent integration of predictable 2-body orbits.
+- **No precomputation advantage**: Each `OrbitalConfig` produces a unique keystream; precomputed tables are useless due to the dynamic gravitational constant ($G$) and large state space.
+
+### 4.4 Asymmetric Identity Verification
+The integration of Curve25519 allows for **Asymmetric Identity Verification**. From a single shared configuration, parties can:
+- Derive a bit-identical **Public Key**.
+- Verify their peer's identity without revealing the underlying orbital state.
+- Perform a simulated ECDH exchange to further diversify the symmetric keys.
+
+Wide reduction ensures that the 512-bit chaotic output is mapped to the 256-bit scalar space with **zero bias**, preserving the entropy of the simulation.
 
 ### 4.3 Memory Safety
 

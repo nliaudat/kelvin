@@ -41,7 +41,7 @@ mod decrypt;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, Vec3, OrbitalBody};
-pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed};
+pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, OrbitalKeyPair, AsymmetricError};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
@@ -210,6 +210,13 @@ impl Kelvin {
     /// Remaining safe bytes before orbital time exhaustion.
     pub fn remaining_safe_bytes(&self) -> u64 {
         self.schedule.remaining_bytes()
+    }
+
+    /// Derive the asymmetric Curve25519 key pair associated with this Kelvin instance.
+    ///
+    /// This utilizes the already simulated orbital state and does not require re-running the simulation.
+    pub fn asymmetric_keypair(&self) -> OrbitalKeyPair {
+        OrbitalKeyPair::from_bodies(&self.bodies, self.config.total_steps)
     }
 }
 

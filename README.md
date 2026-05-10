@@ -13,6 +13,8 @@ Kelvin is an experimental cryptosystem that derives cryptographic keys from the 
 - **Lyapunov time estimation** — shadow orbit method for chaos quantification
 - **SHA3-512 entropy extraction** — domain-separated hashing of orbital state
 - **ChaCha20 stream cipher** — XOR-based encryption/decryption
+- **Curve25519 Asymmetric Keys** — bias-free ECDH key pairs via 512-bit wide reduction
+- **Chaos Quality Test Suite** — Integrated statistical verification (avalanche and uniformity tests)
 
 ### What Makes Kelvin Novel
 
@@ -30,11 +32,15 @@ Key innovations include:
 
 - **Domain-separated SHA3-512 extraction** — Raw orbital coordinates are not uniformly distributed. Kelvin uses SHA3-512 with domain-specific context strings to extract cryptographically uniform seed material, preventing any leakage of the orbital state into the keystream.
 
+- **Asymmetric Identity (Curve25519)** — Kelvin is the first n-body cryptosystem to bridge the gap between chaotic dynamics and Elliptic Curve Cryptography. By applying **512-bit wide reduction** to the orbital state, it derives perfectly uniform Curve25519 key pairs. This allows a shared chaotic configuration to serve as both a symmetric encryption key and an asymmetric identity.
+
+- **Negotiable physical constants** — Kelvin supports a dynamic gravitational constant ($G$), allowing communicating parties to initialize their chaotic environment with unique physical laws. This increases the configuration space and prevents pre-computation attacks based on fixed gravitational models. Strict validation bounds ($1.0 \le G \le 1000.0$) ensure the system remains within a chaotic yet numerically stable regime.
+
 ## How It Works
 
 Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The system follows a deterministic pipeline that transforms a shared orbital configuration into a cryptographic keystream:
 
-1. **Configuration** — The shared secret is an `OrbitalConfig` specifying the number of bodies, their initial positions/velocities, masses, time step, softening factor, and total simulation steps. This configuration is the equivalent of a cryptographic key — anyone with the same config will derive the same keystream.
+1. **Configuration** — The shared secret is an `OrbitalConfig` specifying the number of bodies ($N \ge 3$), their initial positions/velocities, masses, the gravitational constant ($G$), time step, softening factor, and total simulation steps. This configuration is the equivalent of a cryptographic key — anyone with the same config will derive the same keystream.
 
 2. **Lyapunov time estimation** — Before running the full simulation, Kelvin estimates the Lyapunov time of the system using the shadow orbit method. This quantifies the chaotic divergence rate and ensures the simulation runs within the predictable regime. If the requested step count exceeds the safe Lyapunov horizon, the system rejects the configuration.
 
@@ -59,11 +65,11 @@ kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 
 ## Security Levels
 
-| Level    | Bodies | Steps     | Lyapunov Shadow | Setup Time |
-|----------|--------|-----------|-----------------|------------|
-| Standard | 3      | 1,000,000 | 1,000           | ~1s        |
-| Paranoid | 5      | 10,000,000| 10,000          | ~10s       |
-| Maximum  | 10     | 100,000,000| 100,000        | ~2min      |
+| Level    | Bodies | Steps     | G (Dynamic) | Lyapunov Shadow | Setup Time |
+|----------|--------|-----------|-------------|-----------------|------------|
+| Standard | 3      | 1,000,000 | 39.478...   | 1,000           | ~1s        |
+| Paranoid | 5      | 10,000,000| Negotiable  | 10,000          | ~10s       |
+| Maximum  | 10     | 100,000,000| Negotiable | 100,000         | ~2min      |
 
 ## Documentation
 
