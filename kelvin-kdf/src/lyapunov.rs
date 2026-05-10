@@ -144,8 +144,8 @@ impl<'a> LyapunovEstimator<'a> {
         if avg_divergence <= initial_perturbation || time <= Fixed::ZERO {
             // No detectable divergence — system is stable
             return Ok(LyapunovResult {
-                lyapunov_steps: max_steps,
-                safe_steps: max_steps,
+                lyapunov_steps: u64::MAX,
+                safe_steps: u64::MAX,
                 confidence: LyapunovConfidence::Low,
                 shadow_count: divergences.len() as u32,
             });
@@ -187,7 +187,7 @@ impl<'a> LyapunovEstimator<'a> {
                 1
             }
         } else {
-            max_steps
+            u64::MAX
         };
 
         // Compute variance and standard deviation of divergences using f64
@@ -217,7 +217,7 @@ impl<'a> LyapunovEstimator<'a> {
         };
 
         // Safe steps = Lyapunov time / dynamic_margin_factor
-        let safe_steps = (lyapunov_time_steps / margin_factor).max(1).min(max_steps);
+        let safe_steps = (lyapunov_time_steps / margin_factor).max(1);
 
         // Determine confidence
         let confidence = if shadow_steps >= 10000 {
@@ -322,18 +322,6 @@ mod tests {
         assert!(matches!(result, Err(LyapunovError::ZeroSteps)));
     }
 
-    #[test]
-    fn test_lyapunov_safe_steps_bounded() {
-        let bodies = three_body_system();
-        let estimator = LyapunovEstimator::new(
-            &bodies,
-            Fixed::from_raw(1 << 44),
-            Fixed::from_raw(1 << 44),
-            kelvin_core::DEFAULT_G,
-        );
-        let result = estimator.estimate(100, 500).unwrap();
-        assert!(result.safe_steps <= 500);
-    }
 
     #[test]
     fn test_lyapunov_confidence_levels() {

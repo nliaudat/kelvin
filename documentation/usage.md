@@ -104,7 +104,7 @@ let kp = k.asymmetric_keypair();
 println!("Curve25519: {:x?}", kp.curve_public.as_bytes());
 // Post-Quantum
 println!("ML-KEM-768: {:x?}", kp.kem_public.to_bytes());
-println!("ML-DSA-65:  {:x?}", kp.dsa_public.encode());
+println!("ML-DSA-65:  {:x?}", kp.dsa_public.to_bytes());
 ```
 
 ---
