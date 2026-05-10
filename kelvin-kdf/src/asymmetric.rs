@@ -12,6 +12,8 @@
 
 use curve25519_dalek::scalar::Scalar;
 use x25519_dalek::{PublicKey, StaticSecret};
+use ml_kem::{MlKem768, DecapsulationKey, EncapsulationKey};
+use ml_dsa::{MlDsa65, SigningKey, VerifyingKey, KeyGen};
 use crate::{OrbitalConfig, extract_seed};
 use kelvin_core::{OrbitalBody, simulate};
 
@@ -22,43 +24,67 @@ pub enum AsymmetricError {
     SimulationError,
 }
 
-/// A Curve25519 key pair derived from an orbital configuration.
+/// A Hybrid Post-Quantum key pair derived from an orbital configuration.
+/// 
+/// Contains:
+/// - Curve25519 (Classical)
+/// - ML-KEM-768 (Post-Quantum KEM)
+/// - ML-DSA-65 (Post-Quantum Signature)
 #[derive(Clone)]
 pub struct OrbitalKeyPair {
-    /// The derived private key (StaticSecret).
-    pub private_key: StaticSecret,
-    /// The derived public key.
-    pub public_key: PublicKey,
+    /// The derived Curve25519 private key.
+    pub curve_private: StaticSecret,
+    /// The derived Curve25519 public key.
+    pub curve_public: PublicKey,
+    /// The derived ML-KEM-768 decapsulation key.
+    pub kem_private: DecapsulationKey<MlKem768>,
+    /// The derived ML-KEM-768 encapsulation key.
+    pub kem_public: EncapsulationKey<MlKem768>,
+    /// The derived ML-DSA-65 signing key.
+    pub dsa_private: SigningKey<MlDsa65>,
+    /// The derived ML-DSA-65 verifying key.
+    pub dsa_public: VerifyingKey<MlDsa65>,
 }
 
 impl core::fmt::Debug for OrbitalKeyPair {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("OrbitalKeyPair")
-            .field("public_key", &self.public_key)
-            .field("private_key", &"<REDACTED>")
+            .field("curve_public", &self.curve_public)
+            .field("kem_public", &self.kem_public)
+            .field("dsa_public", &self.dsa_public)
+            .field("private_material", &"<REDACTED>")
             .finish()
     }
 }
 
 impl OrbitalKeyPair {
-    /// Derive a Curve25519 key pair from an existing orbital state.
+    /// Derive a Hybrid key pair from an existing orbital state.
     pub fn from_bodies(bodies: &[OrbitalBody], step: u64) -> Self {
-        // Extract 512 bits (64 bytes)
-        let seed_512 = extract_seed(bodies, step, b"kelvin-asymmetric-v1");
+        // 1. Derive Curve25519 (Classical)
+        let seed_ecc = extract_seed(bodies, step, b"kelvin-curve25519-v1");
+        let scalar = Scalar::from_bytes_mod_order_wide(&seed_ecc);
+        let curve_private = StaticSecret::from(scalar.to_bytes());
+        let curve_public = PublicKey::from(&curve_private);
 
-        // Wide reduction to derive scalar
-        // Scalar::from_bytes_mod_order_wide ensures no bias by reducing a 512-bit input.
-        let scalar = Scalar::from_bytes_mod_order_wide(&seed_512);
-        let secret_bytes = scalar.to_bytes();
-        
-        // Create X25519 StaticSecret.
-        // Note: StaticSecret::from() will perform standard clamping as per RFC 7748.
-        let private_key = StaticSecret::from(secret_bytes);
-        let public_key = PublicKey::from(&private_key);
+        // 2. Derive ML-KEM-768 (Post-Quantum KEM)
+        let seed_kem = extract_seed(bodies, step, b"kelvin-ml-kem-v1");
+        let kem_private = DecapsulationKey::<MlKem768>::from_seed(seed_kem.into());
+        let kem_public = kem_private.encapsulation_key().clone();
+
+        // 3. Derive ML-DSA-65 (Post-Quantum Signature)
+        let seed_dsa = extract_seed(bodies, step, b"kelvin-ml-dsa-v1");
+        let dsa_seed_32: [u8; 32] = seed_dsa[0..32].try_into().expect("SHA3-512 must be 64 bytes");
+        let dsa_kp = MlDsa65::key_gen_internal(&dsa_seed_32.into());
+        let dsa_private = dsa_kp.signing_key().clone();
+        let dsa_public = dsa_kp.verifying_key().clone();
 
         OrbitalKeyPair {
-            private_key,
-            public_key,
+            curve_private,
+            curve_public,
+            kem_private,
+            kem_public,
+            dsa_private,
+            dsa_public,
         }
     }
 
@@ -114,17 +140,23 @@ mod tests {
 
     #[test]
     fn test_asymmetric_derivation_deterministic() {
+        use ml_kem::KeyExport;
         let config = test_config();
         
         let kp1 = OrbitalKeyPair::derive(&config).unwrap();
         let kp2 = OrbitalKeyPair::derive(&config).unwrap();
         
-        assert_eq!(kp1.private_key.to_bytes(), kp2.private_key.to_bytes());
-        assert_eq!(kp1.public_key.as_bytes(), kp2.public_key.as_bytes());
+        assert_eq!(kp1.curve_private.to_bytes(), kp2.curve_private.to_bytes());
+        assert_eq!(kp1.curve_public.as_bytes(), kp2.curve_public.as_bytes());
+        
+        // Verify PQ keys are deterministic
+        assert_eq!(kp1.kem_public.to_bytes(), kp2.kem_public.to_bytes());
+        assert_eq!(kp1.dsa_public.encode(), kp2.dsa_public.encode());
     }
 
     #[test]
     fn test_asymmetric_derivation_different_configs() {
+        use ml_kem::KeyExport;
         let config1 = test_config();
         let mut config2 = test_config();
         config2.total_steps += 1;
@@ -132,7 +164,7 @@ mod tests {
         let kp1 = OrbitalKeyPair::derive(&config1).unwrap();
         let kp2 = OrbitalKeyPair::derive(&config2).unwrap();
         
-        assert_ne!(kp1.private_key.to_bytes(), kp2.private_key.to_bytes());
-        assert_ne!(kp1.public_key.as_bytes(), kp2.public_key.as_bytes());
+        assert_ne!(kp1.curve_private.to_bytes(), kp2.curve_private.to_bytes());
+        assert_ne!(kp1.kem_public.to_bytes(), kp2.kem_public.to_bytes());
     }
 }

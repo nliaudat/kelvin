@@ -17,7 +17,7 @@ Kelvin is an experimental cryptosystem that derives cryptographic keys from the 
 - **Lyapunov time estimation** — shadow orbit method for chaos quantification
 - **SHA3-512 entropy extraction** — domain-separated hashing of orbital state
 - **ChaCha20 stream cipher** — XOR-based encryption/decryption
-- **Curve25519 Asymmetric Keys** — bias-free ECDH key pairs via 512-bit wide reduction
+- **Post-Quantum Hybrid Identity** — ML-DSA-65 (Primary), ML-KEM-768, and Curve25519 identities
 - **Chaos Quality Test Suite** — Integrated statistical verification (avalanche and uniformity tests)
 
 ### What Makes Kelvin Novel
@@ -36,7 +36,7 @@ Key innovations include:
 
 - **Entropy Extraction past the Lyapunov Horizon** — To ensure maximum uncertainty, Kelvin requires that the total simulation steps exceed the estimated Lyapunov time. This guarantees that the extractable entropy is fully randomized and decoupled from the initial configuration secrets.
 
-- **Asymmetric Identity (Curve25519)** — Kelvin bridges chaotic dynamics and ECC. By applying **512-bit wide reduction** to the orbital state, it derives uniform Curve25519 key pairs. This allows a shared chaotic configuration to serve as both a symmetric encryption key and an asymmetric identity.
+- **Post-Quantum Hybrid Identity** — Kelvin bridges chaotic dynamics and Post-Quantum Cryptography. By applying **domain-separated hashing** to the orbital state, it derives uniform key pairs for **ML-DSA-65** (Quantum-Safe Signature), **ML-KEM-768** (Quantum-Safe KEM), and **Curve25519** (Classical). This allows a shared chaotic configuration to serve as a universally identifiable and quantum-resistant identity.
 
 - **Negotiable physical constants** — Kelvin supports a dynamic gravitational constant ($G$), allowing communicating parties to initialize their chaotic environment with unique physical laws. This increases the configuration space and prevents pre-computation attacks based on fixed gravitational models. Strict validation bounds ($1.0 \le G \le 1000.0$) ensure the system remains within a chaotic yet numerically stable regime.
 

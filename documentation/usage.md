@@ -45,10 +45,17 @@ Decryption is the exact inverse of encryption. The same config must be used.
 ```
 
 ### Identity (Asymmetric Keys)
-Kelvin can derive a Curve25519 public key from the orbital state. This can be used to identify a peer or verify a configuration without sharing it.
+Kelvin derives multiple Post-Quantum (PQ) and classical asymmetric identities from the orbital state. This allows for quantum-safe identification of peers.
 
 ```bash
+# Default: Show ML-DSA-65 (Post-Quantum Signature Identity)
 ./kelvin identify --config my_secret.json
+
+# Show all identities (ML-DSA-65, ML-KEM-768, and Curve25519)
+./kelvin identify --config my_secret.json --all
+
+# Show specific identities
+./kelvin identify --config my_secret.json --ecc --kem
 ```
 
 ---
@@ -93,7 +100,11 @@ fn main() -> anyhow::Result<()> {
 ### Accessing Asymmetric Keys
 ```rust
 let kp = k.asymmetric_keypair();
-println!("Public Key: {:x?}", kp.public_key.as_bytes());
+// Classical
+println!("Curve25519: {:x?}", kp.curve_public.as_bytes());
+// Post-Quantum
+println!("ML-KEM-768: {:x?}", kp.kem_public.to_bytes());
+println!("ML-DSA-65:  {:x?}", kp.dsa_public.encode());
 ```
 
 ---

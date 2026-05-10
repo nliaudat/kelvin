@@ -8,7 +8,7 @@ This document evaluates the security of Kelvin in the context of a Post-Quantum 
 |-----------|-----------|----------------|--------------------|
 | **Symmetric Cipher** | ChaCha20 | **Quantum-Resistant** | 128-bit (Grover) |
 | **Entropy Extractor** | SHA3-512 | **Quantum-Resistant** | 256-bit (Grover) |
-| **Asymmetric Identity** | Curve25519 | **Vulnerable** | < 1-bit (Shor) |
+| **Asymmetric Identity** | **ML-DSA-65** | **Quantum-Resistant** | NIST Level 3 (Lattice) |
 | **Chaos Generator** | N-Body Simulation | **Likely PQ-Safe** | Unquantified |
 
 ---
@@ -19,9 +19,13 @@ This document evaluates the security of Kelvin in the context of a Post-Quantum 
 Grover's algorithm provides a square-root speedup for unstructured search. For a 256-bit key like the one used in Kelvin's ChaCha20 stream, a quantum computer would require ~2^128 operations to find the key. This is still considered computationally infeasible for the foreseeable future.
 - **Verdict**: Kelvin's bulk encryption remains secure against quantum attacks.
 
-### 2.2 Asymmetric Identity (Curve25519)
-Shor's algorithm can solve the Elliptic Curve Discrete Logarithm Problem (ECDLP) in polynomial time. A sufficiently powerful quantum computer could derive the private `OrbitalKeyPair` from a captured Public Key.
-- **Verdict**: The `identify` feature and any ECDH handshakes are **not** quantum-resistant. They should be used for identity verification only in classical environments.
+### 2.2 Asymmetric Identity (Hybrid PQC)
+Kelvin uses a hybrid asymmetric layer that defaults to **ML-DSA-65** (FIPS 204) for identity verification.
+- **ML-DSA-65**: Based on the Module Learning with Errors (M-LWE) problem, it is designed to be resistant to Shor's algorithm and is standardized for post-quantum signatures.
+- **ML-KEM-768**: Also supported for key encapsulation (FIPS 203), providing a quantum-safe transition for shared secrets.
+- **Curve25519 (Legacy)**: Remains available for classical compatibility but is vulnerable to Shor's algorithm.
+
+---
 
 ### 2.3 The Chaos Generator (N-Body KDF)
 The core of Kelvin is the high-dimensional chaotic state space of the n-body problem.
@@ -33,28 +37,22 @@ The core of Kelvin is the high-dimensional chaotic state space of the n-body pro
 
 ## 3. Analysis Tools
 
-To verify the quality of Kelvin's chaos and its resistance to pattern analysis, the following tools are provided:
+### 3.1 CLI Identify (Public Key Inspection)
+The `identify` command allows you to inspect your PQ and classical identities:
 
-### 3.1 Avalanche Verification (Sensitivity to Initial Conditions)
-This tool verifies that flipping a single bit in the `OrbitalConfig` (e.g., a planet's position by $10^{-19}$ meters) results in a completely different 512-bit seed.
+```bash
+# Show default PQ-Signature (ML-DSA-65)
+kelvin identify --config key.json
+
+# Show all identities (including Curve25519 and ML-KEM)
+kelvin identify --config key.json --all
+```
+
+### 3.2 Avalanche Verification
+Flipping a single bit in the `OrbitalConfig` results in a completely different set of PQ-keys. This can be verified with:
 
 ```bash
 # Run the internal chaos quality suite
 cargo test -p kelvin-kdf --test chaos_test
 ```
 
-### 3.2 Keystream Entropy Analysis
-You can use the CLI to generate a raw keystream and pipe it to standard entropy testing tools like `ent` or `dieharder`.
-
-```bash
-# Generate 1MB of raw keystream
-kelvin encrypt --config key.json --input /dev/zero --output keystream.raw
-
-# Analyze with 'ent' (if installed)
-ent keystream.raw
-```
-
-### 3.3 Potential PQ Upgrades (Future Work)
-To make Kelvin fully quantum-resistant, the Curve25519 layer must be replaced or augmented with a Post-Quantum Asymmetric primitive, such as:
-- **Kyber (ML-KEM)**: Lattice-based key encapsulation.
-- **Dilithium (ML-DSA)**: Lattice-based digital signatures.

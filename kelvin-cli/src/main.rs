@@ -14,6 +14,7 @@ use kelvin::{Kelvin, OrbitalConfig, OrbitalBody, Vec3, Fixed};
 use rand::Rng;
 use std::fs;
 use std::io::{Read, Write};
+use ml_kem::KeyExport;
 
 #[derive(Parser)]
 #[command(name = "kelvin", version, about = "Orbital Chaos KDF Cryptosystem")]
@@ -62,6 +63,15 @@ enum Commands {
         /// Path to orbital config JSON
         #[arg(long)]
         config: String,
+        /// Show all keys (Classical and PQ)
+        #[arg(long)]
+        all: bool,
+        /// Show Curve25519 Public Key
+        #[arg(long)]
+        ecc: bool,
+        /// Show ML-KEM-768 Public Key
+        #[arg(long)]
+        kem: bool,
     },
     /// Run performance benchmarks
     Benchmark,
@@ -92,12 +102,32 @@ fn main() -> Result<()> {
         Commands::Decrypt { config, input, output } => {
             process_file(&config, &input, &output, false)?;
         }
-        Commands::Identify { config } => {
+        Commands::Identify { config, all, ecc, kem } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
             let config = OrbitalConfig::from_json(&config_json)?;
             let k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
             let kp = k.asymmetric_keypair();
-            println!("Public Key: {}", hex::encode(kp.public_key.as_bytes()));
+            
+            let mut shown = false;
+
+            if all || ecc {
+                println!("Curve25519 (Classical): {}", hex::encode(kp.curve_public.as_bytes()));
+                shown = true;
+            }
+            if all || kem {
+                println!("ML-KEM-768 (PQ-KEM):    {}", hex::encode(&kp.kem_public.to_bytes()));
+                shown = true;
+            }
+            
+            // Default: Show ML-DSA-65
+            if all || (!ecc && !kem) {
+                println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.encode()));
+                shown = true;
+            }
+            
+            if !shown {
+                 println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.encode()));
+            }
         }
         Commands::Analyze { config } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
@@ -109,7 +139,7 @@ fn main() -> Result<()> {
             println!("Deriving Base Key...");
             let k1 = Kelvin::new(config.clone()).context("Failed to init first instance")?;
             let kp1 = k1.asymmetric_keypair();
-            let key1 = kp1.public_key.as_bytes();
+            let key1 = kp1.curve_public.as_bytes();
 
             // 2. Flip 1 bit in input (Sun mass)
             println!("Flipping 1 bit in initial conditions...");
@@ -118,7 +148,7 @@ fn main() -> Result<()> {
             println!("Deriving Shadow Key...");
             let k2 = Kelvin::new(config).context("Failed to init shadow instance")?;
             let kp2 = k2.asymmetric_keypair();
-            let key2 = kp2.public_key.as_bytes();
+            let key2 = kp2.curve_public.as_bytes();
 
             // 3. Compare (Avalanche)
             let mut diff_bits = 0;
@@ -130,7 +160,8 @@ fn main() -> Result<()> {
             }
 
             println!("--- Analysis Results ---");
-            println!("Total Key Bits: 256");
+            println!("Target: Curve25519 Identity");
+            println!("Total Bits: 256");
             println!("Bit Entropy (Base): {:.2} bits", set_bits as f32 / 256.0);
             println!("Avalanche Effect: {} / 256 bits changed ({:.2}%)", 
                 diff_bits, (diff_bits as f32 / 256.0) * 100.0);

@@ -16,6 +16,8 @@ curve25519-dalek = { version = "4", default-features = false, features = ["alloc
 x25519-dalek = { version = "2", default-features = false, features = ["static_secrets"] }
 thiserror = "1.0"
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
+ml-kem = { version = "0.3", default-features = false, features = ["alloc"] }
+ml-dsa = { version = "0.0", default-features = false }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 
