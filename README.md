@@ -5,10 +5,17 @@
 [Proof of Concept](documentation/proof_of_concept.md) | [Usage Guide](documentation/usage.md) | [Quantum Analysis](documentation/quantum_analysis.md)
 
 ---
+
 ### *Three bodies. Infinite chaos...*
-================================================================================
+
+<iframe src="examples/orbital_visualizer.html" width="100%" height="600" style="border: 1px solid #0f0; border-radius: 8px; background: #0a0a1a;" allowfullscreen></iframe>
+
+*Drag to rotate, scroll to zoom, Space to pause. Load a `key.json` file to configure custom initial conditions.*
 
 **EXPERIMENTAL — NOT FOR PRODUCTION USE.**
+================================================================================
+
+
 
 Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines:
 
