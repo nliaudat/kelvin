@@ -62,6 +62,8 @@ pub struct LyapunovEstimator<'a> {
     dt: Fixed,
     /// Softening factor.
     softening: Fixed,
+    /// Gravitational constant.
+    g: Fixed,
 }
 
 impl<'a> LyapunovEstimator<'a> {
@@ -70,11 +72,13 @@ impl<'a> LyapunovEstimator<'a> {
         reference: &'a [OrbitalBody],
         dt: Fixed,
         softening: Fixed,
+        g: Fixed,
     ) -> Self {
         LyapunovEstimator {
             reference,
             dt,
             softening,
+            g,
         }
     }
 
@@ -95,7 +99,7 @@ impl<'a> LyapunovEstimator<'a> {
         // Run reference simulation
         let mut ref_bodies = self.reference.to_vec();
         for _ in 0..shadow_steps {
-            verlet_step(&mut ref_bodies, self.dt, self.softening);
+            verlet_step(&mut ref_bodies, self.dt, self.softening, self.g);
         }
 
         // Create shadow orbits with small perturbations
@@ -116,7 +120,7 @@ impl<'a> LyapunovEstimator<'a> {
 
             // Run shadow simulation
             for _ in 0..shadow_steps {
-                verlet_step(&mut shadow, self.dt, self.softening);
+                verlet_step(&mut shadow, self.dt, self.softening, self.g);
             }
 
             // Measure divergence
@@ -186,27 +190,28 @@ impl<'a> LyapunovEstimator<'a> {
             max_steps
         };
 
-        // Compute variance and standard deviation of divergences
-        let mut sq_diff = Fixed::ZERO;
+        // Compute variance and standard deviation of divergences using f64
+        // to prevent overflow/precision loss during intermediate squaring.
+        let avg_div_f64 = avg_divergence.to_f64();
+        let mut sq_diff_f64 = 0.0;
         for div in &divergences {
-            let diff = if *div > avg_divergence {
-                *div - avg_divergence
-            } else {
-                avg_divergence - *div
-            };
-            sq_diff += diff * diff;
+            let diff = div.to_f64() - avg_div_f64;
+            sq_diff_f64 += diff * diff;
         }
-        let variance = sq_diff / Fixed::from_int(divergences.len() as i64);
-        let std_dev = variance.sqrt();
+        let variance_f64 = sq_diff_f64 / (divergences.len() as f64);
+        let std_dev_f64 = variance_f64.sqrt();
 
         // Calculate dynamic safety margin factor
         // Base margin is 10. We increase it based on relative uncertainty (std_dev / avg_divergence).
-        let margin_factor = if avg_divergence > Fixed::ZERO {
-            let relative_std_dev = std_dev / avg_divergence;
+        let margin_factor = if avg_div_f64 > 0.0 {
+            let relative_std_dev = std_dev_f64 / avg_div_f64;
             // factor = 10 + relative_std_dev * 50
-            let factor_fixed = Fixed::from_int(10) + relative_std_dev * Fixed::from_int(50);
-            let factor = factor_fixed.to_raw() >> 64;
-            if factor < 10 { 10 } else { factor as u64 }
+            let factor_f64 = 10.0 + relative_std_dev * 50.0;
+            if factor_f64 < 10.0 {
+                10
+            } else {
+                factor_f64 as u64
+            }
         } else {
             10
         };
@@ -255,27 +260,33 @@ mod tests {
     use super::*;
     use kelvin_core::Fixed;
 
-    fn two_body_system() -> Vec<OrbitalBody> {
+    fn three_body_system() -> Vec<OrbitalBody> {
         let sun = OrbitalBody::new(
             Fixed::ONE,
             Vec3::ZERO,
             Vec3::ZERO,
         );
-        let planet = OrbitalBody::new(
+        let planet1 = OrbitalBody::new(
             Fixed::from_raw(1 << 54),
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
             Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
         );
-        vec![sun, planet]
+        let planet2 = OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
+        );
+        vec![sun, planet1, planet2]
     }
 
     #[test]
     fn test_lyapunov_estimate() {
-        let bodies = two_body_system();
+        let bodies = three_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         let result = estimator.estimate(100, 10000).unwrap();
         assert!(result.lyapunov_steps > 0);
@@ -292,6 +303,7 @@ mod tests {
             &bodies,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         let result = estimator.estimate(100, 10000);
         assert!(matches!(result, Err(LyapunovError::TooFewBodies)));
@@ -299,11 +311,12 @@ mod tests {
 
     #[test]
     fn test_lyapunov_zero_steps() {
-        let bodies = two_body_system();
+        let bodies = three_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         let result = estimator.estimate(0, 10000);
         assert!(matches!(result, Err(LyapunovError::ZeroSteps)));
@@ -311,11 +324,12 @@ mod tests {
 
     #[test]
     fn test_lyapunov_safe_steps_bounded() {
-        let bodies = two_body_system();
+        let bodies = three_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         let result = estimator.estimate(100, 500).unwrap();
         assert!(result.safe_steps <= 500);
@@ -323,11 +337,12 @@ mod tests {
 
     #[test]
     fn test_lyapunov_confidence_levels() {
-        let bodies = two_body_system();
+        let bodies = three_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         // Short run → Low confidence
         let result = estimator.estimate(10, 1000).unwrap();

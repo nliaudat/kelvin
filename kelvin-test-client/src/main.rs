@@ -322,6 +322,7 @@ fn run_self_test() -> Result<(), String> {
         safe_steps / 10,
         Fixed::from_raw(1 << 44),
         Fixed::from_raw(1 << 44),
+        kelvin_core::DEFAULT_G,
     ).map_err(|e| format!("Failed to create config: {}", e))?;
 
     let plaintext = b"Kelvin determinism test vector - this data should encrypt identically on all platforms.";

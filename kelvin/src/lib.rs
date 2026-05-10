@@ -83,6 +83,7 @@ impl Kelvin {
             &config.bodies,
             config.dt,
             config.softening,
+            config.g,
         );
         let result = lyapunov.estimate(1000, config.total_steps)?;
 
@@ -97,7 +98,7 @@ impl Kelvin {
         let mut bodies = config.bodies.clone();
 
         // Run initial simulation
-        simulate(&mut bodies, config.total_steps, config.dt, config.softening);
+        simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
 
         // Extract initial seed
         let seed = extract_seed(&bodies, config.total_steps, b"kelvin-orbital-state-v1");
@@ -141,6 +142,7 @@ impl Kelvin {
             &config.bodies,
             config.dt,
             config.softening,
+            config.g,
         );
         let result = lyapunov.estimate(1000, config.total_steps)?;
 
@@ -155,7 +157,7 @@ impl Kelvin {
         let mut bodies = config.bodies.clone();
 
         // Run initial simulation
-        simulate(&mut bodies, config.total_steps, config.dt, config.softening);
+        simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
 
         // Extract initial seed
         let seed = extract_seed(&bodies, config.total_steps, b"kelvin-orbital-state-v1");
@@ -222,17 +224,23 @@ mod tests {
             Vec3::ZERO,
             Vec3::ZERO,
         );
-        let planet = OrbitalBody::new(
+        let planet1 = OrbitalBody::new(
             Fixed::from_raw(1 << 54), // ~1e-6 solar masses
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
             Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
         );
+        let planet2 = OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
+        );
         OrbitalConfig::new(
-            vec![sun, planet],
+            vec![sun, planet1, planet2],
             50,  // Use fewer steps to stay within Lyapunov time
             10,
             Fixed::from_raw(1 << 44), // ~1e-6
             Fixed::from_raw(1 << 44), // ~1e-6
+            kelvin_core::DEFAULT_G,
         ).unwrap()
     }
 

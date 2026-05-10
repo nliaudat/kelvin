@@ -14,8 +14,8 @@ use crate::Fixed;
 ///
 /// G = 4π² AU³/(M☉·yr²) when using AU, solar masses, and years.
 /// This is exact by definition of the astronomical unit.
-pub const G: Fixed = Fixed::from_raw(0x0000_0000_0000_0027_7A79_937C_8BBC_0000);
-// G ≈ 39.47841760435743... (4π²)
+pub const DEFAULT_G: Fixed = Fixed::from_raw(0x0000_0000_0000_0027_7A79_937C_8BBC_0000);
+// DEFAULT_G ≈ 39.47841760435743... (4π²)
 
 /// Solar mass in solar masses (1.0 by definition).
 pub const SOLAR_MASS: Fixed = Fixed::ONE;
@@ -31,7 +31,7 @@ pub const SOFTENING_FACTOR: Fixed = Fixed::from_raw(1 << 44);
 pub const DEFAULT_DT: Fixed = Fixed::from_raw(1 << 44);
 
 /// Minimum number of bodies required for meaningful chaos.
-pub const MIN_BODIES: usize = 2;
+pub const MIN_BODIES: usize = 3;
 
 /// Maximum number of bodies supported.
 pub const MAX_BODIES: usize = 100;
@@ -48,13 +48,13 @@ mod tests {
 
     #[test]
     fn test_g_positive() {
-        assert!(G > Fixed::ZERO);
+        assert!(DEFAULT_G > Fixed::ZERO);
     }
 
     #[test]
     fn test_g_approx_4pi2() {
         // G should be approximately 39.478...
-        let g_f64 = G.to_f64();
+        let g_f64 = DEFAULT_G.to_f64();
         assert!((g_f64 - 39.478).abs() < 0.01);
     }
 

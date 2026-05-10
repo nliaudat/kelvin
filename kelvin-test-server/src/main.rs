@@ -163,6 +163,7 @@ fn generate_test_vector(
         reseed_interval,
         Fixed::from_raw(1 << 44), // dt ~ 1e-6 years
         Fixed::from_raw(1 << 44), // softening ~ 1e-6 AU
+        kelvin_core::DEFAULT_G,
     ).map_err(|e| format!("Config error: {}", e))?;
 
     let config_json = serde_json::to_string_pretty(&config)

@@ -43,7 +43,7 @@ mod integrator;
 
 pub use fixed_math::Fixed;
 pub use body::{Vec3, OrbitalBody};
-pub use constants::{G, SOLAR_MASS, SOFTENING_FACTOR, DEFAULT_DT, MIN_BODIES, MAX_BODIES, DEFAULT_STEPS, DEFAULT_RESEED_INTERVAL};
+pub use constants::{DEFAULT_G, SOLAR_MASS, SOFTENING_FACTOR, DEFAULT_DT, MIN_BODIES, MAX_BODIES, DEFAULT_STEPS, DEFAULT_RESEED_INTERVAL};
 pub use integrator::{compute_accelerations, verlet_step, simulate};
 
 #[cfg(test)]

@@ -43,8 +43,8 @@ fn test_chaos_avalanche() {
     let steps = 10_000;
 
     // Simulate both systems
-    simulate(&mut bodies_orig, steps, dt, softening);
-    simulate(&mut bodies_pert, steps, dt, softening);
+    simulate(&mut bodies_orig, steps, dt, softening, kelvin_core::DEFAULT_G);
+    simulate(&mut bodies_pert, steps, dt, softening, kelvin_core::DEFAULT_G);
 
     // Extract seeds
     let seed_orig = extract_seed(&bodies_orig, steps, b"avalanche-test");
@@ -74,7 +74,7 @@ fn test_chaos_uniformity() {
     let steps_per_run = 1000;
 
     for i in 0..num_tests {
-        simulate(&mut bodies, steps_per_run, dt, softening);
+        simulate(&mut bodies, steps_per_run, dt, softening, kelvin_core::DEFAULT_G);
         let seed = extract_seed(&bodies, (i + 1) * steps_per_run, b"uniformity-test");
         
         for byte in seed.iter() {

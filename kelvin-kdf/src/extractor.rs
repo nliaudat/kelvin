@@ -116,6 +116,11 @@ mod tests {
                 Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
                 Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
             ),
+            OrbitalBody::new(
+                Fixed::from_raw(1 << 53),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+                Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
+            ),
         ]
     }
 
