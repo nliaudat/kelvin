@@ -21,3 +21,4 @@ zeroize = { version = "1.6", features = ["zeroize_derive"] }
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "kelvin-kdf/serde"]
+aes-ni = ["kelvin-stream/aes-ni"]

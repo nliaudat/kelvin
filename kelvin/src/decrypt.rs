@@ -4,7 +4,6 @@
 //! The same keystream is generated from the same orbital configuration.
 
 use crate::{Kelvin, KelvinError};
-use kelvin_stream::StreamCipher;
 
 impl Kelvin {
     /// Decrypt data in-place.

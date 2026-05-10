@@ -21,7 +21,7 @@ pub enum ScheduleState {
 /// Key schedule for the Kelvin cryptosystem.
 ///
 /// Manages key derivation from orbital simulation state.
-/// Each key is 32 bytes (ChaCha20 key) + 12 bytes (ChaCha20 nonce).
+/// Each key is 32 bytes (cipher key) + 16 bytes (nonce/IV).
 #[derive(Clone, Debug)]
 pub struct KeySchedule {
     /// Current seed material.
@@ -78,7 +78,7 @@ impl KeySchedule {
     /// Get the next key and nonce.
     ///
     /// Returns `None` if the schedule is exhausted.
-    pub fn next_key(&mut self) -> Option<([u8; 32], [u8; 12])> {
+    pub fn next_key(&mut self) -> Option<([u8; 32], [u8; 16])> {
         if self.state == ScheduleState::Exhausted {
             return None;
         }
@@ -98,8 +98,8 @@ impl KeySchedule {
         let mut key = [0u8; 32];
         key.copy_from_slice(&hash[..32]);
 
-        let mut nonce = [0u8; 12];
-        nonce.copy_from_slice(&hash[32..44]);
+        let mut nonce = [0u8; 16];
+        nonce.copy_from_slice(&hash[32..48]);
 
         // Advance step and reseed if needed
         self.step += self.reseed_interval;
@@ -184,7 +184,7 @@ mod tests {
         assert!(result.is_some());
         let (key, nonce) = result.unwrap();
         assert_eq!(key.len(), 32);
-        assert_eq!(nonce.len(), 12);
+        assert_eq!(nonce.len(), 16);
     }
 
     #[test]
@@ -249,7 +249,7 @@ mod tests {
         let mut schedule = KeySchedule::new(test_seed(), 10000, 1000, 5000);
         let (key, nonce) = schedule.next_key().unwrap();
         // Key and nonce should be different (different parts of hash)
-        assert_ne!(&key[..12], &nonce[..]);
+        assert_ne!(&key[..16], &nonce[..]);
     }
 
     #[test]

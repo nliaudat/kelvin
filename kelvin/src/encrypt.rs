@@ -4,7 +4,6 @@
 //! The keystream is generated from seeds extracted from the orbital simulation.
 
 use crate::{Kelvin, KelvinError};
-use kelvin_stream::StreamCipher;
 
 impl Kelvin {
     /// Encrypt data in-place.
