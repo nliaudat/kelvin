@@ -91,8 +91,8 @@ impl KeySchedule {
         // Derive key from current seed
         let mut hasher = Sha3_512::new();
         hasher.update(b"kelvin-key-derivation-v1");
-        hasher.update(&self.seed);
-        hasher.update(&self.keys_generated.to_le_bytes());
+        hasher.update(self.seed);
+        hasher.update(self.keys_generated.to_le_bytes());
         let hash = hasher.finalize();
 
         let mut key = [0u8; 32];
@@ -108,8 +108,8 @@ impl KeySchedule {
         // Reseed: derive new seed from current seed
         let mut reseed_hasher = Sha3_512::new();
         reseed_hasher.update(b"kelvin-reseed-v1");
-        reseed_hasher.update(&self.seed);
-        reseed_hasher.update(&self.step.to_le_bytes());
+        reseed_hasher.update(self.seed);
+        reseed_hasher.update(self.step.to_le_bytes());
         let new_hash = reseed_hasher.finalize();
         self.seed.copy_from_slice(&new_hash);
 

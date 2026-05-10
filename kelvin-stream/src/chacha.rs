@@ -83,7 +83,7 @@ impl ChaChaStream {
 
 impl StreamCipher for ChaChaStream {
     fn xor_in_place(&mut self, data: &mut [u8]) {
-        self.cipher.apply_keystream(data.into());
+        self.cipher.apply_keystream(data);
         self.position += data.len() as u64;
     }
 

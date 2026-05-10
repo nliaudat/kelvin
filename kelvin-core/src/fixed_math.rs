@@ -294,19 +294,19 @@ impl Div for Fixed {
         
         // Process a2 (at position 2^128)
         let q2 = rem / b;
-        rem = rem % b;
+        rem %= b;
         result = q2; // q2 is at position 2^64 in the final result
         
         // Process a1 (at position 2^96, which is 2^32 in the result)
         rem = (rem << 32) + a1;
         let q1 = rem / b;
-        rem = rem % b;
+        rem %= b;
         result = (result << 32) + q1;
         
         // Process a0 (at position 2^64, which is 2^0 in the result)
         rem = (rem << 32) + a0;
         let q0 = rem / b;
-        rem = rem % b;
+        rem %= b;
         result = (result << 32) + q0;
         
         // Process the fractional part (we need 64 bits of fraction)
@@ -314,9 +314,9 @@ impl Div for Fixed {
         // We need to continue dividing to get 64 fractional bits
         // Each iteration gives us 32 bits of fraction
         for _ in 0..2 {
-            rem = rem << 32;
+            rem <<= 32;
             let q = rem / b;
-            rem = rem % b;
+            rem %= b;
             result = (result << 32) + q;
         }
         

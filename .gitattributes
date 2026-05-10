@@ -8,7 +8,6 @@
 
 # Cargo files
 Cargo.toml text diff=toml
-Cargo.lock text diff=toml
 
 # Markdown documentation
 *.md text diff=markdown
@@ -23,9 +22,6 @@ CITATION.cff text
 *.png binary
 *.jpg binary
 *.ico binary
-
-# Lock file (generated, no diff)
-Cargo.lock -diff
 
 # Line endings
 * text=auto eol=lf

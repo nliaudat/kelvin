@@ -224,7 +224,7 @@ fn main() -> Result<(), String> {
                 for entry in fs::read_dir(&dir_path).map_err(|e| format!("FS error: {}", e))? {
                     let entry = entry.map_err(|e| format!("FS error: {}", e))?;
                     let path = entry.path();
-                    if path.extension().map_or(false, |e| e == "json") {
+                    if path.extension().is_some_and(|e| e == "json") {
                         vector_files.push(path);
                     }
                 }

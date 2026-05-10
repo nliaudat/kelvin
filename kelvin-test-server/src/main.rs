@@ -199,7 +199,7 @@ fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
 
     let output_dir = if args.len() > 1 && args[1] == "--output" {
-        args.get(2).map(|s| PathBuf::from(s))
+        args.get(2).map(PathBuf::from)
     } else {
         None
     };
