@@ -112,7 +112,7 @@ impl<'a> LyapunovEstimator<'a> {
                 1 => Vec3::new(Fixed::ZERO, perturbation, Fixed::ZERO),
                 _ => Vec3::new(Fixed::ZERO, Fixed::ZERO, perturbation),
             };
-            shadow[0].position = shadow[0].position + delta;
+            shadow[0].position += delta;
 
             // Run shadow simulation
             for _ in 0..shadow_steps {

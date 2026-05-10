@@ -1,7 +1,19 @@
 Cargo.lock
-/target/debug
-/target/x86_64-pc-windows-gnu
 /target
 dropbox_ignore.ps
 implementation_plan.md
 THREAT_MODEL.md
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Rust tooling
+*.rs.bk

@@ -37,20 +37,20 @@ pub fn extract_seed(
     hasher.update(domain_separator);
 
     // Step counter
-    hasher.update(&step.to_le_bytes());
+    hasher.update(step.to_le_bytes());
 
     // Number of bodies
-    hasher.update(&(bodies.len() as u32).to_le_bytes());
+    hasher.update((bodies.len() as u32).to_le_bytes());
 
     // Body data
     for body in bodies {
-        hasher.update(&body.mass.to_raw().to_le_bytes());
-        hasher.update(&body.position.x.to_raw().to_le_bytes());
-        hasher.update(&body.position.y.to_raw().to_le_bytes());
-        hasher.update(&body.position.z.to_raw().to_le_bytes());
-        hasher.update(&body.velocity.x.to_raw().to_le_bytes());
-        hasher.update(&body.velocity.y.to_raw().to_le_bytes());
-        hasher.update(&body.velocity.z.to_raw().to_le_bytes());
+        hasher.update(body.mass.to_raw().to_le_bytes());
+        hasher.update(body.position.x.to_raw().to_le_bytes());
+        hasher.update(body.position.y.to_raw().to_le_bytes());
+        hasher.update(body.position.z.to_raw().to_le_bytes());
+        hasher.update(body.velocity.x.to_raw().to_le_bytes());
+        hasher.update(body.velocity.y.to_raw().to_le_bytes());
+        hasher.update(body.velocity.z.to_raw().to_le_bytes());
     }
 
     let result = hasher.finalize();
@@ -75,18 +75,18 @@ pub fn extract_seed_extended(
     while output.len() < output_len {
         let mut hasher = Sha3_512::new();
         hasher.update(domain_separator);
-        hasher.update(&step.to_le_bytes());
-        hasher.update(&counter.to_le_bytes());
-        hasher.update(&(bodies.len() as u32).to_le_bytes());
+        hasher.update(step.to_le_bytes());
+        hasher.update(counter.to_le_bytes());
+        hasher.update((bodies.len() as u32).to_le_bytes());
 
         for body in bodies {
-            hasher.update(&body.mass.to_raw().to_le_bytes());
-            hasher.update(&body.position.x.to_raw().to_le_bytes());
-            hasher.update(&body.position.y.to_raw().to_le_bytes());
-            hasher.update(&body.position.z.to_raw().to_le_bytes());
-            hasher.update(&body.velocity.x.to_raw().to_le_bytes());
-            hasher.update(&body.velocity.y.to_raw().to_le_bytes());
-            hasher.update(&body.velocity.z.to_raw().to_le_bytes());
+            hasher.update(body.mass.to_raw().to_le_bytes());
+            hasher.update(body.position.x.to_raw().to_le_bytes());
+            hasher.update(body.position.y.to_raw().to_le_bytes());
+            hasher.update(body.position.z.to_raw().to_le_bytes());
+            hasher.update(body.velocity.x.to_raw().to_le_bytes());
+            hasher.update(body.velocity.y.to_raw().to_le_bytes());
+            hasher.update(body.velocity.z.to_raw().to_le_bytes());
         }
 
         let result = hasher.finalize();
@@ -187,7 +187,7 @@ mod tests {
         // Small change in input should produce completely different output
         let bodies1 = test_bodies();
         let mut bodies2 = test_bodies();
-        bodies2[0].mass = bodies2[0].mass + Fixed::from_raw(1); // minimal change
+        bodies2[0].mass += Fixed::from_raw(1); // minimal change
 
         let seed1 = extract_seed(&bodies1, 0, b"test");
         let seed2 = extract_seed(&bodies2, 0, b"test");
