@@ -79,6 +79,7 @@ kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 
 - **[Academic Citations](documentation/citations.md)** — Full academic context for every component of Kelvin, organized by pipeline stage. Each citation includes a summary of its relevance.
 - **[Proof of Concept](documentation/proof_of_concept.md)** — Test results, benchmarks, and verification that Kelvin works as a functional cryptosystem.
+- **[Project History](documentation/project_history.md)** — The 24-year evolution of the Kelvin cryptosystem, from celestial concept to hybrid post-quantum reality.
 - **[Threat Model](THREAT_MODEL.md)** — Attacker capabilities, security boundaries, and comparison with existing KDFs.
 - **[REFERENCES.bib](REFERENCES.bib)** — Complete BibTeX bibliography for LaTeX integration.
 
