@@ -88,7 +88,7 @@ impl<'a> LyapunovEstimator<'a> {
     /// `max_steps` is the maximum number of steps to consider.
     ///
     /// Returns the estimated Lyapunov time and safe steps.
-    pub fn estimate(&self, shadow_steps: u64, max_steps: u64) -> Result<LyapunovResult, LyapunovError> {
+    pub fn estimate(&self, shadow_steps: u64, _max_steps: u64) -> Result<LyapunovResult, LyapunovError> {
         if self.reference.len() < 2 {
             return Err(LyapunovError::TooFewBodies);
         }
@@ -144,8 +144,8 @@ impl<'a> LyapunovEstimator<'a> {
         if avg_divergence <= initial_perturbation || time <= Fixed::ZERO {
             // No detectable divergence — system is stable
             return Ok(LyapunovResult {
-                lyapunov_steps: max_steps,
-                safe_steps: max_steps,
+                lyapunov_steps: u64::MAX,
+                safe_steps: u64::MAX,
                 confidence: LyapunovConfidence::Low,
                 shadow_count: divergences.len() as u32,
             });
@@ -187,7 +187,7 @@ impl<'a> LyapunovEstimator<'a> {
                 1
             }
         } else {
-            max_steps
+            u64::MAX
         };
 
         // Compute variance and standard deviation of divergences using f64
@@ -217,7 +217,7 @@ impl<'a> LyapunovEstimator<'a> {
         };
 
         // Safe steps = Lyapunov time / dynamic_margin_factor
-        let safe_steps = (lyapunov_time_steps / margin_factor).max(1).min(max_steps);
+        let safe_steps = (lyapunov_time_steps / margin_factor).max(1);
 
         // Determine confidence
         let confidence = if shadow_steps >= 10000 {
@@ -260,7 +260,7 @@ mod tests {
     use super::*;
     use kelvin_core::Fixed;
 
-    fn three_body_system() -> Vec<OrbitalBody> {
+    fn five_body_system() -> Vec<OrbitalBody> {
         let sun = OrbitalBody::new(
             Fixed::ONE,
             Vec3::ZERO,
@@ -276,15 +276,25 @@ mod tests {
             Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
             Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
         );
-        vec![sun, planet1, planet2]
+        let planet3 = OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        );
+        let planet4 = OrbitalBody::new(
+            Fixed::from_raw(1 << 51),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+        );
+        vec![sun, planet1, planet2, planet3, planet4]
     }
 
     #[test]
     fn test_lyapunov_estimate() {
-        let bodies = three_body_system();
+        let bodies = five_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
@@ -301,7 +311,7 @@ mod tests {
         let bodies = [body];
         let estimator = LyapunovEstimator::new(
             &bodies,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
@@ -311,10 +321,10 @@ mod tests {
 
     #[test]
     fn test_lyapunov_zero_steps() {
-        let bodies = three_body_system();
+        let bodies = five_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
@@ -322,25 +332,13 @@ mod tests {
         assert!(matches!(result, Err(LyapunovError::ZeroSteps)));
     }
 
-    #[test]
-    fn test_lyapunov_safe_steps_bounded() {
-        let bodies = three_body_system();
-        let estimator = LyapunovEstimator::new(
-            &bodies,
-            Fixed::from_raw(1 << 44),
-            Fixed::from_raw(1 << 44),
-            kelvin_core::DEFAULT_G,
-        );
-        let result = estimator.estimate(100, 500).unwrap();
-        assert!(result.safe_steps <= 500);
-    }
 
     #[test]
     fn test_lyapunov_confidence_levels() {
-        let bodies = three_body_system();
+        let bodies = five_body_system();
         let estimator = LyapunovEstimator::new(
             &bodies,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );

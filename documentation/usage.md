@@ -31,14 +31,14 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 ```
 
 ### Encrypt a File
-Kelvin uses the orbital simulation to generate a chaotic keystream for encryption.
+Kelvin uses the orbital simulation to generate a chaotic **Orbital One-Time Pad** for encryption.
 
 ```bash
 ./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
 ```
 
 ### Decrypt a File
-Decryption is the exact inverse of encryption. The same config must be used.
+Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config must be used.
 
 ```bash
 ./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar
@@ -104,7 +104,7 @@ let kp = k.asymmetric_keypair();
 println!("Curve25519: {:x?}", kp.curve_public.as_bytes());
 // Post-Quantum
 println!("ML-KEM-768: {:x?}", kp.kem_public.to_bytes());
-println!("ML-DSA-65:  {:x?}", kp.dsa_public.encode());
+println!("ML-DSA-65:  {:x?}", kp.dsa_public.to_bytes());
 ```
 
 ---

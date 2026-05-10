@@ -40,11 +40,13 @@ mod fixed_math;
 mod body;
 mod constants;
 mod integrator;
+mod stability;
 
 pub use fixed_math::Fixed;
 pub use body::{Vec3, OrbitalBody};
-pub use constants::{DEFAULT_G, SOLAR_MASS, SOFTENING_FACTOR, DEFAULT_DT, MIN_BODIES, MAX_BODIES, DEFAULT_STEPS, DEFAULT_RESEED_INTERVAL};
+pub use constants::{DEFAULT_G, SOLAR_MASS, SOFTENING_FACTOR, DEFAULT_DT, MIN_DT, MAX_DT, MIN_BODIES, MAX_BODIES, DEFAULT_STEPS, DEFAULT_RESEED_INTERVAL, MIN_SEPARATION, MONITOR_INTERVAL, EJECTION_ENERGY_THRESHOLD};
 pub use integrator::{compute_accelerations, verlet_step, simulate};
+pub use stability::{StabilityError, is_body_ejected, detect_collapse, simulate_with_monitoring};
 
 #[cfg(test)]
 mod tests {

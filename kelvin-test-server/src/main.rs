@@ -60,10 +60,9 @@ pub struct TestVector {
     pub generation_time_s: f64,
 }
 
-/// Generate a standard 3-body test configuration (Standard security level).
+/// Generate a standard 5-body test configuration (Standard security level).
 ///
 /// Uses a small step count that the Lyapunov estimator will accept.
-/// The estimator typically allows ~73 safe steps for this config.
 fn standard_config() -> (Vec<OrbitalBody>, u64, u64) {
     let bodies = vec![
         // Central body (1 solar mass at origin)
@@ -87,6 +86,18 @@ fn standard_config() -> (Vec<OrbitalBody>, u64, u64) {
                 Fixed::from_raw(4896710557980672i128), // ~5 AU/yr
                 Fixed::from_raw(1 << 62),              // slight z-component
             ),
+        ),
+        // Planet 3: at -1 AU, retrograde-ish
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        ),
+        // Planet 4: at 2 AU, inclined
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
         ),
     ];
     let total_steps = 50;
@@ -224,7 +235,7 @@ fn main() -> Result<(), String> {
     let (bodies, steps, reseed) = standard_config();
 
     vectors.push(generate_test_vector(
-        "Standard level, short plaintext (3 bodies)",
+        "Standard level, short plaintext (5 bodies)",
         "Standard",
         bodies.clone(),
         steps,
@@ -233,7 +244,7 @@ fn main() -> Result<(), String> {
     )?);
 
     vectors.push(generate_test_vector(
-        "Standard level, empty plaintext (3 bodies)",
+        "Standard level, empty plaintext (5 bodies)",
         "Standard",
         bodies.clone(),
         steps,
@@ -242,7 +253,7 @@ fn main() -> Result<(), String> {
     )?);
 
     vectors.push(generate_test_vector(
-        "Standard level, 1KB plaintext (3 bodies)",
+        "Standard level, 1KB plaintext (5 bodies)",
         "Standard",
         bodies.clone(),
         steps,

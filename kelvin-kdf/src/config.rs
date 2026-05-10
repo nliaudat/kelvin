@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 
 use kelvin_core::{Fixed, OrbitalBody, Vec3};
 #[allow(unused_imports)]
-use kelvin_core::{MIN_BODIES, MAX_BODIES, DEFAULT_RESEED_INTERVAL};
+use kelvin_core::{MIN_BODIES, MAX_BODIES, DEFAULT_RESEED_INTERVAL, MIN_DT, MAX_DT};
 
 /// Orbital configuration — the shared secret.
 ///
@@ -81,8 +81,12 @@ impl OrbitalConfig {
                 return Err(ConfigError::NonPositiveMass { body_index: i });
             }
         }
-        if self.dt <= Fixed::ZERO {
-            return Err(ConfigError::InvalidDt);
+        if self.dt < MIN_DT || self.dt > MAX_DT {
+            return Err(ConfigError::InvalidDt {
+                dt: self.dt,
+                min_dt: MIN_DT,
+                max_dt: MAX_DT,
+            });
         }
         if self.softening <= Fixed::ZERO {
             return Err(ConfigError::InvalidSoftening);
@@ -262,9 +266,16 @@ pub enum ConfigError {
         /// Index of the offending body.
         body_index: usize,
     },
-    /// Time step must be positive.
-    #[error("time step must be positive")]
-    InvalidDt,
+    /// Time step is outside acceptable bounds.
+    #[error("time step {dt} is outside acceptable range [{min_dt}, {max_dt}]")]
+    InvalidDt {
+        /// The provided time step.
+        dt: Fixed,
+        /// Minimum allowed time step.
+        min_dt: Fixed,
+        /// Maximum allowed time step.
+        max_dt: Fixed,
+    },
     /// Softening factor must be positive.
     #[error("softening factor must be positive")]
     InvalidSoftening,
@@ -377,11 +388,21 @@ mod tests {
             Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
             Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
         );
+        let planet3 = OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        );
+        let planet4 = OrbitalBody::new(
+            Fixed::from_raw(1 << 51),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+        );
         OrbitalConfig::new(
-            vec![sun, planet1, planet2],
+            vec![sun, planet1, planet2, planet3, planet4],
             10000,
             1000,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         ).unwrap()
@@ -390,7 +411,7 @@ mod tests {
     #[test]
     fn test_valid_config() {
         let config = valid_config();
-        assert_eq!(config.bodies.len(), 3);
+        assert_eq!(config.bodies.len(), 5);
     }
 
     #[test]
@@ -400,7 +421,7 @@ mod tests {
         let result = OrbitalConfig::new(
             vec![sun, planet],
             10000, 1000,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
@@ -414,10 +435,15 @@ mod tests {
             Vec3::ZERO,
             Vec3::ZERO,
         );
+        let body2 = OrbitalBody::new(
+            Fixed::ONE,
+            Vec3::ZERO,
+            Vec3::ZERO,
+        );
         let result = OrbitalConfig::new(
-            vec![body, body, body],
+            vec![body, body2, body2, body2, body2],
             10000, 1000,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
@@ -429,10 +455,12 @@ mod tests {
         let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
         let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
+        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
+        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![sun, planet, planet2],
+            vec![sun, planet, planet2, planet3, planet4],
             0, 1000,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
@@ -464,18 +492,37 @@ mod tests {
     }
 
     #[test]
-    fn test_validate_dt() {
+    fn test_validate_dt_too_small() {
         let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
         let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
+        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
+        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![sun, planet, planet2],
+            vec![sun, planet, planet2, planet3, planet4],
             10000, 1000,
             Fixed::ZERO,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
-        assert!(matches!(result, Err(ConfigError::InvalidDt)));
+        assert!(matches!(result, Err(ConfigError::InvalidDt { .. })));
+    }
+
+    #[test]
+    fn test_validate_dt_too_large() {
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
+        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
+        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
+        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
+        let result = OrbitalConfig::new(
+            vec![sun, planet, planet2, planet3, planet4],
+            10000, 1000,
+            Fixed::from_raw(1 << 62), // exceeds MAX_DT
+            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
+        );
+        assert!(matches!(result, Err(ConfigError::InvalidDt { .. })));
     }
 
     #[test]
@@ -483,10 +530,12 @@ mod tests {
         let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
         let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
+        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
+        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![sun, planet, planet2],
+            vec![sun, planet, planet2, planet3, planet4],
             10000, 1000,
-            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_DT,
             Fixed::ZERO,
             kelvin_core::DEFAULT_G,
         );

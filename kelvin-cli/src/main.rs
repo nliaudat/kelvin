@@ -121,12 +121,12 @@ fn main() -> Result<()> {
             
             // Default: Show ML-DSA-65
             if all || (!ecc && !kem) {
-                println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.encode()));
+                println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.to_bytes()));
                 shown = true;
             }
             
             if !shown {
-                 println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.encode()));
+                 println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.to_bytes()));
             }
         }
         Commands::Analyze { config } => {
@@ -182,9 +182,9 @@ fn main() -> Result<()> {
 fn generate_config(level: &str) -> Result<OrbitalConfig> {
     let mut rng = rand::thread_rng();
     let (n_bodies, steps) = match level {
-        "standard" => (3, 10_000),
-        "paranoid" => (5, 50_000),
-        "maximum" => (10, 200_000),
+        "standard" => (3, 1_000_000),
+        "paranoid" => (5, 10_000_000),
+        "maximum" => (10, 100_000_000),
         _ => anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level),
     };
 
@@ -210,19 +210,22 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         let radius = (i as i64 + 1) * 50;
         let mass = Fixed::from_raw(rng.gen_range(1 << 30..1 << 35));
         
-        // Randomize position on a sphere of 'radius'
+        // Uniform spherical sampling for position
         let theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
-        let phi = rng.gen_range(0.0..std::f64::consts::PI);
+        let phi = (rng.gen_range(-1.0..1.0f64)).acos();
         
         let x = (radius as f64) * phi.sin() * theta.cos();
         let y = (radius as f64) * phi.sin() * theta.sin();
         let z = (radius as f64) * phi.cos();
 
-        // Velocity magnitude (approx circular)
+        // Velocity: uniform direction, fixed magnitude
+        let v_theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
+        let v_phi = (rng.gen_range(-1.0..1.0f64)).acos();
         let v_mag = 1.0 / (radius as f64).sqrt() * 6.3;
-        let vx = rng.gen_range(-v_mag..v_mag);
-        let vy = rng.gen_range(-v_mag..v_mag);
-        let vz = rng.gen_range(-v_mag..v_mag);
+        
+        let vx = v_mag * v_phi.sin() * v_theta.cos();
+        let vy = v_mag * v_phi.sin() * v_theta.sin();
+        let vz = v_mag * v_phi.cos();
 
         bodies.push(OrbitalBody::new(
             mass,

@@ -27,11 +27,23 @@ pub const SOFTENING_FACTOR: Fixed = Fixed::from_raw(1 << 44);
 
 /// Default time step in years.
 ///
-/// ~1e-6 years ≈ 31.5 seconds
-pub const DEFAULT_DT: Fixed = Fixed::from_raw(1 << 44);
+/// ~1e-3 years ≈ 8.76 hours (1000× faster than previous default)
+pub const DEFAULT_DT: Fixed = Fixed::from_raw(1 << 54);
+
+/// Minimum allowed time step in years.
+///
+/// ~1e-8 years ≈ 0.315 seconds — prevents numerical instability from
+/// excessively small steps that could cause overflow in step counts.
+pub const MIN_DT: Fixed = Fixed::from_raw(1 << 34);
+
+/// Maximum allowed time step in years.
+///
+/// ~1e-1 years ≈ 36.5 days — prevents loss of orbital resolution
+/// from excessively large steps that could skip orbital dynamics.
+pub const MAX_DT: Fixed = Fixed::from_raw(1 << 60);
 
 /// Minimum number of bodies required for meaningful chaos.
-pub const MIN_BODIES: usize = 3;
+pub const MIN_BODIES: usize = 5; 
 
 /// Maximum number of bodies supported.
 pub const MAX_BODIES: usize = 100;
@@ -41,6 +53,26 @@ pub const DEFAULT_STEPS: u64 = 1_000_000;
 
 /// Default reseed interval (steps between key schedule reseeds).
 pub const DEFAULT_RESEED_INTERVAL: u64 = 10_000;
+
+/// Minimum allowed separation between any two bodies (in AU).
+///
+/// If any pair of bodies comes closer than this distance, the system
+/// is considered to have undergone gravitational collapse (effective
+/// degree-of-freedom reduction). ~9e-13 AU ≈ 0.13 meters.
+pub const MIN_SEPARATION: Fixed = Fixed::from_raw(1 << 40);
+
+/// Default monitoring interval for ejection/collapse detection.
+///
+/// The simulation checks for stability every `MONITOR_INTERVAL` steps.
+/// This is set to 1% of a standard simulation (10,000 steps).
+pub const MONITOR_INTERVAL: u64 = 10_000;
+
+/// Energy threshold for detecting unbound (ejected) bodies.
+///
+/// A body with total specific energy >= `EJECTION_ENERGY_THRESHOLD`
+/// is considered ejected. The small positive value accounts for
+/// numerical precision in fixed-point arithmetic.
+pub const EJECTION_ENERGY_THRESHOLD: Fixed = Fixed::from_raw(1 << 20);
 
 #[cfg(test)]
 mod tests {

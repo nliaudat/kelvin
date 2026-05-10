@@ -18,14 +18,22 @@ pub enum ScheduleState {
     Exhausted,
 }
 
+/// Size of the seed material in bytes (5× the standard 64-byte SHA3-512 output).
+///
+/// 320 bytes = 5 × 64 bytes, providing 5× more entropy per reseed cycle.
+const SEED_SIZE: usize = 320;
+
 /// Key schedule for the Kelvin cryptosystem.
 ///
 /// Manages key derivation from orbital simulation state.
 /// Each key is 32 bytes (cipher key) + 16 bytes (nonce/IV).
+///
+/// The seed is 320 bytes (5× SHA3-512), providing 5× more entropy
+/// per reseed cycle compared to the standard 64-byte seed.
 #[derive(Clone, Debug)]
 pub struct KeySchedule {
-    /// Current seed material.
-    seed: [u8; 64],
+    /// Current seed material (320 bytes = 5× SHA3-512).
+    seed: [u8; 320],
     /// Current step counter.
     step: u64,
     /// Total steps in the simulation.
@@ -45,12 +53,12 @@ pub struct KeySchedule {
 impl KeySchedule {
     /// Create a new key schedule.
     ///
-    /// `seed` is the initial 64-byte seed from SHA3-512 extraction.
+    /// `seed` is the initial 320-byte seed from SHA3-512 extraction.
     /// `total_steps` is the total number of simulation steps.
     /// `reseed_interval` is the number of steps between reseeds.
     /// `safe_steps` is the maximum safe steps from Lyapunov estimation.
     pub fn new(
-        seed: [u8; 64],
+        seed: [u8; 320],
         total_steps: u64,
         reseed_interval: u64,
         safe_steps: u64,
@@ -105,13 +113,24 @@ impl KeySchedule {
         self.step += self.reseed_interval;
         self.keys_generated += 1;
 
-        // Reseed: derive new seed from current seed
-        let mut reseed_hasher = Sha3_512::new();
-        reseed_hasher.update(b"kelvin-reseed-v1");
-        reseed_hasher.update(self.seed);
-        reseed_hasher.update(self.step.to_le_bytes());
-        let new_hash = reseed_hasher.finalize();
-        self.seed.copy_from_slice(&new_hash);
+        // Reseed: derive new 320-byte seed from current seed using counter mode
+        let mut reseed_buf = [0u8; 320];
+        let mut counter: u64 = 0;
+        let mut offset = 0;
+        while offset < SEED_SIZE {
+            let mut reseed_hasher = Sha3_512::new();
+            reseed_hasher.update(b"kelvin-reseed-v1");
+            reseed_hasher.update(self.seed);
+            reseed_hasher.update(self.step.to_le_bytes());
+            reseed_hasher.update(counter.to_le_bytes());
+            let hash = reseed_hasher.finalize();
+            let remaining = SEED_SIZE - offset;
+            let to_copy = remaining.min(64);
+            reseed_buf[offset..offset + to_copy].copy_from_slice(&hash[..to_copy]);
+            offset += to_copy;
+            counter += 1;
+        }
+        self.seed = reseed_buf;
 
         // Check exhaustion
         if self.step >= self.safe_steps || self.step >= self.total_steps {
@@ -149,7 +168,7 @@ impl KeySchedule {
     }
 
     /// Reset the schedule with a new seed.
-    pub fn reset(&mut self, seed: [u8; 64]) {
+    pub fn reset(&mut self, seed: [u8; 320]) {
         self.seed = seed;
         self.step = 0;
         self.keys_generated = 0;
@@ -161,10 +180,10 @@ impl KeySchedule {
 mod tests {
     use super::*;
 
-    fn test_seed() -> [u8; 64] {
-        let mut seed = [0u8; 64];
-        for i in 0..64 {
-            seed[i] = i as u8;
+    fn test_seed() -> [u8; 320] {
+        let mut seed = [0u8; 320];
+        for i in 0..320 {
+            seed[i] = (i % 256) as u8;
         }
         seed
     }

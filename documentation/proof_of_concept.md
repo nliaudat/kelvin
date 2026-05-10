@@ -89,9 +89,9 @@ All 93 unit tests pass across the four core crates:
 |-------|-------|--------|
 | kelvin | 1 | ✅ PASS |
 | kelvin-core | 51 | ✅ PASS |
-| kelvin-kdf | 36 | ✅ PASS |
+| kelvin-kdf | 34 | ✅ PASS |
 | kelvin-stream | 9 | ✅ PASS |
-| **Total** | **97** | **✅ ALL PASS** |
+| **Total** | **95** | **✅ ALL PASS** |
 
 ---
 
@@ -115,34 +115,35 @@ The Verlet integrator is inherently sequential — step N+1 requires the output 
 - **No closed-form solution**: The n-body problem ($N \ge 3$) has no known analytical solution. Kelvin strictly enforces $N \ge 3$ to prevent integration of predictable 2-body orbits.
 - **No precomputation advantage**: Each `OrbitalConfig` produces a unique keystream; precomputed tables are useless due to the dynamic gravitational constant ($G$) and large state space.
 
-### 4.4 Asymmetric Identity Verification
-The integration of Curve25519 allows for **Asymmetric Identity Verification**. From a single shared configuration, parties can:
-- Derive a bit-identical **Public Key**.
-- Verify their peer's identity without revealing the underlying orbital state.
-- Perform a simulated ECDH exchange to further diversify the symmetric keys.
+### 4.4 Hybrid Post-Quantum Identity Verification
+The asymmetric layer provides **Hybrid Post-Quantum Identity Verification**, combining classical and quantum-resistant primitives:
+- **Primary Identity (ML-DSA-65)**: Provides FIPS 204 standardized digital signatures resistant to Shor's algorithm.
+- **Key Encapsulation (ML-KEM-768)**: Provides FIPS 203 standardized post-quantum key exchange.
+- **Classical Fallback (Curve25519)**: Ensures continued security on classical hardware.
 
-Wide reduction ensures that the 512-bit chaotic output is mapped to the 256-bit scalar space with **zero bias**, preserving the entropy of the simulation.
+Parties can:
+- Derive a bit-identical **Hybrid Public Key** from a shared configuration.
+- Verify identities using ML-DSA signatures, ensuring quantum resistance.
+- Perform hybrid key exchange, combining the security of X25519 with ML-KEM.
 
 ### 4.5 Chaotic Regime Enforcement
-Kelvin enforces a mandatory **Lyapunov Horizon Check** during initialization.
+Kelvin enforces a mandatory **Lyapunov Horizon Check** in all critical paths:
 - **Rule**: `total_steps >= safe_steps` (the horizon of unpredictability).
-- **Security Goal**: This ensures that key material is extracted only after the simulation has reached the chaotic regime, where the state is maximally decoupled from the initial configuration secrets. Extracting before this horizon would result in lower entropy.
-- **Implementation**: The library rejects configurations where the requested steps are less than the estimated Lyapunov time.
+- **Security Goal**: This ensures that key material is extracted only after the simulation has reached the chaotic regime, where the state is maximally decoupled from the initial configuration.
+- **Enforcement**: This check is mandatory in both the main `Kelvin` initialization and the `OrbitalKeyPair::derive` pathway, preventing any extraction of entropy from the predictable (non-chaotic) phase of the simulation.
 
 ### 4.3 Memory Safety
-
 All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at compile time. This eliminates entire classes of vulnerabilities (buffer overflows, use-after-free, etc.).
 
 ---
 
 ## 5. Performance Benchmarks
 
-| Operation | Standard (3 bodies, 50 steps) | Paranoid (5 bodies, 50 steps) |
+| Operation | Standard (3 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
 |-----------|-------------------------------|-------------------------------|
-| Setup + Encrypt (short) | ~27ms | ~90ms |
-| Setup + Encrypt (1KB) | ~30ms | ~89ms |
-| Setup + Encrypt (10KB) | ~26ms | — |
-| Test vector generation | ~0.14s (5 vectors) | — |
+| Setup + Keygen (CLI) | ~1.1s | ~12.5s |
+| ML-DSA Signature | ~2ms | ~2ms |
+| ML-KEM Encapsulation | ~1ms | ~1ms |
 
 ---
 
@@ -151,7 +152,7 @@ All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at 
 - **Experimental status**: Kelvin has not undergone formal cryptanalysis. The security claims are based on physical reasoning (chaotic dynamics) rather than mathematical proof.
 - **Key exchange**: Kelvin does not define a key exchange protocol. The `OrbitalConfig` must be established through an out-of-band mechanism.
 - **Memory hardness**: Unlike Argon2, Kelvin is not memory-hard. An attacker with sufficient RAM faces no memory constraint.
-- **Quantum resistance**: ChaCha20 provides 128-bit post-quantum security (Grover's algorithm), which is adequate but not future-proof against quantum advances.
+- **Quantum resistance**: Full quantum resistance is achieved through the integration of **ML-DSA** and **ML-KEM**. The stream cipher (ChaCha20) remains vulnerable to Grover's algorithm but maintains 128-bit PQ security.
 
 ---
 
