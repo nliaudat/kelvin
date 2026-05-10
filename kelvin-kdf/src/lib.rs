@@ -31,8 +31,10 @@ mod config;
 mod lyapunov;
 mod extractor;
 mod schedule;
+mod asymmetric;
 
 pub use config::{OrbitalConfig, ConfigError};
 pub use lyapunov::{LyapunovEstimator, LyapunovResult, LyapunovConfidence, LyapunovError};
 pub use extractor::extract_seed;
 pub use schedule::{KeySchedule, ScheduleState};
+pub use asymmetric::{OrbitalKeyPair, AsymmetricError};

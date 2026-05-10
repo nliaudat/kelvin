@@ -4,7 +4,6 @@
 //! simulation. It is the shared secret between communicating parties.
 
 use alloc::vec::Vec;
-use core::fmt;
 
 use kelvin_core::{Fixed, OrbitalBody, Vec3};
 #[allow(unused_imports)]
@@ -239,9 +238,10 @@ impl OrbitalConfig {
 }
 
 /// Errors from configuration validation.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum ConfigError {
     /// Too few bodies.
+    #[error("too few bodies: {count}, need at least {min}")]
     TooFewBodies {
         /// Number of bodies provided.
         count: usize,
@@ -249,6 +249,7 @@ pub enum ConfigError {
         min: usize,
     },
     /// Too many bodies.
+    #[error("too many bodies: {count}, max is {max}")]
     TooManyBodies {
         /// Number of bodies provided.
         count: usize,
@@ -256,49 +257,32 @@ pub enum ConfigError {
         max: usize,
     },
     /// A body has non-positive mass.
+    #[error("body {body_index} has non-positive mass")]
     NonPositiveMass {
         /// Index of the offending body.
         body_index: usize,
     },
     /// Time step must be positive.
+    #[error("time step must be positive")]
     InvalidDt,
     /// Softening factor must be positive.
+    #[error("softening factor must be positive")]
     InvalidSoftening,
     /// Total steps must be > 0.
+    #[error("total steps must be > 0")]
     ZeroSteps,
     /// Reseed interval must be > 0 and <= total_steps.
+    #[error("reseed interval must be > 0 and <= total_steps")]
     InvalidReseedInterval,
     /// Gravitational constant must be within [1, 1000].
+    #[error("gravitational constant must be within [1, 1000]")]
     InvalidG,
     /// Serialization error.
+    #[error("serialization error: {0}")]
     Serialization(String),
     /// Invalid binary data.
+    #[error("invalid binary data: {0}")]
     InvalidBinary(String),
-}
-
-impl fmt::Display for ConfigError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ConfigError::TooFewBodies { count, min } => {
-                write!(f, "too few bodies: {count}, need at least {min}")
-            }
-            ConfigError::TooManyBodies { count, max } => {
-                write!(f, "too many bodies: {count}, max is {max}")
-            }
-            ConfigError::NonPositiveMass { body_index } => {
-                write!(f, "body {body_index} has non-positive mass")
-            }
-            ConfigError::InvalidDt => write!(f, "time step must be positive"),
-            ConfigError::InvalidSoftening => write!(f, "softening factor must be positive"),
-            ConfigError::ZeroSteps => write!(f, "total steps must be > 0"),
-            ConfigError::InvalidReseedInterval => {
-                write!(f, "reseed interval must be > 0 and <= total_steps")
-            }
-            ConfigError::InvalidG => write!(f, "gravitational constant must be within [1, 1000]"),
-            ConfigError::Serialization(msg) => write!(f, "serialization error: {msg}"),
-            ConfigError::InvalidBinary(msg) => write!(f, "invalid binary data: {msg}"),
-        }
-    }
 }
 
 #[cfg(feature = "serde")]

@@ -264,40 +264,27 @@ impl Div for Fixed {
         let a_abs = a.unsigned_abs();
         let b_abs = b.unsigned_abs();
 
-        // Compute (a_abs << 64) / b_abs using 32-bit chunked long division
-        // We split the 192-bit dividend (a_abs << 64) into six 32-bit chunks.
-        let a5 = (a_abs >> 96) as u32 as u128;
-        let a4 = (a_abs >> 64) as u32 as u128;
-        let a3 = (a_abs >> 32) as u32 as u128;
-        let a2 = (a_abs & 0xFFFFFFFF) as u128;
-
-        let mut rem = a5;
-        let mut quotient = rem / b_abs;
-        rem %= b_abs;
-
-        rem = (rem << 32) | a4;
-        quotient = quotient.wrapping_shl(32) | (rem / b_abs);
-        rem %= b_abs;
-
-        rem = (rem << 32) | a3;
-        quotient = quotient.wrapping_shl(32) | (rem / b_abs);
-        rem %= b_abs;
-
-        rem = (rem << 32) | a2;
-        quotient = quotient.wrapping_shl(32) | (rem / b_abs);
-        rem %= b_abs;
-
-        rem <<= 32;
-        quotient = quotient.wrapping_shl(32) | (rem / b_abs);
-        rem %= b_abs;
-
-        rem <<= 32;
-        quotient = quotient.wrapping_shl(32) | (rem / b_abs);
+        let quotient = a_abs / b_abs;
+        let mut rem = a_abs % b_abs;
+        
+        // The result is (a_abs << 64) / b_abs.
+        // We handle the integer part and fractional part in a single loop.
+        let mut res = quotient;
+        
+        for _ in 0..64 {
+            let high_bit = (rem >> 127) & 1;
+            rem <<= 1;
+            res = res.wrapping_shl(1);
+            if high_bit == 1 || rem >= b_abs {
+                rem = rem.wrapping_sub(b_abs);
+                res |= 1;
+            }
+        }
 
         let result = if sign {
-            -(quotient as i128)
+            -(res as i128)
         } else {
-            quotient as i128
+            res as i128
         };
         
         Fixed(result)
