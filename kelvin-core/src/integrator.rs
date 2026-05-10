@@ -27,7 +27,6 @@ use alloc::vec::Vec;
 use alloc::vec;
 
 use crate::body::{OrbitalBody, Vec3};
-use crate::constants::G;
 use crate::Fixed;
 
 /// Compute gravitational accelerations for all bodies.
@@ -41,6 +40,7 @@ use crate::Fixed;
 pub fn compute_accelerations(
     bodies: &[OrbitalBody],
     softening: Fixed,
+    g: Fixed,
 ) -> Vec<Vec3> {
     let n = bodies.len();
     let mut accelerations = vec![Vec3::ZERO; n];
@@ -59,7 +59,7 @@ pub fn compute_accelerations(
             let dist_cubed = dist_sq * dist;
 
             // G / dist³
-            let factor = G / dist_cubed;
+            let factor = g / dist_cubed;
 
             // a_i += G * m_j * (r_j - r_i) / dist³
             let acc_i = diff.scale(factor * bodies[j].mass);
@@ -84,11 +84,12 @@ pub fn verlet_step(
     bodies: &mut [OrbitalBody],
     dt: Fixed,
     softening: Fixed,
+    g: Fixed,
 ) {
     let half_dt = dt / Fixed::from_int(2);
 
     // Step 1: Kick (half step)
-    let accelerations = compute_accelerations(bodies, softening);
+    let accelerations = compute_accelerations(bodies, softening, g);
     for (body, acc) in bodies.iter_mut().zip(accelerations.iter()) {
         body.velocity += acc.scale(half_dt);
     }
@@ -99,7 +100,7 @@ pub fn verlet_step(
     }
 
     // Step 3: Compute new accelerations
-    let new_accelerations = compute_accelerations(bodies, softening);
+    let new_accelerations = compute_accelerations(bodies, softening, g);
 
     // Step 4: Kick (half step)
     for (body, acc) in bodies.iter_mut().zip(new_accelerations.iter()) {
@@ -115,9 +116,10 @@ pub fn simulate(
     steps: u64,
     dt: Fixed,
     softening: Fixed,
+    g: Fixed,
 ) {
     for _ in 0..steps {
-        verlet_step(bodies, dt, softening);
+        verlet_step(bodies, dt, softening, g);
     }
 }
 
@@ -127,7 +129,7 @@ pub fn simulate(
 /// KE = Σ 0.5 * m_i * v_i²
 /// PE = -Σ_{i<j} G * m_i * m_j / |r_ij|
 #[allow(dead_code)]
-pub fn total_energy(bodies: &[OrbitalBody]) -> Fixed {
+pub fn total_energy(bodies: &[OrbitalBody], g: Fixed) -> Fixed {
     let mut kinetic = Fixed::ZERO;
     let mut potential = Fixed::ZERO;
 
@@ -140,7 +142,7 @@ pub fn total_energy(bodies: &[OrbitalBody]) -> Fixed {
             let diff = bodies[j].position - bodies[i].position;
             let dist = diff.length();
             if dist > Fixed::ZERO {
-                potential -= G * bodies[i].mass * bodies[j].mass / dist;
+                potential -= g * bodies[i].mass * bodies[j].mass / dist;
             }
         }
     }
@@ -179,7 +181,7 @@ pub fn center_of_mass(bodies: &[OrbitalBody]) -> Vec3 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Fixed;
+    use crate::{Fixed, DEFAULT_G};
 
     fn two_body_system() -> Vec<OrbitalBody> {
         let sun = OrbitalBody::new(
@@ -198,7 +200,7 @@ mod tests {
     #[test]
     fn test_compute_accelerations() {
         let bodies = two_body_system();
-        let accs = compute_accelerations(&bodies, Fixed::from_raw(1 << 44));
+        let accs = compute_accelerations(&bodies, Fixed::from_raw(1 << 44), DEFAULT_G);
         assert_eq!(accs.len(), 2);
         // Sun should be attracted toward planet
         assert!(accs[0].x > Fixed::ZERO);
@@ -212,7 +214,7 @@ mod tests {
         let initial_momentum = total_momentum(&bodies);
 
         for _ in 0..100 {
-            verlet_step(&mut bodies, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44));
+            verlet_step(&mut bodies, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44), DEFAULT_G);
         }
 
         let final_momentum = total_momentum(&bodies);
@@ -223,13 +225,13 @@ mod tests {
     #[test]
     fn test_verlet_step_energy_stability() {
         let mut bodies = two_body_system();
-        let initial_energy = total_energy(&bodies);
+        let initial_energy = total_energy(&bodies, DEFAULT_G);
 
         for _ in 0..1000 {
-            verlet_step(&mut bodies, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44));
+            verlet_step(&mut bodies, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44), DEFAULT_G);
         }
 
-        let final_energy = total_energy(&bodies);
+        let final_energy = total_energy(&bodies, DEFAULT_G);
         let energy_diff = (final_energy - initial_energy).abs();
         let relative_diff = energy_diff / initial_energy.abs();
         assert!(relative_diff.to_f64() < 0.01, "Energy drift too large: {}", relative_diff.to_f64());
@@ -238,7 +240,7 @@ mod tests {
     #[test]
     fn test_simulate_runs() {
         let mut bodies = two_body_system();
-        simulate(&mut bodies, 100, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44));
+        simulate(&mut bodies, 100, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44), DEFAULT_G);
         // Bodies should have moved
         assert!(bodies[0].position.length() > Fixed::ZERO || bodies[1].position.length() > Fixed::ZERO);
     }
@@ -254,7 +256,7 @@ mod tests {
     #[test]
     fn test_total_energy_negative() {
         let bodies = two_body_system();
-        let energy = total_energy(&bodies);
+        let energy = total_energy(&bodies, DEFAULT_G);
         // Bound orbit should have negative total energy
         assert!(energy < Fixed::ZERO);
     }
@@ -269,7 +271,7 @@ mod tests {
             OrbitalBody::new(mass, Vec3::new(Fixed::ZERO, Fixed::from_int(1), Fixed::ZERO), Vec3::ZERO),
         ];
 
-        let accs = compute_accelerations(&bodies, Fixed::from_raw(1 << 44));
+        let accs = compute_accelerations(&bodies, Fixed::from_raw(1 << 44), DEFAULT_G);
         assert_eq!(accs.len(), 3);
         // All accelerations should be non-zero
         for acc in &accs {
@@ -280,7 +282,7 @@ mod tests {
     #[test]
     fn test_single_body_no_acceleration() {
         let body = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let accs = compute_accelerations(&[body], Fixed::from_raw(1 << 44));
+        let accs = compute_accelerations(&[body], Fixed::from_raw(1 << 44), DEFAULT_G);
         assert_eq!(accs.len(), 1);
         assert_eq!(accs[0], Vec3::ZERO);
     }
@@ -293,7 +295,7 @@ mod tests {
             Vec3::new(Fixed::from_int(1), Fixed::ZERO, Fixed::ZERO),
         )];
         let initial_pos = bodies[0].position;
-        verlet_step(&mut bodies, Fixed::from_int(1), Fixed::from_raw(1 << 44));
+        verlet_step(&mut bodies, Fixed::from_int(1), Fixed::from_raw(1 << 44), DEFAULT_G);
         // Single body should drift at constant velocity
         assert!(bodies[0].position.x > initial_pos.x);
     }

@@ -28,6 +28,8 @@ pub struct OrbitalConfig {
     pub dt: Fixed,
     /// Softening factor in AU.
     pub softening: Fixed,
+    /// Gravitational constant G.
+    pub g: Fixed,
 }
 
 impl OrbitalConfig {
@@ -40,6 +42,7 @@ impl OrbitalConfig {
         reseed_interval: u64,
         dt: Fixed,
         softening: Fixed,
+        g: Fixed,
     ) -> Result<Self, ConfigError> {
         let config = OrbitalConfig {
             bodies,
@@ -47,6 +50,7 @@ impl OrbitalConfig {
             reseed_interval,
             dt,
             softening,
+            g,
         };
         config.validate()?;
         Ok(config)
@@ -90,6 +94,9 @@ impl OrbitalConfig {
         if self.reseed_interval == 0 || self.reseed_interval > self.total_steps {
             return Err(ConfigError::InvalidReseedInterval);
         }
+        if self.g < Fixed::from_int(1) || self.g > Fixed::from_int(1000) {
+            return Err(ConfigError::InvalidG);
+        }
         Ok(())
     }
 
@@ -105,12 +112,10 @@ impl OrbitalConfig {
         serde_json::from_str(json).map_err(|e| ConfigError::Serialization(e.to_string()))
     }
 
-    /// Serialize to binary format.
-    ///
     /// Format: [n_bodies: u32][body_data: n × 112 bytes][total_steps: u64]
-    ///         [reseed_interval: u64][dt: i128][softening: i128]
+    ///         [reseed_interval: u64][dt: i128][softening: i128][g: i128]
     pub fn to_binary(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16);
+        let mut buf = Vec::with_capacity(4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16 + 16);
 
         // Number of bodies (u32)
         buf.extend_from_slice(&(self.bodies.len() as u32).to_le_bytes());
@@ -131,6 +136,7 @@ impl OrbitalConfig {
         buf.extend_from_slice(&self.reseed_interval.to_le_bytes());
         buf.extend_from_slice(&self.dt.to_raw().to_le_bytes());
         buf.extend_from_slice(&self.softening.to_raw().to_le_bytes());
+        buf.extend_from_slice(&self.g.to_raw().to_le_bytes());
 
         buf
     }
@@ -149,7 +155,7 @@ impl OrbitalConfig {
         offset += 4;
 
         let body_size = 112; // 7 × i128
-        let header_size = 4 + n_bodies * body_size + 8 + 8 + 16 + 16;
+        let header_size = 4 + n_bodies * body_size + 8 + 8 + 16 + 16 + 16;
 
         if data.len() < header_size {
             return Err(ConfigError::InvalidBinary("data too short for bodies".into()));
@@ -213,6 +219,11 @@ impl OrbitalConfig {
         let softening = Fixed::from_raw(i128::from_le_bytes(
             data[offset..offset + 16].try_into().unwrap(),
         ));
+        offset += 16;
+
+        let g = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
 
         let config = OrbitalConfig {
             bodies,
@@ -220,6 +231,7 @@ impl OrbitalConfig {
             reseed_interval,
             dt,
             softening,
+            g,
         };
         config.validate()?;
         Ok(config)
@@ -256,6 +268,8 @@ pub enum ConfigError {
     ZeroSteps,
     /// Reseed interval must be > 0 and <= total_steps.
     InvalidReseedInterval,
+    /// Gravitational constant must be within [1, 1000].
+    InvalidG,
     /// Serialization error.
     Serialization(String),
     /// Invalid binary data.
@@ -280,6 +294,7 @@ impl fmt::Display for ConfigError {
             ConfigError::InvalidReseedInterval => {
                 write!(f, "reseed interval must be > 0 and <= total_steps")
             }
+            ConfigError::InvalidG => write!(f, "gravitational constant must be within [1, 1000]"),
             ConfigError::Serialization(msg) => write!(f, "serialization error: {msg}"),
             ConfigError::InvalidBinary(msg) => write!(f, "invalid binary data: {msg}"),
         }
@@ -290,12 +305,13 @@ impl fmt::Display for ConfigError {
 impl serde::Serialize for OrbitalConfig {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("OrbitalConfig", 5)?;
+        let mut state = serializer.serialize_struct("OrbitalConfig", 6)?;
         state.serialize_field("bodies", &self.bodies)?;
         state.serialize_field("total_steps", &self.total_steps)?;
         state.serialize_field("reseed_interval", &self.reseed_interval)?;
         state.serialize_field("dt", &self.dt.to_raw())?;
         state.serialize_field("softening", &self.softening.to_raw())?;
+        state.serialize_field("g", &self.g.to_raw())?;
         state.end()
     }
 }
@@ -313,6 +329,7 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
             reseed_interval: Option<u64>,
             dt_raw: Option<i128>,
             softening_raw: Option<i128>,
+            g_raw: Option<i128>,
         }
 
         struct ConfigVisitor;
@@ -333,6 +350,7 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                         "reseed_interval" => fields.reseed_interval = Some(map.next_value()?),
                         "dt" => fields.dt_raw = Some(map.next_value()?),
                         "softening" => fields.softening_raw = Some(map.next_value()?),
+                        "g" => fields.g_raw = Some(map.next_value()?),
                         _ => { let _: serde_json::Value = map.next_value()?; }
                     }
                 }
@@ -342,13 +360,14 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                 let reseed_interval = fields.reseed_interval.unwrap_or(DEFAULT_RESEED_INTERVAL);
                 let dt = Fixed::from_raw(fields.dt_raw.unwrap_or_else(|| kelvin_core::DEFAULT_DT.to_raw()));
                 let softening = Fixed::from_raw(fields.softening_raw.unwrap_or_else(|| kelvin_core::SOFTENING_FACTOR.to_raw()));
+                let g = Fixed::from_raw(fields.g_raw.unwrap_or_else(|| kelvin_core::DEFAULT_G.to_raw()));
 
-                OrbitalConfig::new(bodies, total_steps, reseed_interval, dt, softening)
+                OrbitalConfig::new(bodies, total_steps, reseed_interval, dt, softening, g)
                     .map_err(de::Error::custom)
             }
         }
 
-        deserializer.deserialize_struct("OrbitalConfig", &["bodies", "total_steps", "reseed_interval", "dt", "softening"], ConfigVisitor)
+        deserializer.deserialize_struct("OrbitalConfig", &["bodies", "total_steps", "reseed_interval", "dt", "softening", "g"], ConfigVisitor)
     }
 }
 
@@ -364,33 +383,42 @@ mod tests {
             Vec3::ZERO,
             Vec3::ZERO,
         );
-        let planet = OrbitalBody::new(
+        let planet1 = OrbitalBody::new(
             Fixed::from_raw(1 << 54),
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
             Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
         );
+        let planet2 = OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
+        );
         OrbitalConfig::new(
-            vec![sun, planet],
+            vec![sun, planet1, planet2],
             10000,
             1000,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         ).unwrap()
     }
 
     #[test]
     fn test_valid_config() {
         let config = valid_config();
-        assert_eq!(config.bodies.len(), 2);
+        assert_eq!(config.bodies.len(), 3);
     }
 
     #[test]
     fn test_too_few_bodies() {
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![],
+            vec![sun, planet],
             10000, 1000,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         assert!(matches!(result, Err(ConfigError::TooFewBodies { .. })));
     }
@@ -403,10 +431,11 @@ mod tests {
             Vec3::ZERO,
         );
         let result = OrbitalConfig::new(
-            vec![body, body],
+            vec![body, body, body],
             10000, 1000,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         assert!(matches!(result, Err(ConfigError::NonPositiveMass { .. })));
     }
@@ -415,11 +444,13 @@ mod tests {
     fn test_zero_steps() {
         let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
+        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![sun, planet],
+            vec![sun, planet, planet2],
             0, 1000,
             Fixed::from_raw(1 << 44),
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         assert!(matches!(result, Err(ConfigError::ZeroSteps)));
     }
@@ -434,6 +465,7 @@ mod tests {
         assert_eq!(config.reseed_interval, decoded.reseed_interval);
         assert_eq!(config.dt, decoded.dt);
         assert_eq!(config.softening, decoded.softening);
+        assert_eq!(config.g, decoded.g);
         for (a, b) in config.bodies.iter().zip(decoded.bodies.iter()) {
             assert_eq!(a.mass, b.mass);
             assert_eq!(a.position, b.position);
@@ -451,11 +483,13 @@ mod tests {
     fn test_validate_dt() {
         let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
+        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![sun, planet],
+            vec![sun, planet, planet2],
             10000, 1000,
             Fixed::ZERO,
             Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
         );
         assert!(matches!(result, Err(ConfigError::InvalidDt)));
     }
@@ -464,11 +498,13 @@ mod tests {
     fn test_validate_softening() {
         let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
+        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
         let result = OrbitalConfig::new(
-            vec![sun, planet],
+            vec![sun, planet, planet2],
             10000, 1000,
             Fixed::from_raw(1 << 44),
             Fixed::ZERO,
+            kelvin_core::DEFAULT_G,
         );
         assert!(matches!(result, Err(ConfigError::InvalidSoftening)));
     }
