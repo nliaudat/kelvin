@@ -2,19 +2,30 @@
 //!
 //! The `OrbitalConfig` defines the initial conditions for the n-body
 //! simulation. It is the shared secret between communicating parties.
+//!
+//! All non-trivial parameters are part of the config — there are no
+//! hidden constants that could cause two parties to diverge.
 
 use alloc::vec::Vec;
 
 use kelvin_core::{Fixed, OrbitalBody, Vec3};
 #[allow(unused_imports)]
-use kelvin_core::{MIN_BODIES, MAX_BODIES, DEFAULT_RESEED_INTERVAL, MIN_DT, MAX_DT};
+use kelvin_core::{
+    DEFAULT_RESEED_INTERVAL, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G,
+    MIN_SEPARATION, EJECTION_ENERGY_THRESHOLD, MONITOR_INTERVAL,
+    MIN_BODIES, MAX_BODIES, MIN_DT, MAX_DT,
+};
 
 /// Orbital configuration — the shared secret.
 ///
 /// Contains:
 /// - Initial positions, velocities, and masses of all bodies
-/// - Simulation parameters (steps, dt, softening)
-/// - Reseed interval for the key schedule
+/// - Simulation parameters (steps, dt, softening, G)
+/// - Stability thresholds (min_separation, ejection_energy, monitor_interval)
+/// - Validation bounds (min/max bodies, dt, G)
+///
+/// Every non-trivial parameter is part of the config so that two parties
+/// with different compiled versions still derive identical keystreams.
 #[derive(Clone, Debug)]
 pub struct OrbitalConfig {
     /// Initial orbital bodies.
@@ -29,12 +40,48 @@ pub struct OrbitalConfig {
     pub softening: Fixed,
     /// Gravitational constant G.
     pub g: Fixed,
+
+    // ── Stability thresholds (part of the key) ──
+
+    /// Minimum allowed separation between any two bodies (in AU).
+    /// If any pair comes closer, the system is considered collapsed.
+    /// Default: ~6e-8 AU ≈ 9 km.
+    pub min_separation: Fixed,
+    /// Energy threshold for detecting unbound (ejected) bodies.
+    /// A body with total specific energy >= this threshold is ejected.
+    /// Default: ~1.9e-6 (relative energy).
+    pub ejection_energy_threshold: Fixed,
+    /// Steps between stability checks during simulation.
+    /// Default: 10,000 (1% of a standard simulation).
+    pub monitor_interval: u64,
+
+    // ── Validation bounds (part of the key) ──
+
+    /// Minimum number of bodies required.
+    /// Default: 5.
+    pub min_bodies: usize,
+    /// Maximum number of bodies supported.
+    /// Default: 100.
+    pub max_bodies: usize,
+    /// Minimum allowed time step in years.
+    /// Default: ~1e-8 yr (0.315 seconds).
+    pub min_dt: Fixed,
+    /// Maximum allowed time step in years.
+    /// Default: ~1e-1 yr (36.5 days).
+    pub max_dt: Fixed,
+    /// Minimum allowed gravitational constant.
+    /// Default: 1.0.
+    pub min_g: Fixed,
+    /// Maximum allowed gravitational constant.
+    /// Default: 1000.0.
+    pub max_g: Fixed,
 }
 
 impl OrbitalConfig {
     /// Create a new orbital configuration.
     ///
     /// Returns an error if validation fails.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         bodies: Vec<OrbitalBody>,
         total_steps: u64,
@@ -43,6 +90,36 @@ impl OrbitalConfig {
         softening: Fixed,
         g: Fixed,
     ) -> Result<Self, ConfigError> {
+        // Use defaults for all stability/validation fields
+        OrbitalConfig::new_full(
+            bodies, total_steps, reseed_interval, dt, softening, g,
+            MIN_SEPARATION, EJECTION_ENERGY_THRESHOLD, MONITOR_INTERVAL,
+            MIN_BODIES, MAX_BODIES, MIN_DT, MAX_DT,
+            Fixed::from_int(1), Fixed::from_int(1000),
+        )
+    }
+
+    /// Create a new orbital configuration with all parameters specified.
+    ///
+    /// Every non-trivial parameter is explicit — no hidden constants.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_full(
+        bodies: Vec<OrbitalBody>,
+        total_steps: u64,
+        reseed_interval: u64,
+        dt: Fixed,
+        softening: Fixed,
+        g: Fixed,
+        min_separation: Fixed,
+        ejection_energy_threshold: Fixed,
+        monitor_interval: u64,
+        min_bodies: usize,
+        max_bodies: usize,
+        min_dt: Fixed,
+        max_dt: Fixed,
+        min_g: Fixed,
+        max_g: Fixed,
+    ) -> Result<Self, ConfigError> {
         let config = OrbitalConfig {
             bodies,
             total_steps,
@@ -50,6 +127,15 @@ impl OrbitalConfig {
             dt,
             softening,
             g,
+            min_separation,
+            ejection_energy_threshold,
+            monitor_interval,
+            min_bodies,
+            max_bodies,
+            min_dt,
+            max_dt,
+            min_g,
+            max_g,
         };
         config.validate()?;
         Ok(config)
@@ -58,34 +144,82 @@ impl OrbitalConfig {
     /// Validate the configuration.
     ///
     /// Checks:
-    /// - Number of bodies is within [MIN_BODIES, MAX_BODIES]
+    /// - Number of bodies is within [min_bodies, max_bodies]
     /// - All masses are positive
-    /// - dt and softening are positive
+    /// - dt is within [min_dt, max_dt]
+    /// - softening is positive
     /// - total_steps > 0
     /// - reseed_interval > 0 and <= total_steps
+    /// - G is within [min_g, max_g]
+    /// - min_separation > 0
+    /// - ejection_energy_threshold > 0
+    /// - monitor_interval > 0
+    /// - min_bodies >= 2 (need at least 2 for any dynamics)
+    /// - max_bodies >= min_bodies
+    /// - min_dt > 0, max_dt >= min_dt
+    /// - min_g > 0, max_g >= min_g
+    ///
+    /// Bodyguard checks (reject bad systems at creation time):
+    /// - No two bodies at identical positions (zero distance)
+    /// - No body already on escape trajectory at step 0
+    /// - No two bodies already closer than min_separation at step 0
     pub fn validate(&self) -> Result<(), ConfigError> {
-        if self.bodies.len() < MIN_BODIES {
+        // ── Validation bound sanity ──
+        if self.min_bodies < 2 {
+            return Err(ConfigError::InvalidMinBodies(self.min_bodies));
+        }
+        if self.max_bodies < self.min_bodies {
+            return Err(ConfigError::InvalidMaxBodies {
+                max: self.max_bodies,
+                min: self.min_bodies,
+            });
+        }
+        if self.min_dt <= Fixed::ZERO {
+            return Err(ConfigError::InvalidMinDt(self.min_dt));
+        }
+        if self.max_dt < self.min_dt {
+            return Err(ConfigError::InvalidMaxDt {
+                max: self.max_dt,
+                min: self.min_dt,
+            });
+        }
+        if self.min_g <= Fixed::ZERO {
+            return Err(ConfigError::InvalidMinG(self.min_g));
+        }
+        if self.max_g < self.min_g {
+            return Err(ConfigError::InvalidMaxG {
+                max: self.max_g,
+                min: self.min_g,
+            });
+        }
+
+        // ── Body count ──
+        if self.bodies.len() < self.min_bodies {
             return Err(ConfigError::TooFewBodies {
                 count: self.bodies.len(),
-                min: MIN_BODIES,
+                min: self.min_bodies,
             });
         }
-        if self.bodies.len() > MAX_BODIES {
+        if self.bodies.len() > self.max_bodies {
             return Err(ConfigError::TooManyBodies {
                 count: self.bodies.len(),
-                max: MAX_BODIES,
+                max: self.max_bodies,
             });
         }
+
+        // ── Masses ──
         for (i, body) in self.bodies.iter().enumerate() {
             if body.mass <= Fixed::ZERO {
                 return Err(ConfigError::NonPositiveMass { body_index: i });
             }
         }
-        if self.dt < MIN_DT || self.dt > MAX_DT {
+
+        // ── Simulation parameters ──
+        if self.dt < self.min_dt || self.dt > self.max_dt {
             return Err(ConfigError::InvalidDt {
                 dt: self.dt,
-                min_dt: MIN_DT,
-                max_dt: MAX_DT,
+                min_dt: self.min_dt,
+                max_dt: self.max_dt,
             });
         }
         if self.softening <= Fixed::ZERO {
@@ -97,9 +231,60 @@ impl OrbitalConfig {
         if self.reseed_interval == 0 || self.reseed_interval > self.total_steps {
             return Err(ConfigError::InvalidReseedInterval);
         }
-        if self.g < Fixed::from_int(1) || self.g > Fixed::from_int(1000) {
-            return Err(ConfigError::InvalidG);
+        if self.g < self.min_g || self.g > self.max_g {
+            return Err(ConfigError::InvalidG {
+                g: self.g,
+                min_g: self.min_g,
+                max_g: self.max_g,
+            });
         }
+
+        // ── Stability thresholds ──
+        if self.min_separation <= Fixed::ZERO {
+            return Err(ConfigError::InvalidMinSeparation(self.min_separation));
+        }
+        if self.ejection_energy_threshold <= Fixed::ZERO {
+            return Err(ConfigError::InvalidEjectionThreshold(self.ejection_energy_threshold));
+        }
+        if self.monitor_interval == 0 {
+            return Err(ConfigError::InvalidMonitorInterval);
+        }
+
+        // ── Bodyguard: reject bad systems at creation time ──
+
+        // 1. Check for identical positions (zero distance)
+        for i in 0..self.bodies.len() {
+            for j in (i + 1)..self.bodies.len() {
+                let diff = self.bodies[j].position - self.bodies[i].position;
+                if diff.length() == Fixed::ZERO {
+                    return Err(ConfigError::IdenticalPositions { body_i: i, body_j: j });
+                }
+            }
+        }
+
+        // 2. Check for initial collapse (bodies already too close)
+        for i in 0..self.bodies.len() {
+            for j in (i + 1)..self.bodies.len() {
+                let diff = self.bodies[j].position - self.bodies[i].position;
+                let dist = diff.length();
+                if dist < self.min_separation {
+                    return Err(ConfigError::InitialCollapse {
+                        body_i: i,
+                        body_j: j,
+                        distance: dist,
+                        min_separation: self.min_separation,
+                    });
+                }
+            }
+        }
+
+        // 3. Check for initial ejection (body already on escape trajectory)
+        for i in 0..self.bodies.len() {
+            if is_body_ejected(i, &self.bodies, self.g, self.ejection_energy_threshold) {
+                return Err(ConfigError::InitialEjection { body_index: i });
+            }
+        }
+
         Ok(())
     }
 
@@ -117,8 +302,12 @@ impl OrbitalConfig {
 
     /// Format: [n_bodies: u32][body_data: n × 112 bytes][total_steps: u64]
     ///         [reseed_interval: u64][dt: i128][softening: i128][g: i128]
+    ///         [min_separation: i128][ejection_energy_threshold: i128]
+    ///         [monitor_interval: u64][min_bodies: u32][max_bodies: u32]
+    ///         [min_dt: i128][max_dt: i128][min_g: i128][max_g: i128]
     pub fn to_binary(&self) -> Vec<u8> {
-        let mut buf = Vec::with_capacity(4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16 + 16);
+        let extra = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16;
+        let mut buf = Vec::with_capacity(4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16 + 16 + extra);
 
         // Number of bodies (u32)
         buf.extend_from_slice(&(self.bodies.len() as u32).to_le_bytes());
@@ -141,6 +330,19 @@ impl OrbitalConfig {
         buf.extend_from_slice(&self.softening.to_raw().to_le_bytes());
         buf.extend_from_slice(&self.g.to_raw().to_le_bytes());
 
+        // Stability thresholds
+        buf.extend_from_slice(&self.min_separation.to_raw().to_le_bytes());
+        buf.extend_from_slice(&self.ejection_energy_threshold.to_raw().to_le_bytes());
+        buf.extend_from_slice(&self.monitor_interval.to_le_bytes());
+
+        // Validation bounds
+        buf.extend_from_slice(&(self.min_bodies as u32).to_le_bytes());
+        buf.extend_from_slice(&(self.max_bodies as u32).to_le_bytes());
+        buf.extend_from_slice(&self.min_dt.to_raw().to_le_bytes());
+        buf.extend_from_slice(&self.max_dt.to_raw().to_le_bytes());
+        buf.extend_from_slice(&self.min_g.to_raw().to_le_bytes());
+        buf.extend_from_slice(&self.max_g.to_raw().to_le_bytes());
+
         buf
     }
 
@@ -158,7 +360,8 @@ impl OrbitalConfig {
         offset += 4;
 
         let body_size = 112; // 7 × i128
-        let header_size = 4 + n_bodies * body_size + 8 + 8 + 16 + 16 + 16;
+        let extra = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16;
+        let header_size = 4 + n_bodies * body_size + 8 + 8 + 16 + 16 + 16 + extra;
 
         if data.len() < header_size {
             return Err(ConfigError::InvalidBinary("data too short for bodies".into()));
@@ -227,6 +430,53 @@ impl OrbitalConfig {
         let g = Fixed::from_raw(i128::from_le_bytes(
             data[offset..offset + 16].try_into().unwrap(),
         ));
+        offset += 16;
+
+        // Stability thresholds
+        let min_separation = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
+        offset += 16;
+
+        let ejection_energy_threshold = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
+        offset += 16;
+
+        let monitor_interval = u64::from_le_bytes(
+            data[offset..offset + 8].try_into().unwrap(),
+        );
+        offset += 8;
+
+        // Validation bounds
+        let min_bodies = u32::from_le_bytes([
+            data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        ]) as usize;
+        offset += 4;
+
+        let max_bodies = u32::from_le_bytes([
+            data[offset], data[offset + 1], data[offset + 2], data[offset + 3],
+        ]) as usize;
+        offset += 4;
+
+        let min_dt = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
+        offset += 16;
+
+        let max_dt = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
+        offset += 16;
+
+        let min_g = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
+        offset += 16;
+
+        let max_g = Fixed::from_raw(i128::from_le_bytes(
+            data[offset..offset + 16].try_into().unwrap(),
+        ));
 
         let config = OrbitalConfig {
             bodies,
@@ -235,10 +485,59 @@ impl OrbitalConfig {
             dt,
             softening,
             g,
+            min_separation,
+            ejection_energy_threshold,
+            monitor_interval,
+            min_bodies,
+            max_bodies,
+            min_dt,
+            max_dt,
+            min_g,
+            max_g,
         };
         config.validate()?;
         Ok(config)
     }
+}
+
+/// Check whether a body is on an unbound (ejected) trajectory.
+///
+/// Computes the total energy of the body relative to the rest of the system:
+///
+///   E_i = 0.5 * m_i * v_i² - Σ_{j≠i} G * m_i * m_j / |r_i - r_j|
+///
+/// If E_i >= threshold, the body is on a hyperbolic or parabolic trajectory.
+fn is_body_ejected(
+    body_index: usize,
+    bodies: &[OrbitalBody],
+    g: Fixed,
+    ejection_energy_threshold: Fixed,
+) -> bool {
+    let n = bodies.len();
+    if body_index >= n {
+        return false;
+    }
+
+    let body = &bodies[body_index];
+
+    // Kinetic energy: 0.5 * m * v²
+    let kinetic = body.kinetic_energy();
+
+    // Potential energy: -Σ_{j≠i} G * m_i * m_j / |r_i - r_j|
+    let mut potential = Fixed::ZERO;
+    for j in 0..n {
+        if j == body_index {
+            continue;
+        }
+        let diff = bodies[j].position - body.position;
+        let dist = diff.length();
+        if dist > Fixed::ZERO {
+            potential -= g * body.mass * bodies[j].mass / dist;
+        }
+    }
+
+    // Total energy >= threshold means unbound
+    kinetic + potential >= ejection_energy_threshold
 }
 
 /// Errors from configuration validation.
@@ -285,28 +584,118 @@ pub enum ConfigError {
     /// Reseed interval must be > 0 and <= total_steps.
     #[error("reseed interval must be > 0 and <= total_steps")]
     InvalidReseedInterval,
-    /// Gravitational constant must be within [1, 1000].
-    #[error("gravitational constant must be within [1, 1000]")]
-    InvalidG,
+    /// Gravitational constant is outside bounds.
+    #[error("gravitational constant {g} is outside range [{min_g}, {max_g}]")]
+    InvalidG {
+        /// The provided G.
+        g: Fixed,
+        /// Minimum allowed G.
+        min_g: Fixed,
+        /// Maximum allowed G.
+        max_g: Fixed,
+    },
     /// Serialization error.
     #[error("serialization error: {0}")]
     Serialization(String),
     /// Invalid binary data.
     #[error("invalid binary data: {0}")]
     InvalidBinary(String),
+
+    // ── New validation bound errors ──
+    /// Minimum bodies must be >= 2.
+    #[error("min_bodies must be >= 2, got {0}")]
+    InvalidMinBodies(usize),
+    /// Maximum bodies must be >= minimum bodies.
+    #[error("max_bodies {max} must be >= min_bodies {min}")]
+    InvalidMaxBodies {
+        /// Maximum bodies provided.
+        max: usize,
+        /// Minimum bodies.
+        min: usize,
+    },
+    /// Minimum dt must be positive.
+    #[error("min_dt must be positive, got {0}")]
+    InvalidMinDt(Fixed),
+    /// Maximum dt must be >= minimum dt.
+    #[error("max_dt {max} must be >= min_dt {min}")]
+    InvalidMaxDt {
+        /// Maximum dt provided.
+        max: Fixed,
+        /// Minimum dt.
+        min: Fixed,
+    },
+    /// Minimum G must be positive.
+    #[error("min_g must be positive, got {0}")]
+    InvalidMinG(Fixed),
+    /// Maximum G must be >= minimum G.
+    #[error("max_g {max} must be >= min_g {min}")]
+    InvalidMaxG {
+        /// Maximum G provided.
+        max: Fixed,
+        /// Minimum G.
+        min: Fixed,
+    },
+
+    // ── Stability threshold errors ──
+    /// Minimum separation must be positive.
+    #[error("min_separation must be positive, got {0}")]
+    InvalidMinSeparation(Fixed),
+    /// Ejection energy threshold must be positive.
+    #[error("ejection_energy_threshold must be positive, got {0}")]
+    InvalidEjectionThreshold(Fixed),
+    /// Monitor interval must be > 0.
+    #[error("monitor_interval must be > 0")]
+    InvalidMonitorInterval,
+
+    // ── Bodyguard errors ──
+    /// Two bodies have identical positions (zero distance).
+    #[error("bodies {body_i} and {body_j} have identical positions")]
+    IdenticalPositions {
+        /// Index of the first body.
+        body_i: usize,
+        /// Index of the second body.
+        body_j: usize,
+    },
+    /// Two bodies are already closer than min_separation at step 0.
+    #[error("bodies {body_i} and {body_j} are too close: distance {distance} < min_separation {min_separation}")]
+    InitialCollapse {
+        /// Index of the first body.
+        body_i: usize,
+        /// Index of the second body.
+        body_j: usize,
+        /// Distance between the bodies.
+        distance: Fixed,
+        /// Minimum allowed separation.
+        min_separation: Fixed,
+    },
+    /// A body is already on an escape trajectory at step 0.
+    #[error("body {body_index} is already on an escape trajectory at step 0")]
+    InitialEjection {
+        /// Index of the ejected body.
+        body_index: usize,
+    },
 }
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for OrbitalConfig {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("OrbitalConfig", 6)?;
+        let mut state = serializer.serialize_struct("OrbitalConfig", 15)?;
         state.serialize_field("bodies", &self.bodies)?;
         state.serialize_field("total_steps", &self.total_steps)?;
         state.serialize_field("reseed_interval", &self.reseed_interval)?;
         state.serialize_field("dt", &self.dt.to_raw())?;
         state.serialize_field("softening", &self.softening.to_raw())?;
         state.serialize_field("g", &self.g.to_raw())?;
+        state.serialize_field("min_separation", &self.min_separation.to_raw())?;
+        state.serialize_field("ejection_energy_threshold", &self.ejection_energy_threshold.to_raw())?;
+        state.serialize_field("monitor_interval", &self.monitor_interval)?;
+        state.serialize_field("min_bodies", &self.min_bodies)?;
+        state.serialize_field("max_bodies", &self.max_bodies)?;
+        state.serialize_field("min_dt", &self.min_dt.to_raw())?;
+        state.serialize_field("max_dt", &self.max_dt.to_raw())?;
+        state.serialize_field("min_g", &self.min_g.to_raw())?;
+        state.serialize_field("max_g", &self.max_g.to_raw())?;
         state.end()
     }
 }
@@ -325,6 +714,15 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
             dt_raw: Option<i128>,
             softening_raw: Option<i128>,
             g_raw: Option<i128>,
+            min_separation_raw: Option<i128>,
+            ejection_energy_threshold_raw: Option<i128>,
+            monitor_interval: Option<u64>,
+            min_bodies: Option<usize>,
+            max_bodies: Option<usize>,
+            min_dt_raw: Option<i128>,
+            max_dt_raw: Option<i128>,
+            min_g_raw: Option<i128>,
+            max_g_raw: Option<i128>,
         }
 
         struct ConfigVisitor;
@@ -346,6 +744,15 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                         "dt" => fields.dt_raw = Some(map.next_value()?),
                         "softening" => fields.softening_raw = Some(map.next_value()?),
                         "g" => fields.g_raw = Some(map.next_value()?),
+                        "min_separation" => fields.min_separation_raw = Some(map.next_value()?),
+                        "ejection_energy_threshold" => fields.ejection_energy_threshold_raw = Some(map.next_value()?),
+                        "monitor_interval" => fields.monitor_interval = Some(map.next_value()?),
+                        "min_bodies" => fields.min_bodies = Some(map.next_value()?),
+                        "max_bodies" => fields.max_bodies = Some(map.next_value()?),
+                        "min_dt" => fields.min_dt_raw = Some(map.next_value()?),
+                        "max_dt" => fields.max_dt_raw = Some(map.next_value()?),
+                        "min_g" => fields.min_g_raw = Some(map.next_value()?),
+                        "max_g" => fields.max_g_raw = Some(map.next_value()?),
                         _ => { let _: serde_json::Value = map.next_value()?; }
                     }
                 }
@@ -353,16 +760,45 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                 let bodies = fields.bodies.ok_or_else(|| de::Error::missing_field("bodies"))?;
                 let total_steps = fields.total_steps.ok_or_else(|| de::Error::missing_field("total_steps"))?;
                 let reseed_interval = fields.reseed_interval.unwrap_or(DEFAULT_RESEED_INTERVAL);
-                let dt = Fixed::from_raw(fields.dt_raw.unwrap_or_else(|| kelvin_core::DEFAULT_DT.to_raw()));
-                let softening = Fixed::from_raw(fields.softening_raw.unwrap_or_else(|| kelvin_core::SOFTENING_FACTOR.to_raw()));
-                let g = Fixed::from_raw(fields.g_raw.unwrap_or_else(|| kelvin_core::DEFAULT_G.to_raw()));
+                let dt = Fixed::from_raw(fields.dt_raw.unwrap_or_else(|| DEFAULT_DT.to_raw()));
+                let softening = Fixed::from_raw(fields.softening_raw.unwrap_or_else(|| SOFTENING_FACTOR.to_raw()));
+                let g = Fixed::from_raw(fields.g_raw.unwrap_or_else(|| DEFAULT_G.to_raw()));
 
-                OrbitalConfig::new(bodies, total_steps, reseed_interval, dt, softening, g)
-                    .map_err(de::Error::custom)
+                // Stability thresholds (optional, use defaults)
+                let min_separation = Fixed::from_raw(
+                    fields.min_separation_raw.unwrap_or_else(|| MIN_SEPARATION.to_raw())
+                );
+                let ejection_energy_threshold = Fixed::from_raw(
+                    fields.ejection_energy_threshold_raw.unwrap_or_else(|| EJECTION_ENERGY_THRESHOLD.to_raw())
+                );
+                let monitor_interval = fields.monitor_interval.unwrap_or(MONITOR_INTERVAL);
+
+                // Validation bounds (optional, use defaults)
+                let min_bodies = fields.min_bodies.unwrap_or(MIN_BODIES);
+                let max_bodies = fields.max_bodies.unwrap_or(MAX_BODIES);
+                let min_dt = Fixed::from_raw(fields.min_dt_raw.unwrap_or_else(|| MIN_DT.to_raw()));
+                let max_dt = Fixed::from_raw(fields.max_dt_raw.unwrap_or_else(|| MAX_DT.to_raw()));
+                let min_g = Fixed::from_raw(fields.min_g_raw.unwrap_or(Fixed::from_int(1).to_raw()));
+                let max_g = Fixed::from_raw(fields.max_g_raw.unwrap_or(Fixed::from_int(1000).to_raw()));
+
+                OrbitalConfig::new_full(
+                    bodies, total_steps, reseed_interval, dt, softening, g,
+                    min_separation, ejection_energy_threshold, monitor_interval,
+                    min_bodies, max_bodies, min_dt, max_dt, min_g, max_g,
+                )
+                .map_err(de::Error::custom)
             }
         }
 
-        deserializer.deserialize_struct("OrbitalConfig", &["bodies", "total_steps", "reseed_interval", "dt", "softening", "g"], ConfigVisitor)
+        deserializer.deserialize_struct(
+            "OrbitalConfig",
+            &[
+                "bodies", "total_steps", "reseed_interval", "dt", "softening", "g",
+                "min_separation", "ejection_energy_threshold", "monitor_interval",
+                "min_bodies", "max_bodies", "min_dt", "max_dt", "min_g", "max_g",
+            ],
+            ConfigVisitor,
+        )
     }
 }
 
@@ -420,125 +856,317 @@ mod tests {
         let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
         let result = OrbitalConfig::new(
             vec![sun, planet],
-            10000, 1000,
+            10000,
+            1000,
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
-        assert!(matches!(result, Err(ConfigError::TooFewBodies { .. })));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::TooFewBodies { count, min } => {
+                assert_eq!(count, 2);
+                assert_eq!(min, 5);
+            }
+            other => panic!("expected TooFewBodies, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_identical_positions_rejected() {
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let sun2 = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::ZERO, Vec3::ZERO);
+        let p1 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO));
+        let p2 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO));
+        let p3 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO));
+        let result = OrbitalConfig::new(
+            vec![sun, sun2, p1, p2, p3],
+            10000,
+            1000,
+            kelvin_core::DEFAULT_DT,
+            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::IdenticalPositions { body_i, body_j } => {
+                assert_eq!(body_i, 0);
+                assert_eq!(body_j, 1);
+            }
+            other => panic!("expected IdenticalPositions, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_initial_collapse_rejected() {
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        // All bodies at rest (zero velocity) to avoid ejection
+        let p1 = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::from_int(10), Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
+        let p2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(10), Fixed::ZERO), Vec3::ZERO);
+        let p3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-10), Fixed::from_int(-10), Fixed::ZERO), Vec3::ZERO);
+        // Place planet4 extremely close to planet3 (different x, same y/z)
+        // Use a clearly distinct position that is very close but not identical.
+        // The offset is 1/1000 AU = Fixed::from_raw(SCALE / 1000) = Fixed::from_raw(1 << 64 / 1000)
+        // which is approximately Fixed::from_raw(18446744073709551)
+        let p4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(-10) + Fixed::from_raw(18446744073709551i128), Fixed::from_int(-10), Fixed::ZERO), Vec3::ZERO);
+        let result = OrbitalConfig::new_full(
+            vec![sun, p1, p2, p3, p4],
+            10000,
+            1000,
+            kelvin_core::DEFAULT_DT,
+            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
+            Fixed::from_int(1), // 1 AU min_separation to trigger collapse (distance is ~0.001 AU)
+            Fixed::from_raw(1 << 20),
+            1000,
+            5, 100,
+            kelvin_core::MIN_DT, kelvin_core::MAX_DT,
+            Fixed::from_int(1), Fixed::from_int(1000),
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InitialCollapse { body_i, body_j, .. } => {
+                assert!(body_i < body_j);
+            }
+            other => panic!("expected InitialCollapse, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_initial_ejection_rejected() {
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let p1 = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::new(Fixed::from_int(100), Fixed::ZERO, Fixed::ZERO)); // Escape velocity
+        let p2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO));
+        let p3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO));
+        let p4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO));
+        let result = OrbitalConfig::new(
+            vec![sun, p1, p2, p3, p4],
+            10000,
+            1000,
+            kelvin_core::DEFAULT_DT,
+            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InitialEjection { body_index } => {
+                assert_eq!(body_index, 1);
+            }
+            other => panic!("expected InitialEjection, got: {:?}", other),
+        }
     }
 
     #[test]
     fn test_non_positive_mass() {
-        let body = OrbitalBody::new(
-            Fixed::ZERO,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
-        let body2 = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ZERO, Vec3::ZERO, Vec3::ZERO); // Zero mass
+        let p1 = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO));
+        let p2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO));
+        let p3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO));
+        let p4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO));
         let result = OrbitalConfig::new(
-            vec![body, body2, body2, body2, body2],
-            10000, 1000,
+            vec![sun, p1, p2, p3, p4],
+            10000,
+            1000,
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
         );
-        assert!(matches!(result, Err(ConfigError::NonPositiveMass { .. })));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::NonPositiveMass { body_index } => {
+                assert_eq!(body_index, 0);
+            }
+            other => panic!("expected NonPositiveMass, got: {:?}", other),
+        }
     }
 
     #[test]
     fn test_zero_steps() {
-        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
-        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
-        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
-        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
-        let result = OrbitalConfig::new(
-            vec![sun, planet, planet2, planet3, planet4],
-            0, 1000,
-            kelvin_core::DEFAULT_DT,
-            Fixed::from_raw(1 << 44),
-            kelvin_core::DEFAULT_G,
+        let config = valid_config();
+        let result = OrbitalConfig::new_full(
+            config.bodies,
+            0, // Zero steps
+            config.reseed_interval,
+            config.dt,
+            config.softening,
+            config.g,
+            config.min_separation,
+            config.ejection_energy_threshold,
+            config.monitor_interval,
+            config.min_bodies,
+            config.max_bodies,
+            config.min_dt,
+            config.max_dt,
+            config.min_g,
+            config.max_g,
         );
-        assert!(matches!(result, Err(ConfigError::ZeroSteps)));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::ZeroSteps => {}
+            other => panic!("expected ZeroSteps, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_invalid_dt() {
+        let config = valid_config();
+        let result = OrbitalConfig::new_full(
+            config.bodies,
+            config.total_steps,
+            config.reseed_interval,
+            Fixed::from_raw(1 << 10), // Way too small
+            config.softening,
+            config.g,
+            config.min_separation,
+            config.ejection_energy_threshold,
+            config.monitor_interval,
+            config.min_bodies,
+            config.max_bodies,
+            config.min_dt,
+            config.max_dt,
+            config.min_g,
+            config.max_g,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InvalidDt { .. } => {}
+            other => panic!("expected InvalidDt, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_invalid_g() {
+        let config = valid_config();
+        let result = OrbitalConfig::new_full(
+            config.bodies,
+            config.total_steps,
+            config.reseed_interval,
+            config.dt,
+            config.softening,
+            Fixed::from_int(0), // G = 0, below min_g = 1
+            config.min_separation,
+            config.ejection_energy_threshold,
+            config.monitor_interval,
+            config.min_bodies,
+            config.max_bodies,
+            config.min_dt,
+            config.max_dt,
+            config.min_g,
+            config.max_g,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InvalidG { .. } => {}
+            other => panic!("expected InvalidG, got: {:?}", other),
+        }
     }
 
     #[test]
     fn test_binary_roundtrip() {
         let config = valid_config();
         let binary = config.to_binary();
-        let decoded = OrbitalConfig::from_binary(&binary).unwrap();
-        assert_eq!(config.bodies.len(), decoded.bodies.len());
-        assert_eq!(config.total_steps, decoded.total_steps);
-        assert_eq!(config.reseed_interval, decoded.reseed_interval);
-        assert_eq!(config.dt, decoded.dt);
-        assert_eq!(config.softening, decoded.softening);
-        assert_eq!(config.g, decoded.g);
-        for (a, b) in config.bodies.iter().zip(decoded.bodies.iter()) {
-            assert_eq!(a.mass, b.mass);
-            assert_eq!(a.position, b.position);
-            assert_eq!(a.velocity, b.velocity);
+        let restored = OrbitalConfig::from_binary(&binary).unwrap();
+        assert_eq!(config.bodies.len(), restored.bodies.len());
+        assert_eq!(config.total_steps, restored.total_steps);
+        assert_eq!(config.reseed_interval, restored.reseed_interval);
+        assert_eq!(config.dt.to_raw(), restored.dt.to_raw());
+        assert_eq!(config.softening.to_raw(), restored.softening.to_raw());
+        assert_eq!(config.g.to_raw(), restored.g.to_raw());
+        assert_eq!(config.min_separation.to_raw(), restored.min_separation.to_raw());
+        assert_eq!(config.ejection_energy_threshold.to_raw(), restored.ejection_energy_threshold.to_raw());
+        assert_eq!(config.monitor_interval, restored.monitor_interval);
+        assert_eq!(config.min_bodies, restored.min_bodies);
+        assert_eq!(config.max_bodies, restored.max_bodies);
+        assert_eq!(config.min_dt.to_raw(), restored.min_dt.to_raw());
+        assert_eq!(config.max_dt.to_raw(), restored.max_dt.to_raw());
+        assert_eq!(config.min_g.to_raw(), restored.min_g.to_raw());
+        assert_eq!(config.max_g.to_raw(), restored.max_g.to_raw());
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_json_roundtrip() {
+        let config = valid_config();
+        let json = config.to_json().unwrap();
+        let restored = OrbitalConfig::from_json(&json).unwrap();
+        assert_eq!(config.bodies.len(), restored.bodies.len());
+        assert_eq!(config.total_steps, restored.total_steps);
+        assert_eq!(config.min_separation.to_raw(), restored.min_separation.to_raw());
+        assert_eq!(config.min_bodies, restored.min_bodies);
+        assert_eq!(config.max_bodies, restored.max_bodies);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn test_json_without_new_fields_still_works() {
+        // Old-format JSON without the new fields should still parse with defaults
+        let old_json = r#"{
+            "bodies": [
+                {"mass": 1099511627776, "position": {"x": 0, "y": 0, "z": 0}, "velocity": {"x": 0, "y": 0, "z": 0}},
+                {"mass": 1099511627776, "position": {"x": 18446744073709551616, "y": 0, "z": 0}, "velocity": {"x": 0, "y": 0, "z": 0}},
+                {"mass": 1099511627776, "position": {"x": 0, "y": 36893488147419103232, "z": 0}, "velocity": {"x": 0, "y": 0, "z": 0}},
+                {"mass": 1099511627776, "position": {"x": -18446744073709551616, "y": -18446744073709551616, "z": 0}, "velocity": {"x": 0, "y": 0, "z": 0}},
+                {"mass": 1099511627776, "position": {"x": 36893488147419103232, "y": -18446744073709551616, "z": 18446744073709551616}, "velocity": {"x": 0, "y": 0, "z": 0}}
+            ],
+            "total_steps": 10000,
+            "reseed_interval": 1000,
+            "dt": 18014398509481984,
+            "softening": 17592186044416,
+            "g": 18446744073709551616,
+            "min_g": 18446744073709551616,
+            "max_g": 18446744073709551616000000
+        }"#;
+        let config = OrbitalConfig::from_json(old_json).unwrap();
+        assert_eq!(config.bodies.len(), 5);
+        assert_eq!(config.min_separation.to_raw(), MIN_SEPARATION.to_raw());
+        assert_eq!(config.min_bodies, MIN_BODIES);
+        assert_eq!(config.max_bodies, MAX_BODIES);
+    }
+
+    #[test]
+    fn test_min_bodies_validation() {
+        let result = OrbitalConfig::new_full(
+            vec![],
+            10000,
+            1000,
+            kelvin_core::DEFAULT_DT,
+            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
+            MIN_SEPARATION, EJECTION_ENERGY_THRESHOLD, MONITOR_INTERVAL,
+            0, // min_bodies = 0 (invalid)
+            100,
+            kelvin_core::MIN_DT, kelvin_core::MAX_DT,
+            Fixed::from_int(1), Fixed::from_int(1000),
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InvalidMinBodies(0) => {}
+            other => panic!("expected InvalidMinBodies(0), got: {:?}", other),
         }
     }
 
     #[test]
-    fn test_binary_invalid_short() {
-        let result = OrbitalConfig::from_binary(&[0, 0, 0]);
-        assert!(matches!(result, Err(ConfigError::InvalidBinary(_))));
-    }
-
-    #[test]
-    fn test_validate_dt_too_small() {
-        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
-        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
-        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
-        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
-        let result = OrbitalConfig::new(
-            vec![sun, planet, planet2, planet3, planet4],
-            10000, 1000,
-            Fixed::ZERO,
-            Fixed::from_raw(1 << 44),
-            kelvin_core::DEFAULT_G,
-        );
-        assert!(matches!(result, Err(ConfigError::InvalidDt { .. })));
-    }
-
-    #[test]
-    fn test_validate_dt_too_large() {
-        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
-        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
-        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
-        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
-        let result = OrbitalConfig::new(
-            vec![sun, planet, planet2, planet3, planet4],
-            10000, 1000,
-            Fixed::from_raw(1 << 62), // exceeds MAX_DT
-            Fixed::from_raw(1 << 44),
-            kelvin_core::DEFAULT_G,
-        );
-        assert!(matches!(result, Err(ConfigError::InvalidDt { .. })));
-    }
-
-    #[test]
-    fn test_validate_softening() {
-        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let planet = OrbitalBody::new(Fixed::from_raw(1 << 54), Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO), Vec3::ZERO);
-        let planet2 = OrbitalBody::new(Fixed::from_raw(1 << 53), Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO), Vec3::ZERO);
-        let planet3 = OrbitalBody::new(Fixed::from_raw(1 << 52), Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO), Vec3::ZERO);
-        let planet4 = OrbitalBody::new(Fixed::from_raw(1 << 51), Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)), Vec3::ZERO);
-        let result = OrbitalConfig::new(
-            vec![sun, planet, planet2, planet3, planet4],
-            10000, 1000,
+    fn test_max_bodies_less_than_min() {
+        let result = OrbitalConfig::new_full(
+            vec![],
+            10000,
+            1000,
             kelvin_core::DEFAULT_DT,
-            Fixed::ZERO,
+            Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
+            MIN_SEPARATION, EJECTION_ENERGY_THRESHOLD, MONITOR_INTERVAL,
+            10, // min = 10
+            5,  // max = 5 (invalid)
+            kelvin_core::MIN_DT, kelvin_core::MAX_DT,
+            Fixed::from_int(1), Fixed::from_int(1000),
         );
-        assert!(matches!(result, Err(ConfigError::InvalidSoftening)));
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InvalidMaxBodies { max, min } => {
+                assert_eq!(max, 5);
+                assert_eq!(min, 10);
+            }
+            other => panic!("expected InvalidMaxBodies, got: {:?}", other),
+        }
     }
 }

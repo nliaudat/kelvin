@@ -182,7 +182,7 @@ fn main() -> Result<()> {
 fn generate_config(level: &str) -> Result<OrbitalConfig> {
     let mut rng = rand::thread_rng();
     let (n_bodies, steps) = match level {
-        "standard" => (3, 1_000_000),
+        "standard" => (5, 1_000_000),
         "paranoid" => (5, 10_000_000),
         "maximum" => (10, 100_000_000),
         _ => anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level),
@@ -190,9 +190,19 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
 
     let mut bodies = Vec::with_capacity(n_bodies);
     
-    // Sun near center with non-zero jitter
+    // Sun near center with non-zero jitter and variable mass
+    // Mass varies in [0.75, 1.25] solar masses for additional entropy
+    // while remaining safely bound (ejection threshold at M ≤ 0.5)
+    let sun_mass = loop {
+        let raw: i128 = (1 << 64) + rng.gen_range(-(1i128 << 62)..(1i128 << 62) + 1);
+        let m = Fixed::from_raw(raw);
+        // Accept only in [0.75, 1.25] solar masses
+        if m >= Fixed::from_raw(3 << 62) && m <= Fixed::from_raw(5 << 62) {
+            break m;
+        }
+    };
     bodies.push(OrbitalBody::new(
-        Fixed::ONE,
+        sun_mass,
         Vec3::new(
             Fixed::from_raw(rng.gen_range(1 << 20..1 << 30)),
             Fixed::from_raw(rng.gen_range(1 << 20..1 << 30)),
@@ -204,6 +214,7 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
             Fixed::from_raw(rng.gen_range(1 << 10..1 << 20)),
         ),
     ));
+
 
     // Add planets at stable orbits with full 3D randomization
     for i in 1..n_bodies {

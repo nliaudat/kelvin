@@ -44,9 +44,9 @@ The `kelvin-test-server` generates golden test vectors that can be verified on a
 $ kelvin-test-server.exe --output test-vectors/
 
 Generated 5 test vectors:
-  [Standard]   3 bodies,    50 steps,    0.027s -- Standard level, short plaintext
-  [Standard]   3 bodies,    50 steps,    0.027s -- Standard level, empty plaintext
-  [Standard]   3 bodies,    50 steps,    0.030s -- Standard level, 1KB plaintext
+  [Standard]   5 bodies,    50 steps,    0.030s -- Standard level, short plaintext
+  [Standard]   5 bodies,    50 steps,    0.030s -- Standard level, empty plaintext
+  [Standard]   5 bodies,    50 steps,    0.033s -- Standard level, 1KB plaintext
   [Paranoid]   5 bodies,    50 steps,    0.091s -- Paranoid level, short plaintext
   [Paranoid]   5 bodies,    50 steps,    0.089s -- Paranoid level, 1KB plaintext
 ```
@@ -62,13 +62,13 @@ Verifying: Paranoid level, short plaintext (5 bodies)
 Verifying: Paranoid level, 1KB plaintext (5 bodies)
   [PASS] ciphertext_match=true, round_trip=true, idempotent=true
 
-Verifying: Standard level, short plaintext (3 bodies)
+Verifying: Standard level, short plaintext (5 bodies)
   [PASS] ciphertext_match=true, round_trip=true, idempotent=true
 
-Verifying: Standard level, empty plaintext (3 bodies)
+Verifying: Standard level, empty plaintext (5 bodies)
   [PASS] ciphertext_match=true, round_trip=true, idempotent=true
 
-Verifying: Standard level, 1KB plaintext (3 bodies)
+Verifying: Standard level, 1KB plaintext (5 bodies)
   [PASS] ciphertext_match=true, round_trip=true, idempotent=true
 
 Results: 5/5 passed
@@ -139,7 +139,7 @@ All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at 
 
 ## 5. Performance Benchmarks
 
-| Operation | Standard (3 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
+| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
 |-----------|-------------------------------|-------------------------------|
 | Setup + Keygen (CLI) | ~1.1s | ~12.5s |
 | ML-DSA Signature | ~2ms | ~2ms |

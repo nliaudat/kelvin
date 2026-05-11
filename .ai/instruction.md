@@ -141,7 +141,6 @@ AI BEHAVIOR RULES
 2. No floating-point. No exceptions.
 3. If a crypto decision is uncertain, choose conservative and flag for review.
 4. Remind about the "EXPERIMENTAL" status if production use is suggested.
-5. Read implementation_plan.md for details this file doesn't cover.
-6. When suggesting code, follow Rust best practices listed above.
+5. When suggesting code, follow Rust best practices listed above.
 
 ===============================================================================

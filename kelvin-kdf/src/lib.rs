@@ -35,6 +35,7 @@ mod asymmetric;
 
 pub use config::{OrbitalConfig, ConfigError};
 pub use lyapunov::{LyapunovEstimator, LyapunovResult, LyapunovConfidence, LyapunovError};
-pub use extractor::{extract_seed, extract_seed_extended};
+pub use extractor::{extract_seed, extract_seed_extended, extract_shake256};
+
 pub use schedule::{KeySchedule, ScheduleState};
 pub use asymmetric::{OrbitalKeyPair, AsymmetricError};

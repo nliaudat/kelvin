@@ -15,8 +15,51 @@
 //!   — Keccak sponge construction underlying SHA3-512.
 
 use alloc::vec::Vec;
-use sha3::{Digest, Sha3_512};
+use sha3::{Digest, Sha3_512, Shake256};
+use sha3::digest::{ExtendableOutput, XofReader};
 use kelvin_core::OrbitalBody;
+
+/// Feed all orbital state into a hasher (used by both SHA3-512 and SHAKE256).
+fn feed_orbital_state(
+    hasher: &mut impl sha3::digest::Update,
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
+    domain_separator: &[u8],
+) {
+    // Domain separation
+    sha3::digest::Update::update(hasher, domain_separator);
+
+    // Physical constants
+    sha3::digest::Update::update(hasher, &g.to_raw().to_le_bytes());
+    sha3::digest::Update::update(hasher, &softening.to_raw().to_le_bytes());
+
+    // Step counter
+    sha3::digest::Update::update(hasher, &step.to_le_bytes());
+
+    // Number of bodies
+    sha3::digest::Update::update(hasher, &(bodies.len() as u32).to_le_bytes());
+
+    // Instantaneous gravitational forces (accelerations)
+    let accelerations = kelvin_core::compute_accelerations(bodies, softening, g);
+
+    // Body data
+    for (body, acc) in bodies.iter().zip(accelerations.iter()) {
+        sha3::digest::Update::update(hasher, &body.mass.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &body.position.x.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &body.position.y.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &body.position.z.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &body.velocity.x.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &body.velocity.y.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &body.velocity.z.to_raw().to_le_bytes());
+
+        // Instant G force vector (acceleration)
+        sha3::digest::Update::update(hasher, &acc.x.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &acc.y.to_raw().to_le_bytes());
+        sha3::digest::Update::update(hasher, &acc.z.to_raw().to_le_bytes());
+    }
+}
 
 /// Extract a 64-byte seed from the orbital state using SHA3-512.
 ///
@@ -29,28 +72,42 @@ use kelvin_core::OrbitalBody;
 pub fn extract_seed(
     bodies: &[OrbitalBody],
     step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
     domain_separator: &[u8],
 ) -> [u8; 64] {
     let mut hasher = Sha3_512::new();
 
     // Domain separation
-    hasher.update(domain_separator);
+    Digest::update(&mut hasher, domain_separator);
+
+    // Physical constants
+    Digest::update(&mut hasher, &g.to_raw().to_le_bytes());
+    Digest::update(&mut hasher, &softening.to_raw().to_le_bytes());
 
     // Step counter
-    hasher.update(step.to_le_bytes());
+    Digest::update(&mut hasher, &step.to_le_bytes());
 
     // Number of bodies
-    hasher.update((bodies.len() as u32).to_le_bytes());
+    Digest::update(&mut hasher, &(bodies.len() as u32).to_le_bytes());
+
+    // Instantaneous gravitational forces (accelerations)
+    let accelerations = kelvin_core::compute_accelerations(bodies, softening, g);
 
     // Body data
-    for body in bodies {
-        hasher.update(body.mass.to_raw().to_le_bytes());
-        hasher.update(body.position.x.to_raw().to_le_bytes());
-        hasher.update(body.position.y.to_raw().to_le_bytes());
-        hasher.update(body.position.z.to_raw().to_le_bytes());
-        hasher.update(body.velocity.x.to_raw().to_le_bytes());
-        hasher.update(body.velocity.y.to_raw().to_le_bytes());
-        hasher.update(body.velocity.z.to_raw().to_le_bytes());
+    for (body, acc) in bodies.iter().zip(accelerations.iter()) {
+        Digest::update(&mut hasher, &body.mass.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &body.position.x.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &body.position.y.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &body.position.z.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &body.velocity.x.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &body.velocity.y.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &body.velocity.z.to_raw().to_le_bytes());
+
+        // Instant G force vector (acceleration)
+        Digest::update(&mut hasher, &acc.x.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &acc.y.to_raw().to_le_bytes());
+        Digest::update(&mut hasher, &acc.z.to_raw().to_le_bytes());
     }
 
     let result = hasher.finalize();
@@ -59,43 +116,41 @@ pub fn extract_seed(
     seed
 }
 
-/// Extract a seed of arbitrary length from the orbital state.
+/// Extract a seed of arbitrary length from the orbital state using SHAKE256 (XOF).
 ///
-/// Uses SHA3-512 in counter mode to generate the requested number of bytes.
-pub fn extract_seed_extended(
+/// SHAKE256 is an Extendable-Output Function that can produce a deterministic
+/// stream of bits of any length. This is used to derive large entropy pools
+/// (e.g., 2048 bytes) from the orbital state.
+pub fn extract_shake256(
     bodies: &[OrbitalBody],
     step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
     domain_separator: &[u8],
     output_len: usize,
 ) -> Vec<u8> {
-    let mut output = Vec::with_capacity(output_len);
-    let mut counter: u64 = 0;
+    let mut hasher = Shake256::default();
 
-    while output.len() < output_len {
-        let mut hasher = Sha3_512::new();
-        hasher.update(domain_separator);
-        hasher.update(step.to_le_bytes());
-        hasher.update(counter.to_le_bytes());
-        hasher.update((bodies.len() as u32).to_le_bytes());
+    // Feed all orbital state into the XOF hasher
+    feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator);
 
-        for body in bodies {
-            hasher.update(body.mass.to_raw().to_le_bytes());
-            hasher.update(body.position.x.to_raw().to_le_bytes());
-            hasher.update(body.position.y.to_raw().to_le_bytes());
-            hasher.update(body.position.z.to_raw().to_le_bytes());
-            hasher.update(body.velocity.x.to_raw().to_le_bytes());
-            hasher.update(body.velocity.y.to_raw().to_le_bytes());
-            hasher.update(body.velocity.z.to_raw().to_le_bytes());
-        }
-
-        let result = hasher.finalize();
-        let remaining = output_len - output.len();
-        let to_copy = remaining.min(64);
-        output.extend_from_slice(&result[..to_copy]);
-        counter += 1;
-    }
-
+    let mut output = vec![0u8; output_len];
+    let mut reader = hasher.finalize_xof();
+    XofReader::read(&mut reader, &mut output);
     output
+}
+
+/// Legacy wrapper for extract_shake256.
+#[deprecated(note = "Use extract_shake256 for more efficient XOF extraction")]
+pub fn extract_seed_extended(
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
+    domain_separator: &[u8],
+    output_len: usize,
+) -> Vec<u8> {
+    extract_shake256(bodies, step, g, softening, domain_separator, output_len)
 }
 
 #[cfg(test)]
@@ -126,31 +181,31 @@ mod tests {
     #[test]
     fn test_extract_seed_length() {
         let bodies = test_bodies();
-        let seed = extract_seed(&bodies, 0, b"test");
+        let seed = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test");
         assert_eq!(seed.len(), 64);
     }
 
     #[test]
     fn test_extract_seed_deterministic() {
         let bodies = test_bodies();
-        let seed1 = extract_seed(&bodies, 0, b"test");
-        let seed2 = extract_seed(&bodies, 0, b"test");
+        let seed1 = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test");
+        let seed2 = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test");
         assert_eq!(seed1, seed2);
     }
 
     #[test]
     fn test_extract_seed_different_steps() {
         let bodies = test_bodies();
-        let seed1 = extract_seed(&bodies, 0, b"test");
-        let seed2 = extract_seed(&bodies, 1, b"test");
+        let seed1 = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test");
+        let seed2 = extract_seed(&bodies, 1, Fixed::ONE, Fixed::ONE, b"test");
         assert_ne!(seed1, seed2);
     }
 
     #[test]
     fn test_extract_seed_different_domain() {
         let bodies = test_bodies();
-        let seed1 = extract_seed(&bodies, 0, b"domain-a");
-        let seed2 = extract_seed(&bodies, 0, b"domain-b");
+        let seed1 = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"domain-a");
+        let seed2 = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"domain-b");
         assert_ne!(seed1, seed2);
     }
 
@@ -160,29 +215,29 @@ mod tests {
         let mut bodies2 = test_bodies();
         bodies2[0].position = Vec3::new(Fixed::from_int(1), Fixed::ZERO, Fixed::ZERO);
 
-        let seed1 = extract_seed(&bodies1, 0, b"test");
-        let seed2 = extract_seed(&bodies2, 0, b"test");
+        let seed1 = extract_seed(&bodies1, 0, Fixed::ONE, Fixed::ONE, b"test");
+        let seed2 = extract_seed(&bodies2, 0, Fixed::ONE, Fixed::ONE, b"test");
         assert_ne!(seed1, seed2);
     }
 
     #[test]
     fn test_extract_seed_extended() {
         let bodies = test_bodies();
-        let seed = extract_seed_extended(&bodies, 0, b"test", 128);
+        let seed = extract_seed_extended(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
         assert_eq!(seed.len(), 128);
     }
 
     #[test]
     fn test_extract_seed_extended_deterministic() {
         let bodies = test_bodies();
-        let seed1 = extract_seed_extended(&bodies, 0, b"test", 128);
-        let seed2 = extract_seed_extended(&bodies, 0, b"test", 128);
+        let seed1 = extract_seed_extended(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
+        let seed2 = extract_seed_extended(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
         assert_eq!(seed1, seed2);
     }
 
     #[test]
     fn test_extract_seed_no_panic_empty_bodies() {
-        let seed = extract_seed(&[], 0, b"test");
+        let seed = extract_seed(&[], 0, Fixed::ONE, Fixed::ONE, b"test");
         assert_eq!(seed.len(), 64);
     }
 
@@ -193,8 +248,8 @@ mod tests {
         let mut bodies2 = test_bodies();
         bodies2[0].mass += Fixed::from_raw(1); // minimal change
 
-        let seed1 = extract_seed(&bodies1, 0, b"test");
-        let seed2 = extract_seed(&bodies2, 0, b"test");
+        let seed1 = extract_seed(&bodies1, 0, Fixed::ONE, Fixed::ONE, b"test");
+        let seed2 = extract_seed(&bodies2, 0, Fixed::ONE, Fixed::ONE, b"test");
 
         // Count differing bits
         let diff_bits: u32 = seed1.iter().zip(seed2.iter())
@@ -204,4 +259,5 @@ mod tests {
         // Should have roughly half the bits different (avalanche effect)
         assert!(diff_bits > 200, "Too few differing bits: {}", diff_bits);
     }
+
 }

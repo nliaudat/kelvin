@@ -41,7 +41,7 @@ mod decrypt;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, Vec3, OrbitalBody, DEFAULT_G};
-pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, extract_seed_extended, OrbitalKeyPair, AsymmetricError};
+pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, extract_seed_extended, extract_shake256, OrbitalKeyPair, AsymmetricError};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
@@ -100,9 +100,9 @@ impl Kelvin {
         // Run initial simulation
         simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
 
-        // Extract initial 320-byte seed (5× SHA3-512 for enhanced entropy)
-        let seed_vec = extract_seed_extended(&bodies, config.total_steps, b"kelvin-orbital-state-v1", 320);
-        let mut seed = [0u8; 320];
+        // Extract initial 2048-byte seed (using SHAKE256 XOF)
+        let seed_vec = extract_shake256(&bodies, config.total_steps, config.g, config.softening, b"kelvin-orbital-state-v1", 2048);
+        let mut seed = [0u8; 2048];
         seed.copy_from_slice(&seed_vec);
 
         // Create key schedule
@@ -161,9 +161,9 @@ impl Kelvin {
         // Run initial simulation
         simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
 
-        // Extract initial 320-byte seed (5× SHA3-512 for enhanced entropy)
-        let seed_vec = extract_seed_extended(&bodies, config.total_steps, b"kelvin-orbital-state-v1", 320);
-        let mut seed = [0u8; 320];
+        // Extract initial 2048-byte seed (using SHAKE256 XOF)
+        let seed_vec = extract_shake256(&bodies, config.total_steps, config.g, config.softening, b"kelvin-orbital-state-v1", 2048);
+        let mut seed = [0u8; 2048];
         seed.copy_from_slice(&seed_vec);
 
         // Create key schedule
@@ -220,7 +220,7 @@ impl Kelvin {
     ///
     /// This utilizes the already simulated orbital state and does not require re-running the simulation.
     pub fn asymmetric_keypair(&self) -> OrbitalKeyPair {
-        OrbitalKeyPair::from_bodies(&self.bodies, self.config.total_steps)
+        OrbitalKeyPair::from_bodies(&self.bodies, self.config.total_steps, self.config.g, self.config.softening)
     }
 }
 

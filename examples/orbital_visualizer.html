@@ -247,7 +247,7 @@
 </div>
 
 <div id="key-display">
-  <div style="font-size:11px;color:#8f8;margin-bottom:4px;">🔑 ORBITAL KEY MATERIAL (truncated 64B)</div>
+  <div style="font-size:11px;color:#8f8;margin-bottom:4px;">🔑 ORBITAL KEY MATERIAL DEMO (truncated 64B - every 1s)</div>
   <span id="key-material">Waiting for key generation...</span>
 </div>
 <div id="controls-hint">
@@ -294,7 +294,7 @@ const SPEED_PRESETS = [
 // Sizes are computed dynamically from mass in buildBodies().
 function createDefaultBodies() {
   return [
-    { mass: 1.0,   pos: [0, 0, 0],          vel: [0, 0, 0],            name: '☀ Kuna\'s Eye',  color: 0xffaa00 },
+    { mass: 1.0,   pos: [0, 0, 0],          vel: [0, 0, 0],            name: '☀ Kuna',  color: 0xffaa00 },
     { mass: 1e-6,  pos: [1.0, 0.3, 0.5],    vel: [0, 4.5, 3.0],        name: '🟠 Tatooine',     color: 0x4488ff },
     { mass: 5e-7,  pos: [0, 1.8, -0.8],      vel: [-3.5, 0, 2.5],       name: '🟢 Naboo',        color: 0x44ff88 },
     { mass: 3e-7,  pos: [-1.2, -0.6, 1.0],   vel: [2.0, -4.0, -1.5],    name: '🔴 Aargau',       color: 0xff4444 },
@@ -354,7 +354,7 @@ function parseOrbitalConfig(json) {
 
     // Assign names and colors based on index
     const names = [
-      '☀ Kuna\'s Eye', '☀ Ka\'Dedus',
+      '☀ Kuna', '☀ Ka\'Dedus',
       '🟠 Tatooine', '🟢 Naboo', '🔴 Aargau', '🟣 Alderaan',
       '🟡 Bespin', '🔵 Corellia', '🟤 Dantooine', '⚪ Endor',
       '🟢 Hoth', '🔴 Yavin',
