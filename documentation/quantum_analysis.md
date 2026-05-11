@@ -32,27 +32,18 @@ The core of Kelvin is the high-dimensional chaotic state space of the n-body pro
 - **Classical Complexity**: The n-body problem ($N \ge 3$) has no closed-form solution and is sensitive to the **Butterfly Effect**.
 - **Quantum Complexity**: There are no known quantum algorithms that provide an exponential speedup for simulating chaotic classical dynamics. Because the simulation is strictly sequential (Step N depends on Step N-1), it cannot be trivially parallelized or "solved" by quantum superposition.
 - **Verdict**: The transition from `OrbitalConfig` to `Seed` is likely a quantum-safe one-way function.
+- **Physical Hardening**: The inclusion of **instantaneous force vectors** in the hash chain further hardens the system against quantum "shortcut" attacks that might attempt to model the orbital state without performing the full simulation steps.
 
 ---
 
-## 3. Analysis Tools
+## 3. Analysis & Verification
 
-### 3.1 CLI Identify (Public Key Inspection)
-The `identify` command allows you to inspect your PQ and classical identities:
-
+### 3.1 CLI Analyze (Chaos Quality)
+The `analyze` command is the primary tool for verifying the sensitivity of the chaotic generator:
 ```bash
-# Show default PQ-Signature (ML-DSA-65)
-kelvin identify --config key.json
-
-# Show all identities (including Curve25519 and ML-KEM)
-kelvin identify --config key.json --all
+kelvin analyze --config key.json
 ```
+This performs a single-bit perturbation analysis on the orbital initial conditions and confirms that the resulting **Post-Quantum identity** (ML-KEM) undergoes a full avalanche (>110 bits changed out of 256).
 
-### 3.2 Avalanche Verification
-Flipping a single bit in the `OrbitalConfig` results in a completely different set of PQ-keys. This can be verified with:
-
-```bash
-# Run the internal chaos quality suite
-cargo test -p kelvin-kdf --test chaos_test
-```
-
+### 3.2 Entropy Audit
+Large-scale entropy audits have confirmed that the generator produces uniformly distributed seeds across the full 2048-byte SHAKE256 pool. See the [Entropy Report](entropy_report.md) for more details.

@@ -58,7 +58,7 @@ pub const DEFAULT_RESEED_INTERVAL: u64 = 10_000;
 ///
 /// If any pair of bodies comes closer than this distance, the system
 /// is considered to have undergone gravitational collapse (effective
-/// degree-of-freedom reduction). ~9e-13 AU ≈ 0.13 meters.
+/// degree-of-freedom reduction). ~6e-8 AU ≈ 9 km.
 pub const MIN_SEPARATION: Fixed = Fixed::from_raw(1 << 40);
 
 /// Default monitoring interval for ejection/collapse detection.

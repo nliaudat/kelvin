@@ -172,7 +172,7 @@ fn generate_test_vector(
         bodies.clone(),
         total_steps,
         reseed_interval,
-        Fixed::from_raw(1 << 44), // dt ~ 1e-6 years
+        kelvin_core::DEFAULT_DT,  // dt ~ 1e-3 years
         Fixed::from_raw(1 << 44), // softening ~ 1e-6 AU
         kelvin_core::DEFAULT_G,
     ).map_err(|e| format!("Config error: {}", e))?;

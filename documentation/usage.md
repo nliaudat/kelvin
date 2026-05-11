@@ -31,7 +31,7 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 ```
 
 ### Encrypt a File
-Kelvin uses the orbital simulation to generate a chaotic **Orbital One-Time Pad** for encryption.
+Kelvin uses the orbital simulation to generate a chaotic **Orbital Keystream** for encryption.
 
 ```bash
 ./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
@@ -56,6 +56,13 @@ Kelvin derives multiple Post-Quantum (PQ) and classical asymmetric identities fr
 
 # Show specific identities
 ./kelvin identify --config my_secret.json --ecc --kem
+
+### Analyze Configuration Quality
+Verify that a configuration has sufficient chaos and sensitivity to initial conditions.
+```bash
+./kelvin analyze --config my_secret.json
+```
+This performs a bit-flip on the Sun mass and measures the **Avalanche Effect** on the resulting cryptographic identity.
 ```
 
 ---

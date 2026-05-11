@@ -66,20 +66,20 @@ impl core::fmt::Debug for OrbitalKeyPair {
 
 impl OrbitalKeyPair {
     /// Derive a Hybrid key pair from an existing orbital state.
-    pub fn from_bodies(bodies: &[OrbitalBody], step: u64) -> Self {
+    pub fn from_bodies(bodies: &[OrbitalBody], step: u64, g: kelvin_core::Fixed, softening: kelvin_core::Fixed) -> Self {
         // 1. Derive Curve25519 (Classical)
-        let seed_ecc = extract_seed(bodies, step, b"kelvin-curve25519-v1");
+        let seed_ecc = extract_seed(bodies, step, g, softening, b"kelvin-curve25519-v1");
         let scalar = Scalar::from_bytes_mod_order_wide(&seed_ecc);
         let curve_private = StaticSecret::from(scalar.to_bytes());
         let curve_public = PublicKey::from(&curve_private);
 
         // 2. Derive ML-KEM-768 (Post-Quantum KEM)
-        let seed_kem = extract_seed(bodies, step, b"kelvin-ml-kem-v1");
+        let seed_kem = extract_seed(bodies, step, g, softening, b"kelvin-ml-kem-v1");
         let kem_private = DecapsulationKey::<MlKem768>::from_seed(seed_kem.into());
         let kem_public = kem_private.encapsulation_key().clone();
 
         // 3. Derive ML-DSA-65 (Post-Quantum Signature)
-        let seed_dsa = extract_seed(bodies, step, b"kelvin-ml-dsa-v1");
+        let seed_dsa = extract_seed(bodies, step, g, softening, b"kelvin-ml-dsa-v1");
         let dsa_seed_32: [u8; 32] = seed_dsa[0..32].try_into().expect("SHA3-512 must be 64 bytes");
         let dsa_private = SigningKey::<MlDsa65>::from_seed(&dsa_seed_32.into());
         let dsa_public = dsa_private.verifying_key().clone();
@@ -127,7 +127,7 @@ impl OrbitalKeyPair {
             config.g,
         );
 
-        Ok(Self::from_bodies(&bodies, config.total_steps))
+        Ok(Self::from_bodies(&bodies, config.total_steps, config.g, config.softening))
     }
 }
 

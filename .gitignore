@@ -17,3 +17,11 @@ Thumbs.db
 
 # Rust tooling
 *.rs.bk
+/test-vectors
+/tests/entropy_analysis/data_1000
+/test-vectors
+test-vectors/kelvin-test-paranoid-4.json
+test-vectors/kelvin-test-paranoid-5.json
+test-vectors/kelvin-test-standard-1.json
+test-vectors/kelvin-test-standard-2.json
+test-vectors/kelvin-test-standard-3.json

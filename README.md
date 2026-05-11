@@ -8,21 +8,20 @@
 
 ### *Three bodies. Infinite chaos...*
 
-<iframe src="examples/orbital_visualizer.html" width="100%" height="600" style="border: 1px solid #0f0; border-radius: 8px; background: #0a0a1a;" allowfullscreen></iframe>
+[![Kelvin Orbital Key Generator](https://img.shields.io/badge/🚀-Launch_3D_Orbital_Visualizer-00ff00?style=for-the-badge)](examples/orbital_visualizer.html)
 
 *Drag to rotate, scroll to zoom, Space to pause. Load a `key.json` file to configure custom initial conditions.*
 
 **EXPERIMENTAL — NOT FOR PRODUCTION USE.**
+
 ================================================================================
-
-
 
 Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines:
 
 - **Q32.64 fixed-point arithmetic** — deterministic across all platforms
 - **Symplectic Verlet integrator** — energy-conserving n-body simulation
 - **Lyapunov time estimation** — shadow orbit method for chaos quantification
-- **SHA3-512 entropy extraction** — domain-separated hashing of orbital state
+- **SHAKE256 XOF entropy extraction** — 2048-byte domain-separated hashing of orbital state
 - **ChaCha20 stream cipher** — XOR-based encryption/decryption
 - **Post-Quantum Hybrid Identity** — ML-DSA-65 (Primary), ML-KEM-768, and Curve25519 identities
 - **Chaos Quality Test Suite** — Integrated statistical verification (avalanche and uniformity tests)
@@ -43,7 +42,9 @@ Key innovations include:
 
 - **Entropy Extraction past the Lyapunov Horizon** — To ensure maximum uncertainty, Kelvin requires that the total simulation steps exceed the estimated Lyapunov time. This guarantees that the extractable entropy is fully randomized and decoupled from the initial configuration secrets.
 
-- **Post-Quantum Hybrid Identity** — Kelvin bridges chaotic dynamics and Post-Quantum Cryptography. By applying **domain-separated hashing** to the orbital state, it derives uniform key pairs for **ML-DSA-65** (Quantum-Safe Signature), **ML-KEM-768** (Quantum-Safe KEM), and **Curve25519** (Classical). This allows a shared chaotic configuration to serve as a universally identifiable and quantum-resistant identity.
+- **Deep Physical Binding** — Every cryptographic seed is cryptographically bound to the physical laws of the simulation. By hashing the gravitational constant ($G$), softening factor, and **instantaneous force vectors** (accelerations) into the seed, Kelvin ensures that the keyspace is tethered to the physical reality of the N-body system, preventing "shortcut" attacks that ignore the dynamics.
+
+- **Post-Quantum Hybrid Identity** — Kelvin bridges chaotic dynamics and Post-Quantum Cryptography. By applying **domain-separated hashing (SHAKE256)** to the orbital state, it derives uniform key pairs for **ML-DSA-65** (Quantum-Safe Signature), **ML-KEM-768** (Quantum-Safe KEM), and **Curve25519** (Classical). This allows a shared chaotic configuration to serve as a universally identifiable and quantum-resistant identity.
 
 - **Negotiable physical constants** — Kelvin supports a dynamic gravitational constant ($G$), allowing communicating parties to initialize their chaotic environment with unique physical laws. This increases the configuration space and prevents pre-computation attacks based on fixed gravitational models. Strict validation bounds ($1.0 \le G \le 1000.0$) ensure the system remains within a chaotic yet numerically stable regime.
 
@@ -57,17 +58,17 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 
 3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator that conserves energy and momentum. The deterministic fixed-point arithmetic ensures bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
 
-4. **Seed extraction** — After simulation, the final orbital state is hashed with SHA3-512 using domain separation. This produces a cryptographically strong seed that is uniformly distributed and independent of the raw orbital coordinates.
+4. **Seed extraction** — After simulation, the final orbital state is hashed with **SHAKE256 (XOF)** using domain separation. This process incorporates the full physical state: positions, velocities, masses, the gravitational constant ($G$), the softening factor, and the **instantaneous gravitational force vectors** acting on every body. This produces a **2048-byte** cryptographically strong seed that is physically bound to the simulation's reality.
 
-5. **Key schedule** — The seed drives a deterministic key schedule that generates a continuous **Orbital Keystream**. The schedule automatically reseeds at configurable intervals by advancing the simulation, ensuring that the keystream remains tightly coupled to the physical evolution of the system.
+5. **Key schedule** — The seed drives a deterministic key schedule that generates a continuous **Orbital Keystream**. The schedule automatically reseeds at configurable intervals using **SHAKE256** to advance the entropy pool, ensuring that the keystream remains tightly coupled to the physical evolution of the system. Each reseed event incorporates fresh force vector data from the current orbital state.
 
-6. **Encryption/Decryption** — Data is encrypted by XORing with the **Orbital One-Time Pad**. This produces a ciphertext that is computationally irreducible, resting on the fundamental unpredictability of the n-body problem. Decryption is the exact inverse operation, requiring the identical initial orbital configuration.
+6. **Encryption/Decryption** — Data is encrypted by XORing with the **ChaCha20 Orbital Keystream**, seeded by the chaotic orbital state. Decryption is the exact inverse operation, requiring the identical initial orbital configuration.
 
 ## Architecture
 
 ```
 kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet integrator
-kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHA3-512 extractor, KeySchedule
+kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHAKE256 XOF extractor, KeySchedule
 kelvin-stream/   — ChaCha20 wrapper with StreamCipher trait
 kelvin/          — Top-level Kelvin struct (encrypt/decrypt)
 kelvin-cli/      — CLI tool (keygen, encrypt, decrypt, benchmark)
@@ -76,19 +77,11 @@ kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 
 ## Security Levels
 
-| Level    | Bodies | Steps     | G (Dynamic) | Lyapunov Shadow | Setup Time |
-|----------|--------|-----------|-------------|-----------------|------------|
-| Standard | 3      | 1,000,000 | 39.478...   | 1,000           | ~1s        |
-| Paranoid | 5      | 10,000,000| Negotiable  | 10,000          | ~10s       |
-| Maximum  | 10     | 100,000,000| Negotiable | 100,000         | ~2min      |
-
-## Interactive 3D Visualization
-
-Try the Kelvin orbital key generator in your browser:
-
-<iframe src="examples/orbital_visualizer.html" width="100%" height="600" style="border: 1px solid #0f0; border-radius: 8px; background: #0a0a1a;" allowfullscreen></iframe>
-
-*Drag to rotate, scroll to zoom, Space to pause. Load a `key.json` file to configure custom initial conditions.*
+| Level    | Bodies | Steps     | Sun Mass Var. | Raw Keyspace | Setup Time |
+|----------|--------|-----------|---------------|--------------|------------|
+| Standard | 5      | 1,000,000 | ±25%          | $\approx 2^{1287}$ | ~1s        |
+| Paranoid | 5      | 10,000,000| ±25%          | $\approx 2^{1287}$ | ~10s       |
+| Maximum  | 10     | 100,000,000| ±25%         | $\approx 2^{2744}$ | ~2min      |
 
 ## Documentation
 
@@ -117,7 +110,7 @@ Kelvin builds on foundational work across numerical analysis, chaos theory, and 
 - **Murray & Dermott (1999)** — Solar System Dynamics (Cambridge University Press)
 
 ### Cryptographic Hash Functions
-- **NIST FIPS PUB 202 (2015)** — SHA3-512 standard [doi:10.6028/NIST.FIPS.202]
+- **NIST FIPS PUB 202 (2015)** — SHAKE256 Extendable-Output Function (XOF) standard [doi:10.6028/NIST.FIPS.202]
 - **Bertoni et al. (2013)** — Keccak sponge construction [doi:10.1007/978-3-642-38348-9_19]
 
 ### Stream Ciphers
