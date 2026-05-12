@@ -63,10 +63,8 @@ fn feed_orbital_state(
 
 /// Extract a 64-byte seed from the orbital state using SHA3-512.
 ///
-/// The input to the hash is:
-/// - Domain separator (personalization string)
-/// - For each body: mass, position (x, y, z), velocity (x, y, z)
-/// - Step counter
+/// Delegates to `feed_orbital_state` for the hashing logic, ensuring
+/// consistency with the SHAKE256 extraction path.
 ///
 /// This ensures that different simulation states produce different seeds.
 pub fn extract_seed(
@@ -77,44 +75,13 @@ pub fn extract_seed(
     domain_separator: &[u8],
 ) -> [u8; 64] {
     let mut hasher = Sha3_512::new();
-
-    // Domain separation
-    Digest::update(&mut hasher, domain_separator);
-
-    // Physical constants
-    Digest::update(&mut hasher, &g.to_raw().to_le_bytes());
-    Digest::update(&mut hasher, &softening.to_raw().to_le_bytes());
-
-    // Step counter
-    Digest::update(&mut hasher, &step.to_le_bytes());
-
-    // Number of bodies
-    Digest::update(&mut hasher, &(bodies.len() as u32).to_le_bytes());
-
-    // Instantaneous gravitational forces (accelerations)
-    let accelerations = kelvin_core::compute_accelerations(bodies, softening, g);
-
-    // Body data
-    for (body, acc) in bodies.iter().zip(accelerations.iter()) {
-        Digest::update(&mut hasher, &body.mass.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &body.position.x.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &body.position.y.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &body.position.z.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &body.velocity.x.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &body.velocity.y.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &body.velocity.z.to_raw().to_le_bytes());
-
-        // Instant G force vector (acceleration)
-        Digest::update(&mut hasher, &acc.x.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &acc.y.to_raw().to_le_bytes());
-        Digest::update(&mut hasher, &acc.z.to_raw().to_le_bytes());
-    }
-
+    feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator);
     let result = hasher.finalize();
     let mut seed = [0u8; 64];
     seed.copy_from_slice(&result);
     seed
 }
+
 
 /// Extract a seed of arbitrary length from the orbital state using SHAKE256 (XOF).
 ///
