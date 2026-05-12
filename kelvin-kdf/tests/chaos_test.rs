@@ -57,8 +57,8 @@ fn test_chaos_avalanche() {
     simulate(&mut bodies_pert, steps, dt, softening, kelvin_core::DEFAULT_G);
 
     // Extract seeds
-    let seed_orig = extract_seed(&bodies_orig, steps, b"avalanche-test");
-    let seed_pert = extract_seed(&bodies_pert, steps, b"avalanche-test");
+    let seed_orig = extract_seed(&bodies_orig, steps, kelvin_core::DEFAULT_G, softening, b"avalanche-test");
+    let seed_pert = extract_seed(&bodies_pert, steps, kelvin_core::DEFAULT_G, softening, b"avalanche-test");
 
     // Calculate Hamming distance
     let dist = hamming_distance(&seed_orig, &seed_pert);
@@ -85,7 +85,7 @@ fn test_chaos_uniformity() {
 
     for i in 0..num_tests {
         simulate(&mut bodies, steps_per_run, dt, softening, kelvin_core::DEFAULT_G);
-        let seed = extract_seed(&bodies, (i + 1) * steps_per_run, b"uniformity-test");
+        let seed = extract_seed(&bodies, (i + 1) * steps_per_run, kelvin_core::DEFAULT_G, softening, b"uniformity-test");
         
         for byte in seed.iter() {
             ones_count += byte.count_ones();

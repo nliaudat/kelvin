@@ -29,6 +29,10 @@ pub enum KelvinError {
     #[error("seed material exhausted")]
     SeedExhausted,
 
+    /// AEAD authentication error (tampered ciphertext).
+    #[error("AEAD authentication failed: {0}")]
+    AeadError(String),
+
     /// I/O error during encryption/decryption.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -47,5 +51,11 @@ impl From<kelvin_kdf::ConfigError> for KelvinError {
 impl From<kelvin_kdf::LyapunovError> for KelvinError {
     fn from(e: kelvin_kdf::LyapunovError) -> Self {
         KelvinError::InvalidConfig(e.to_string())
+    }
+}
+
+impl From<aead::Error> for KelvinError {
+    fn from(e: aead::Error) -> Self {
+        KelvinError::AeadError(e.to_string())
     }
 }

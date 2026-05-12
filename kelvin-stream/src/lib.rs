@@ -3,8 +3,8 @@
 //! Stream cipher integration for the Kelvin cryptosystem.
 //!
 //! Provides:
-//! - `StreamCipher` trait
-//! - `ChaChaStream` — ChaCha20 wrapper with rekeying support
+//! - `StreamCipher` trait — authenticated encryption/decryption
+//! - `ChaChaStream` — ChaCha20Poly1305 AEAD wrapper
 //!
 //! ## Security
 //!
@@ -29,4 +29,4 @@ pub use chacha::ChaChaStream;
 pub use traits::StreamCipher;
 
 #[cfg(feature = "aes-ni")]
-pub use aes_ctr::AesCtrStream;
+pub use aes_ctr::AesGcmStream;

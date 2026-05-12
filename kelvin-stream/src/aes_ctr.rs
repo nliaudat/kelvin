@@ -1,65 +1,70 @@
-//! AES-256-CTR stream cipher wrapper with rekeying support.
+//! AES-256-GCM authenticated stream cipher wrapper.
 //!
-//! Provides a hardware-accelerated alternative to ChaCha20 when the
-//! `aes-ni` feature is enabled.
+//! Provides a hardware-accelerated authenticated alternative to ChaCha20Poly1305
+//! when the `aes-ni` feature is enabled.
+//!
+//! ## References
+//!
+//! - NIST (2007). "Recommendation for Block Cipher Modes of Operation:
+//!   Galois/Counter Mode (GCM) and GMAC." SP 800-38D.
+//! - Dworkin, M. (2001). "Recommendation for Block Cipher Modes of
+//!   Operation." NIST SP 800-38A.
 
 use crate::traits::StreamCipher;
-use aes::Aes256;
-use aes::cipher::{KeyIvInit, StreamCipher as StreamCipherTrait, StreamCipherSeek};
-use ctr::Ctr128BE;
+use aead::{AeadCore, AeadInPlace, KeyInit};
+use aead::generic_array::typenum::Unsigned;
+use aes_gcm::Aes256Gcm;
 
-type Aes256Ctr = Ctr128BE<Aes256>;
-
-/// AES-256-CTR stream cipher wrapper.
+/// AES-256-GCM authenticated stream cipher wrapper.
 ///
-/// Wraps the `aes` and `ctr` crates with:
-/// - 32-byte key + 16-byte IV
+/// Wraps the `aes-gcm` crate with:
+/// - 32-byte key + 12-byte nonce (standard GCM IV)
+/// - AEAD authentication (GMAC tag)
 /// - Position tracking
 /// - Safe byte limit enforcement
-pub struct AesCtrStream {
-    cipher: Aes256Ctr,
+pub struct AesGcmStream {
+    cipher: Aes256Gcm,
+    nonce: [u8; 12],
     position: u64,
     max_bytes: u64,
 }
 
-impl core::fmt::Debug for AesCtrStream {
+impl core::fmt::Debug for AesGcmStream {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.debug_struct("AesCtrStream")
+        f.debug_struct("AesGcmStream")
             .field("position", &self.position)
             .field("max_bytes", &self.max_bytes)
             .finish()
     }
 }
 
-impl AesCtrStream {
-    /// Create a new AES-256-CTR stream cipher.
+impl AesGcmStream {
+    /// Create a new AES-256-GCM authenticated stream cipher.
     ///
-    /// `key` must be 32 bytes, `iv` must be 16 bytes.
-    pub fn new(key: [u8; 32], iv: [u8; 16]) -> Self {
-        let cipher = Aes256Ctr::new(&key.into(), &iv.into());
+    /// `key` must be 32 bytes, `nonce` must be 12 bytes (standard GCM IV).
+    pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .expect("AES-256-GCM key must be 32 bytes");
 
-        // Max bytes limit. We use 4 GiB limit per key for consistency.
+        // Conservative 4 GiB limit per key
         let max_bytes = 1 << 32;
 
-        AesCtrStream {
+        AesGcmStream {
             cipher,
+            nonce,
             position: 0,
             max_bytes,
         }
     }
 
-    /// Rekey the cipher with a new key and IV.
+    /// Rekey the cipher with a new key and nonce.
     ///
     /// Resets the position counter.
-    pub fn rekey(&mut self, key: [u8; 32], iv: [u8; 16]) {
-        self.cipher = Aes256Ctr::new(&key.into(), &iv.into());
+    pub fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
+        self.cipher = Aes256Gcm::new_from_slice(&key)
+            .expect("AES-256-GCM key must be 32 bytes");
+        self.nonce = nonce;
         self.position = 0;
-    }
-
-    /// Seek to a specific position in the keystream.
-    pub fn seek(&mut self, position: u64) {
-        self.cipher.seek(position);
-        self.position = position;
     }
 
     /// Check if the cipher has exceeded its safe byte limit.
@@ -68,10 +73,42 @@ impl AesCtrStream {
     }
 }
 
-impl StreamCipher for AesCtrStream {
-    fn xor_in_place(&mut self, data: &mut [u8]) {
-        self.cipher.apply_keystream(data);
-        self.position += data.len() as u64;
+impl StreamCipher for AesGcmStream {
+    fn encrypt_in_place(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> Result<(), aead::Error> {
+        // AEAD encrypt_in_place_detached: buffer[..plaintext_len] is plaintext.
+        // The tag is returned separately and appended at buffer[plaintext_len..].
+        let tag_size = <Aes256Gcm as AeadCore>::TagSize::USIZE;
+        if buffer.len() < tag_size {
+            return Err(aead::Error);
+        }
+        let plaintext_len = buffer.len() - tag_size;
+        let nonce = aes_gcm::Nonce::from_slice(&self.nonce);
+        let (msg, tag_out) = buffer.split_at_mut(plaintext_len);
+        let tag = self.cipher.encrypt_in_place_detached(nonce, &[], msg)?;
+        tag_out.copy_from_slice(tag.as_slice());
+        self.position += buffer.len() as u64;
+        Ok(())
+    }
+
+    fn decrypt_in_place(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> Result<(), aead::Error> {
+        // AEAD decrypt_in_place_detached: buffer[..ciphertext_len] is ciphertext,
+        // buffer[ciphertext_len..] contains the 16-byte tag.
+        let tag_size = <Aes256Gcm as AeadCore>::TagSize::USIZE;
+        if buffer.len() < tag_size {
+            return Err(aead::Error);
+        }
+        let ciphertext_len = buffer.len() - tag_size;
+        let nonce = aes_gcm::Nonce::from_slice(&self.nonce);
+        let (msg, tag) = buffer.split_at_mut(ciphertext_len);
+        self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<Aes256Gcm>::from_slice(tag))?;
+        self.position += buffer.len() as u64;
+        Ok(())
     }
 
     fn position(&self) -> u64 {
@@ -95,25 +132,57 @@ mod tests {
         k
     }
 
-    fn test_iv() -> [u8; 16] {
-        let mut n = [0u8; 16];
-        for i in 0..16 {
+    fn test_nonce() -> [u8; 12] {
+        let mut n = [0u8; 12];
+        for i in 0..12 {
             n[i] = (i + 32) as u8;
         }
         n
     }
 
     #[test]
-    fn test_encrypt_decrypt() {
-        let mut cipher = AesCtrStream::new(test_key(), test_iv());
-        let mut data = b"Hello, Kelvin!".to_vec();
-        let original = data.clone();
+    fn test_aead_round_trip() {
+        let mut cipher = AesGcmStream::new(test_key(), test_nonce());
+        let plaintext = b"Hello, Kelvin!";
+        let mut buffer = vec![0u8; plaintext.len() + 16];
+        buffer[..plaintext.len()].copy_from_slice(plaintext);
 
-        cipher.xor_in_place(&mut data);
-        assert_ne!(data, original);
+        cipher.encrypt_in_place(&mut buffer).unwrap();
+        assert_ne!(&buffer[..plaintext.len()], plaintext);
 
-        let mut cipher2 = AesCtrStream::new(test_key(), test_iv());
-        cipher2.xor_in_place(&mut data);
-        assert_eq!(data, original);
+        let mut cipher2 = AesGcmStream::new(test_key(), test_nonce());
+        cipher2.decrypt_in_place(&mut buffer).unwrap();
+        assert_eq!(&buffer[..plaintext.len()], plaintext);
+    }
+
+    #[test]
+    fn test_aead_tag_verification() {
+        let mut cipher = AesGcmStream::new(test_key(), test_nonce());
+        let plaintext = b"Hello, Kelvin!";
+        let mut buffer = vec![0u8; plaintext.len() + 16];
+        buffer[..plaintext.len()].copy_from_slice(plaintext);
+
+        cipher.encrypt_in_place(&mut buffer).unwrap();
+
+        // Corrupt the ciphertext
+        buffer[0] ^= 0xFF;
+
+        let mut cipher2 = AesGcmStream::new(test_key(), test_nonce());
+        let result = cipher2.decrypt_in_place(&mut buffer);
+        assert!(result.is_err(), "AEAD should detect tampered ciphertext");
+    }
+
+    #[test]
+    fn test_deterministic() {
+        let mut c1 = AesGcmStream::new(test_key(), test_nonce());
+        let mut c2 = AesGcmStream::new(test_key(), test_nonce());
+
+        let mut buf1 = vec![0u8; 64 + 16];
+        let mut buf2 = vec![0u8; 64 + 16];
+
+        c1.encrypt_in_place(&mut buf1).unwrap();
+        c2.encrypt_in_place(&mut buf2).unwrap();
+
+        assert_eq!(buf1, buf2);
     }
 }
