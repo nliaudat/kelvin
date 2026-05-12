@@ -7,7 +7,9 @@ This document evaluates the security of Kelvin in the context of a Post-Quantum 
 | Component | Primitive | Quantum Status | Effective Security |
 |-----------|-----------|----------------|--------------------|
 | **Symmetric Cipher** | ChaCha20 | **Quantum-Resistant** | 128-bit (Grover) |
-| **Entropy Extractor** | SHA3-512 | **Quantum-Resistant** | 256-bit (Grover) |
+| **Entropy Extractor (SHA3-512)** | SHA3-512 | **Quantum-Resistant** | 256-bit (Grover) |
+| **Entropy Extractor (SHAKE256)** | SHAKE256 (XOF) | **Quantum-Resistant** | 256-bit (Grover) |
+| **Entropy Pool** | 2048-byte SHAKE256 pool | **Quantum-Resistant** | 256-bit (Grover) |
 | **Asymmetric Identity** | **ML-DSA-65** | **Quantum-Resistant** | NIST Level 3 (Lattice) |
 | **Chaos Generator** | N-Body Simulation | **Likely PQ-Safe** | Unquantified |
 
@@ -24,15 +26,53 @@ Kelvin uses a hybrid asymmetric layer that defaults to **ML-DSA-65** (FIPS 204) 
 - **ML-DSA-65**: Based on the Module Learning with Errors (M-LWE) problem, it is designed to be resistant to Shor's algorithm and is standardized for post-quantum signatures.
 - **ML-KEM-768**: Also supported for key encapsulation (FIPS 203), providing a quantum-safe transition for shared secrets.
 - **Curve25519 (Legacy)**: Remains available for classical compatibility but is vulnerable to Shor's algorithm.
+- **Orbital Key Derivation**: The `asymmetric.rs` module derives key pairs deterministically from the orbital configuration itself, binding the asymmetric identity to the chaotic seed. This means that compromising the orbital state compromises the identity — but also means the identity inherits the PQ properties of the chaos generator.
 
 ---
 
 ### 2.3 The Chaos Generator (N-Body KDF)
+
 The core of Kelvin is the high-dimensional chaotic state space of the n-body problem.
 - **Classical Complexity**: The n-body problem ($N \ge 3$) has no closed-form solution and is sensitive to the **Butterfly Effect**.
 - **Quantum Complexity**: There are no known quantum algorithms that provide an exponential speedup for simulating chaotic classical dynamics. Because the simulation is strictly sequential (Step N depends on Step N-1), it cannot be trivially parallelized or "solved" by quantum superposition.
 - **Verdict**: The transition from `OrbitalConfig` to `Seed` is likely a quantum-safe one-way function.
-- **Physical Hardening**: The inclusion of **instantaneous force vectors** in the hash chain further hardens the system against quantum "shortcut" attacks that might attempt to model the orbital state without performing the full simulation steps.
+
+#### 2.3.1 Deep Physical Binding
+
+The entropy extraction process has been hardened with **Deep Physical Binding** — the hash chain now includes not only the orbital state (positions, velocities, masses) but also:
+
+- **Physical Constants**: The gravitational constant $G$ and softening factor $\varepsilon$ are hashed into every seed. This prevents quantum "shortcut" attacks that might attempt to model the orbital evolution using a different set of physical laws.
+- **Instantaneous Force Vectors**: The acceleration vector $\mathbf{a}_i$ acting on each body at the extraction step is computed via `compute_accelerations()` and hashed alongside the body data. This binds the seed to the *interactions* between bodies, not just their positions.
+- **Domain Separation**: A personalization string ensures that seeds derived for different purposes (e.g., encryption vs. signing) are cryptographically independent.
+
+These measures ensure that even if a quantum adversary could somehow compute the orbital state at a given step, they would still need to invert the SHAKE256 hash to recover the seed — a problem with no known quantum speedup beyond Grover's.
+
+#### 2.3.2 Dual-Path Extraction
+
+Kelvin uses two complementary extraction paths:
+
+| Path | Hash | Output | Purpose |
+|------|------|--------|---------|
+| **SHA3-512** | SHA3-512 | 64 bytes | Legacy seed, asymmetric key derivation |
+| **SHAKE256 (XOF)** | SHAKE256 | 2048 bytes | Key schedule initialization |
+
+Both paths share the same `feed_orbital_state()` hashing logic, ensuring consistency. The SHAKE256 path produces a **2048-byte entropy pool** that is used to initialize the key schedule, providing a large internal state that resists quantum search.
+
+#### 2.3.3 Stability Bodyguard
+
+The `validate()` method in `OrbitalConfig` performs **Bodyguard checks** at configuration creation time:
+
+1. **Identical Position Rejection**: No two bodies may share the same position (zero distance).
+2. **Initial Collapse Detection**: No two bodies may be closer than `min_separation` at step 0.
+3. **Initial Ejection Detection**: No body may be on an unbound (escape) trajectory at step 0.
+
+These checks guarantee that the simulation starts in a chaotic regime. Without them, a degenerate system (e.g., two bodies at the same point) could reduce the effective degrees of freedom, potentially weakening the entropy. The checks are enforced at config creation time, so a quantum adversary cannot exploit a degenerate initial condition to shortcut the simulation.
+
+During simulation, the `stability.rs` module monitors for:
+- **Gravitational Collapse**: Any pair of bodies closer than `min_separation` triggers a collapse event.
+- **Ejection**: Any body with total energy exceeding `ejection_energy_threshold` is flagged as ejected.
+
+These runtime checks ensure the simulation remains in a high-entropy regime throughout its lifetime.
 
 ---
 
@@ -47,3 +87,31 @@ This performs a single-bit perturbation analysis on the orbital initial conditio
 
 ### 3.2 Entropy Audit
 Large-scale entropy audits have confirmed that the generator produces uniformly distributed seeds across the full 2048-byte SHAKE256 pool. See the [Entropy Report](entropy_report.md) for more details.
+
+### 3.3 Bodyguard Validation Coverage
+The Bodyguard checks are verified by unit tests covering:
+- `test_identical_positions_rejected`
+- `test_initial_collapse_rejected`
+- `test_initial_ejection_rejected`
+- `test_too_few_bodies`
+- `test_non_positive_mass`
+
+These tests ensure that any configuration that could lead to a low-entropy regime is rejected at creation time, maintaining the PQ security guarantees of the system.
+
+---
+
+## 4. Summary
+
+| Attack Vector | Kelvin Defense | PQ Status |
+|---------------|----------------|-----------|
+| **Grover's (key search)** | 256-bit ChaCha20 key | 128-bit effective security |
+| **Shor's (factorization)** | ML-DSA-65 / ML-KEM-768 | NIST Level 3 |
+| **Quantum shortcut (simulation)** | Sequential chaos + Deep Physical Binding | No known speedup |
+| **Degenerate initial conditions** | Bodyguard validation | Prevented at creation |
+| **Orbital state inversion** | SHAKE256 + 2048-byte pool | Grover-limited |
+
+Kelvin's architecture combines multiple layers of post-quantum protection: standardized lattice-based cryptography for identity, a chaotic classical simulation for key derivation, and SHAKE256 for entropy extraction. The Deep Physical Binding and Bodyguard checks ensure that the system remains in a high-entropy regime, closing potential attack vectors that could arise from degenerate orbital configurations.
+
+---
+
+*Last Updated: 2026-05-12*

@@ -20,6 +20,9 @@ import (
 	"unsafe"
 )
 
+// ErrClosed is returned when a method is called on a closed Kelvin instance.
+var ErrClosed = errors.New("kelvin: instance is closed")
+
 type Kelvin struct {
 	ctx *C.KelvinCtx
 }
@@ -42,6 +45,9 @@ func New(configJSON string) (*Kelvin, error) {
 
 // Encrypt encrypts the given data in-place.
 func (k *Kelvin) Encrypt(data []byte) error {
+	if k.ctx == nil {
+		return ErrClosed
+	}
 	if len(data) == 0 {
 		return nil
 	}
@@ -54,12 +60,18 @@ func (k *Kelvin) Encrypt(data []byte) error {
 
 // Decrypt decrypts the given data in-place.
 func (k *Kelvin) Decrypt(data []byte) error {
+	if k.ctx == nil {
+		return ErrClosed
+	}
 	// In Kelvin, encryption and decryption are the same XOR operation.
 	return k.Encrypt(data)
 }
 
 // RemainingBytes returns the number of safe bytes remaining in the simulation.
 func (k *Kelvin) RemainingBytes() uint64 {
+	if k.ctx == nil {
+		return 0
+	}
 	return uint64(C.kelvin_remaining_bytes(k.ctx))
 }
 

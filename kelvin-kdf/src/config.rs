@@ -16,6 +16,14 @@ use kelvin_core::{
     MIN_BODIES, MAX_BODIES, MIN_DT, MAX_DT,
 };
 
+/// Size of the extra binary fields beyond the core body + simulation data.
+///
+/// Layout: min_separation(16) + ejection_energy_threshold(16) + monitor_interval(8)
+///         + min_bodies(4) + max_bodies(4) + min_dt(16) + max_dt(16)
+///         + min_g(16) + max_g(16) = 112 bytes
+const BINARY_EXTRA_SIZE: usize = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16;
+
+
 /// Orbital configuration — the shared secret.
 ///
 /// Contains:
@@ -256,11 +264,12 @@ impl OrbitalConfig {
         for i in 0..self.bodies.len() {
             for j in (i + 1)..self.bodies.len() {
                 let diff = self.bodies[j].position - self.bodies[i].position;
-                if diff.length() == Fixed::ZERO {
+                if diff.length_squared() == Fixed::ZERO {
                     return Err(ConfigError::IdenticalPositions { body_i: i, body_j: j });
                 }
             }
         }
+
 
         // 2. Check for initial collapse (bodies already too close)
         for i in 0..self.bodies.len() {
@@ -280,10 +289,11 @@ impl OrbitalConfig {
 
         // 3. Check for initial ejection (body already on escape trajectory)
         for i in 0..self.bodies.len() {
-            if is_body_ejected(i, &self.bodies, self.g, self.ejection_energy_threshold) {
+            if is_body_ejected(i, &self.bodies, self.g, self.softening, self.ejection_energy_threshold) {
                 return Err(ConfigError::InitialEjection { body_index: i });
             }
         }
+
 
         Ok(())
     }
@@ -306,8 +316,8 @@ impl OrbitalConfig {
     ///         [monitor_interval: u64][min_bodies: u32][max_bodies: u32]
     ///         [min_dt: i128][max_dt: i128][min_g: i128][max_g: i128]
     pub fn to_binary(&self) -> Vec<u8> {
-        let extra = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16;
-        let mut buf = Vec::with_capacity(4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16 + 16 + extra);
+        let mut buf = Vec::with_capacity(4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16 + 16 + BINARY_EXTRA_SIZE);
+
 
         // Number of bodies (u32)
         buf.extend_from_slice(&(self.bodies.len() as u32).to_le_bytes());
@@ -360,8 +370,8 @@ impl OrbitalConfig {
         offset += 4;
 
         let body_size = 112; // 7 × i128
-        let extra = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16;
-        let header_size = 4 + n_bodies * body_size + 8 + 8 + 16 + 16 + 16 + extra;
+        let header_size = 4 + n_bodies * body_size + 8 + 8 + 16 + 16 + 16 + BINARY_EXTRA_SIZE;
+
 
         if data.len() < header_size {
             return Err(ConfigError::InvalidBinary("data too short for bodies".into()));
@@ -504,13 +514,17 @@ impl OrbitalConfig {
 ///
 /// Computes the total energy of the body relative to the rest of the system:
 ///
-///   E_i = 0.5 * m_i * v_i² - Σ_{j≠i} G * m_i * m_j / |r_i - r_j|
+///   E_i = 0.5 * m_i * v_i² - Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
+///
+/// where ε is the softening factor. The softened potential is used to remain
+/// consistent with the simulation integrator (see `compute_accelerations`).
 ///
 /// If E_i >= threshold, the body is on a hyperbolic or parabolic trajectory.
 fn is_body_ejected(
     body_index: usize,
     bodies: &[OrbitalBody],
     g: Fixed,
+    softening: Fixed,
     ejection_energy_threshold: Fixed,
 ) -> bool {
     let n = bodies.len();
@@ -523,14 +537,17 @@ fn is_body_ejected(
     // Kinetic energy: 0.5 * m * v²
     let kinetic = body.kinetic_energy();
 
-    // Potential energy: -Σ_{j≠i} G * m_i * m_j / |r_i - r_j|
+    // Potential energy: -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
+    // Uses softened potential to remain consistent with the simulation integrator.
+    let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
     for j in 0..n {
         if j == body_index {
             continue;
         }
         let diff = bodies[j].position - body.position;
-        let dist = diff.length();
+        let dist_sq = diff.length_squared() + softening_sq;
+        let dist = dist_sq.sqrt();
         if dist > Fixed::ZERO {
             potential -= g * body.mass * bodies[j].mass / dist;
         }
@@ -539,6 +556,7 @@ fn is_body_ejected(
     // Total energy >= threshold means unbound
     kinetic + potential >= ejection_energy_threshold
 }
+
 
 /// Errors from configuration validation.
 #[derive(Clone, Debug, thiserror::Error)]
