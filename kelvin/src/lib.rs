@@ -45,7 +45,7 @@ pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, ex
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
-pub use kelvin_stream::AesCtrStream;
+pub use kelvin_stream::AesGcmStream;
 
 use kelvin_core::simulate;
 use kelvin_kdf::LyapunovEstimator;
@@ -57,7 +57,7 @@ use kelvin_kdf::LyapunovEstimator;
 /// 2. Estimate Lyapunov time
 /// 3. Run orbital simulation
 /// 4. Extract seeds via SHA3-512
-/// 5. Generate keystream via ChaCha20
+/// 5. Generate keystream via ChaCha20Poly1305 AEAD
 #[derive(Debug)]
 pub struct Kelvin {
     #[allow(dead_code)]
@@ -131,7 +131,7 @@ impl Kelvin {
         })
     }
 
-    /// Create a new Kelvin instance using the hardware-accelerated AES-256-CTR fallback.
+    /// Create a new Kelvin instance using the hardware-accelerated AES-256-GCM fallback.
     ///
     /// Available when the `aes-ni` feature is enabled.
     #[cfg(feature = "aes-ni")]
@@ -178,8 +178,10 @@ impl Kelvin {
         let (key, nonce) = schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
 
-        // Create stream cipher (AesCtrStream takes a 16-byte nonce)
-        let stream = Box::new(AesCtrStream::new(key, nonce));
+        // Create AES-256-GCM stream cipher
+        let mut aes_nonce = [0u8; 12];
+        aes_nonce.copy_from_slice(&nonce[..12]);
+        let stream = Box::new(AesGcmStream::new(key, aes_nonce));
 
         Ok(Kelvin {
             config,
@@ -190,20 +192,23 @@ impl Kelvin {
         })
     }
 
-    /// Encrypt data in-place (XOR with keystream).
+    /// Encrypt data in-place using AEAD.
     ///
-    /// Encryption and decryption are identical operations (XOR).
+    /// The buffer must have 16 extra bytes after the plaintext for the
+    /// Poly1305/GMAC authentication tag.
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        self.stream.xor_in_place(data);
+        self.stream.encrypt_in_place(data)?;
         self.bytes_processed += data.len() as u64;
         Ok(())
     }
 
-    /// Decrypt data in-place (XOR with keystream).
+    /// Decrypt data in-place using AEAD.
     ///
-    /// Identical to `encrypt` — XOR is its own inverse.
+    /// The buffer must contain ciphertext + 16-byte authentication tag.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        self.encrypt(data)
+        self.stream.decrypt_in_place(data)?;
+        self.bytes_processed += data.len() as u64;
+        Ok(())
     }
 
     /// Total bytes processed (encrypted or decrypted) since initialization.
@@ -216,9 +221,10 @@ impl Kelvin {
         self.schedule.remaining_bytes()
     }
 
-    /// Derive the asymmetric Curve25519 key pair associated with this Kelvin instance.
+    /// Derive the hybrid post-quantum key pair associated with this Kelvin instance.
     ///
-    /// This utilizes the already simulated orbital state and does not require re-running the simulation.
+    /// This utilizes the already simulated orbital state and does not require
+    /// re-running the simulation.
     pub fn asymmetric_keypair(&self) -> OrbitalKeyPair {
         OrbitalKeyPair::from_bodies(&self.bodies, self.config.total_steps, self.config.g, self.config.softening)
     }
@@ -269,13 +275,16 @@ mod tests {
     fn test_round_trip_small() {
         let config = test_config();
         let mut k = Kelvin::new(config.clone()).unwrap();
-        let mut data = vec![0xABu8; 64];
+        // Buffer needs 16 extra bytes for AEAD tag
+        let mut data = vec![0xABu8; 64 + 16];
         let original = data.clone();
         k.encrypt(&mut data).unwrap();
-        assert_ne!(data, original);
+        // Ciphertext portion (first 64 bytes) should differ from plaintext
+        assert_ne!(&data[..64], &original[..64]);
         // Create a new Kelvin instance for decryption (same config = same keystream)
         let mut k2 = Kelvin::new(config).unwrap();
         k2.decrypt(&mut data).unwrap();
-        assert_eq!(data, original);
+        // Plaintext portion should be restored; tag portion is overwritten during decrypt
+        assert_eq!(&data[..64], &original[..64]);
     }
 }

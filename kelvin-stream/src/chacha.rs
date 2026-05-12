@@ -1,4 +1,4 @@
-//! ChaCha20 stream cipher wrapper with rekeying support.
+//! ChaCha20Poly1305 authenticated stream cipher wrapper.
 //!
 //! ## References
 //!
@@ -13,19 +13,20 @@
 //!   — Predecessor to ChaCha20, design rationale.
 
 use crate::traits::StreamCipher;
-use chacha20::{
-    cipher::{KeyIvInit, StreamCipher as ChaCha20Trait, StreamCipherSeek},
-    ChaCha20, Key, Nonce,
-};
+use aead::{AeadCore, AeadInPlace, KeyInit};
+use aead::generic_array::typenum::Unsigned;
+use chacha20poly1305::ChaCha20Poly1305;
 
-/// ChaCha20 stream cipher wrapper.
+/// ChaCha20Poly1305 authenticated stream cipher wrapper.
 ///
-/// Wraps the `chacha20` crate with:
+/// Wraps the `chacha20poly1305` crate with:
 /// - 32-byte key + 12-byte nonce (IETF variant)
+/// - AEAD authentication (Poly1305 tag)
 /// - Position tracking
 /// - Safe byte limit enforcement
 pub struct ChaChaStream {
-    cipher: ChaCha20,
+    cipher: ChaCha20Poly1305,
+    nonce: [u8; 12],
     position: u64,
     max_bytes: u64,
 }
@@ -40,13 +41,12 @@ impl core::fmt::Debug for ChaChaStream {
 }
 
 impl ChaChaStream {
-    /// Create a new ChaCha20 stream cipher.
+    /// Create a new ChaCha20Poly1305 authenticated stream cipher.
     ///
     /// `key` must be 32 bytes, `nonce` must be 12 bytes (IETF variant).
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
-        let key = Key::from_slice(&key);
-        let nonce = Nonce::from_slice(&nonce);
-        let cipher = ChaCha20::new(key, nonce);
+        let cipher = ChaCha20Poly1305::new_from_slice(&key)
+            .expect("ChaCha20Poly1305 key must be 32 bytes");
 
         // ChaCha20 IETF max: 2^32 - 1 blocks × 64 bytes ≈ 256 GiB
         // We use a conservative 4 GiB limit per key
@@ -54,6 +54,7 @@ impl ChaChaStream {
 
         ChaChaStream {
             cipher,
+            nonce,
             position: 0,
             max_bytes,
         }
@@ -63,16 +64,10 @@ impl ChaChaStream {
     ///
     /// Resets the position counter.
     pub fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
-        let key = Key::from_slice(&key);
-        let nonce = Nonce::from_slice(&nonce);
-        self.cipher = ChaCha20::new(key, nonce);
+        self.cipher = ChaCha20Poly1305::new_from_slice(&key)
+            .expect("ChaCha20Poly1305 key must be 32 bytes");
+        self.nonce = nonce;
         self.position = 0;
-    }
-
-    /// Seek to a specific position in the keystream.
-    pub fn seek(&mut self, position: u64) {
-        self.cipher.seek(position);
-        self.position = position;
     }
 
     /// Check if the cipher has exceeded its safe byte limit.
@@ -82,9 +77,41 @@ impl ChaChaStream {
 }
 
 impl StreamCipher for ChaChaStream {
-    fn xor_in_place(&mut self, data: &mut [u8]) {
-        self.cipher.apply_keystream(data);
-        self.position += data.len() as u64;
+    fn encrypt_in_place(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> Result<(), aead::Error> {
+        // AEAD encrypt_in_place_detached: buffer[..plaintext_len] is plaintext.
+        // The tag is returned separately and appended at buffer[plaintext_len..].
+        let tag_size = <ChaCha20Poly1305 as AeadCore>::TagSize::USIZE;
+        if buffer.len() < tag_size {
+            return Err(aead::Error);
+        }
+        let plaintext_len = buffer.len() - tag_size;
+        let nonce = chacha20poly1305::Nonce::from_slice(&self.nonce);
+        let (msg, tag_out) = buffer.split_at_mut(plaintext_len);
+        let tag = self.cipher.encrypt_in_place_detached(nonce, &[], msg)?;
+        tag_out.copy_from_slice(tag.as_slice());
+        self.position += buffer.len() as u64;
+        Ok(())
+    }
+
+    fn decrypt_in_place(
+        &mut self,
+        buffer: &mut [u8],
+    ) -> Result<(), aead::Error> {
+        // AEAD decrypt_in_place_detached: buffer[..ciphertext_len] is ciphertext,
+        // buffer[ciphertext_len..] contains the 16-byte tag.
+        let tag_size = <ChaCha20Poly1305 as AeadCore>::TagSize::USIZE;
+        if buffer.len() < tag_size {
+            return Err(aead::Error);
+        }
+        let ciphertext_len = buffer.len() - tag_size;
+        let nonce = chacha20poly1305::Nonce::from_slice(&self.nonce);
+        let (msg, tag) = buffer.split_at_mut(ciphertext_len);
+        self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<ChaCha20Poly1305>::from_slice(tag))?;
+        self.position += buffer.len() as u64;
+        Ok(())
     }
 
     fn position(&self) -> u64 {
@@ -117,18 +144,70 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt() {
+    fn test_aead_round_trip() {
         let mut cipher = ChaChaStream::new(test_key(), test_nonce());
-        let mut data = b"Hello, Kelvin!".to_vec();
-        let original = data.clone();
+        let plaintext = b"Hello, Kelvin!";
+        // Buffer needs space for plaintext + 16-byte tag
+        let mut buffer = vec![0u8; plaintext.len() + 16];
+        buffer[..plaintext.len()].copy_from_slice(plaintext);
 
-        cipher.xor_in_place(&mut data);
-        assert_ne!(data, original);
+        cipher.encrypt_in_place(&mut buffer).unwrap();
+        // The first plaintext.len() bytes should now be ciphertext (different from plaintext)
+        assert_ne!(&buffer[..plaintext.len()], plaintext);
 
         // Decrypt with new cipher at same position
         let mut cipher2 = ChaChaStream::new(test_key(), test_nonce());
-        cipher2.xor_in_place(&mut data);
-        assert_eq!(data, original);
+        cipher2.decrypt_in_place(&mut buffer).unwrap();
+        assert_eq!(&buffer[..plaintext.len()], plaintext);
+    }
+
+    #[test]
+    fn test_aead_tag_verification() {
+        let mut cipher = ChaChaStream::new(test_key(), test_nonce());
+        let plaintext = b"Hello, Kelvin!";
+        let mut buffer = vec![0u8; plaintext.len() + 16];
+        buffer[..plaintext.len()].copy_from_slice(plaintext);
+
+        cipher.encrypt_in_place(&mut buffer).unwrap();
+
+        // Corrupt the ciphertext
+        buffer[0] ^= 0xFF;
+
+        // Decryption should fail
+        let mut cipher2 = ChaChaStream::new(test_key(), test_nonce());
+        let result = cipher2.decrypt_in_place(&mut buffer);
+        assert!(result.is_err(), "AEAD should detect tampered ciphertext");
+    }
+
+    #[test]
+    fn test_aead_deterministic() {
+        let mut c1 = ChaChaStream::new(test_key(), test_nonce());
+        let mut c2 = ChaChaStream::new(test_key(), test_nonce());
+
+        let mut buf1 = vec![0u8; 64 + 16];
+        let mut buf2 = vec![0u8; 64 + 16];
+
+        c1.encrypt_in_place(&mut buf1).unwrap();
+        c2.encrypt_in_place(&mut buf2).unwrap();
+
+        assert_eq!(buf1, buf2);
+    }
+
+    #[test]
+    fn test_aead_different_keys() {
+        let mut key2 = test_key();
+        key2[0] ^= 0x01;
+
+        let mut c1 = ChaChaStream::new(test_key(), test_nonce());
+        let mut c2 = ChaChaStream::new(key2, test_nonce());
+
+        let mut buf1 = vec![0u8; 64 + 16];
+        let mut buf2 = vec![0u8; 64 + 16];
+
+        c1.encrypt_in_place(&mut buf1).unwrap();
+        c2.encrypt_in_place(&mut buf2).unwrap();
+
+        assert_ne!(buf1, buf2);
     }
 
     #[test]
@@ -136,42 +215,24 @@ mod tests {
         let mut cipher = ChaChaStream::new(test_key(), test_nonce());
         assert_eq!(cipher.position(), 0);
 
-        cipher.xor_in_place(&mut [0u8; 10]);
-        assert_eq!(cipher.position(), 10);
+        let mut buf = vec![0u8; 10 + 16];
+        cipher.encrypt_in_place(&mut buf).unwrap();
+        assert_eq!(cipher.position(), 26);
 
-        cipher.xor_in_place(&mut [0u8; 20]);
-        assert_eq!(cipher.position(), 30);
+        let mut buf2 = vec![0u8; 20 + 16];
+        cipher.encrypt_in_place(&mut buf2).unwrap();
+        assert_eq!(cipher.position(), 62);
     }
 
     #[test]
     fn test_rekey() {
         let mut cipher = ChaChaStream::new(test_key(), test_nonce());
-        cipher.xor_in_place(&mut [0u8; 10]);
-        assert_eq!(cipher.position(), 10);
+        let mut buf = vec![0u8; 10 + 16];
+        cipher.encrypt_in_place(&mut buf).unwrap();
+        assert_eq!(cipher.position(), 26);
 
         cipher.rekey(test_key(), test_nonce());
         assert_eq!(cipher.position(), 0);
-    }
-
-    #[test]
-    fn test_seek() {
-        let mut cipher = ChaChaStream::new(test_key(), test_nonce());
-        cipher.seek(100);
-        assert_eq!(cipher.position(), 100);
-    }
-
-    #[test]
-    fn test_deterministic() {
-        let mut c1 = ChaChaStream::new(test_key(), test_nonce());
-        let mut c2 = ChaChaStream::new(test_key(), test_nonce());
-
-        let mut d1 = [0u8; 64];
-        let mut d2 = [0u8; 64];
-
-        c1.xor_in_place(&mut d1);
-        c2.xor_in_place(&mut d2);
-
-        assert_eq!(d1, d2);
     }
 
     #[test]
@@ -189,21 +250,8 @@ mod tests {
     #[test]
     fn test_empty_data() {
         let mut cipher = ChaChaStream::new(test_key(), test_nonce());
-        cipher.xor_in_place(&mut []);
-        assert_eq!(cipher.position(), 0);
-    }
-
-    #[test]
-    fn test_large_data() {
-        let mut cipher = ChaChaStream::new(test_key(), test_nonce());
-        let mut data = vec![0xABu8; 10000];
-        let original = data.clone();
-
-        cipher.xor_in_place(&mut data);
-        assert_ne!(data, original);
-
-        let mut cipher2 = ChaChaStream::new(test_key(), test_nonce());
-        cipher2.xor_in_place(&mut data);
-        assert_eq!(data, original);
+        let mut buf = vec![0u8; 16]; // Just tag space
+        cipher.encrypt_in_place(&mut buf).unwrap();
+        assert_eq!(cipher.position(), 16);
     }
 }

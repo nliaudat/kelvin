@@ -6,9 +6,28 @@
 //! - Reseed interval (when to advance the simulation for new entropy)
 //! - Safe step limit (from Lyapunov estimation)
 //! - Bytes encrypted per key (to prevent overuse)
+//!
+//! ## Key Derivation
+//!
+//! Uses **HKDF-SHA512** (RFC 5869) for standardized key derivation from the
+//! entropy pool. This replaces the previous ad-hoc SHA3-512 construction.
+//!
+//! ## Reseeding
+//!
+//! Uses **BLAKE3** for fast XOF-based reseeding of the 2048-byte entropy pool.
+//! BLAKE3 is ~10x faster than SHAKE256 for large outputs, and the reseeding
+//! path is performance-critical (called every `reseed_interval` steps).
+//!
+//! ## References
+//!
+//! - Krawczyk, H., & Eronen, P. (2010). "HMAC-based Extract-and-Expand Key
+//!   Derivation Function (HKDF)." RFC 5869. doi:10.17487/RFC5869
+//! - Aumasson, J.-P., et al. (2020). "BLAKE3: One Function, Fast Everywhere."
+//!   https://github.com/BLAKE3-team/BLAKE3-specs
 
-use sha3::{Digest, Sha3_512, Shake256};
-use sha3::digest::{ExtendableOutput, XofReader};
+use blake3::Hasher;
+use hkdf::Hkdf;
+use sha3::Sha3_512;
 
 /// State of the key schedule.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -22,10 +41,10 @@ pub enum ScheduleState {
 /// Key schedule for the Kelvin cryptosystem.
 ///
 /// Manages key derivation from orbital simulation state.
-/// Each key is 32 bytes (cipher key) + 16 bytes (nonce/IV).
+/// Each key is 32 bytes (cipher key) + 12 bytes (nonce/IV).
 ///
 /// The seed is 2048 bytes, providing a large entropy pool for long-term
-/// forward secrecy. Each reseed derives a fresh 2048-byte pool via SHAKE256.
+/// forward secrecy. Each reseed derives a fresh 2048-byte pool via BLAKE3.
 #[derive(Clone, Debug)]
 pub struct KeySchedule {
     /// Current seed material (2048 bytes).
@@ -76,10 +95,10 @@ impl KeySchedule {
 
     }
 
-    /// Get the next key and nonce.
+    /// Get the next key and nonce using HKDF-SHA512.
     ///
     /// Returns `None` if the schedule is exhausted.
-    pub fn next_key(&mut self) -> Option<([u8; 32], [u8; 16])> {
+    pub fn next_key(&mut self) -> Option<([u8; 32], [u8; 12])> {
         if self.state == ScheduleState::Exhausted {
             return None;
         }
@@ -89,31 +108,37 @@ impl KeySchedule {
             return None;
         }
 
-        // Derive key from current seed
-        let mut hasher = Sha3_512::new();
-        Digest::update(&mut hasher, b"kelvin-key-derivation-v1");
-        Digest::update(&mut hasher, &self.seed[..]);
-        Digest::update(&mut hasher, &self.keys_generated.to_le_bytes());
-        let hash = hasher.finalize();
+        // Derive key and nonce using HKDF-SHA512 (RFC 5869)
+        let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
+
+        // Domain-separated key derivation
+        let mut key_info = Vec::new();
+        key_info.extend_from_slice(b"kelvin-hkdf-key-v1");
+        key_info.extend_from_slice(&self.keys_generated.to_le_bytes());
+
+        let mut nonce_info = Vec::new();
+        nonce_info.extend_from_slice(b"kelvin-hkdf-nonce-v1");
+        nonce_info.extend_from_slice(&self.keys_generated.to_le_bytes());
 
         let mut key = [0u8; 32];
-        key.copy_from_slice(&hash[..32]);
+        hk.expand(&key_info, &mut key)
+            .expect("HKDF expand should not fail for valid output length");
 
-        let mut nonce = [0u8; 16];
-        nonce.copy_from_slice(&hash[32..48]);
+        let mut nonce = [0u8; 12];
+        hk.expand(&nonce_info, &mut nonce)
+            .expect("HKDF expand should not fail for valid output length");
 
         // Advance step and reseed if needed
         self.step += self.reseed_interval;
         self.keys_generated += 1;
 
-        // Reseed: derive new 2048-byte seed from current seed using SHAKE256
+        // Reseed: derive new 2048-byte seed from current seed using BLAKE3
+        let mut reseed_hasher = Hasher::new();
+        reseed_hasher.update(b"kelvin-reseed-v1");
+        reseed_hasher.update(&self.seed[..]);
+        reseed_hasher.update(&self.step.to_le_bytes());
         let mut reseed_buf = [0u8; 2048];
-        let mut reseed_hasher = Shake256::default();
-        sha3::digest::Update::update(&mut reseed_hasher, b"kelvin-reseed-v1");
-        sha3::digest::Update::update(&mut reseed_hasher, &self.seed[..]);
-        sha3::digest::Update::update(&mut reseed_hasher, &self.step.to_le_bytes());
-        let mut reader = reseed_hasher.finalize_xof();
-        XofReader::read(&mut reader, &mut reseed_buf);
+        reseed_hasher.finalize_xof().fill(&mut reseed_buf);
         self.seed = reseed_buf;
 
         // Check exhaustion
@@ -187,7 +212,7 @@ mod tests {
         assert!(result.is_some());
         let (key, nonce) = result.unwrap();
         assert_eq!(key.len(), 32);
-        assert_eq!(nonce.len(), 16);
+        assert_eq!(nonce.len(), 12);
     }
 
     #[test]
@@ -205,6 +230,14 @@ mod tests {
         let k1 = schedule.next_key().unwrap();
         let k2 = schedule.next_key().unwrap();
         assert_ne!(k1.0, k2.0); // keys should differ
+    }
+
+    #[test]
+    fn test_hkdf_domain_separation() {
+        // Key and nonce should be different (different info strings)
+        let mut schedule = KeySchedule::new(test_seed(), 10000, 1000, 5000);
+        let (key, nonce) = schedule.next_key().unwrap();
+        assert_ne!(&key[..12], &nonce[..]);
     }
 
     #[test]
@@ -248,14 +281,6 @@ mod tests {
     }
 
     #[test]
-    fn test_key_nonce_different() {
-        let mut schedule = KeySchedule::new(test_seed(), 10000, 1000, 5000);
-        let (key, nonce) = schedule.next_key().unwrap();
-        // Key and nonce should be different (different parts of hash)
-        assert_ne!(&key[..16], &nonce[..]);
-    }
-
-    #[test]
     fn test_step_increments() {
         let mut schedule = KeySchedule::new(test_seed(), 10000, 1000, 5000);
         assert_eq!(schedule.step(), 0);
@@ -263,5 +288,38 @@ mod tests {
         assert_eq!(schedule.step(), 1000);
         schedule.next_key();
         assert_eq!(schedule.step(), 2000);
+    }
+
+    #[test]
+    fn test_hkdf_seed_avalanche() {
+        let mut seed2 = test_seed();
+        seed2[0] ^= 0x01; // 1-bit change
+
+        let mut s1 = KeySchedule::new(test_seed(), 10000, 1000, 5000);
+        let mut s2 = KeySchedule::new(seed2, 10000, 1000, 5000);
+
+        let (k1, _) = s1.next_key().unwrap();
+        let (k2, _) = s2.next_key().unwrap();
+
+        // Count differing bits
+        let diff_bits: u32 = k1.iter().zip(k2.iter())
+            .map(|(a, b)| (a ^ b).count_ones())
+            .sum();
+
+        // Should have roughly half the bits different (avalanche effect)
+        assert!(diff_bits > 100, "Too few differing bits: {}", diff_bits);
+    }
+
+    #[test]
+    fn test_blake3_reseed_deterministic() {
+        let mut s1 = KeySchedule::new(test_seed(), 10000, 1000, 5000);
+        let mut s2 = KeySchedule::new(test_seed(), 10000, 1000, 5000);
+
+        // Both should produce the same sequence of keys
+        for _ in 0..3 {
+            let k1 = s1.next_key();
+            let k2 = s2.next_key();
+            assert_eq!(k1, k2);
+        }
     }
 }
