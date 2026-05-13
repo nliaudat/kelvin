@@ -1,5 +1,20 @@
 //! ChaCha20Poly1305 authenticated stream cipher wrapper.
 //!
+//! ## Security Notes
+//!
+//! ### Nonce Rotation
+//!
+//! The nonce is incremented after each `encrypt_in_place`/`decrypt_in_place`
+//! call to prevent nonce reuse. This ensures that each message uses a unique
+//! (key, nonce) pair, which is the fundamental AEAD security invariant.
+//!
+//! ### Invocation Limit
+//!
+//! ChaCha20Poly1305 (IETF variant) uses a 12-byte nonce with a 32-bit block
+//! counter, allowing up to 2^32 - 1 blocks (≈256 GiB) per (key, nonce) pair.
+//! Kelvin enforces a conservative **4 GiB plaintext limit** per key, with
+//! automatic key rotation via the key schedule when the limit is approached.
+//!
 //! ## References
 //!
 //! - Bernstein, D. J. (2008). "ChaCha, a Variant of Salsa20." *Workshop
@@ -90,17 +105,19 @@ impl StreamCipher for ChaChaStream {
         let plaintext_len = buffer.len() - tag_size;
         let nonce = chacha20poly1305::Nonce::from_slice(&self.nonce);
         let (msg, tag_out) = buffer.split_at_mut(plaintext_len);
-        let tag = self.cipher.encrypt_in_place_detached(nonce, &[], msg)?;
-        tag_out.copy_from_slice(tag.as_slice());
-        self.position += plaintext_len as u64;
+        let result = self.cipher.encrypt_in_place_detached(nonce, &[], msg);
 
-        // Increment nonce as big-endian counter to prevent nonce reuse
+        // Increment nonce regardless of success to prevent reuse and maintain sync
         for byte in self.nonce.iter_mut().rev() {
             *byte = byte.wrapping_add(1);
             if *byte != 0 {
                 break;
             }
         }
+
+        let tag = result?;
+        tag_out.copy_from_slice(tag.as_slice());
+        self.position += plaintext_len as u64;
 
         Ok(())
     }
@@ -118,16 +135,18 @@ impl StreamCipher for ChaChaStream {
         let ciphertext_len = buffer.len() - tag_size;
         let nonce = chacha20poly1305::Nonce::from_slice(&self.nonce);
         let (msg, tag) = buffer.split_at_mut(ciphertext_len);
-        self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<ChaCha20Poly1305>::from_slice(tag))?;
-        self.position += ciphertext_len as u64;
+        let result = self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<ChaCha20Poly1305>::from_slice(tag));
 
-        // Increment nonce as big-endian counter to prevent nonce reuse
+        // Increment nonce regardless of success to maintain sync
         for byte in self.nonce.iter_mut().rev() {
             *byte = byte.wrapping_add(1);
             if *byte != 0 {
                 break;
             }
         }
+
+        result?;
+        self.position += ciphertext_len as u64;
 
         Ok(())
     }
@@ -274,5 +293,34 @@ mod tests {
         cipher.encrypt_in_place(&mut buf).unwrap();
         // Position counts plaintext bytes only — 0 plaintext bytes
         assert_eq!(cipher.position(), 0);
+    }
+
+    #[test]
+    fn test_multi_message_round_trip() {
+        // Verify that nonce increment keeps encryptor and decryptor in sync
+        // across multiple sequential messages.
+        let mut enc = ChaChaStream::new(test_key(), test_nonce());
+        let mut dec = ChaChaStream::new(test_key(), test_nonce());
+
+        let msg1 = b"First message";
+        let msg2 = b"Second message, longer!";
+
+        // Encrypt msg1
+        let mut buf1 = vec![0u8; msg1.len() + 16];
+        buf1[..msg1.len()].copy_from_slice(msg1);
+        enc.encrypt_in_place(&mut buf1).unwrap();
+
+        // Encrypt msg2
+        let mut buf2 = vec![0u8; msg2.len() + 16];
+        buf2[..msg2.len()].copy_from_slice(msg2);
+        enc.encrypt_in_place(&mut buf2).unwrap();
+
+        // Decrypt msg1 (dec starts at same nonce as enc)
+        dec.decrypt_in_place(&mut buf1).unwrap();
+        assert_eq!(&buf1[..msg1.len()], msg1, "msg1 should round-trip");
+
+        // Decrypt msg2 (nonce advanced by one)
+        dec.decrypt_in_place(&mut buf2).unwrap();
+        assert_eq!(&buf2[..msg2.len()], msg2, "msg2 should round-trip");
     }
 }

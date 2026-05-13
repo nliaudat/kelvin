@@ -87,9 +87,12 @@ impl fmt::Display for StabilityError {
 ///
 /// Computes the total energy of the body relative to the rest of the system:
 ///
-///   E_i = 0.5 * m_i * v_i² - Σ_{j≠i} G * m_i * m_j / |r_i - r_j|
+///   E_i = 0.5 * m_i * v_i² - Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
 ///
-/// If E_i ≥ 0, the body is on a hyperbolic or parabolic trajectory and
+/// where ε is the softening factor. The softened potential is used to remain
+/// consistent with the simulation integrator (see `compute_accelerations`).
+///
+/// If E_i ≥ threshold, the body is on a hyperbolic or parabolic trajectory and
 /// will escape to infinity. A small threshold (`EJECTION_ENERGY_THRESHOLD`)
 /// accounts for numerical precision in fixed-point arithmetic.
 ///
@@ -97,10 +100,11 @@ impl fmt::Display for StabilityError {
 /// * `body_index` — Index of the body to check.
 /// * `bodies` — All bodies in the system.
 /// * `g` — Gravitational constant.
+/// * `softening` — Softening factor (must match the integrator).
 ///
 /// # Returns
 /// `true` if the body is ejected (unbound), `false` otherwise.
-pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed) -> bool {
+pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed) -> bool {
     let n = bodies.len();
     if body_index >= n {
         return false;
@@ -111,14 +115,17 @@ pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed) -> b
     // Kinetic energy: 0.5 * m * v² (use the existing method on OrbitalBody)
     let kinetic = body.kinetic_energy();
 
-    // Potential energy: -Σ_{j≠i} G * m_i * m_j / |r_i - r_j|
+    // Potential energy: -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
+    // Uses softened potential to remain consistent with the simulation integrator.
+    let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
     for j in 0..n {
         if j == body_index {
             continue;
         }
         let diff = bodies[j].position - body.position;
-        let dist = diff.length();
+        let dist_sq = diff.length_squared() + softening_sq;
+        let dist = dist_sq.sqrt();
         if dist > Fixed::ZERO {
             potential -= g * body.mass * bodies[j].mass / dist;
         }
@@ -208,9 +215,9 @@ pub fn simulate_with_monitoring(
         });
     }
     for i in 0..bodies.len() {
-        if is_body_ejected(i, bodies, g) {
+        if is_body_ejected(i, bodies, g, softening) {
             let energy = (bodies[i].kinetic_energy()
-                + gravitational_potential(i, bodies, g))
+                + gravitational_potential(i, bodies, g, softening))
                 .to_f64();
             return Err(StabilityError::BodyEjected {
                 body_index: i,
@@ -237,9 +244,9 @@ pub fn simulate_with_monitoring(
 
             // Check for ejection (energy-based check)
             for i in 0..bodies.len() {
-                if is_body_ejected(i, bodies, g) {
+                if is_body_ejected(i, bodies, g, softening) {
                     let energy = (bodies[i].kinetic_energy()
-                        + gravitational_potential(i, bodies, g))
+                        + gravitational_potential(i, bodies, g, softening))
                         .to_f64();
                     return Err(StabilityError::BodyEjected {
                         body_index: i,
@@ -255,10 +262,14 @@ pub fn simulate_with_monitoring(
 }
 
 /// Compute the gravitational potential energy of a single body with respect
-/// to all other bodies in the system.
-fn gravitational_potential(body_index: usize, bodies: &[OrbitalBody], g: Fixed) -> Fixed {
+/// to all other bodies in the system, using softened potential.
+///
+/// Uses the same softened potential as the simulation integrator:
+///   U_i = -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
+fn gravitational_potential(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed) -> Fixed {
     let n = bodies.len();
     let body = &bodies[body_index];
+    let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
 
     for j in 0..n {
@@ -266,7 +277,8 @@ fn gravitational_potential(body_index: usize, bodies: &[OrbitalBody], g: Fixed) 
             continue;
         }
         let diff = bodies[j].position - body.position;
-        let dist = diff.length();
+        let dist_sq = diff.length_squared() + softening_sq;
+        let dist = dist_sq.sqrt();
         if dist > Fixed::ZERO {
             potential -= g * body.mass * bodies[j].mass / dist;
         }
@@ -354,16 +366,18 @@ mod tests {
     #[test]
     fn test_is_body_ejected_detects_escape() {
         let bodies = ejection_system();
+        let softening = Fixed::from_raw(1 << 44);
         // The high-velocity planet should be detected as ejected
-        assert!(is_body_ejected(1, &bodies, DEFAULT_G));
+        assert!(is_body_ejected(1, &bodies, DEFAULT_G, softening));
     }
 
     #[test]
     fn test_is_body_ejected_confirms_bound() {
         let bodies = stable_three_body_system();
+        let softening = Fixed::from_raw(1 << 44);
         // All bodies should be bound (not ejected)
         for i in 0..bodies.len() {
-            assert!(!is_body_ejected(i, &bodies, DEFAULT_G),
+            assert!(!is_body_ejected(i, &bodies, DEFAULT_G, softening),
                 "body {} should be bound but was detected as ejected", i);
         }
     }
@@ -456,14 +470,16 @@ mod tests {
     #[test]
     fn test_gravitational_potential_negative() {
         let bodies = stable_three_body_system();
-        let pot = gravitational_potential(0, &bodies, DEFAULT_G);
+        let softening = Fixed::from_raw(1 << 44);
+        let pot = gravitational_potential(0, &bodies, DEFAULT_G, softening);
         assert!(pot < Fixed::ZERO, "gravitational potential should be negative");
     }
 
     #[test]
     fn test_gravitational_potential_zero_for_single_body() {
         let body = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let pot = gravitational_potential(0, &[body], DEFAULT_G);
+        let softening = Fixed::from_raw(1 << 44);
+        let pot = gravitational_potential(0, &[body], DEFAULT_G, softening);
         assert_eq!(pot, Fixed::ZERO, "single body should have zero potential");
     }
 }

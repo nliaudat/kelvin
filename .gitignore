@@ -4,6 +4,9 @@ dropbox_ignore.ps
 implementation_plan.md
 THREAT_MODEL.md
 
+# Key material — do not commit real orbital configs
+key.json
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -19,10 +22,8 @@ Thumbs.db
 *.rs.bk
 /test-vectors
 /tests/entropy_analysis/data_1000
-/test-vectors
 test-vectors/kelvin-test-paranoid-4.json
 test-vectors/kelvin-test-paranoid-5.json
 test-vectors/kelvin-test-standard-1.json
 test-vectors/kelvin-test-standard-2.json
 test-vectors/kelvin-test-standard-3.json
-/test-vectors

@@ -33,6 +33,10 @@ pub enum KelvinError {
     #[error("AEAD authentication failed: {0}")]
     AeadError(String),
 
+    /// Stability monitoring detected a system failure (ejection or collapse).
+    #[error("stability error: {0}")]
+    StabilityError(String),
+
     /// I/O error during encryption/decryption.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -57,5 +61,11 @@ impl From<kelvin_kdf::LyapunovError> for KelvinError {
 impl From<aead::Error> for KelvinError {
     fn from(e: aead::Error) -> Self {
         KelvinError::AeadError(e.to_string())
+    }
+}
+
+impl From<kelvin_core::StabilityError> for KelvinError {
+    fn from(e: kelvin_core::StabilityError) -> Self {
+        KelvinError::StabilityError(e.to_string())
     }
 }
