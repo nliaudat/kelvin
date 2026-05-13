@@ -13,12 +13,12 @@
 //!   Floating-Point Arithmetic." *ACM Computing Surveys*, 23(1), 5–48.
 //!   doi:10.1145/103162.103163
 //!   — Motivates the use of fixed-point arithmetic for cross-platform
-//!     determinism in cryptographic applications.
+//!   determinism in cryptographic applications.
 //! - Hairer, E., Lubich, C., & Wanner, G. (2006). *Geometric Numerical
 //!   Integration: Structure-Preserving Algorithms for Ordinary Differential
 //!   Equations* (2nd ed.). Springer.
 //!   — Theoretical foundation for structure-preserving integrators that
-//!     require deterministic arithmetic.
+//!   require deterministic arithmetic.
 
 use core::cmp::{Eq, Ord, Ordering, PartialEq, PartialOrd};
 use core::fmt;
@@ -347,6 +347,7 @@ impl fmt::Display for Fixed {
 }
 
 #[cfg(test)]
+#[allow(clippy::disallowed_methods)]
 mod tests {
     use super::*;
 

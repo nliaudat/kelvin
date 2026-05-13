@@ -158,6 +158,13 @@ impl StreamCipher for ChaChaStream {
     fn max_safe_bytes(&self) -> u64 {
         self.max_bytes
     }
+
+    fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
+        self.cipher = ChaCha20Poly1305::new_from_slice(&key)
+            .expect("ChaCha20Poly1305 key must be 32 bytes");
+        self.nonce = nonce;
+        self.position = 0;
+    }
 }
 
 #[cfg(test)]
@@ -166,16 +173,16 @@ mod tests {
 
     fn test_key() -> [u8; 32] {
         let mut k = [0u8; 32];
-        for i in 0..32 {
-            k[i] = i as u8;
+        for (i, byte) in k.iter_mut().enumerate() {
+            *byte = i as u8;
         }
         k
     }
 
     fn test_nonce() -> [u8; 12] {
         let mut n = [0u8; 12];
-        for i in 0..12 {
-            n[i] = (i + 32) as u8;
+        for (i, byte) in n.iter_mut().enumerate() {
+            *byte = (i + 32) as u8;
         }
         n
     }

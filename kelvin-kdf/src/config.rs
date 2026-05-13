@@ -573,15 +573,15 @@ fn is_body_ejected(
     // Uses softened potential to remain consistent with the simulation integrator.
     let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
-    for j in 0..n {
+    for (j, other) in bodies.iter().enumerate() {
         if j == body_index {
             continue;
         }
-        let diff = bodies[j].position - body.position;
+        let diff = other.position - body.position;
         let dist_sq = diff.length_squared() + softening_sq;
         let dist = dist_sq.sqrt();
         if dist > Fixed::ZERO {
-            potential -= g * body.mass * bodies[j].mass / dist;
+            potential -= g * body.mass * other.mass / dist;
         }
     }
 

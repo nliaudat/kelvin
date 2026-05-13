@@ -78,7 +78,7 @@ impl KeySchedule {
         // Each reseed produces one key, and each key can encrypt ~256 GiB
         // (ChaCha20 limit). We limit to safe_steps / reseed_interval keys.
         let max_keys = if reseed_interval > 0 {
-            (safe_steps / reseed_interval).max(1)
+            safe_steps.checked_div(reseed_interval).map(|v| v.max(1)).unwrap_or(1)
         } else {
             1
         };
@@ -192,8 +192,8 @@ mod tests {
 
     fn test_seed() -> [u8; 2048] {
         let mut seed = [0u8; 2048];
-        for i in 0..2048 {
-            seed[i] = (i % 256) as u8;
+        for (i, byte) in seed.iter_mut().enumerate() {
+            *byte = (i % 256) as u8;
         }
         seed
     }

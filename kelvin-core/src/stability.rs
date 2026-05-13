@@ -26,7 +26,7 @@ extern crate alloc;
 use core::fmt;
 
 use crate::body::OrbitalBody;
-use crate::constants::{EJECTION_ENERGY_THRESHOLD, MONITOR_INTERVAL};
+use crate::constants::MONITOR_INTERVAL;
 use crate::Fixed;
 use crate::integrator::verlet_step;
 
@@ -93,18 +93,20 @@ impl fmt::Display for StabilityError {
 /// consistent with the simulation integrator (see `compute_accelerations`).
 ///
 /// If E_i ≥ threshold, the body is on a hyperbolic or parabolic trajectory and
-/// will escape to infinity. A small threshold (`EJECTION_ENERGY_THRESHOLD`)
-/// accounts for numerical precision in fixed-point arithmetic.
+/// will escape to infinity. The threshold is configurable via `OrbitalConfig`
+/// to allow different sensitivity levels.
 ///
 /// # Arguments
 /// * `body_index` — Index of the body to check.
 /// * `bodies` — All bodies in the system.
 /// * `g` — Gravitational constant.
 /// * `softening` — Softening factor (must match the integrator).
+/// * `ejection_energy_threshold` — Energy threshold above which a body is
+///   considered ejected. Use `EJECTION_ENERGY_THRESHOLD` for the default.
 ///
 /// # Returns
 /// `true` if the body is ejected (unbound), `false` otherwise.
-pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed) -> bool {
+pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed, ejection_energy_threshold: Fixed) -> bool {
     let n = bodies.len();
     if body_index >= n {
         return false;
@@ -119,15 +121,15 @@ pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, soft
     // Uses softened potential to remain consistent with the simulation integrator.
     let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
-    for j in 0..n {
+    for (j, other) in bodies.iter().enumerate() {
         if j == body_index {
             continue;
         }
-        let diff = bodies[j].position - body.position;
+        let diff = other.position - body.position;
         let dist_sq = diff.length_squared() + softening_sq;
         let dist = dist_sq.sqrt();
         if dist > Fixed::ZERO {
-            potential -= g * body.mass * bodies[j].mass / dist;
+            potential -= g * body.mass * other.mass / dist;
         }
     }
 
@@ -135,7 +137,7 @@ pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, soft
     let total_energy = kinetic + potential;
 
     // If total energy >= threshold, the body is unbound (ejected)
-    total_energy >= EJECTION_ENERGY_THRESHOLD
+    total_energy >= ejection_energy_threshold
 }
 
 /// Detect gravitational collapse between any pair of bodies.
@@ -183,10 +185,13 @@ pub fn detect_collapse(
 /// * `g` — Gravitational constant.
 /// * `min_separation` — Minimum allowed distance between bodies.
 /// * `monitor_interval` — Steps between stability checks.
+/// * `ejection_energy_threshold` — Energy threshold for ejection detection.
+///   Use `EJECTION_ENERGY_THRESHOLD` for the default.
 ///
 /// # Returns
 /// `Ok(())` if the simulation completed without stability violations.
 /// `Err(StabilityError)` if ejection or collapse was detected.
+#[allow(clippy::too_many_arguments)]
 pub fn simulate_with_monitoring(
     bodies: &mut [OrbitalBody],
     steps: u64,
@@ -195,6 +200,7 @@ pub fn simulate_with_monitoring(
     g: Fixed,
     min_separation: Fixed,
     monitor_interval: u64,
+    ejection_energy_threshold: Fixed,
 ) -> Result<(), StabilityError> {
     let effective_interval = if monitor_interval == 0 {
         MONITOR_INTERVAL
@@ -215,7 +221,7 @@ pub fn simulate_with_monitoring(
         });
     }
     for i in 0..bodies.len() {
-        if is_body_ejected(i, bodies, g, softening) {
+        if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
             let energy = (bodies[i].kinetic_energy()
                 + gravitational_potential(i, bodies, g, softening))
                 .to_f64();
@@ -244,7 +250,7 @@ pub fn simulate_with_monitoring(
 
             // Check for ejection (energy-based check)
             for i in 0..bodies.len() {
-                if is_body_ejected(i, bodies, g, softening) {
+                if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
                     let energy = (bodies[i].kinetic_energy()
                         + gravitational_potential(i, bodies, g, softening))
                         .to_f64();
@@ -267,20 +273,19 @@ pub fn simulate_with_monitoring(
 /// Uses the same softened potential as the simulation integrator:
 ///   U_i = -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
 fn gravitational_potential(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed) -> Fixed {
-    let n = bodies.len();
     let body = &bodies[body_index];
     let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
 
-    for j in 0..n {
+    for (j, other) in bodies.iter().enumerate() {
         if j == body_index {
             continue;
         }
-        let diff = bodies[j].position - body.position;
+        let diff = other.position - body.position;
         let dist_sq = diff.length_squared() + softening_sq;
         let dist = dist_sq.sqrt();
         if dist > Fixed::ZERO {
-            potential -= g * body.mass * bodies[j].mass / dist;
+            potential -= g * body.mass * other.mass / dist;
         }
     }
 
@@ -293,7 +298,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
     use crate::body::Vec3;
-    use crate::constants::DEFAULT_G;
+    use crate::constants::{DEFAULT_G, EJECTION_ENERGY_THRESHOLD};
     use crate::Fixed;
 
     /// Create a stable 3-body system (bound orbits).
@@ -368,7 +373,7 @@ mod tests {
         let bodies = ejection_system();
         let softening = Fixed::from_raw(1 << 44);
         // The high-velocity planet should be detected as ejected
-        assert!(is_body_ejected(1, &bodies, DEFAULT_G, softening));
+        assert!(is_body_ejected(1, &bodies, DEFAULT_G, softening, EJECTION_ENERGY_THRESHOLD));
     }
 
     #[test]
@@ -377,7 +382,7 @@ mod tests {
         let softening = Fixed::from_raw(1 << 44);
         // All bodies should be bound (not ejected)
         for i in 0..bodies.len() {
-            assert!(!is_body_ejected(i, &bodies, DEFAULT_G, softening),
+            assert!(!is_body_ejected(i, &bodies, DEFAULT_G, softening, EJECTION_ENERGY_THRESHOLD),
                 "body {} should be bound but was detected as ejected", i);
         }
     }
@@ -410,6 +415,7 @@ mod tests {
             DEFAULT_G,
             Fixed::from_raw(1 << 35),
             50,
+            EJECTION_ENERGY_THRESHOLD,
         );
         assert!(result.is_ok(), "stable system should complete: {:?}", result);
     }
@@ -425,6 +431,7 @@ mod tests {
             DEFAULT_G,
             Fixed::from_raw(1 << 35),
             10,
+            EJECTION_ENERGY_THRESHOLD,
         );
         assert!(result.is_err(), "ejection system should be rejected");
         match result.unwrap_err() {
@@ -444,6 +451,7 @@ mod tests {
             DEFAULT_G,
             Fixed::from_raw(1 << 35), // Sensitive threshold
             10,
+            EJECTION_ENERGY_THRESHOLD,
         );
         assert!(result.is_err(), "collapse system should be rejected");
         match result.unwrap_err() {
@@ -463,6 +471,7 @@ mod tests {
             DEFAULT_G,
             Fixed::from_raw(1 << 35),
             0, // Should use default MONITOR_INTERVAL
+            EJECTION_ENERGY_THRESHOLD,
         );
         assert!(result.is_ok(), "should handle zero interval gracefully");
     }

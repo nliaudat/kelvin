@@ -11,7 +11,7 @@
 //!   for Hamiltonian Systems; A Method for Computing All of Them."
 //!   *Meccanica*, 15(1), 9–20. doi:10.1007/BF02128236
 //!   — Standard algorithm for computing Lyapunov exponents, adapted for
-//!     Kelvin's shadow orbit method.
+//!   Kelvin's shadow orbit method.
 //! - Wolf, A., Swift, J. B., Swinney, H. L., & Vastano, J. A. (1985).
 //!   "Determining Lyapunov Exponents from a Time Series." *Physica D:
 //!   Nonlinear Phenomena*, 16(3), 285–317. doi:10.1016/0167-2789(85)90011-9
@@ -175,8 +175,8 @@ impl<'a> LyapunovEstimator<'a> {
             let mut ln_sum = Fixed::ZERO;
             let ln_10 = Fixed::from_parts(2, 0x26E978D4FDF3B646); // ln(10) ≈ 2.302585
             while x > ten {
-                x = x / ten;
-                ln_sum = ln_sum + ln_10;
+                x /= ten;
+                ln_sum += ln_10;
             }
             // Padé approximation for ln(x) where 1 < x ≤ 10
             let num = x - Fixed::ONE;
@@ -217,6 +217,7 @@ impl<'a> LyapunovEstimator<'a> {
             sq_diff_f64 += diff * diff;
         }
         let variance_f64 = sq_diff_f64 / (divergences.len() as f64);
+        #[allow(clippy::disallowed_methods)]
         let std_dev_f64 = variance_f64.sqrt();
 
         // Calculate dynamic safety margin factor

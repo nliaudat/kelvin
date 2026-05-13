@@ -51,6 +51,7 @@ pub struct TestVector {
 /// Result of verifying a single test vector.
 #[derive(Debug)]
 struct VerificationResult {
+    #[allow(dead_code)]
     description: String,
     ciphertext_match: bool,
     round_trip_ok: bool,

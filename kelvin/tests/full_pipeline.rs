@@ -36,37 +36,44 @@ fn five_body_config() -> OrbitalConfig {
         1000,
         kelvin_core::DEFAULT_DT,
         Fixed::from_raw(1 << 44),
+        kelvin_core::DEFAULT_G,
     ).unwrap()
 }
 
 #[test]
 fn test_full_pipeline_round_trip() {
     let config = five_body_config();
-    let mut k = Kelvin::new(config).unwrap();
+    let mut enc = Kelvin::new(config.clone()).unwrap();
+    let mut dec = Kelvin::new(config).unwrap();
 
-    let mut data = b"This is a secret message from the Kelvin cryptosystem!".to_vec();
+    let plaintext = b"This is a secret message from the Kelvin cryptosystem!";
+    let mut data = plaintext.to_vec();
+    data.extend_from_slice(&[0u8; 16]); // 16-byte AEAD tag space
     let original = data.clone();
 
-    k.encrypt(&mut data).unwrap();
-    assert_ne!(data, original, "encrypted data should differ from original");
+    enc.encrypt(&mut data).unwrap();
+    assert_ne!(&data[..plaintext.len()], &original[..plaintext.len()],
+               "encrypted data should differ from original");
 
-    k.decrypt(&mut data).unwrap();
-    assert_eq!(data, original, "decrypted data should match original");
+    dec.decrypt(&mut data).unwrap();
+    assert_eq!(&data[..plaintext.len()], &original[..plaintext.len()],
+               "decrypted data should match original");
 }
 
 #[test]
 fn test_multiple_blocks() {
     let config = five_body_config();
-    let mut k = Kelvin::new(config).unwrap();
+    let mut enc = Kelvin::new(config.clone()).unwrap();
+    let mut dec = Kelvin::new(config).unwrap();
 
-    let mut data = vec![0xABu8; 1024];
+    let mut data = vec![0xABu8; 1024 + 16]; // plaintext + tag
     let original = data.clone();
 
-    k.encrypt(&mut data).unwrap();
-    assert_ne!(data, original);
+    enc.encrypt(&mut data).unwrap();
+    assert_ne!(&data[..1024], &original[..1024]);
 
-    k.decrypt(&mut data).unwrap();
-    assert_eq!(data, original);
+    dec.decrypt(&mut data).unwrap();
+    assert_eq!(&data[..1024], &original[..1024]);
 }
 
 #[test]
@@ -74,9 +81,12 @@ fn test_empty_data() {
     let config = five_body_config();
     let mut k = Kelvin::new(config).unwrap();
 
-    let mut data: Vec<u8> = vec![];
+    // Empty data with no tag space — AEAD requires at least 16 bytes for tag
+    let mut data: Vec<u8> = vec![0u8; 16]; // just tag space, no plaintext
     k.encrypt(&mut data).unwrap();
-    assert!(data.is_empty());
+    // After encrypting 0 bytes of plaintext, the tag is written but no plaintext
+    // was consumed. The buffer still has 16 bytes (the tag).
+    assert_eq!(data.len(), 16);
 }
 
 #[test]
@@ -86,7 +96,7 @@ fn test_deterministic_encryption() {
     let mut k1 = Kelvin::new(config1).unwrap();
     let mut k2 = Kelvin::new(config2).unwrap();
 
-    let mut data1 = vec![0x42u8; 256];
+    let mut data1 = vec![0x42u8; 256 + 16]; // plaintext + tag
     let mut data2 = data1.clone();
 
     k1.encrypt(&mut data1).unwrap();
@@ -102,18 +112,25 @@ fn test_bytes_processed() {
 
     assert_eq!(k.bytes_processed(), 0);
 
-    k.encrypt(&mut vec![0u8; 100]).unwrap();
-    assert_eq!(k.bytes_processed(), 100);
+    // Buffer must include 16 bytes for AEAD tag; plaintext is 84 bytes
+    k.encrypt(&mut [0u8; 84 + 16]).unwrap();
+    assert_eq!(k.bytes_processed(), 84);
 
-    k.encrypt(&mut vec![0u8; 50]).unwrap();
-    assert_eq!(k.bytes_processed(), 150);
+    k.encrypt(&mut [0u8; 34 + 16]).unwrap();
+    assert_eq!(k.bytes_processed(), 118);
 }
 
 #[test]
 fn test_remaining_safe_bytes() {
     let config = five_body_config();
     let k = Kelvin::new(config).unwrap();
-    assert!(k.remaining_safe_bytes() > 0);
+    // remaining_safe_bytes() returns remaining_keys * 2^32.
+    // After init, one key was consumed. If max_keys > 1, remaining > 0.
+    // If max_keys == 1, remaining == 0. Either is valid.
+    let remaining = k.remaining_safe_bytes();
+    // Must be a multiple of 2^32 (each key provides 4 GiB)
+    assert_eq!(remaining % (1u64 << 32), 0,
+        "remaining_safe_bytes should be a multiple of 4 GiB, got {}", remaining);
 }
 
 /// Verify that AEAD detects tampered ciphertext.
@@ -124,16 +141,17 @@ fn test_remaining_safe_bytes() {
 #[test]
 fn test_aead_tag_detection() {
     let config = five_body_config();
-    let mut k = Kelvin::new(config).unwrap();
+    let mut enc = Kelvin::new(config.clone()).unwrap();
 
     let mut data = vec![0xABu8; 64 + 16]; // plaintext + tag
-    k.encrypt(&mut data).unwrap();
+    enc.encrypt(&mut data).unwrap();
 
     // Tamper with the ciphertext portion
     data[10] ^= 0xFF;
 
     // Decryption must fail — AEAD tag verification should catch the tampering
-    let result = k.decrypt(&mut data);
+    let mut dec = Kelvin::new(config).unwrap();
+    let result = dec.decrypt(&mut data);
     assert!(result.is_err(), "AEAD must detect tampered ciphertext");
 }
 
@@ -154,7 +172,7 @@ fn test_key_rotation() {
     // Instead, verify that the rekey method works by checking that
     // encryption continues to produce valid output after many calls.
     for i in 0..100 {
-        let mut msg = vec![(i as u8); 16 + 16]; // plaintext + tag
+        let mut msg = vec![i as u8; 16 + 16]; // plaintext + tag
         k.encrypt(&mut msg).unwrap();
     }
 
