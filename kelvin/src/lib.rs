@@ -192,21 +192,19 @@ impl Kelvin {
     ///
     /// The buffer must have 16 extra bytes after the plaintext for the
     /// Poly1305/GMAC authentication tag.
+    ///
+    /// This is a convenience wrapper around [`encrypt_in_place`](Self::encrypt_in_place).
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        self.stream.encrypt_in_place(data)?;
-        // Count only plaintext bytes, not the 16-byte AEAD tag
-        self.bytes_processed += data.len().saturating_sub(16) as u64;
-        Ok(())
+        self.encrypt_in_place(data)
     }
 
     /// Decrypt data in-place using AEAD.
     ///
     /// The buffer must contain ciphertext + 16-byte authentication tag.
+    ///
+    /// This is a convenience wrapper around [`decrypt_in_place`](Self::decrypt_in_place).
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        self.stream.decrypt_in_place(data)?;
-        // Count only plaintext bytes, not the 16-byte AEAD tag
-        self.bytes_processed += data.len().saturating_sub(16) as u64;
-        Ok(())
+        self.decrypt_in_place(data)
     }
 
     /// Total bytes processed (encrypted or decrypted) since initialization.
@@ -276,12 +274,12 @@ mod tests {
         // Buffer needs 16 extra bytes for AEAD tag
         let mut data = vec![0xABu8; 64 + 16];
         let original = data.clone();
-        k.encrypt(&mut data).unwrap();
+        k.encrypt_in_place(&mut data).unwrap();
         // Ciphertext portion (first 64 bytes) should differ from plaintext
         assert_ne!(&data[..64], &original[..64]);
         // Create a new Kelvin instance for decryption (same config = same keystream)
         let mut k2 = Kelvin::new(config).unwrap();
-        k2.decrypt(&mut data).unwrap();
+        k2.decrypt_in_place(&mut data).unwrap();
         // Plaintext portion should be restored; tag portion is overwritten during decrypt
         assert_eq!(&data[..64], &original[..64]);
     }
