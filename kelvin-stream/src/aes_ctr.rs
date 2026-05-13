@@ -89,7 +89,16 @@ impl StreamCipher for AesGcmStream {
         let (msg, tag_out) = buffer.split_at_mut(plaintext_len);
         let tag = self.cipher.encrypt_in_place_detached(nonce, &[], msg)?;
         tag_out.copy_from_slice(tag.as_slice());
-        self.position += buffer.len() as u64;
+        self.position += plaintext_len as u64;
+
+        // Increment nonce as big-endian counter to prevent nonce reuse
+        for byte in self.nonce.iter_mut().rev() {
+            *byte = byte.wrapping_add(1);
+            if *byte != 0 {
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -107,7 +116,16 @@ impl StreamCipher for AesGcmStream {
         let nonce = aes_gcm::Nonce::from_slice(&self.nonce);
         let (msg, tag) = buffer.split_at_mut(ciphertext_len);
         self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<Aes256Gcm>::from_slice(tag))?;
-        self.position += buffer.len() as u64;
+        self.position += ciphertext_len as u64;
+
+        // Increment nonce as big-endian counter to prevent nonce reuse
+        for byte in self.nonce.iter_mut().rev() {
+            *byte = byte.wrapping_add(1);
+            if *byte != 0 {
+                break;
+            }
+        }
+
         Ok(())
     }
 

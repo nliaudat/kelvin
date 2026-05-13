@@ -117,10 +117,8 @@ impl Kelvin {
         let (key, nonce) = schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
 
-        // Create stream cipher (ChaChaStream takes a 12-byte nonce)
-        let mut chacha_nonce = [0u8; 12];
-        chacha_nonce.copy_from_slice(&nonce[..12]);
-        let stream = Box::new(ChaChaStream::new(key, chacha_nonce));
+        // Create stream cipher (nonce is already [u8; 12])
+        let stream = Box::new(ChaChaStream::new(key, nonce));
 
         Ok(Kelvin {
             config,
@@ -178,10 +176,8 @@ impl Kelvin {
         let (key, nonce) = schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
 
-        // Create AES-256-GCM stream cipher
-        let mut aes_nonce = [0u8; 12];
-        aes_nonce.copy_from_slice(&nonce[..12]);
-        let stream = Box::new(AesGcmStream::new(key, aes_nonce));
+        // Create AES-256-GCM stream cipher (nonce is already [u8; 12])
+        let stream = Box::new(AesGcmStream::new(key, nonce));
 
         Ok(Kelvin {
             config,
@@ -198,7 +194,8 @@ impl Kelvin {
     /// Poly1305/GMAC authentication tag.
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
         self.stream.encrypt_in_place(data)?;
-        self.bytes_processed += data.len() as u64;
+        // Count only plaintext bytes, not the 16-byte AEAD tag
+        self.bytes_processed += data.len().saturating_sub(16) as u64;
         Ok(())
     }
 
@@ -207,7 +204,8 @@ impl Kelvin {
     /// The buffer must contain ciphertext + 16-byte authentication tag.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
         self.stream.decrypt_in_place(data)?;
-        self.bytes_processed += data.len() as u64;
+        // Count only plaintext bytes, not the 16-byte AEAD tag
+        self.bytes_processed += data.len().saturating_sub(16) as u64;
         Ok(())
     }
 

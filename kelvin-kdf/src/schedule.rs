@@ -111,21 +111,22 @@ impl KeySchedule {
         // Derive key and nonce using HKDF-SHA512 (RFC 5869)
         let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
 
-        // Domain-separated key derivation
-        let mut key_info = Vec::new();
-        key_info.extend_from_slice(b"kelvin-hkdf-key-v1");
-        key_info.extend_from_slice(&self.keys_generated.to_le_bytes());
+        // Domain-separated key derivation using stack-allocated arrays
+        // to avoid heap allocations in this performance-critical path.
+        let mut info = [0u8; 28];
 
-        let mut nonce_info = Vec::new();
-        nonce_info.extend_from_slice(b"kelvin-hkdf-nonce-v1");
-        nonce_info.extend_from_slice(&self.keys_generated.to_le_bytes());
-
+        // Derive key: "kelvin-hkdf-key-v1" (18 bytes) + counter (8 bytes) = 26 bytes
+        info[..18].copy_from_slice(b"kelvin-hkdf-key-v1");
+        info[18..26].copy_from_slice(&self.keys_generated.to_le_bytes());
         let mut key = [0u8; 32];
-        hk.expand(&key_info, &mut key)
+        hk.expand(&info[..26], &mut key)
             .expect("HKDF expand should not fail for valid output length");
 
+        // Derive nonce: "kelvin-hkdf-nonce-v1" (20 bytes) + counter (8 bytes) = 28 bytes
+        info[..20].copy_from_slice(b"kelvin-hkdf-nonce-v1");
+        info[20..28].copy_from_slice(&self.keys_generated.to_le_bytes());
         let mut nonce = [0u8; 12];
-        hk.expand(&nonce_info, &mut nonce)
+        hk.expand(&info[..28], &mut nonce)
             .expect("HKDF expand should not fail for valid output length");
 
         // Advance step and reseed if needed
