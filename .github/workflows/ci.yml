@@ -1,0 +1,146 @@
+# ==============================================================================
+# Kelvin CI/CD Pipeline
+# ==============================================================================
+# Runs on every push/PR to main: build, lint, unit tests, integration tests.
+#
+# Test matrix:
+#   - All workspace crates build cleanly
+#   - Clippy denies warnings
+#   - Formatting is canonical
+#   - Unit tests pass (ChaCha + AES-GCM code paths)
+#   - Integration tests pass (full pipeline round-trip)
+#   - Chaos test passes (Lyapunov estimation)
+# ==============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build — verify all workspace members compile
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build workspace (default features)
+        run: cargo build --workspace
+
+      - name: Build with AES-NI feature
+        run: cargo build -p kelvin-stream --features aes-ni
+
+      - name: Build kelvin with AES-NI feature
+        run: cargo build -p kelvin --features aes-ni
+
+  # ---------------------------------------------------------------------------
+  # Lint — clippy + rustfmt
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace -- -D warnings
+
+      - name: Check formatting
+        run: cargo fmt --check
+
+  # ---------------------------------------------------------------------------
+  # Unit tests — run all crate-level tests
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      # Core fixed-point math + n-body simulation
+      - name: Test kelvin-core
+        run: cargo test --lib -p kelvin-core
+
+      # KDF: key schedule, HKDF, BLAKE3 reseeding, Ed25519 derivation
+      - name: Test kelvin-kdf
+        run: cargo test --lib -p kelvin-kdf
+
+      # Stream ciphers: ChaCha20Poly1305 (default)
+      - name: Test kelvin-stream (ChaCha)
+        run: cargo test --lib -p kelvin-stream
+
+      # Stream ciphers: AES-256-GCM (aes-ni feature)
+      - name: Test kelvin-stream (AES-GCM)
+        run: cargo test --lib -p kelvin-stream --features aes-ni
+
+      # Top-level Kelvin orchestrator
+      - name: Test kelvin
+        run: cargo test --lib -p kelvin
+
+  # ---------------------------------------------------------------------------
+  # Integration tests — full pipeline round-trip
+  # ---------------------------------------------------------------------------
+  integration-tests:
+    name: Integration tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Restore cargo cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Full pipeline integration tests
+        run: cargo test -p kelvin --test full_pipeline
+
+      - name: Chaos test (Lyapunov estimation)
+        run: cargo test -p kelvin-kdf --test chaos_test
+
+  # ---------------------------------------------------------------------------
+  # Security audit — check for known vulnerabilities in dependencies
+  # ---------------------------------------------------------------------------
+  security-audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Audit dependencies
+        run: cargo audit

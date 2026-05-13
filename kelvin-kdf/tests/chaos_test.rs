@@ -67,7 +67,7 @@ fn test_chaos_avalanche() {
     // Standard deviation is sqrt(512 * 0.5 * 0.5) ≈ 11.3
     // We check within 4 standard deviations (~45 bits) -> 211 to 301
     assert!(
-        dist >= 210 && dist <= 302,
+        (210..=302).contains(&dist),
         "Avalanche failed: expected ~256 flipped bits, got {}",
         dist
     );

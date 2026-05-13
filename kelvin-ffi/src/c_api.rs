@@ -55,14 +55,18 @@ pub unsafe extern "C" fn kelvin_new(
     Box::into_raw(Box::new(KelvinCtx { inner: kelvin }))
 }
 
-/// Encrypt data in-place.
+/// Encrypt data in-place using AEAD.
+///
+/// The buffer must have 16 extra bytes after `len` for the AEAD
+/// authentication tag (Poly1305 or GMAC). The plaintext occupies
+/// the first `len` bytes; the tag is written at `data[len..len+16]`.
 ///
 /// Returns 0 on success, -1 on error.
 ///
 /// # Safety
 ///
 /// - `ctx` must be a valid pointer from `kelvin_new`.
-/// - `data` must point to a buffer of at least `len` bytes.
+/// - `data` must point to a buffer of at least `len + 16` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_encrypt(
     ctx: *mut KelvinCtx,
@@ -80,7 +84,12 @@ pub unsafe extern "C" fn kelvin_encrypt(
     }
 }
 
-/// Decrypt data in-place.
+/// Decrypt data in-place using AEAD.
+///
+/// The buffer must contain ciphertext + 16-byte authentication tag.
+/// The first `len - 16` bytes are the ciphertext; the last 16 bytes
+/// are the tag. On success, the first `len - 16` bytes contain the
+/// recovered plaintext.
 ///
 /// Returns 0 on success, -1 on error.
 ///

@@ -21,6 +21,9 @@ for n bodies. Brute-forcing requires running the full simulation per guess.
 
 Status: Implementation complete. All 93 tests pass across 6 crates.
 
+For operational instructions (build commands, Windows quirks, CLI usage),
+see `.clinerules`.
+
 ===============================================================================
 
 RUST BEST PRACTICES (MANDATORY)
@@ -56,12 +59,14 @@ Never merge these phases. The design depends on their separation.
 
 WORKSPACE CRATES
 
-kelvin-core/     no_std, no alloc. Fixed math + integrator + body types.
-kelvin-kdf/      Depends on core. Config, Lyapunov estimator, extraction.
-kelvin-stream/   Depends on nothing from kelvin. ChaCha20 (+ optional AES).
-kelvin/          Orchestrator. Depends on kdf + stream. Public API.
-kelvin-cli/      Binary. Depends on kelvin. Keygen, encrypt/decrypt.
-kelvin-ffi/      C ABI exports. For mobile bindings.
+kelvin-core/        no_std, no alloc. Fixed math + integrator + body types.
+kelvin-kdf/         Depends on core. Config, Lyapunov estimator, extraction.
+kelvin-stream/      Depends on nothing from kelvin. ChaCha20 (+ optional AES).
+kelvin/             Orchestrator. Depends on kdf + stream. Public API.
+kelvin-cli/         Binary. Depends on kelvin. Keygen, encrypt/decrypt.
+kelvin-ffi/         C ABI exports. For mobile bindings.
+kelvin-test-server/ Test vector golden file server (serde feature).
+kelvin-test-client/ Test vector verification client (serde feature).
 
 Tests live in each crate's tests/ + workspace tests/ for integration.
 Known-answer vectors in tests/vectors/ (golden files, checked into git).
@@ -118,6 +123,7 @@ FILES IN REPO
 implementation_plan.md    Full specification (long, detailed)
 project_summary.md        Concise overview (shorter)
 ai/instruction.md         This file (session restoration)
+.clinerules               AI tool operational instructions (build, CLI, Windows)
 
 ===============================================================================
 

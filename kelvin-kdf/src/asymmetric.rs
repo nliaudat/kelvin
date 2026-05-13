@@ -27,7 +27,6 @@ use x25519_dalek::{PublicKey, StaticSecret};
 use ml_kem::{MlKem768, DecapsulationKey, EncapsulationKey};
 use ml_dsa::{MlDsa65, SigningKey, VerifyingKey, Keypair};
 use ed25519_dalek::{SigningKey as EdSigningKey, VerifyingKey as EdVerifyingKey};
-use signature::{Signer, Verifier};
 use crate::{OrbitalConfig, extract_seed};
 use kelvin_core::{OrbitalBody, simulate};
 
@@ -196,6 +195,7 @@ impl OrbitalKeyPair {
 /// Adapter implementing RustCrypto's `Signer` trait for ML-DSA-65.
 ///
 /// Uses `ml-dsa`'s re-exported `signature` v3 internally.
+#[allow(dead_code)]
 pub struct MlDsaSigner(pub SigningKey<MlDsa65>);
 
 impl signature::Signer<Vec<u8>> for MlDsaSigner {
@@ -211,6 +211,7 @@ impl signature::Signer<Vec<u8>> for MlDsaSigner {
 /// Adapter implementing RustCrypto's `Verifier` trait for ML-DSA-65.
 ///
 /// Uses `ml-dsa`'s re-exported `signature` v3 internally.
+#[allow(dead_code)]
 pub struct MlDsaVerifier(pub VerifyingKey<MlDsa65>);
 
 impl signature::Verifier<Vec<u8>> for MlDsaVerifier {
@@ -225,6 +226,7 @@ impl signature::Verifier<Vec<u8>> for MlDsaVerifier {
 }
 
 /// Adapter implementing RustCrypto's `Signer` trait for Ed25519.
+#[allow(dead_code)]
 pub struct Ed25519Signer(pub EdSigningKey);
 
 impl signature::Signer<ed25519_dalek::Signature> for Ed25519Signer {
@@ -234,6 +236,7 @@ impl signature::Signer<ed25519_dalek::Signature> for Ed25519Signer {
 }
 
 /// Adapter implementing RustCrypto's `Verifier` trait for Ed25519.
+#[allow(dead_code)]
 pub struct Ed25519Verifier(pub EdVerifyingKey);
 
 impl signature::Verifier<ed25519_dalek::Signature> for Ed25519Verifier {

@@ -25,4 +25,10 @@ pub trait StreamCipher: core::fmt::Debug {
 
     /// Get the maximum safe bytes before rekeying.
     fn max_safe_bytes(&self) -> u64;
+
+    /// Rekey the cipher with a new key and nonce.
+    ///
+    /// Resets the position counter. Preserves the cipher variant
+    /// (ChaCha20Poly1305 vs AES-256-GCM) chosen at construction time.
+    fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]);
 }

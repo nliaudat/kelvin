@@ -109,6 +109,7 @@ pub fn extract_shake256(
 
 /// Legacy wrapper for extract_shake256.
 #[deprecated(note = "Use extract_shake256 for more efficient XOF extraction")]
+#[allow(dead_code)]
 pub fn extract_seed_extended(
     bodies: &[OrbitalBody],
     step: u64,
@@ -188,17 +189,17 @@ mod tests {
     }
 
     #[test]
-    fn test_extract_seed_extended() {
+    fn test_extract_shake256() {
         let bodies = test_bodies();
-        let seed = extract_seed_extended(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
+        let seed = extract_shake256(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
         assert_eq!(seed.len(), 128);
     }
 
     #[test]
-    fn test_extract_seed_extended_deterministic() {
+    fn test_extract_shake256_deterministic() {
         let bodies = test_bodies();
-        let seed1 = extract_seed_extended(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
-        let seed2 = extract_seed_extended(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
+        let seed1 = extract_shake256(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
+        let seed2 = extract_shake256(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
         assert_eq!(seed1, seed2);
     }
 

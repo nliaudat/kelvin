@@ -179,6 +179,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+#[allow(clippy::disallowed_methods)]
 fn generate_config(level: &str) -> Result<OrbitalConfig> {
     let mut rng = rand::thread_rng();
     let (n_bodies, steps) = match level {
@@ -292,7 +293,7 @@ fn process_file(config_path: &str, input_path: &str, output_path: &str, encrypt:
         
         output_file.write_all(&buffer[..bytes_read])?;
         total_processed += bytes_read as u64;
-        if total_processed % (1024 * 1024) == 0 {
+        if total_processed.is_multiple_of(1024 * 1024) {
              print!(".");
              let _ = std::io::stdout().flush();
         }

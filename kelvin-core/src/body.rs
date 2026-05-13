@@ -5,7 +5,7 @@
 //! - Murray, C. D., & Dermott, S. F. (1999). *Solar System Dynamics*.
 //!   Cambridge University Press.
 //!   — Reference for orbital mechanics, AU scaling, and gravitational
-//!     constants used in Kelvin.
+//!   constants used in Kelvin.
 
 use crate::Fixed;
 use core::ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign};
@@ -194,6 +194,7 @@ impl OrbitalBody {
 }
 
 #[cfg(test)]
+#[allow(clippy::disallowed_methods)]
 mod tests {
     use super::*;
 

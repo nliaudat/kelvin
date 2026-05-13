@@ -74,6 +74,7 @@ struct InitState {
     config: OrbitalConfig,
     bodies: Vec<OrbitalBody>,
     schedule: KeySchedule,
+    #[allow(dead_code)]
     safe_steps: u64,
 }
 
@@ -112,6 +113,7 @@ impl Kelvin {
             config.g,
             config.min_separation,
             config.monitor_interval,
+            config.ejection_energy_threshold,
         )?;
 
         // Extract initial 2048-byte seed (using SHAKE256 XOF)
@@ -225,7 +227,9 @@ impl Kelvin {
     fn rotate_key(&mut self) -> Result<(), KelvinError> {
         let (key, nonce) = self.schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
-        self.stream = Box::new(ChaChaStream::new(key, nonce));
+        // Rekey the existing stream in-place to preserve the cipher variant
+        // (ChaCha20Poly1305 vs AES-256-GCM) chosen at construction time.
+        self.stream.rekey(key, nonce);
         Ok(())
     }
 }

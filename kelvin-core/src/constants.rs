@@ -75,6 +75,7 @@ pub const MONITOR_INTERVAL: u64 = 10_000;
 pub const EJECTION_ENERGY_THRESHOLD: Fixed = Fixed::from_raw(1 << 20);
 
 #[cfg(test)]
+#[allow(clippy::disallowed_methods)]
 mod tests {
     use super::*;
 
@@ -102,11 +103,11 @@ mod tests {
 
     #[test]
     fn test_min_bodies() {
-        assert!(MIN_BODIES >= 2);
+        const { assert!(MIN_BODIES >= 2); }
     }
 
     #[test]
     fn test_max_bodies() {
-        assert!(MAX_BODIES >= MIN_BODIES);
+        const { assert!(MAX_BODIES >= MIN_BODIES); }
     }
 }
