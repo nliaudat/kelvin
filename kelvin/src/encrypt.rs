@@ -13,7 +13,8 @@ impl Kelvin {
     /// Poly1305/GMAC authentication tag.
     pub fn encrypt_in_place(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
         self.stream.encrypt_in_place(data)?;
-        self.bytes_processed += data.len() as u64;
+        // Count only plaintext bytes, not the 16-byte AEAD tag
+        self.bytes_processed += data.len().saturating_sub(16) as u64;
         Ok(())
     }
 }

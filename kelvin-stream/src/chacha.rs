@@ -92,7 +92,16 @@ impl StreamCipher for ChaChaStream {
         let (msg, tag_out) = buffer.split_at_mut(plaintext_len);
         let tag = self.cipher.encrypt_in_place_detached(nonce, &[], msg)?;
         tag_out.copy_from_slice(tag.as_slice());
-        self.position += buffer.len() as u64;
+        self.position += plaintext_len as u64;
+
+        // Increment nonce as big-endian counter to prevent nonce reuse
+        for byte in self.nonce.iter_mut().rev() {
+            *byte = byte.wrapping_add(1);
+            if *byte != 0 {
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -110,7 +119,16 @@ impl StreamCipher for ChaChaStream {
         let nonce = chacha20poly1305::Nonce::from_slice(&self.nonce);
         let (msg, tag) = buffer.split_at_mut(ciphertext_len);
         self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<ChaCha20Poly1305>::from_slice(tag))?;
-        self.position += buffer.len() as u64;
+        self.position += ciphertext_len as u64;
+
+        // Increment nonce as big-endian counter to prevent nonce reuse
+        for byte in self.nonce.iter_mut().rev() {
+            *byte = byte.wrapping_add(1);
+            if *byte != 0 {
+                break;
+            }
+        }
+
         Ok(())
     }
 
@@ -217,11 +235,12 @@ mod tests {
 
         let mut buf = vec![0u8; 10 + 16];
         cipher.encrypt_in_place(&mut buf).unwrap();
-        assert_eq!(cipher.position(), 26);
+        // Position counts plaintext bytes only (not the 16-byte tag)
+        assert_eq!(cipher.position(), 10);
 
         let mut buf2 = vec![0u8; 20 + 16];
         cipher.encrypt_in_place(&mut buf2).unwrap();
-        assert_eq!(cipher.position(), 62);
+        assert_eq!(cipher.position(), 30);
     }
 
     #[test]
@@ -229,7 +248,8 @@ mod tests {
         let mut cipher = ChaChaStream::new(test_key(), test_nonce());
         let mut buf = vec![0u8; 10 + 16];
         cipher.encrypt_in_place(&mut buf).unwrap();
-        assert_eq!(cipher.position(), 26);
+        // Position counts plaintext bytes only
+        assert_eq!(cipher.position(), 10);
 
         cipher.rekey(test_key(), test_nonce());
         assert_eq!(cipher.position(), 0);
@@ -250,8 +270,9 @@ mod tests {
     #[test]
     fn test_empty_data() {
         let mut cipher = ChaChaStream::new(test_key(), test_nonce());
-        let mut buf = vec![0u8; 16]; // Just tag space
+        let mut buf = vec![0u8; 16]; // Just tag space (0 bytes plaintext)
         cipher.encrypt_in_place(&mut buf).unwrap();
-        assert_eq!(cipher.position(), 16);
+        // Position counts plaintext bytes only — 0 plaintext bytes
+        assert_eq!(cipher.position(), 0);
     }
 }

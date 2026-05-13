@@ -13,8 +13,8 @@ pub trait StreamCipher: core::fmt::Debug {
 
     /// Decrypt data in-place using AEAD.
     ///
-    /// `buffer[..ciphertext_len]` contains ciphertext + appended tag.
-    /// On success, `buffer[..ciphertext_len - 16]` contains plaintext.
+    /// `buffer` contains ciphertext + appended 16-byte tag.
+    /// On success, `buffer[..buffer.len() - 16]` contains plaintext.
     fn decrypt_in_place(
         &mut self,
         buffer: &mut [u8],
