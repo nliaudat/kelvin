@@ -4,6 +4,9 @@ dropbox_ignore.ps
 implementation_plan.md
 THREAT_MODEL.md
 
+# Key material — do not commit real orbital configs
+key.json
+
 # OS files
 .DS_Store
 Thumbs.db

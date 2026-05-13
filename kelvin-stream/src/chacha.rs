@@ -1,5 +1,20 @@
 //! ChaCha20Poly1305 authenticated stream cipher wrapper.
 //!
+//! ## Security Notes
+//!
+//! ### Nonce Rotation
+//!
+//! The nonce is incremented after each `encrypt_in_place`/`decrypt_in_place`
+//! call to prevent nonce reuse. This ensures that each message uses a unique
+//! (key, nonce) pair, which is the fundamental AEAD security invariant.
+//!
+//! ### Invocation Limit
+//!
+//! ChaCha20Poly1305 (IETF variant) uses a 12-byte nonce with a 32-bit block
+//! counter, allowing up to 2^32 - 1 blocks (≈256 GiB) per (key, nonce) pair.
+//! Kelvin enforces a conservative **4 GiB plaintext limit** per key, with
+//! automatic key rotation via the key schedule when the limit is approached.
+//!
 //! ## References
 //!
 //! - Bernstein, D. J. (2008). "ChaCha, a Variant of Salsa20." *Workshop

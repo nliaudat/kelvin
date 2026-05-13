@@ -357,6 +357,11 @@ impl OrbitalConfig {
     }
 
     /// Deserialize from binary format.
+    ///
+    /// Returns an error if:
+    /// - The data is too short for the declared header
+    /// - Trailing bytes remain after parsing (rejects malformed data)
+    /// - The parsed configuration fails validation
     pub fn from_binary(data: &[u8]) -> Result<Self, ConfigError> {
         let mut offset = 0;
 
@@ -380,33 +385,40 @@ impl OrbitalConfig {
         let mut bodies = Vec::with_capacity(n_bodies);
         for _ in 0..n_bodies {
             let mass = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body mass read failed".into()))?,
             ));
             offset += 16;
 
             let px = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body position x read failed".into()))?,
             ));
             offset += 16;
             let py = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body position y read failed".into()))?,
             ));
             offset += 16;
             let pz = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body position z read failed".into()))?,
             ));
             offset += 16;
 
             let vx = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body velocity x read failed".into()))?,
             ));
             offset += 16;
             let vy = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body velocity y read failed".into()))?,
             ));
             offset += 16;
             let vz = Fixed::from_raw(i128::from_le_bytes(
-                data[offset..offset + 16].try_into().unwrap(),
+                data[offset..offset + 16].try_into()
+                    .map_err(|_| ConfigError::InvalidBinary("body velocity z read failed".into()))?,
             ));
             offset += 16;
 
@@ -418,43 +430,51 @@ impl OrbitalConfig {
         }
 
         let total_steps = u64::from_le_bytes(
-            data[offset..offset + 8].try_into().unwrap(),
+            data[offset..offset + 8].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("total_steps read failed".into()))?,
         );
         offset += 8;
 
         let reseed_interval = u64::from_le_bytes(
-            data[offset..offset + 8].try_into().unwrap(),
+            data[offset..offset + 8].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("reseed_interval read failed".into()))?,
         );
         offset += 8;
 
         let dt = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("dt read failed".into()))?,
         ));
         offset += 16;
 
         let softening = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("softening read failed".into()))?,
         ));
         offset += 16;
 
         let g = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("g read failed".into()))?,
         ));
         offset += 16;
 
         // Stability thresholds
         let min_separation = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("min_separation read failed".into()))?,
         ));
         offset += 16;
 
         let ejection_energy_threshold = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("ejection_energy_threshold read failed".into()))?,
         ));
         offset += 16;
 
         let monitor_interval = u64::from_le_bytes(
-            data[offset..offset + 8].try_into().unwrap(),
+            data[offset..offset + 8].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("monitor_interval read failed".into()))?,
         );
         offset += 8;
 
@@ -470,23 +490,35 @@ impl OrbitalConfig {
         offset += 4;
 
         let min_dt = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("min_dt read failed".into()))?,
         ));
         offset += 16;
 
         let max_dt = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("max_dt read failed".into()))?,
         ));
         offset += 16;
 
         let min_g = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("min_g read failed".into()))?,
         ));
         offset += 16;
 
         let max_g = Fixed::from_raw(i128::from_le_bytes(
-            data[offset..offset + 16].try_into().unwrap(),
+            data[offset..offset + 16].try_into()
+                .map_err(|_| ConfigError::InvalidBinary("max_g read failed".into()))?,
         ));
+        offset += 16;
+
+        // Check for trailing bytes — reject malformed data
+        if offset != data.len() {
+            return Err(ConfigError::InvalidBinary(
+                format!("trailing bytes: expected {} bytes, got {}", offset, data.len())
+            ));
+        }
 
         let config = OrbitalConfig {
             bodies,

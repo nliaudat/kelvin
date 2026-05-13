@@ -41,13 +41,13 @@ mod decrypt;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, Vec3, OrbitalBody, DEFAULT_G};
-pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, extract_seed_extended, extract_shake256, OrbitalKeyPair, AsymmetricError};
+pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, extract_shake256, OrbitalKeyPair, AsymmetricError};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
 pub use kelvin_stream::AesGcmStream;
 
-use kelvin_core::simulate;
+use kelvin_core::simulate_with_monitoring;
 use kelvin_kdf::LyapunovEstimator;
 
 /// Main entry point for the Kelvin cryptosystem.
@@ -69,12 +69,18 @@ pub struct Kelvin {
     bytes_processed: u64,
 }
 
+/// Shared state produced by the initialization pipeline.
+struct InitState {
+    config: OrbitalConfig,
+    bodies: Vec<OrbitalBody>,
+    schedule: KeySchedule,
+    safe_steps: u64,
+}
+
 impl Kelvin {
-    /// Create a new Kelvin instance from a validated configuration.
-    ///
-    /// This runs the Lyapunov time estimator and initial orbital simulation.
-    /// Setup time depends on the security level (seconds to minutes).
-    pub fn new(config: OrbitalConfig) -> Result<Self, KelvinError> {
+    /// Run the shared initialization pipeline (validation, Lyapunov estimation,
+    /// simulation, seed extraction, key schedule creation).
+    fn init(config: OrbitalConfig) -> Result<InitState, KelvinError> {
         // Validate config
         config.validate()?;
 
@@ -97,8 +103,16 @@ impl Kelvin {
         // Clone bodies for simulation
         let mut bodies = config.bodies.clone();
 
-        // Run initial simulation
-        simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
+        // Run initial simulation with stability monitoring
+        simulate_with_monitoring(
+            &mut bodies,
+            config.total_steps,
+            config.dt,
+            config.softening,
+            config.g,
+            config.min_separation,
+            config.monitor_interval,
+        )?;
 
         // Extract initial 2048-byte seed (using SHAKE256 XOF)
         let seed_vec = extract_shake256(&bodies, config.total_steps, config.g, config.softening, b"kelvin-orbital-state-v1", 2048);
@@ -106,24 +120,39 @@ impl Kelvin {
         seed.copy_from_slice(&seed_vec);
 
         // Create key schedule
-        let mut schedule = KeySchedule::new(
+        let schedule = KeySchedule::new(
             seed,
             config.total_steps,
             config.reseed_interval,
             result.safe_steps,
         );
 
+        Ok(InitState {
+            config,
+            bodies,
+            schedule,
+            safe_steps: result.safe_steps,
+        })
+    }
+
+    /// Create a new Kelvin instance from a validated configuration.
+    ///
+    /// This runs the Lyapunov time estimator and initial orbital simulation.
+    /// Setup time depends on the security level (seconds to minutes).
+    pub fn new(config: OrbitalConfig) -> Result<Self, KelvinError> {
+        let mut state = Self::init(config)?;
+
         // Get first key
-        let (key, nonce) = schedule.next_key()
+        let (key, nonce) = state.schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
 
         // Create stream cipher (nonce is already [u8; 12])
         let stream = Box::new(ChaChaStream::new(key, nonce));
 
         Ok(Kelvin {
-            config,
-            bodies,
-            schedule,
+            config: state.config,
+            bodies: state.bodies,
+            schedule: state.schedule,
             stream,
             bytes_processed: 0,
         })
@@ -134,55 +163,19 @@ impl Kelvin {
     /// Available when the `aes-ni` feature is enabled.
     #[cfg(feature = "aes-ni")]
     pub fn new_aes(config: OrbitalConfig) -> Result<Self, KelvinError> {
-        // Validate config
-        config.validate()?;
-
-        // Estimate Lyapunov time
-        let lyapunov = LyapunovEstimator::new(
-            &config.bodies,
-            config.dt,
-            config.softening,
-            config.g,
-        );
-        let result = lyapunov.estimate(1000, config.total_steps)?;
-
-        if config.total_steps < result.safe_steps {
-            return Err(KelvinError::InsufficientChaos {
-                requested: config.total_steps,
-                horizon: result.safe_steps,
-            });
-        }
-
-        // Clone bodies for simulation
-        let mut bodies = config.bodies.clone();
-
-        // Run initial simulation
-        simulate(&mut bodies, config.total_steps, config.dt, config.softening, config.g);
-
-        // Extract initial 2048-byte seed (using SHAKE256 XOF)
-        let seed_vec = extract_shake256(&bodies, config.total_steps, config.g, config.softening, b"kelvin-orbital-state-v1", 2048);
-        let mut seed = [0u8; 2048];
-        seed.copy_from_slice(&seed_vec);
-
-        // Create key schedule
-        let mut schedule = KeySchedule::new(
-            seed,
-            config.total_steps,
-            config.reseed_interval,
-            result.safe_steps,
-        );
+        let mut state = Self::init(config)?;
 
         // Get first key
-        let (key, nonce) = schedule.next_key()
+        let (key, nonce) = state.schedule.next_key()
             .ok_or(KelvinError::SeedExhausted)?;
 
         // Create AES-256-GCM stream cipher (nonce is already [u8; 12])
         let stream = Box::new(AesGcmStream::new(key, nonce));
 
         Ok(Kelvin {
-            config,
-            bodies,
-            schedule,
+            config: state.config,
+            bodies: state.bodies,
+            schedule: state.schedule,
             stream,
             bytes_processed: 0,
         })
@@ -223,6 +216,17 @@ impl Kelvin {
     /// re-running the simulation.
     pub fn asymmetric_keypair(&self) -> OrbitalKeyPair {
         OrbitalKeyPair::from_bodies(&self.bodies, self.config.total_steps, self.config.g, self.config.softening)
+    }
+
+    /// Rotate the stream cipher key by deriving the next key from the schedule.
+    ///
+    /// Called automatically when the current key approaches its maximum safe
+    /// byte limit. This prevents nonce reuse and provides forward secrecy.
+    fn rotate_key(&mut self) -> Result<(), KelvinError> {
+        let (key, nonce) = self.schedule.next_key()
+            .ok_or(KelvinError::SeedExhausted)?;
+        self.stream = Box::new(ChaChaStream::new(key, nonce));
+        Ok(())
     }
 }
 

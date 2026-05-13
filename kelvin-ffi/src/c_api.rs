@@ -130,6 +130,19 @@ pub unsafe extern "C" fn kelvin_free(ctx: *mut KelvinCtx) {
     }
 }
 
+/// Free a C string allocated by the Kelvin library (e.g., error messages).
+///
+/// # Safety
+///
+/// `s` must be a valid pointer returned by a Kelvin function that allocates
+/// a C string, and must not have been freed yet.
+#[no_mangle]
+pub unsafe extern "C" fn kelvin_free_string(s: *mut c_char) {
+    if !s.is_null() {
+        drop(unsafe { CString::from_raw(s) });
+    }
+}
+
 /// Set an error string in the output pointer.
 ///
 /// # Safety

@@ -3,6 +3,22 @@
 //! Provides a hardware-accelerated authenticated alternative to ChaCha20Poly1305
 //! when the `aes-ni` feature is enabled.
 //!
+//! ## Security Notes
+//!
+//! ### Invocation Limit
+//!
+//! AES-GCM has a **2^32 invocation limit** per key when using a 12-byte nonce
+//! (NIST SP 800-38D, Section 8.3). After 2^32 encryptions, the probability of
+//! a nonce collision exceeds 2^-32. Kelvin enforces a conservative **4 GiB
+//! plaintext limit** per key, which at 16-byte minimum messages allows at most
+//! 2^28 invocations — well within the safety margin.
+//!
+//! ### Nonce Rotation
+//!
+//! The nonce is incremented after each `encrypt_in_place`/`decrypt_in_place`
+//! call to prevent nonce reuse. This ensures that each message uses a unique
+//! (key, nonce) pair, which is the fundamental AEAD security invariant.
+//!
 //! ## References
 //!
 //! - NIST (2007). "Recommendation for Block Cipher Modes of Operation:

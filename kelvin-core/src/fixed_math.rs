@@ -91,20 +91,27 @@ impl Fixed {
 
     /// Compute square root using Newton's method.
     ///
-    /// Uses 20 iterations for constant-time operation.
-    /// Returns the floor of the square root.
+    /// Uses 20 iterations for constant-time operation (no early returns for
+    /// positive inputs). Returns the floor of the square root.
+    ///
+    /// # Panics
+    ///
+    /// Does not panic — returns `Fixed::ZERO` for non-positive inputs.
+    /// Use `abs()` first if negative values are possible.
     pub fn sqrt(self) -> Self {
+        // For zero or negative, return zero (handles the edge case without
+        // early return to maintain constant-time behavior for positive inputs)
         if self.0 <= 0 {
             return Fixed::ZERO;
         }
 
-        // For very small values, return early to avoid division by zero
-        if self < Fixed::from_raw(1 << 8) {
-            return Fixed::ZERO;
-        }
-
         // Initial guess: use the value itself (good for values near 1.0)
-        let mut x = self;
+        // For very small values, clamp to a minimum to avoid division by zero
+        let mut x = if self < Fixed::from_raw(1 << 8) {
+            Fixed::from_raw(1 << 8)
+        } else {
+            self
+        };
 
         // Newton's method: x_{n+1} = (x_n + a/x_n) / 2
         // 20 iterations is more than enough for convergence
