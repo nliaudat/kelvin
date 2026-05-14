@@ -35,13 +35,16 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
-mod error;
-mod encrypt;
 mod decrypt;
+mod encrypt;
+mod error;
 
 pub use error::KelvinError;
-pub use kelvin_core::{Fixed, Vec3, OrbitalBody, DEFAULT_G};
-pub use kelvin_kdf::{OrbitalConfig, KeySchedule, ScheduleState, extract_seed, extract_shake256, OrbitalKeyPair, AsymmetricError};
+pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_G};
+pub use kelvin_kdf::{
+    extract_seed, extract_shake256, AsymmetricError, KeySchedule, OrbitalConfig, OrbitalKeyPair,
+    ScheduleState,
+};
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
@@ -49,6 +52,7 @@ pub use kelvin_stream::AesGcmStream;
 
 use kelvin_core::simulate_with_monitoring;
 use kelvin_kdf::LyapunovEstimator;
+use zeroize::Zeroize;
 
 /// Main entry point for the Kelvin cryptosystem.
 ///
@@ -86,12 +90,8 @@ impl Kelvin {
         config.validate()?;
 
         // Estimate Lyapunov time
-        let lyapunov = LyapunovEstimator::new(
-            &config.bodies,
-            config.dt,
-            config.softening,
-            config.g,
-        );
+        let lyapunov =
+            LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
         let result = lyapunov.estimate(1000, config.total_steps)?;
 
         if config.total_steps < result.safe_steps {
@@ -117,24 +117,22 @@ impl Kelvin {
         )?;
 
         // Extract initial 2048-byte seed (using SHAKE256 XOF)
-        let seed_vec = extract_shake256(&bodies, config.total_steps, config.g, config.softening, b"kelvin-orbital-state-v1", 2048);
+        let seed_vec = extract_shake256(
+            &bodies,
+            config.total_steps,
+            config.g,
+            config.softening,
+            b"kelvin-orbital-state-v1",
+            2048,
+        );
         let mut seed = [0u8; 2048];
         seed.copy_from_slice(&seed_vec);
 
         // Create key schedule
-        let schedule = KeySchedule::new(
-            seed,
-            config.total_steps,
-            config.reseed_interval,
-            result.safe_steps,
-        );
+        let schedule =
+            KeySchedule::new(seed, config.total_steps, config.reseed_interval, result.safe_steps);
 
-        Ok(InitState {
-            config,
-            bodies,
-            schedule,
-            safe_steps: result.safe_steps,
-        })
+        Ok(InitState { config, bodies, schedule, safe_steps: result.safe_steps })
     }
 
     /// Create a new Kelvin instance from a validated configuration.
@@ -145,8 +143,7 @@ impl Kelvin {
         let mut state = Self::init(config)?;
 
         // Get first key
-        let (key, nonce) = state.schedule.next_key()
-            .ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
 
         // Create stream cipher (nonce is already [u8; 12])
         let stream = Box::new(ChaChaStream::new(key, nonce));
@@ -168,8 +165,7 @@ impl Kelvin {
         let mut state = Self::init(config)?;
 
         // Get first key
-        let (key, nonce) = state.schedule.next_key()
-            .ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
 
         // Create AES-256-GCM stream cipher (nonce is already [u8; 12])
         let stream = Box::new(AesGcmStream::new(key, nonce));
@@ -217,7 +213,12 @@ impl Kelvin {
     /// This utilizes the already simulated orbital state and does not require
     /// re-running the simulation.
     pub fn asymmetric_keypair(&self) -> OrbitalKeyPair {
-        OrbitalKeyPair::from_bodies(&self.bodies, self.config.total_steps, self.config.g, self.config.softening)
+        OrbitalKeyPair::from_bodies(
+            &self.bodies,
+            self.config.total_steps,
+            self.config.g,
+            self.config.softening,
+        )
     }
 
     /// Rotate the stream cipher key by deriving the next key from the schedule.
@@ -225,12 +226,26 @@ impl Kelvin {
     /// Called automatically when the current key approaches its maximum safe
     /// byte limit. This prevents nonce reuse and provides forward secrecy.
     fn rotate_key(&mut self) -> Result<(), KelvinError> {
-        let (key, nonce) = self.schedule.next_key()
-            .ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = self.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
         // Rekey the existing stream in-place to preserve the cipher variant
         // (ChaCha20Poly1305 vs AES-256-GCM) chosen at construction time.
         self.stream.rekey(key, nonce);
         Ok(())
+    }
+}
+
+impl Drop for Kelvin {
+    fn drop(&mut self) {
+        // Zeroize the stream cipher key material
+        self.stream.zeroize_key_material();
+        // Zeroize the bodies (simulated orbital state)
+        for body in self.bodies.iter_mut() {
+            body.zeroize();
+        }
+        self.bodies.clear();
+        // Zeroize bytes_processed counter
+        self.bytes_processed.zeroize();
+        // config and schedule are zeroized by their own Drop impls
     }
 }
 
@@ -240,11 +255,7 @@ mod tests {
     use kelvin_core::Fixed;
 
     fn test_config() -> OrbitalConfig {
-        let sun = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet1 = OrbitalBody::new(
             Fixed::from_raw(1 << 54), // ~1e-6 solar masses
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -267,12 +278,13 @@ mod tests {
         );
         OrbitalConfig::new(
             vec![sun, planet1, planet2, planet3, planet4],
-            200,  // Use enough steps to exceed Lyapunov horizon
+            200, // Use enough steps to exceed Lyapunov horizon
             10,
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44), // ~1e-6
             kelvin_core::DEFAULT_G,
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     #[test]

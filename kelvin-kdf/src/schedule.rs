@@ -28,6 +28,7 @@
 use blake3::Hasher;
 use hkdf::Hkdf;
 use sha3::Sha3_512;
+use zeroize::Zeroize;
 
 /// State of the key schedule.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -69,12 +70,7 @@ impl KeySchedule {
     /// Create a new key schedule.
     ///
     /// `seed` is the initial 2048-byte seed from SHAKE256 extraction.
-    pub fn new(
-        seed: [u8; 2048],
-        total_steps: u64,
-        reseed_interval: u64,
-        safe_steps: u64,
-    ) -> Self {
+    pub fn new(seed: [u8; 2048], total_steps: u64, reseed_interval: u64, safe_steps: u64) -> Self {
         // Each reseed produces one key, and each key can encrypt ~256 GiB
         // (ChaCha20 limit). We limit to safe_steps / reseed_interval keys.
         let max_keys = if reseed_interval > 0 {
@@ -92,7 +88,6 @@ impl KeySchedule {
             keys_generated: 0,
             max_keys,
         }
-
     }
 
     /// Get the next key and nonce using HKDF-SHA512.
@@ -183,6 +178,18 @@ impl KeySchedule {
         self.step = 0;
         self.keys_generated = 0;
         self.state = ScheduleState::Active;
+    }
+}
+
+impl Drop for KeySchedule {
+    fn drop(&mut self) {
+        self.seed.zeroize();
+        self.step.zeroize();
+        self.total_steps.zeroize();
+        self.reseed_interval.zeroize();
+        self.safe_steps.zeroize();
+        self.keys_generated.zeroize();
+        self.max_keys.zeroize();
     }
 }
 
@@ -303,9 +310,7 @@ mod tests {
         let (k2, _) = s2.next_key().unwrap();
 
         // Count differing bits
-        let diff_bits: u32 = k1.iter().zip(k2.iter())
-            .map(|(a, b)| (a ^ b).count_ones())
-            .sum();
+        let diff_bits: u32 = k1.iter().zip(k2.iter()).map(|(a, b)| (a ^ b).count_ones()).sum();
 
         // Should have roughly half the bits different (avalanche effect)
         assert!(diff_bits > 100, "Too few differing bits: {}", diff_bits);

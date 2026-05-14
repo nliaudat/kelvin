@@ -43,7 +43,7 @@ pub const MIN_DT: Fixed = Fixed::from_raw(1 << 34);
 pub const MAX_DT: Fixed = Fixed::from_raw(1 << 60);
 
 /// Minimum number of bodies required for meaningful chaos.
-pub const MIN_BODIES: usize = 5; 
+pub const MIN_BODIES: usize = 5;
 
 /// Maximum number of bodies supported.
 pub const MAX_BODIES: usize = 100;
@@ -103,11 +103,15 @@ mod tests {
 
     #[test]
     fn test_min_bodies() {
-        const { assert!(MIN_BODIES >= 2); }
+        const {
+            assert!(MIN_BODIES >= 2);
+        }
     }
 
     #[test]
     fn test_max_bodies() {
-        const { assert!(MAX_BODIES >= MIN_BODIES); }
+        const {
+            assert!(MAX_BODIES >= MIN_BODIES);
+        }
     }
 }

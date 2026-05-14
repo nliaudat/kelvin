@@ -33,7 +33,7 @@ pub unsafe extern "C" fn kelvin_new(
         Err(e) => {
             set_error(error_out, &format!("invalid UTF-8: {}", e));
             return std::ptr::null_mut();
-        }
+        },
     };
 
     let config = match OrbitalConfig::from_json(config_str) {
@@ -41,7 +41,7 @@ pub unsafe extern "C" fn kelvin_new(
         Err(e) => {
             set_error(error_out, &format!("config parse error: {}", e));
             return std::ptr::null_mut();
-        }
+        },
     };
 
     let kelvin = match Kelvin::new(config) {
@@ -49,7 +49,7 @@ pub unsafe extern "C" fn kelvin_new(
         Err(e) => {
             set_error(error_out, &format!("kelvin init error: {}", e));
             return std::ptr::null_mut();
-        }
+        },
     };
 
     Box::into_raw(Box::new(KelvinCtx { inner: kelvin }))
@@ -57,7 +57,7 @@ pub unsafe extern "C" fn kelvin_new(
 
 /// Encrypt data in-place using AEAD.
 ///
-/// The buffer must have a total size of `len` bytes. The plaintext
+/// The buffer must have a total size of `len` bytes (minimum 16). The plaintext
 /// occupies the first `len - 16` bytes; the AEAD authentication tag
 /// (Poly1305 or GMAC) is written at `data[len-16..len]`.
 ///
@@ -68,11 +68,7 @@ pub unsafe extern "C" fn kelvin_new(
 /// - `ctx` must be a valid pointer from `kelvin_new`.
 /// - `data` must point to a buffer of at least `len` bytes.
 #[no_mangle]
-pub unsafe extern "C" fn kelvin_encrypt(
-    ctx: *mut KelvinCtx,
-    data: *mut u8,
-    len: usize,
-) -> i32 {
+pub unsafe extern "C" fn kelvin_encrypt(ctx: *mut KelvinCtx, data: *mut u8, len: usize) -> i32 {
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
@@ -87,6 +83,7 @@ pub unsafe extern "C" fn kelvin_encrypt(
 /// Decrypt data in-place using AEAD.
 ///
 /// The buffer must contain ciphertext + 16-byte authentication tag.
+/// The buffer must have a total size of `len` bytes (minimum 16).
 /// The first `len - 16` bytes are the ciphertext; the last 16 bytes
 /// are the tag. On success, the first `len - 16` bytes contain the
 /// recovered plaintext.
@@ -98,11 +95,7 @@ pub unsafe extern "C" fn kelvin_encrypt(
 /// - `ctx` must be a valid pointer from `kelvin_new`.
 /// - `data` must point to a buffer of at least `len` bytes.
 #[no_mangle]
-pub unsafe extern "C" fn kelvin_decrypt(
-    ctx: *mut KelvinCtx,
-    data: *mut u8,
-    len: usize,
-) -> i32 {
+pub unsafe extern "C" fn kelvin_decrypt(ctx: *mut KelvinCtx, data: *mut u8, len: usize) -> i32 {
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
@@ -160,6 +153,8 @@ pub unsafe extern "C" fn kelvin_free_string(s: *mut c_char) {
 unsafe fn set_error(error_out: *mut *mut c_char, msg: &str) {
     if !error_out.is_null() {
         let c_str = CString::new(msg).unwrap_or_default();
-        unsafe { *error_out = c_str.into_raw(); }
+        unsafe {
+            *error_out = c_str.into_raw();
+        }
     }
 }

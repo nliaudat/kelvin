@@ -23,8 +23,8 @@
 //!   — Symplectic integration for n-body gravitational systems.
 
 extern crate alloc;
-use alloc::vec::Vec;
 use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::body::{OrbitalBody, Vec3};
 use crate::Fixed;
@@ -37,11 +37,7 @@ use crate::Fixed;
 /// where ε is the softening factor.
 ///
 /// Complexity: O(n²) where n = number of bodies.
-pub fn compute_accelerations(
-    bodies: &[OrbitalBody],
-    softening: Fixed,
-    g: Fixed,
-) -> Vec<Vec3> {
+pub fn compute_accelerations(bodies: &[OrbitalBody], softening: Fixed, g: Fixed) -> Vec<Vec3> {
     let n = bodies.len();
     let mut accelerations = vec![Vec3::ZERO; n];
 
@@ -80,12 +76,7 @@ pub fn compute_accelerations(
 /// 2. Drift:  x ← x + v * dt
 /// 3. Compute new accelerations a'
 /// 4. Kick:   v ← v + a' * dt/2
-pub fn verlet_step(
-    bodies: &mut [OrbitalBody],
-    dt: Fixed,
-    softening: Fixed,
-    g: Fixed,
-) {
+pub fn verlet_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) {
     let half_dt = dt / Fixed::from_int(2);
 
     // Step 1: Kick (half step)
@@ -111,13 +102,7 @@ pub fn verlet_step(
 /// Run the simulation for a given number of steps.
 ///
 /// This is the main simulation loop. It modifies the bodies in-place.
-pub fn simulate(
-    bodies: &mut [OrbitalBody],
-    steps: u64,
-    dt: Fixed,
-    softening: Fixed,
-    g: Fixed,
-) {
+pub fn simulate(bodies: &mut [OrbitalBody], steps: u64, dt: Fixed, softening: Fixed, g: Fixed) {
     for _ in 0..steps {
         verlet_step(bodies, dt, softening, g);
     }
@@ -184,11 +169,7 @@ mod tests {
     use crate::{Fixed, DEFAULT_G};
 
     fn two_body_system() -> Vec<OrbitalBody> {
-        let sun = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet = OrbitalBody::new(
             Fixed::from_raw(1 << 54), // ~1e-6 solar masses
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -234,7 +215,11 @@ mod tests {
         let final_energy = total_energy(&bodies, DEFAULT_G);
         let energy_diff = (final_energy - initial_energy).abs();
         let relative_diff = energy_diff / initial_energy.abs();
-        assert!(relative_diff.to_f64() < 0.01, "Energy drift too large: {}", relative_diff.to_f64());
+        assert!(
+            relative_diff.to_f64() < 0.01,
+            "Energy drift too large: {}",
+            relative_diff.to_f64()
+        );
     }
 
     #[test]
@@ -242,7 +227,9 @@ mod tests {
         let mut bodies = two_body_system();
         simulate(&mut bodies, 100, Fixed::from_raw(1 << 44), Fixed::from_raw(1 << 44), DEFAULT_G);
         // Bodies should have moved
-        assert!(bodies[0].position.length() > Fixed::ZERO || bodies[1].position.length() > Fixed::ZERO);
+        assert!(
+            bodies[0].position.length() > Fixed::ZERO || bodies[1].position.length() > Fixed::ZERO
+        );
     }
 
     #[test]
@@ -266,9 +253,21 @@ mod tests {
         // Three equal masses at vertices of equilateral triangle
         let mass = Fixed::from_raw(1 << 56); // ~1/256 solar masses
         let bodies = vec![
-            OrbitalBody::new(mass, Vec3::new(Fixed::from_int(1), Fixed::ZERO, Fixed::ZERO), Vec3::ZERO),
-            OrbitalBody::new(mass, Vec3::new(Fixed::from_int(-1), Fixed::ZERO, Fixed::ZERO), Vec3::ZERO),
-            OrbitalBody::new(mass, Vec3::new(Fixed::ZERO, Fixed::from_int(1), Fixed::ZERO), Vec3::ZERO),
+            OrbitalBody::new(
+                mass,
+                Vec3::new(Fixed::from_int(1), Fixed::ZERO, Fixed::ZERO),
+                Vec3::ZERO,
+            ),
+            OrbitalBody::new(
+                mass,
+                Vec3::new(Fixed::from_int(-1), Fixed::ZERO, Fixed::ZERO),
+                Vec3::ZERO,
+            ),
+            OrbitalBody::new(
+                mass,
+                Vec3::new(Fixed::ZERO, Fixed::from_int(1), Fixed::ZERO),
+                Vec3::ZERO,
+            ),
         ];
 
         let accs = compute_accelerations(&bodies, Fixed::from_raw(1 << 44), DEFAULT_G);

@@ -24,7 +24,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use kelvin_core::{Fixed, OrbitalBody, Vec3, verlet_step};
+use kelvin_core::{verlet_step, Fixed, OrbitalBody, Vec3};
 
 /// Confidence level for Lyapunov time estimation.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -78,18 +78,8 @@ pub struct LyapunovEstimator<'a> {
 
 impl<'a> LyapunovEstimator<'a> {
     /// Create a new Lyapunov estimator.
-    pub fn new(
-        reference: &'a [OrbitalBody],
-        dt: Fixed,
-        softening: Fixed,
-        g: Fixed,
-    ) -> Self {
-        LyapunovEstimator {
-            reference,
-            dt,
-            softening,
-            g,
-        }
+    pub fn new(reference: &'a [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) -> Self {
+        LyapunovEstimator { reference, dt, softening, g }
     }
 
     /// Estimate the Lyapunov time.
@@ -98,7 +88,11 @@ impl<'a> LyapunovEstimator<'a> {
     /// `max_steps` is the maximum number of steps to consider.
     ///
     /// Returns the estimated Lyapunov time and safe steps.
-    pub fn estimate(&self, shadow_steps: u64, _max_steps: u64) -> Result<LyapunovResult, LyapunovError> {
+    pub fn estimate(
+        &self,
+        shadow_steps: u64,
+        _max_steps: u64,
+    ) -> Result<LyapunovResult, LyapunovError> {
         if self.reference.len() < 2 {
             return Err(LyapunovError::TooFewBodies);
         }
@@ -186,11 +180,7 @@ impl<'a> LyapunovEstimator<'a> {
             Fixed::ZERO
         };
 
-        let lyapunov_exponent = if time > Fixed::ZERO {
-            ln_ratio / time
-        } else {
-            Fixed::ZERO
-        };
+        let lyapunov_exponent = if time > Fixed::ZERO { ln_ratio / time } else { Fixed::ZERO };
 
         // Lyapunov time = 1/λ (in steps)
         let lyapunov_time_steps = if lyapunov_exponent > Fixed::ZERO {
@@ -268,7 +258,9 @@ pub enum LyapunovError {
 impl fmt::Display for LyapunovError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LyapunovError::TooFewBodies => write!(f, "need at least 2 bodies for Lyapunov estimation"),
+            LyapunovError::TooFewBodies => {
+                write!(f, "need at least 2 bodies for Lyapunov estimation")
+            },
             LyapunovError::ZeroSteps => write!(f, "shadow steps must be > 0"),
         }
     }
@@ -280,11 +272,7 @@ mod tests {
     use kelvin_core::Fixed;
 
     fn five_body_system() -> Vec<OrbitalBody> {
-        let sun = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet1 = OrbitalBody::new(
             Fixed::from_raw(1 << 54),
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -350,7 +338,6 @@ mod tests {
         let result = estimator.estimate(0, 10000);
         assert!(matches!(result, Err(LyapunovError::ZeroSteps)));
     }
-
 
     #[test]
     fn test_lyapunov_confidence_levels() {

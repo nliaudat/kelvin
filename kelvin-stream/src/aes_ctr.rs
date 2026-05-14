@@ -27,8 +27,8 @@
 //!   Operation." NIST SP 800-38A.
 
 use crate::traits::StreamCipher;
-use aead::{AeadCore, AeadInPlace, KeyInit};
 use aead::generic_array::typenum::Unsigned;
+use aead::{AeadCore, AeadInPlace, KeyInit};
 use aes_gcm::Aes256Gcm;
 
 /// AES-256-GCM authenticated stream cipher wrapper.
@@ -59,26 +59,19 @@ impl AesGcmStream {
     ///
     /// `key` must be 32 bytes, `nonce` must be 12 bytes (standard GCM IV).
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
-        let cipher = Aes256Gcm::new_from_slice(&key)
-            .expect("AES-256-GCM key must be 32 bytes");
+        let cipher = Aes256Gcm::new_from_slice(&key).expect("AES-256-GCM key must be 32 bytes");
 
         // Conservative 4 GiB limit per key
         let max_bytes = 1 << 32;
 
-        AesGcmStream {
-            cipher,
-            nonce,
-            position: 0,
-            max_bytes,
-        }
+        AesGcmStream { cipher, nonce, position: 0, max_bytes }
     }
 
     /// Rekey the cipher with a new key and nonce.
     ///
     /// Resets the position counter.
     pub fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
-        self.cipher = Aes256Gcm::new_from_slice(&key)
-            .expect("AES-256-GCM key must be 32 bytes");
+        self.cipher = Aes256Gcm::new_from_slice(&key).expect("AES-256-GCM key must be 32 bytes");
         self.nonce = nonce;
         self.position = 0;
     }
@@ -90,10 +83,7 @@ impl AesGcmStream {
 }
 
 impl StreamCipher for AesGcmStream {
-    fn encrypt_in_place(
-        &mut self,
-        buffer: &mut [u8],
-    ) -> Result<(), aead::Error> {
+    fn encrypt_in_place(&mut self, buffer: &mut [u8]) -> Result<(), aead::Error> {
         // AEAD encrypt_in_place_detached: buffer[..plaintext_len] is plaintext.
         // The tag is returned separately and appended at buffer[plaintext_len..].
         let tag_size = <Aes256Gcm as AeadCore>::TagSize::USIZE;
@@ -120,10 +110,7 @@ impl StreamCipher for AesGcmStream {
         Ok(())
     }
 
-    fn decrypt_in_place(
-        &mut self,
-        buffer: &mut [u8],
-    ) -> Result<(), aead::Error> {
+    fn decrypt_in_place(&mut self, buffer: &mut [u8]) -> Result<(), aead::Error> {
         // AEAD decrypt_in_place_detached: buffer[..ciphertext_len] is ciphertext,
         // buffer[ciphertext_len..] contains the 16-byte tag.
         let tag_size = <Aes256Gcm as AeadCore>::TagSize::USIZE;
@@ -133,7 +120,12 @@ impl StreamCipher for AesGcmStream {
         let ciphertext_len = buffer.len() - tag_size;
         let nonce = aes_gcm::Nonce::from_slice(&self.nonce);
         let (msg, tag) = buffer.split_at_mut(ciphertext_len);
-        let result = self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<Aes256Gcm>::from_slice(tag));
+        let result = self.cipher.decrypt_in_place_detached(
+            nonce,
+            &[],
+            msg,
+            aead::Tag::<Aes256Gcm>::from_slice(tag),
+        );
 
         // Increment nonce regardless of success to maintain sync
         for byte in self.nonce.iter_mut().rev() {
@@ -158,9 +150,18 @@ impl StreamCipher for AesGcmStream {
     }
 
     fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
-        self.cipher = Aes256Gcm::new_from_slice(&key)
-            .expect("AES-256-GCM key must be 32 bytes");
+        self.cipher = Aes256Gcm::new_from_slice(&key).expect("AES-256-GCM key must be 32 bytes");
         self.nonce = nonce;
+        self.position = 0;
+    }
+
+    fn zeroize_key_material(&mut self) {
+        // Rekey with zeros to overwrite the internal cipher state
+        let zero_key = [0u8; 32];
+        let zero_nonce = [0u8; 12];
+        self.cipher =
+            Aes256Gcm::new_from_slice(&zero_key).expect("AES-256-GCM key must be 32 bytes");
+        self.nonce = zero_nonce;
         self.position = 0;
     }
 }

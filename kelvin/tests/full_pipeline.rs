@@ -2,14 +2,10 @@
 //!
 //! Tests the complete encrypt/decrypt round-trip with a 5-body system.
 
-use kelvin::{Kelvin, OrbitalConfig, Fixed, Vec3, OrbitalBody};
+use kelvin::{Fixed, Kelvin, OrbitalBody, OrbitalConfig, Vec3};
 
 fn five_body_config() -> OrbitalConfig {
-    let sun = OrbitalBody::new(
-        Fixed::ONE,
-        Vec3::ZERO,
-        Vec3::ZERO,
-    );
+    let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
     let planet1 = OrbitalBody::new(
         Fixed::from_raw(1 << 54),
         Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -37,7 +33,8 @@ fn five_body_config() -> OrbitalConfig {
         kelvin_core::DEFAULT_DT,
         Fixed::from_raw(1 << 44),
         kelvin_core::DEFAULT_G,
-    ).unwrap()
+    )
+    .unwrap()
 }
 
 #[test]
@@ -52,12 +49,18 @@ fn test_full_pipeline_round_trip() {
     let original = data.clone();
 
     enc.encrypt(&mut data).unwrap();
-    assert_ne!(&data[..plaintext.len()], &original[..plaintext.len()],
-               "encrypted data should differ from original");
+    assert_ne!(
+        &data[..plaintext.len()],
+        &original[..plaintext.len()],
+        "encrypted data should differ from original"
+    );
 
     dec.decrypt(&mut data).unwrap();
-    assert_eq!(&data[..plaintext.len()], &original[..plaintext.len()],
-               "decrypted data should match original");
+    assert_eq!(
+        &data[..plaintext.len()],
+        &original[..plaintext.len()],
+        "decrypted data should match original"
+    );
 }
 
 #[test]
@@ -129,8 +132,12 @@ fn test_remaining_safe_bytes() {
     // If max_keys == 1, remaining == 0. Either is valid.
     let remaining = k.remaining_safe_bytes();
     // Must be a multiple of 2^32 (each key provides 4 GiB)
-    assert_eq!(remaining % (1u64 << 32), 0,
-        "remaining_safe_bytes should be a multiple of 4 GiB, got {}", remaining);
+    assert_eq!(
+        remaining % (1u64 << 32),
+        0,
+        "remaining_safe_bytes should be a multiple of 4 GiB, got {}",
+        remaining
+    );
 }
 
 /// Verify that AEAD detects tampered ciphertext.
