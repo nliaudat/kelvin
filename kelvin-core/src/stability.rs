@@ -119,19 +119,7 @@ pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, soft
 
     // Potential energy: -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
     // Uses softened potential to remain consistent with the simulation integrator.
-    let softening_sq = softening * softening;
-    let mut potential = Fixed::ZERO;
-    for (j, other) in bodies.iter().enumerate() {
-        if j == body_index {
-            continue;
-        }
-        let diff = other.position - body.position;
-        let dist_sq = diff.length_squared() + softening_sq;
-        let dist = dist_sq.sqrt();
-        if dist > Fixed::ZERO {
-            potential -= g * body.mass * other.mass / dist;
-        }
-    }
+    let potential = gravitational_potential(body_index, bodies, g, softening);
 
     // Total energy
     let total_energy = kinetic + potential;

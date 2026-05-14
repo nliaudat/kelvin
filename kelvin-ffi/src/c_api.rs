@@ -57,16 +57,16 @@ pub unsafe extern "C" fn kelvin_new(
 
 /// Encrypt data in-place using AEAD.
 ///
-/// The buffer must have 16 extra bytes after `len` for the AEAD
-/// authentication tag (Poly1305 or GMAC). The plaintext occupies
-/// the first `len` bytes; the tag is written at `data[len..len+16]`.
+/// The buffer must have a total size of `len` bytes. The plaintext
+/// occupies the first `len - 16` bytes; the AEAD authentication tag
+/// (Poly1305 or GMAC) is written at `data[len-16..len]`.
 ///
 /// Returns 0 on success, -1 on error.
 ///
 /// # Safety
 ///
 /// - `ctx` must be a valid pointer from `kelvin_new`.
-/// - `data` must point to a buffer of at least `len + 16` bytes.
+/// - `data` must point to a buffer of at least `len` bytes.
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_encrypt(
     ctx: *mut KelvinCtx,
