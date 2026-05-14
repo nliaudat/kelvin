@@ -572,10 +572,7 @@ impl OrbitalConfig {
 impl Drop for OrbitalConfig {
     fn drop(&mut self) {
         // Zeroize the bodies (mass, position, velocity) — the shared secret
-        for body in self.bodies.iter_mut() {
-            body.zeroize();
-        }
-        self.bodies.clear();
+        self.bodies.zeroize();
         // Zeroize simulation parameters
         self.total_steps.zeroize();
         self.reseed_interval.zeroize();

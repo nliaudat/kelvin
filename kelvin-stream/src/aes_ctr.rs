@@ -30,6 +30,7 @@ use crate::traits::StreamCipher;
 use aead::generic_array::typenum::Unsigned;
 use aead::{AeadCore, AeadInPlace, KeyInit};
 use aes_gcm::Aes256Gcm;
+use zeroize::Zeroize;
 
 /// AES-256-GCM authenticated stream cipher wrapper.
 ///
@@ -158,10 +159,9 @@ impl StreamCipher for AesGcmStream {
     fn zeroize_key_material(&mut self) {
         // Rekey with zeros to overwrite the internal cipher state
         let zero_key = [0u8; 32];
-        let zero_nonce = [0u8; 12];
         self.cipher =
             Aes256Gcm::new_from_slice(&zero_key).expect("AES-256-GCM key must be 32 bytes");
-        self.nonce = zero_nonce;
+        self.nonce.zeroize();
         self.position = 0;
     }
 }
