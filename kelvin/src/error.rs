@@ -10,7 +10,9 @@ pub enum KelvinError {
     InvalidConfig(String),
 
     /// Orbital simulation did not reach the chaotic regime.
-    #[error("insufficient chaos: requested {requested} steps, but Lyapunov horizon is at {horizon}")]
+    #[error(
+        "insufficient chaos: requested {requested} steps, but Lyapunov horizon is at {horizon}"
+    )]
     InsufficientChaos {
         /// Number of simulation steps requested.
         requested: u64,

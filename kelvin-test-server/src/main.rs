@@ -130,11 +130,7 @@ fn paranoid_config() -> (Vec<OrbitalBody>, u64, u64) {
                 Fixed::ZERO,
                 Fixed::ZERO,
             ),
-            Vec3::new(
-                Fixed::ZERO,
-                Fixed::from_int(4),
-                Fixed::from_raw(1 << 62),
-            ),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(4), Fixed::from_raw(1 << 62)),
         ),
         // Planet 4: outer, retrograde
         OrbitalBody::new(
@@ -144,11 +140,7 @@ fn paranoid_config() -> (Vec<OrbitalBody>, u64, u64) {
                 Fixed::ZERO,
                 Fixed::ZERO,
             ),
-            Vec3::new(
-                Fixed::ZERO,
-                Fixed::from_int(-3),
-                Fixed::ZERO,
-            ),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(-3), Fixed::ZERO),
         ),
     ];
     let total_steps = 50;
@@ -175,10 +167,11 @@ fn generate_test_vector(
         kelvin_core::DEFAULT_DT,  // dt ~ 1e-3 years
         Fixed::from_raw(1 << 44), // softening ~ 1e-6 AU
         kelvin_core::DEFAULT_G,
-    ).map_err(|e| format!("Config error: {}", e))?;
+    )
+    .map_err(|e| format!("Config error: {}", e))?;
 
-    let config_json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("JSON error: {}", e))?;
+    let config_json =
+        serde_json::to_string_pretty(&config).map_err(|e| format!("JSON error: {}", e))?;
 
     // Create Kelvin instance and encrypt
     let mut k = Kelvin::new(config).map_err(|e| format!("Kelvin error: {}", e))?;
@@ -195,11 +188,7 @@ fn generate_test_vector(
         ciphertext_hex: hex::encode(&data),
         keystream_hex: hex::encode(
             // XOR plaintext with ciphertext to recover keystream
-            plaintext
-                .iter()
-                .zip(data.iter())
-                .map(|(p, c)| p ^ c)
-                .collect::<Vec<_>>(),
+            plaintext.iter().zip(data.iter()).map(|(p, c)| p ^ c).collect::<Vec<_>>(),
         ),
         num_bodies: bodies.len(),
         total_steps,
@@ -210,11 +199,8 @@ fn generate_test_vector(
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().collect();
 
-    let output_dir = if args.len() > 1 && args[1] == "--output" {
-        args.get(2).map(PathBuf::from)
-    } else {
-        None
-    };
+    let output_dir =
+        if args.len() > 1 && args[1] == "--output" { args.get(2).map(PathBuf::from) } else { None };
 
     let to_stdout = args.contains(&"--stdout".to_string());
 
@@ -298,7 +284,10 @@ fn main() -> Result<(), String> {
         println!();
         println!("=== TEST VECTORS (JSON) ===");
         for v in &vectors {
-            println!("{}", serde_json::to_string_pretty(v).map_err(|e| format!("JSON error: {}", e))?);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(v).map_err(|e| format!("JSON error: {}", e))?
+            );
             println!("---");
         }
     }
@@ -306,11 +295,7 @@ fn main() -> Result<(), String> {
     if let Some(dir) = output_dir {
         fs::create_dir_all(&dir).map_err(|e| format!("FS error: {}", e))?;
         for (i, v) in vectors.iter().enumerate() {
-            let filename = format!(
-                "kelvin-test-{}-{}.json",
-                v.level.to_lowercase(),
-                i + 1
-            );
+            let filename = format!("kelvin-test-{}-{}.json", v.level.to_lowercase(), i + 1);
             let path = dir.join(&filename);
             let json = serde_json::to_string_pretty(v).map_err(|e| format!("JSON error: {}", e))?;
             fs::write(&path, json).map_err(|e| format!("FS error: {}", e))?;

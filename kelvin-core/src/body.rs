@@ -25,11 +25,7 @@ pub struct Vec3 {
 
 impl Vec3 {
     /// Zero vector.
-    pub const ZERO: Vec3 = Vec3 {
-        x: Fixed::ZERO,
-        y: Fixed::ZERO,
-        z: Fixed::ZERO,
-    };
+    pub const ZERO: Vec3 = Vec3 { x: Fixed::ZERO, y: Fixed::ZERO, z: Fixed::ZERO };
 
     /// Create a new 3D vector.
     #[inline]
@@ -68,11 +64,7 @@ impl Vec3 {
     /// Scale vector by a factor.
     #[inline]
     pub fn scale(self, factor: Fixed) -> Self {
-        Vec3 {
-            x: self.x * factor,
-            y: self.y * factor,
-            z: self.z * factor,
-        }
+        Vec3 { x: self.x * factor, y: self.y * factor, z: self.z * factor }
     }
 }
 
@@ -80,11 +72,7 @@ impl Add for Vec3 {
     type Output = Self;
     #[inline]
     fn add(self, rhs: Self) -> Self {
-        Vec3 {
-            x: self.x + rhs.x,
-            y: self.y + rhs.y,
-            z: self.z + rhs.z,
-        }
+        Vec3 { x: self.x + rhs.x, y: self.y + rhs.y, z: self.z + rhs.z }
     }
 }
 
@@ -101,11 +89,7 @@ impl Sub for Vec3 {
     type Output = Self;
     #[inline]
     fn sub(self, rhs: Self) -> Self {
-        Vec3 {
-            x: self.x - rhs.x,
-            y: self.y - rhs.y,
-            z: self.z - rhs.z,
-        }
+        Vec3 { x: self.x - rhs.x, y: self.y - rhs.y, z: self.z - rhs.z }
     }
 }
 
@@ -130,11 +114,7 @@ impl Div<Fixed> for Vec3 {
     type Output = Self;
     #[inline]
     fn div(self, rhs: Fixed) -> Self {
-        Vec3 {
-            x: self.x / rhs,
-            y: self.y / rhs,
-            z: self.z / rhs,
-        }
+        Vec3 { x: self.x / rhs, y: self.y / rhs, z: self.z / rhs }
     }
 }
 
@@ -142,11 +122,7 @@ impl Neg for Vec3 {
     type Output = Self;
     #[inline]
     fn neg(self) -> Self {
-        Vec3 {
-            x: -self.x,
-            y: -self.y,
-            z: -self.z,
-        }
+        Vec3 { x: -self.x, y: -self.y, z: -self.z }
     }
 }
 
@@ -172,11 +148,7 @@ impl OrbitalBody {
     /// Create a new orbital body.
     #[inline]
     pub const fn new(mass: Fixed, position: Vec3, velocity: Vec3) -> Self {
-        OrbitalBody {
-            mass,
-            position,
-            velocity,
-        }
+        OrbitalBody { mass, position, velocity }
     }
 
     /// Kinetic energy: 0.5 * mass * v²
@@ -316,11 +288,7 @@ mod tests {
 
     #[test]
     fn test_orbital_body_zero_velocity() {
-        let body = OrbitalBody::new(
-            Fixed::from_int(5),
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let body = OrbitalBody::new(Fixed::from_int(5), Vec3::ZERO, Vec3::ZERO);
         assert_eq!(body.kinetic_energy(), Fixed::ZERO);
         assert_eq!(body.momentum(), Vec3::ZERO);
     }

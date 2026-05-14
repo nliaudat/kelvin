@@ -27,8 +27,8 @@ use core::fmt;
 
 use crate::body::OrbitalBody;
 use crate::constants::MONITOR_INTERVAL;
-use crate::Fixed;
 use crate::integrator::verlet_step;
+use crate::Fixed;
 
 /// Errors from stability monitoring.
 #[derive(Clone, Debug)]
@@ -71,14 +71,14 @@ impl fmt::Display for StabilityError {
                     "body {} ejected at step {} (energy = {:.6e} AU²/yr²)",
                     body_index, step, energy
                 )
-            }
+            },
             StabilityError::BodyCollision { body_i, body_j, step, distance } => {
                 write!(
                     f,
                     "bodies {} and {} collided at step {} (distance = {:.6e} AU)",
                     body_i, body_j, step, distance
                 )
-            }
+            },
         }
     }
 }
@@ -106,7 +106,13 @@ impl fmt::Display for StabilityError {
 ///
 /// # Returns
 /// `true` if the body is ejected (unbound), `false` otherwise.
-pub fn is_body_ejected(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed, ejection_energy_threshold: Fixed) -> bool {
+pub fn is_body_ejected(
+    body_index: usize,
+    bodies: &[OrbitalBody],
+    g: Fixed,
+    softening: Fixed,
+    ejection_energy_threshold: Fixed,
+) -> bool {
     let n = bodies.len();
     if body_index >= n {
         return false;
@@ -190,11 +196,8 @@ pub fn simulate_with_monitoring(
     monitor_interval: u64,
     ejection_energy_threshold: Fixed,
 ) -> Result<(), StabilityError> {
-    let effective_interval = if monitor_interval == 0 {
-        MONITOR_INTERVAL
-    } else {
-        monitor_interval
-    };
+    let effective_interval =
+        if monitor_interval == 0 { MONITOR_INTERVAL } else { monitor_interval };
 
     // Ensure we check at least once at the end
     let check_interval = effective_interval.min(steps);
@@ -212,12 +215,8 @@ pub fn simulate_with_monitoring(
         if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
             let energy = (bodies[i].kinetic_energy()
                 + gravitational_potential(i, bodies, g, softening))
-                .to_f64();
-            return Err(StabilityError::BodyEjected {
-                body_index: i,
-                step: 0,
-                energy,
-            });
+            .to_f64();
+            return Err(StabilityError::BodyEjected { body_index: i, step: 0, energy });
         }
     }
 
@@ -241,7 +240,7 @@ pub fn simulate_with_monitoring(
                 if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
                     let energy = (bodies[i].kinetic_energy()
                         + gravitational_potential(i, bodies, g, softening))
-                        .to_f64();
+                    .to_f64();
                     return Err(StabilityError::BodyEjected {
                         body_index: i,
                         step: step + 1,
@@ -260,7 +259,12 @@ pub fn simulate_with_monitoring(
 ///
 /// Uses the same softened potential as the simulation integrator:
 ///   U_i = -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
-fn gravitational_potential(body_index: usize, bodies: &[OrbitalBody], g: Fixed, softening: Fixed) -> Fixed {
+fn gravitational_potential(
+    body_index: usize,
+    bodies: &[OrbitalBody],
+    g: Fixed,
+    softening: Fixed,
+) -> Fixed {
     let body = &bodies[body_index];
     let softening_sq = softening * softening;
     let mut potential = Fixed::ZERO;
@@ -283,19 +287,15 @@ fn gravitational_potential(body_index: usize, bodies: &[OrbitalBody], g: Fixed, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::vec;
-    use alloc::vec::Vec;
     use crate::body::Vec3;
     use crate::constants::{DEFAULT_G, EJECTION_ENERGY_THRESHOLD};
     use crate::Fixed;
+    use alloc::vec;
+    use alloc::vec::Vec;
 
     /// Create a stable 3-body system (bound orbits).
     fn stable_three_body_system() -> Vec<OrbitalBody> {
-        let sun = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         let planet1 = OrbitalBody::new(
             Fixed::from_raw(1 << 54), // ~1e-6 solar masses
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -311,11 +311,7 @@ mod tests {
 
     /// Create a system where one body is on an escape trajectory.
     fn ejection_system() -> Vec<OrbitalBody> {
-        let sun = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         // Planet on hyperbolic trajectory (escape velocity)
         let planet = OrbitalBody::new(
             Fixed::from_raw(1 << 54),
@@ -336,11 +332,7 @@ mod tests {
     /// velocity, so they remain close without immediately ejecting each
     /// other. The close proximity should trigger the collapse detector.
     fn collapse_system() -> Vec<OrbitalBody> {
-        let sun = OrbitalBody::new(
-            Fixed::ONE,
-            Vec3::ZERO,
-            Vec3::ZERO,
-        );
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
         // Two planets at nearly the same position, same velocity
         // so they stay close without a huge relative acceleration
         let planet1 = OrbitalBody::new(
@@ -370,8 +362,11 @@ mod tests {
         let softening = Fixed::from_raw(1 << 44);
         // All bodies should be bound (not ejected)
         for i in 0..bodies.len() {
-            assert!(!is_body_ejected(i, &bodies, DEFAULT_G, softening, EJECTION_ENERGY_THRESHOLD),
-                "body {} should be bound but was detected as ejected", i);
+            assert!(
+                !is_body_ejected(i, &bodies, DEFAULT_G, softening, EJECTION_ENERGY_THRESHOLD),
+                "body {} should be bound but was detected as ejected",
+                i
+            );
         }
     }
 
@@ -423,7 +418,7 @@ mod tests {
         );
         assert!(result.is_err(), "ejection system should be rejected");
         match result.unwrap_err() {
-            StabilityError::BodyEjected { .. } => {} // Expected
+            StabilityError::BodyEjected { .. } => {}, // Expected
             other => panic!("expected BodyEjected, got: {:?}", other),
         }
     }
@@ -443,7 +438,7 @@ mod tests {
         );
         assert!(result.is_err(), "collapse system should be rejected");
         match result.unwrap_err() {
-            StabilityError::BodyCollision { .. } => {} // Expected
+            StabilityError::BodyCollision { .. } => {}, // Expected
             other => panic!("expected BodyCollision, got: {:?}", other),
         }
     }

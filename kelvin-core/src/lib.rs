@@ -36,17 +36,21 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
-mod fixed_math;
 mod body;
 mod constants;
+mod fixed_math;
 mod integrator;
 mod stability;
 
+pub use body::{OrbitalBody, Vec3};
+pub use constants::{
+    DEFAULT_DT, DEFAULT_G, DEFAULT_RESEED_INTERVAL, DEFAULT_STEPS, EJECTION_ENERGY_THRESHOLD,
+    MAX_BODIES, MAX_DT, MIN_BODIES, MIN_DT, MIN_SEPARATION, MONITOR_INTERVAL, SOFTENING_FACTOR,
+    SOLAR_MASS,
+};
 pub use fixed_math::Fixed;
-pub use body::{Vec3, OrbitalBody};
-pub use constants::{DEFAULT_G, SOLAR_MASS, SOFTENING_FACTOR, DEFAULT_DT, MIN_DT, MAX_DT, MIN_BODIES, MAX_BODIES, DEFAULT_STEPS, DEFAULT_RESEED_INTERVAL, MIN_SEPARATION, MONITOR_INTERVAL, EJECTION_ENERGY_THRESHOLD};
-pub use integrator::{compute_accelerations, verlet_step, simulate};
-pub use stability::{StabilityError, is_body_ejected, detect_collapse, simulate_with_monitoring};
+pub use integrator::{compute_accelerations, simulate, verlet_step};
+pub use stability::{detect_collapse, is_body_ejected, simulate_with_monitoring, StabilityError};
 
 #[cfg(test)]
 mod tests {

@@ -28,8 +28,8 @@
 //!   — Predecessor to ChaCha20, design rationale.
 
 use crate::traits::StreamCipher;
-use aead::{AeadCore, AeadInPlace, KeyInit};
 use aead::generic_array::typenum::Unsigned;
+use aead::{AeadCore, AeadInPlace, KeyInit};
 use chacha20poly1305::ChaCha20Poly1305;
 
 /// ChaCha20Poly1305 authenticated stream cipher wrapper.
@@ -60,27 +60,22 @@ impl ChaChaStream {
     ///
     /// `key` must be 32 bytes, `nonce` must be 12 bytes (IETF variant).
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
-        let cipher = ChaCha20Poly1305::new_from_slice(&key)
-            .expect("ChaCha20Poly1305 key must be 32 bytes");
+        let cipher =
+            ChaCha20Poly1305::new_from_slice(&key).expect("ChaCha20Poly1305 key must be 32 bytes");
 
         // ChaCha20 IETF max: 2^32 - 1 blocks × 64 bytes ≈ 256 GiB
         // We use a conservative 4 GiB limit per key
         let max_bytes = 1 << 32;
 
-        ChaChaStream {
-            cipher,
-            nonce,
-            position: 0,
-            max_bytes,
-        }
+        ChaChaStream { cipher, nonce, position: 0, max_bytes }
     }
 
     /// Rekey the cipher with a new key and nonce.
     ///
     /// Resets the position counter.
     pub fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
-        self.cipher = ChaCha20Poly1305::new_from_slice(&key)
-            .expect("ChaCha20Poly1305 key must be 32 bytes");
+        self.cipher =
+            ChaCha20Poly1305::new_from_slice(&key).expect("ChaCha20Poly1305 key must be 32 bytes");
         self.nonce = nonce;
         self.position = 0;
     }
@@ -92,10 +87,7 @@ impl ChaChaStream {
 }
 
 impl StreamCipher for ChaChaStream {
-    fn encrypt_in_place(
-        &mut self,
-        buffer: &mut [u8],
-    ) -> Result<(), aead::Error> {
+    fn encrypt_in_place(&mut self, buffer: &mut [u8]) -> Result<(), aead::Error> {
         // AEAD encrypt_in_place_detached: buffer[..plaintext_len] is plaintext.
         // The tag is returned separately and appended at buffer[plaintext_len..].
         let tag_size = <ChaCha20Poly1305 as AeadCore>::TagSize::USIZE;
@@ -122,10 +114,7 @@ impl StreamCipher for ChaChaStream {
         Ok(())
     }
 
-    fn decrypt_in_place(
-        &mut self,
-        buffer: &mut [u8],
-    ) -> Result<(), aead::Error> {
+    fn decrypt_in_place(&mut self, buffer: &mut [u8]) -> Result<(), aead::Error> {
         // AEAD decrypt_in_place_detached: buffer[..ciphertext_len] is ciphertext,
         // buffer[ciphertext_len..] contains the 16-byte tag.
         let tag_size = <ChaCha20Poly1305 as AeadCore>::TagSize::USIZE;
@@ -135,7 +124,12 @@ impl StreamCipher for ChaChaStream {
         let ciphertext_len = buffer.len() - tag_size;
         let nonce = chacha20poly1305::Nonce::from_slice(&self.nonce);
         let (msg, tag) = buffer.split_at_mut(ciphertext_len);
-        let result = self.cipher.decrypt_in_place_detached(nonce, &[], msg, aead::Tag::<ChaCha20Poly1305>::from_slice(tag));
+        let result = self.cipher.decrypt_in_place_detached(
+            nonce,
+            &[],
+            msg,
+            aead::Tag::<ChaCha20Poly1305>::from_slice(tag),
+        );
 
         // Increment nonce regardless of success to maintain sync
         for byte in self.nonce.iter_mut().rev() {
@@ -160,9 +154,19 @@ impl StreamCipher for ChaChaStream {
     }
 
     fn rekey(&mut self, key: [u8; 32], nonce: [u8; 12]) {
-        self.cipher = ChaCha20Poly1305::new_from_slice(&key)
-            .expect("ChaCha20Poly1305 key must be 32 bytes");
+        self.cipher =
+            ChaCha20Poly1305::new_from_slice(&key).expect("ChaCha20Poly1305 key must be 32 bytes");
         self.nonce = nonce;
+        self.position = 0;
+    }
+
+    fn zeroize_key_material(&mut self) {
+        // Rekey with zeros to overwrite the internal cipher state
+        let zero_key = [0u8; 32];
+        let zero_nonce = [0u8; 12];
+        self.cipher = ChaCha20Poly1305::new_from_slice(&zero_key)
+            .expect("ChaCha20Poly1305 key must be 32 bytes");
+        self.nonce = zero_nonce;
         self.position = 0;
     }
 }

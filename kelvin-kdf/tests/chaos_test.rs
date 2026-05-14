@@ -1,12 +1,8 @@
-use kelvin_core::{Fixed, OrbitalBody, Vec3, simulate};
+use kelvin_core::{simulate, Fixed, OrbitalBody, Vec3};
 use kelvin_kdf::extract_seed;
 
 fn test_system() -> Vec<OrbitalBody> {
-    let sun = OrbitalBody::new(
-        Fixed::ONE,
-        Vec3::ZERO,
-        Vec3::ZERO,
-    );
+    let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
     let planet1 = OrbitalBody::new(
         Fixed::from_raw(1 << 54), // small mass
         Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -33,10 +29,7 @@ fn test_system() -> Vec<OrbitalBody> {
 /// Compute Hamming distance between two byte slices.
 fn hamming_distance(a: &[u8], b: &[u8]) -> u32 {
     assert_eq!(a.len(), b.len());
-    a.iter()
-        .zip(b.iter())
-        .map(|(x, y)| (x ^ y).count_ones())
-        .sum()
+    a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum()
 }
 
 #[test]
@@ -57,8 +50,10 @@ fn test_chaos_avalanche() {
     simulate(&mut bodies_pert, steps, dt, softening, kelvin_core::DEFAULT_G);
 
     // Extract seeds
-    let seed_orig = extract_seed(&bodies_orig, steps, kelvin_core::DEFAULT_G, softening, b"avalanche-test");
-    let seed_pert = extract_seed(&bodies_pert, steps, kelvin_core::DEFAULT_G, softening, b"avalanche-test");
+    let seed_orig =
+        extract_seed(&bodies_orig, steps, kelvin_core::DEFAULT_G, softening, b"avalanche-test");
+    let seed_pert =
+        extract_seed(&bodies_pert, steps, kelvin_core::DEFAULT_G, softening, b"avalanche-test");
 
     // Calculate Hamming distance
     let dist = hamming_distance(&seed_orig, &seed_pert);
@@ -85,8 +80,14 @@ fn test_chaos_uniformity() {
 
     for i in 0..num_tests {
         simulate(&mut bodies, steps_per_run, dt, softening, kelvin_core::DEFAULT_G);
-        let seed = extract_seed(&bodies, (i + 1) * steps_per_run, kelvin_core::DEFAULT_G, softening, b"uniformity-test");
-        
+        let seed = extract_seed(
+            &bodies,
+            (i + 1) * steps_per_run,
+            kelvin_core::DEFAULT_G,
+            softening,
+            b"uniformity-test",
+        );
+
         for byte in seed.iter() {
             ones_count += byte.count_ones();
         }

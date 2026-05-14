@@ -74,7 +74,7 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
                 idempotent_ok: false,
                 errors: vec![format!("Failed to parse config JSON: {}", e)],
             };
-        }
+        },
     };
 
     // Decode plaintext
@@ -88,7 +88,7 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
                 idempotent_ok: false,
                 errors: vec![format!("Failed to decode plaintext hex: {}", e)],
             };
-        }
+        },
     };
 
     // Decode expected ciphertext
@@ -102,7 +102,7 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
                 idempotent_ok: false,
                 errors: vec![format!("Failed to decode ciphertext hex: {}", e)],
             };
-        }
+        },
     };
 
     // Test 1: Determinism -- encrypt locally and compare with golden ciphertext
@@ -114,13 +114,13 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
                 Err(e) => {
                     errors.push(format!("Encryption failed: {}", e));
                     false
-                }
+                },
             }
-        }
+        },
         Err(e) => {
             errors.push(format!("Kelvin::new failed: {}", e));
             false
-        }
+        },
     };
 
     // Test 2: Round-trip -- encrypt with instance A, decrypt with instance B
@@ -130,33 +130,29 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
         Ok(mut k_enc) => {
             let mut data = plaintext.clone();
             match k_enc.encrypt(&mut data) {
-                Ok(()) => {
-                    match Kelvin::new(config.clone()) {
-                        Ok(mut k_dec) => {
-                            match k_dec.decrypt(&mut data) {
-                                Ok(()) => data == plaintext,
-                                Err(e) => {
-                                    errors.push(format!("Decryption failed: {}", e));
-                                    false
-                                }
-                            }
-                        }
+                Ok(()) => match Kelvin::new(config.clone()) {
+                    Ok(mut k_dec) => match k_dec.decrypt(&mut data) {
+                        Ok(()) => data == plaintext,
                         Err(e) => {
-                            errors.push(format!("Kelvin::new failed (dec): {}", e));
+                            errors.push(format!("Decryption failed: {}", e));
                             false
-                        }
-                    }
-                }
+                        },
+                    },
+                    Err(e) => {
+                        errors.push(format!("Kelvin::new failed (dec): {}", e));
+                        false
+                    },
+                },
                 Err(e) => {
                     errors.push(format!("Encryption failed (round-trip): {}", e));
                     false
-                }
+                },
             }
-        }
+        },
         Err(e) => {
             errors.push(format!("Kelvin::new failed (enc): {}", e));
             false
-        }
+        },
     };
 
     // Test 3: Idempotency -- encrypt with A, encrypt with B = original
@@ -166,33 +162,29 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
         Ok(mut k_a) => {
             let mut data = plaintext.clone();
             match k_a.encrypt(&mut data) {
-                Ok(()) => {
-                    match Kelvin::new(config.clone()) {
-                        Ok(mut k_b) => {
-                            match k_b.encrypt(&mut data) {
-                                Ok(()) => data == plaintext,
-                                Err(e) => {
-                                    errors.push(format!("Second encrypt failed: {}", e));
-                                    false
-                                }
-                            }
-                        }
+                Ok(()) => match Kelvin::new(config.clone()) {
+                    Ok(mut k_b) => match k_b.encrypt(&mut data) {
+                        Ok(()) => data == plaintext,
                         Err(e) => {
-                            errors.push(format!("Kelvin::new failed (idem B): {}", e));
+                            errors.push(format!("Second encrypt failed: {}", e));
                             false
-                        }
-                    }
-                }
+                        },
+                    },
+                    Err(e) => {
+                        errors.push(format!("Kelvin::new failed (idem B): {}", e));
+                        false
+                    },
+                },
                 Err(e) => {
                     errors.push(format!("Encryption failed (idempotent): {}", e));
                     false
-                }
+                },
             }
-        }
+        },
         Err(e) => {
             errors.push(format!("Kelvin::new failed (idem A): {}", e));
             false
-        }
+        },
     };
 
     VerificationResult {
@@ -219,7 +211,8 @@ fn main() -> Result<(), String> {
             vector_files.push(PathBuf::from(file));
         }
     } else if args.contains(&"--vectors".to_string()) {
-        if let Some(dir) = args.iter().position(|a| a == "--vectors").and_then(|i| args.get(i + 1)) {
+        if let Some(dir) = args.iter().position(|a| a == "--vectors").and_then(|i| args.get(i + 1))
+        {
             let dir_path = PathBuf::from(dir);
             if dir_path.is_dir() {
                 for entry in fs::read_dir(&dir_path).map_err(|e| format!("FS error: {}", e))? {
@@ -247,11 +240,14 @@ fn main() -> Result<(), String> {
 
     for path in &vector_files {
         let content = fs::read_to_string(path).map_err(|e| format!("FS error: {}", e))?;
-        let vector: TestVector = serde_json::from_str(&content)
-            .map_err(|e| format!("JSON error: {}", e))?;
+        let vector: TestVector =
+            serde_json::from_str(&content).map_err(|e| format!("JSON error: {}", e))?;
 
         println!("Verifying: {} ({})", vector.description, path.display());
-        println!("  Level: {}, Bodies: {}, Steps: {}", vector.level, vector.num_bodies, vector.total_steps);
+        println!(
+            "  Level: {}, Bodies: {}, Steps: {}",
+            vector.level, vector.num_bodies, vector.total_steps
+        );
 
         let result = verify_test_vector(&vector);
         total += 1;
@@ -301,16 +297,8 @@ fn run_self_test() -> Result<(), String> {
         ),
         OrbitalBody::new(
             Fixed::from_raw(1 << 54),
-            Vec3::new(
-                Fixed::from_raw(3 << 63),
-                Fixed::ZERO,
-                Fixed::ZERO,
-            ),
-            Vec3::new(
-                Fixed::ZERO,
-                Fixed::from_raw(4896710557980672i128),
-                Fixed::from_raw(1 << 62),
-            ),
+            Vec3::new(Fixed::from_raw(3 << 63), Fixed::ZERO, Fixed::ZERO),
+            Vec3::new(Fixed::ZERO, Fixed::from_raw(4896710557980672i128), Fixed::from_raw(1 << 62)),
         ),
         OrbitalBody::new(
             Fixed::from_raw(1 << 53),
@@ -334,9 +322,11 @@ fn run_self_test() -> Result<(), String> {
         Fixed::from_raw(1 << 44),
         Fixed::from_raw(1 << 44),
         kelvin_core::DEFAULT_G,
-    ).map_err(|e| format!("Failed to create config: {}", e))?;
+    )
+    .map_err(|e| format!("Failed to create config: {}", e))?;
 
-    let plaintext = b"Kelvin determinism test vector - this data should encrypt identically on all platforms.";
+    let plaintext =
+        b"Kelvin determinism test vector - this data should encrypt identically on all platforms.";
 
     // Test 1: Two independent instances with same config produce same ciphertext
     println!("Test 1: Determinism (two instances, same config)...");
@@ -361,11 +351,13 @@ fn run_self_test() -> Result<(), String> {
     // Both start from same initial state, so they produce the same keystream.
     println!();
     println!("Test 2: Round-trip (encrypt A, decrypt B, same config)...");
-    let mut k_enc = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
+    let mut k_enc =
+        Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     let mut data3 = plaintext.to_vec();
     k_enc.encrypt(&mut data3).map_err(|e| format!("Encrypt failed: {}", e))?;
 
-    let mut k_dec = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
+    let mut k_dec =
+        Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     k_dec.decrypt(&mut data3).map_err(|e| format!("Decrypt failed: {}", e))?;
 
     if data3 == plaintext {
@@ -405,12 +397,14 @@ fn run_self_test() -> Result<(), String> {
     println!();
     println!("Test 5: Large data (10KB round-trip, two instances)...");
     let large_data = vec![0x42u8; 10_240];
-    let mut k_enc2 = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
+    let mut k_enc2 =
+        Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     let mut large_enc = large_data.clone();
     let start = std::time::Instant::now();
     k_enc2.encrypt(&mut large_enc).map_err(|e| format!("Encrypt failed: {}", e))?;
 
-    let mut k_dec2 = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
+    let mut k_dec2 =
+        Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     k_dec2.decrypt(&mut large_enc).map_err(|e| format!("Decrypt failed: {}", e))?;
     let elapsed = start.elapsed();
 

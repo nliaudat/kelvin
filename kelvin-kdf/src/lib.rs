@@ -27,15 +27,15 @@
 
 extern crate alloc;
 
-mod config;
-mod lyapunov;
-mod extractor;
-mod schedule;
 mod asymmetric;
+mod config;
+mod extractor;
+mod lyapunov;
+mod schedule;
 
-pub use config::{OrbitalConfig, ConfigError};
-pub use lyapunov::{LyapunovEstimator, LyapunovResult, LyapunovConfidence, LyapunovError};
+pub use config::{ConfigError, OrbitalConfig};
 pub use extractor::{extract_seed, extract_shake256};
+pub use lyapunov::{LyapunovConfidence, LyapunovError, LyapunovEstimator, LyapunovResult};
 
+pub use asymmetric::{AsymmetricError, OrbitalKeyPair};
 pub use schedule::{KeySchedule, ScheduleState};
-pub use asymmetric::{OrbitalKeyPair, AsymmetricError};

@@ -10,11 +10,11 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use kelvin::{Kelvin, OrbitalConfig, OrbitalBody, Vec3, Fixed};
+use kelvin::{Fixed, Kelvin, OrbitalBody, OrbitalConfig, Vec3};
+use ml_kem::KeyExport;
 use rand::Rng;
 use std::fs;
 use std::io::{Read, Write};
-use ml_kem::KeyExport;
 
 #[derive(Parser)]
 #[command(name = "kelvin", version, about = "Orbital Chaos KDF Cryptosystem")]
@@ -95,19 +95,19 @@ fn main() -> Result<()> {
             } else {
                 println!("{}", json);
             }
-        }
+        },
         Commands::Encrypt { config, input, output } => {
             process_file(&config, &input, &output, true)?;
-        }
+        },
         Commands::Decrypt { config, input, output } => {
             process_file(&config, &input, &output, false)?;
-        }
+        },
         Commands::Identify { config, all, ecc, kem } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
             let config = OrbitalConfig::from_json(&config_json)?;
             let k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
             let kp = k.asymmetric_keypair();
-            
+
             let mut shown = false;
 
             if all || ecc {
@@ -118,23 +118,23 @@ fn main() -> Result<()> {
                 println!("ML-KEM-768 (PQ-KEM):    {}", hex::encode(&kp.kem_public.to_bytes()));
                 shown = true;
             }
-            
+
             // Default: Show ML-DSA-65
             if all || (!ecc && !kem) {
                 println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.to_bytes()));
                 shown = true;
             }
-            
+
             if !shown {
-                 println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.to_bytes()));
+                println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.to_bytes()));
             }
-        }
+        },
         Commands::Analyze { config } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
             let mut config = OrbitalConfig::from_json(&config_json)?;
-            
+
             println!("Analyzing Cryptographic Quality...");
-            
+
             // 1. Base Key
             println!("Deriving Base Key...");
             let k1 = Kelvin::new(config.clone()).context("Failed to init first instance")?;
@@ -144,7 +144,7 @@ fn main() -> Result<()> {
             // 2. Flip 1 bit in input (Sun mass)
             println!("Flipping 1 bit in initial conditions...");
             config.bodies[0].mass = Fixed::from_raw(config.bodies[0].mass.to_raw() ^ 1);
-            
+
             println!("Deriving Shadow Key...");
             let k2 = Kelvin::new(config).context("Failed to init shadow instance")?;
             let kp2 = k2.asymmetric_keypair();
@@ -163,18 +163,21 @@ fn main() -> Result<()> {
             println!("Target: Curve25519 Identity");
             println!("Total Bits: 256");
             println!("Bit Entropy (Base): {:.2} bits", set_bits as f32 / 256.0);
-            println!("Avalanche Effect: {} / 256 bits changed ({:.2}%)", 
-                diff_bits, (diff_bits as f32 / 256.0) * 100.0);
-            
+            println!(
+                "Avalanche Effect: {} / 256 bits changed ({:.2}%)",
+                diff_bits,
+                (diff_bits as f32 / 256.0) * 100.0
+            );
+
             if diff_bits > 110 && diff_bits < 146 {
                 println!("Result: PASS (Strong Avalanche Effect)");
             } else {
                 println!("Result: FAIL (Weak sensitivity to initial conditions)");
             }
-        }
+        },
         Commands::Benchmark => {
             run_benchmark()?;
-        }
+        },
     }
     Ok(())
 }
@@ -186,11 +189,13 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         "standard" => (5, 1_000_000),
         "paranoid" => (5, 10_000_000),
         "maximum" => (10, 100_000_000),
-        _ => anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level),
+        _ => {
+            anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level)
+        },
     };
 
     let mut bodies = Vec::with_capacity(n_bodies);
-    
+
     // Sun near center with non-zero jitter and variable mass
     // Mass varies in [0.75, 1.25] solar masses for additional entropy
     // while remaining safely bound (ejection threshold at M ≤ 0.5)
@@ -216,16 +221,15 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         ),
     ));
 
-
     // Add planets at stable orbits with full 3D randomization
     for i in 1..n_bodies {
         let radius = (i as i64 + 1) * 50;
         let mass = Fixed::from_raw(rng.gen_range(1 << 30..1 << 35));
-        
+
         // Uniform spherical sampling for position
         let theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
         let phi = (rng.gen_range(-1.0..1.0f64)).acos();
-        
+
         let x = (radius as f64) * phi.sin() * theta.cos();
         let y = (radius as f64) * phi.sin() * theta.sin();
         let z = (radius as f64) * phi.cos();
@@ -234,7 +238,7 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         let v_theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
         let v_phi = (rng.gen_range(-1.0..1.0f64)).acos();
         let v_mag = 1.0 / (radius as f64).sqrt() * 6.3;
-        
+
         let vx = v_mag * v_phi.sin() * v_theta.cos();
         let vy = v_mag * v_phi.sin() * v_theta.sin();
         let vz = v_mag * v_phi.cos();
@@ -257,25 +261,31 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
     OrbitalConfig::new(
         bodies,
         steps,
-        steps / 10, // reseed interval
+        steps / 10,               // reseed interval
         Fixed::from_raw(1 << 54), // dt = 1/1024
         Fixed::from_raw(1 << 48), // Large softening for stability
         kelvin::DEFAULT_G,
-    ).map_err(|e| anyhow::anyhow!(e))
+    )
+    .map_err(|e| anyhow::anyhow!(e))
 }
 
-fn process_file(config_path: &str, input_path: &str, output_path: &str, encrypt: bool) -> Result<()> {
+fn process_file(
+    config_path: &str,
+    input_path: &str,
+    output_path: &str,
+    encrypt: bool,
+) -> Result<()> {
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
-    
+
     println!("Initializing Kelvin (this may take a few seconds)...");
     let mut k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
     let _metadata = input_file.metadata()?;
-    
+
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
-    
+
     println!("Processing...");
     let mut buffer = vec![0u8; 64 * 1024]; // 64KB buffer
     let mut total_processed = 0u64;
@@ -284,18 +294,18 @@ fn process_file(config_path: &str, input_path: &str, output_path: &str, encrypt:
         if bytes_read == 0 {
             break;
         }
-        
+
         if encrypt {
             k.encrypt(&mut buffer[..bytes_read])?;
         } else {
             k.decrypt(&mut buffer[..bytes_read])?;
         }
-        
+
         output_file.write_all(&buffer[..bytes_read])?;
         total_processed += bytes_read as u64;
         if total_processed.is_multiple_of(1024 * 1024) {
-             print!(".");
-             let _ = std::io::stdout().flush();
+            print!(".");
+            let _ = std::io::stdout().flush();
         }
     }
 
@@ -306,7 +316,7 @@ fn process_file(config_path: &str, input_path: &str, output_path: &str, encrypt:
 fn run_benchmark() -> Result<()> {
     println!("Running Kelvin Benchmarks...");
     let levels = ["standard", "paranoid"];
-    
+
     for level in levels {
         println!("\nLevel: {}", level);
         let config = generate_config(level)?;
@@ -314,7 +324,7 @@ fn run_benchmark() -> Result<()> {
         let _ = Kelvin::new(config)?;
         let duration = start.elapsed();
         println!("  Setup Time: {:?}", duration);
-        
+
         // Throughput test
         let mut data = vec![0u8; 1024 * 1024]; // 1MB
         let mut k = Kelvin::new(generate_config(level)?)?;
@@ -323,7 +333,7 @@ fn run_benchmark() -> Result<()> {
         let duration = start.elapsed();
         println!("  Encryption Throughput (ChaCha20): {:.2} MB/s", 1.0 / duration.as_secs_f64());
     }
-    
+
     Ok(())
 }
 

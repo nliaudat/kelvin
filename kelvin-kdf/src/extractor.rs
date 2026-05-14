@@ -15,9 +15,9 @@
 //!   — Keccak sponge construction underlying SHA3-512.
 
 use alloc::vec::Vec;
-use sha3::{Digest, Sha3_512, Shake256};
-use sha3::digest::{ExtendableOutput, XofReader};
 use kelvin_core::OrbitalBody;
+use sha3::digest::{ExtendableOutput, XofReader};
+use sha3::{Digest, Sha3_512, Shake256};
 
 /// Feed all orbital state into a hasher (used by both SHA3-512 and SHAKE256).
 fn feed_orbital_state(
@@ -82,7 +82,6 @@ pub fn extract_seed(
     seed
 }
 
-
 /// Extract a seed of arbitrary length from the orbital state using SHAKE256 (XOF).
 ///
 /// SHAKE256 is an Extendable-Output Function that can produce a deterministic
@@ -128,11 +127,7 @@ mod tests {
 
     fn test_bodies() -> Vec<OrbitalBody> {
         vec![
-            OrbitalBody::new(
-                Fixed::ONE,
-                Vec3::ZERO,
-                Vec3::ZERO,
-            ),
+            OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
             OrbitalBody::new(
                 Fixed::from_raw(1 << 54),
                 Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
@@ -220,12 +215,10 @@ mod tests {
         let seed2 = extract_seed(&bodies2, 0, Fixed::ONE, Fixed::ONE, b"test");
 
         // Count differing bits
-        let diff_bits: u32 = seed1.iter().zip(seed2.iter())
-            .map(|(a, b)| (a ^ b).count_ones())
-            .sum();
+        let diff_bits: u32 =
+            seed1.iter().zip(seed2.iter()).map(|(a, b)| (a ^ b).count_ones()).sum();
 
         // Should have roughly half the bits different (avalanche effect)
         assert!(diff_bits > 200, "Too few differing bits: {}", diff_bits);
     }
-
 }

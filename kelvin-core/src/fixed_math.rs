@@ -107,11 +107,7 @@ impl Fixed {
 
         // Initial guess: use the value itself (good for values near 1.0)
         // For very small values, clamp to a minimum to avoid division by zero
-        let mut x = if self < Fixed::from_raw(1 << 8) {
-            Fixed::from_raw(1 << 8)
-        } else {
-            self
-        };
+        let mut x = if self < Fixed::from_raw(1 << 8) { Fixed::from_raw(1 << 8) } else { self };
 
         // Newton's method: x_{n+1} = (x_n + a/x_n) / 2
         // 20 iterations is more than enough for convergence
@@ -148,11 +144,7 @@ impl Fixed {
         let b = rhs.0;
         // (a * b) >> 64 with rounding
         let product = a.checked_mul(b)?;
-        let rounded = if product >= 0 {
-            product + (SCALE >> 1)
-        } else {
-            product - (SCALE >> 1)
-        };
+        let rounded = if product >= 0 { product + (SCALE >> 1) } else { product - (SCALE >> 1) };
         Some(Fixed(rounded >> 64))
     }
 
@@ -213,13 +205,10 @@ impl Mul for Fixed {
         let b = rhs.0;
         match a.checked_mul(b) {
             Some(product) => {
-                let rounded = if product >= 0 {
-                    product + (SCALE >> 1)
-                } else {
-                    product - (SCALE >> 1)
-                };
+                let rounded =
+                    if product >= 0 { product + (SCALE >> 1) } else { product - (SCALE >> 1) };
                 Fixed(rounded >> 64)
-            }
+            },
             None => {
                 // Fallback: split into high/low 64-bit halves
                 // a = a_hi * 2^64 + a_lo
@@ -245,7 +234,7 @@ impl Mul for Fixed {
                     .wrapping_add(lo_hi)
                     .wrapping_add((lo_lo >> 64) as i128);
                 Fixed(result)
-            }
+            },
         }
     }
 }
@@ -266,18 +255,18 @@ impl Div for Fixed {
         }
         let a = self.0;
         let b = rhs.0;
-        
+
         let sign = (a < 0) ^ (b < 0);
         let a_abs = a.unsigned_abs();
         let b_abs = b.unsigned_abs();
 
         let quotient = a_abs / b_abs;
         let mut rem = a_abs % b_abs;
-        
+
         // The result is (a_abs << 64) / b_abs.
         // We handle the integer part and fractional part in a single loop.
         let mut res = quotient;
-        
+
         for _ in 0..64 {
             let high_bit = (rem >> 127) & 1;
             rem <<= 1;
@@ -288,12 +277,8 @@ impl Div for Fixed {
             }
         }
 
-        let result = if sign {
-            -(res as i128)
-        } else {
-            res as i128
-        };
-        
+        let result = if sign { -(res as i128) } else { res as i128 };
+
         Fixed(result)
     }
 }
