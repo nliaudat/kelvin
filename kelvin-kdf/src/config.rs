@@ -289,7 +289,7 @@ impl OrbitalConfig {
 
         // 3. Check for initial ejection (body already on escape trajectory)
         for i in 0..self.bodies.len() {
-            if is_body_ejected(i, &self.bodies, self.g, self.softening, self.ejection_energy_threshold) {
+            if kelvin_core::is_body_ejected(i, &self.bodies, self.g, self.softening, self.ejection_energy_threshold) {
                 return Err(ConfigError::InitialEjection { body_index: i });
             }
         }
@@ -542,52 +542,6 @@ impl OrbitalConfig {
     }
 }
 
-/// Check whether a body is on an unbound (ejected) trajectory.
-///
-/// Computes the total energy of the body relative to the rest of the system:
-///
-///   E_i = 0.5 * m_i * v_i² - Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
-///
-/// where ε is the softening factor. The softened potential is used to remain
-/// consistent with the simulation integrator (see `compute_accelerations`).
-///
-/// If E_i >= threshold, the body is on a hyperbolic or parabolic trajectory.
-fn is_body_ejected(
-    body_index: usize,
-    bodies: &[OrbitalBody],
-    g: Fixed,
-    softening: Fixed,
-    ejection_energy_threshold: Fixed,
-) -> bool {
-    let n = bodies.len();
-    if body_index >= n {
-        return false;
-    }
-
-    let body = &bodies[body_index];
-
-    // Kinetic energy: 0.5 * m * v²
-    let kinetic = body.kinetic_energy();
-
-    // Potential energy: -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
-    // Uses softened potential to remain consistent with the simulation integrator.
-    let softening_sq = softening * softening;
-    let mut potential = Fixed::ZERO;
-    for (j, other) in bodies.iter().enumerate() {
-        if j == body_index {
-            continue;
-        }
-        let diff = other.position - body.position;
-        let dist_sq = diff.length_squared() + softening_sq;
-        let dist = dist_sq.sqrt();
-        if dist > Fixed::ZERO {
-            potential -= g * body.mass * other.mass / dist;
-        }
-    }
-
-    // Total energy >= threshold means unbound
-    kinetic + potential >= ejection_energy_threshold
-}
 
 
 /// Errors from configuration validation.
