@@ -31,6 +31,7 @@ use crate::traits::StreamCipher;
 use aead::generic_array::typenum::Unsigned;
 use aead::{AeadCore, AeadInPlace, KeyInit};
 use chacha20poly1305::ChaCha20Poly1305;
+use zeroize::Zeroize;
 
 /// ChaCha20Poly1305 authenticated stream cipher wrapper.
 ///
@@ -163,10 +164,9 @@ impl StreamCipher for ChaChaStream {
     fn zeroize_key_material(&mut self) {
         // Rekey with zeros to overwrite the internal cipher state
         let zero_key = [0u8; 32];
-        let zero_nonce = [0u8; 12];
         self.cipher = ChaCha20Poly1305::new_from_slice(&zero_key)
             .expect("ChaCha20Poly1305 key must be 32 bytes");
-        self.nonce = zero_nonce;
+        self.nonce.zeroize();
         self.position = 0;
     }
 }

@@ -117,7 +117,7 @@ impl Kelvin {
         )?;
 
         // Extract initial 2048-byte seed (using SHAKE256 XOF)
-        let seed_vec = extract_shake256(
+        let mut seed_vec = extract_shake256(
             &bodies,
             config.total_steps,
             config.g,
@@ -127,6 +127,7 @@ impl Kelvin {
         );
         let mut seed = [0u8; 2048];
         seed.copy_from_slice(&seed_vec);
+        seed_vec.zeroize();
 
         // Create key schedule
         let schedule =
@@ -239,10 +240,7 @@ impl Drop for Kelvin {
         // Zeroize the stream cipher key material
         self.stream.zeroize_key_material();
         // Zeroize the bodies (simulated orbital state)
-        for body in self.bodies.iter_mut() {
-            body.zeroize();
-        }
-        self.bodies.clear();
+        self.bodies.zeroize();
         // Zeroize bytes_processed counter
         self.bytes_processed.zeroize();
         // config and schedule are zeroized by their own Drop impls
