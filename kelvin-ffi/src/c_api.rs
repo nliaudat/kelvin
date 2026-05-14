@@ -57,7 +57,7 @@ pub unsafe extern "C" fn kelvin_new(
 
 /// Encrypt data in-place using AEAD.
 ///
-/// The buffer must have a total size of `len` bytes. The plaintext
+/// The buffer must have a total size of `len` bytes (minimum 16). The plaintext
 /// occupies the first `len - 16` bytes; the AEAD authentication tag
 /// (Poly1305 or GMAC) is written at `data[len-16..len]`.
 ///
@@ -83,6 +83,7 @@ pub unsafe extern "C" fn kelvin_encrypt(ctx: *mut KelvinCtx, data: *mut u8, len:
 /// Decrypt data in-place using AEAD.
 ///
 /// The buffer must contain ciphertext + 16-byte authentication tag.
+/// The buffer must have a total size of `len` bytes (minimum 16).
 /// The first `len - 16` bytes are the ciphertext; the last 16 bytes
 /// are the tag. On success, the first `len - 16` bytes contain the
 /// recovered plaintext.
