@@ -16,9 +16,10 @@
     border-radius: 8px;
     border: 1px solid #0f0;
     font-size: 14px;
-    pointer-events: none;
+    pointer-events: auto;
     z-index: 10;
-    min-width: 280px;
+    min-width: 238px;
+    max-width: 294px;
     text-shadow: 0 0 8px rgba(0,255,0,0.3);
   }
   #info h1 {
@@ -34,26 +35,81 @@
   }
   #info .label { color: #8f8; }
   #info .value { color: #0f0; font-family: 'Courier New', monospace; }
-  #key-display {
+
+  /* ─── Pipeline stages ──────────────────────────────────────────── */
+  .pipeline-title {
+    margin: 10px 0 6px 0;
+    font-size: 11px;
+    color: #8f8;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(0,255,0,0.2);
+    padding-bottom: 3px;
+  }
+  .pipeline-stage {
+    margin: 3px 0;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: rgba(0,255,0,0.04);
+    border-left: 2px solid;
+    cursor: help;
+    transition: background 0.2s;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pipeline-stage:hover {
+    background: rgba(0,255,0,0.12);
+  }
+  .pipeline-stage .stage-icon { font-size: 14px; }
+  .pipeline-stage .stage-name { color: #0f0; font-weight: bold; }
+  .pipeline-stage .stage-detail { color: #8f8; font-size: 11px; margin-left: auto; white-space: nowrap; }
+  .pipeline-stage .stage-arrow { color: #0f0; opacity: 0.4; font-size: 10px; }
+
+  /* ─── Pipeline sub-stage rows ──────────────────────────────────── */
+  .pipeline-sub {
+    margin: 1px 0 1px 16px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(0,255,0,0.02);
+    border-left: 1px dashed rgba(0,255,0,0.25);
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .pipeline-sub .sub-icon { color: #8f8; font-size: 10px; }
+  .pipeline-sub .sub-label { color: #8f8; }
+  .pipeline-sub .sub-value { color: #0f0; font-family: 'Courier New', monospace; margin-left: auto; font-size: 9px; word-break: break-all; max-width: 140px; text-align: right; }
+  .pipeline-sub .sub-otp { color: #f4f; font-size: 9px; }
+
+  /* ─── Tooltip ──────────────────────────────────────────────────── */
+  #pipeline-tooltip {
     position: absolute;
-    bottom: 30px;
+    bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
     color: #0f0;
-    background: rgba(0,0,0,0.85);
-    padding: 16px 32px;
+    background: rgba(0,0,0,0.92);
+    padding: 10px 18px;
     border-radius: 8px;
     border: 1px solid #0f0;
-    font-family: 'Courier New', monospace;
-    font-size: 18px;
-    letter-spacing: 2px;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    font-size: 13px;
     pointer-events: none;
-    z-index: 10;
+    z-index: 15;
     text-align: center;
-    max-width: 90vw;
-    word-break: break-all;
-    text-shadow: 0 0 8px rgba(0,255,0,0.3);
+    max-width: 600px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+    box-shadow: 0 0 20px rgba(0,255,0,0.15);
   }
+  #pipeline-tooltip.visible { opacity: 1; }
+  #pipeline-tooltip .tt-title { font-weight: bold; color: #0f0; margin-bottom: 2px; }
+  #pipeline-tooltip .tt-desc { color: #8f8; font-size: 12px; }
+  #pipeline-tooltip .tt-size { color: #ff8; font-size: 12px; margin-top: 2px; }
+
   #controls-hint {
     position: absolute;
     bottom: 100px;
@@ -219,10 +275,76 @@
   <div class="stat"><span class="label">Bodies:</span><span class="value" id="bodies-display">3</span></div>
   <div class="stat"><span class="label">G:</span><span class="value" id="g-display">39.478</span></div>
   <div class="stat"><span class="label">Energy:</span><span class="value" id="energy-display">0.000</span></div>
-  <div class="stat"><span class="label">Status:</span>
+
+  <div class="pipeline-title">🔑 KDF Pipeline — hover for details</div>
+
+  <!-- Raw orbital state (fed into SHAKE256) -->
+  <div class="pipeline-stage" style="border-color:#0f0;border-left-width:1px;background:rgba(0,255,0,0.02);cursor:default;"
+       data-tt-title="📡 Raw orbital state (all bodies)"
+       data-tt-desc="Instantaneous position, velocity, mass, and gravitational acceleration fed into SHAKE256 every step."
+       data-tt-size="7 × i128 per body = 1008 B total for 9 bodies">
+    <span class="stage-icon">📡</span>
+    <span class="stage-name" style="font-size:10px;">raw state</span>
+    <span class="stage-detail" style="font-size:9px;white-space:normal;text-align:right;" id="raw-state-box">waiting...</span>
+  </div>
+
+  <!-- Stage 1: Extract -->
+  <div class="pipeline-stage" style="border-color:#0f0;"
+       data-tt-title="① EXTRACT — SHAKE256 XOF"
+       data-tt-desc="Feeds orbital state (pos, vel, mass, acceleration) into SHAKE256 extendable-output function. Produces a 2048-byte entropy pool."
+       data-tt-size="Input: 9 bodies × 7× i128 = 1008 B → Output: 2048 B entropy pool">
+    <span class="stage-icon">🟢</span>
+    <span class="stage-name">Extract</span>
+    <span class="stage-detail">SHAKE256 → 2048 B</span>
+  </div>
+  <!-- Sub: SHAKE256 output demo -->
+  <div class="pipeline-sub">
+    <span class="sub-icon">⤷</span>
+    <span class="sub-label">SHAKE256 output</span>
+    <span class="sub-value" id="key-material-box">waiting...</span>
+  </div>
+
+  <!-- Stage 2: Expand -->
+  <div class="pipeline-stage" style="border-color:#48f;"
+       data-tt-title="② EXPAND — HKDF-SHA512"
+       data-tt-desc="Derives per-step encryption keys from the entropy pool using HKDF-SHA512. Each call produces a 32-byte ChaCha20 key + 12-byte nonce."
+       data-tt-size="Input: 2048 B pool → Output: 32 B key + 12 B nonce per step">
+    <span class="stage-icon">🔵</span>
+    <span class="stage-name">Expand</span>
+    <span class="stage-detail">HKDF-SHA512 → 32 B + 12 B</span>
+  </div>
+
+  <!-- Stage 3: Encrypt -->
+  <div class="pipeline-stage" style="border-color:#f4f;"
+       data-tt-title="③ ENCRYPT — ChaCha20 Stream Cipher"
+       data-tt-desc="ChaCha20 generates a keystream XORed with plaintext (one-time pad equivalent). Each 32-byte key encrypts up to ~256 GiB. Grover's quantum search reduces effective security to 128-bit."
+       data-tt-size="Key: 32 B | Nonce: 12 B | Limit: ~256 GiB per key | Grover: 128-bit">
+    <span class="stage-icon">🟣</span>
+    <span class="stage-name">Encrypt</span>
+    <span class="stage-detail">ChaCha20 (Grover 128-bit)</span>
+  </div>
+  <!-- Sub: one-time pad explanation -->
+  <div class="pipeline-sub">
+    <span class="sub-icon">⤷</span>
+    <span class="sub-label">ChaCha20 keystream</span>
+    <span class="sub-otp">⊕ plaintext ≡ <a href="https://en.wikipedia.org/wiki/One-time_pad" target="_blank" style="color:#f4f;text-decoration:underline dotted;">one-time pad</a></span>
+  </div>
+
+  <!-- Stage 4: Sign -->
+  <div class="pipeline-stage" style="border-color:#ff0;"
+       data-tt-title="④ SIGN — ML-DSA-65 (FIPS 204)"
+       data-tt-desc="Module-Lattice-Based Digital Signature Algorithm at NIST Level 3. Provides quantum-resistant asymmetric identity verification."
+       data-tt-size="Public key: ~1.3 KB | Signature: ~2.4 KB | Security: NIST L3 (Lattice)">
+    <span class="stage-icon">🟡</span>
+    <span class="stage-name">Sign</span>
+    <span class="stage-detail">ML-DSA-65 (NIST L3)</span>
+  </div>
+
+  <div class="stat" style="margin-top:6px;"><span class="label">Status:</span>
     <span class="value"><span id="status-dot" class="stable"></span><span id="status-text">SIMULATING</span></span>
   </div>
 </div>
+
 
 <div id="toolbar">
   <div class="toolbar-group">
@@ -246,10 +368,7 @@
   </div>
 </div>
 
-<div id="key-display">
-  <div style="font-size:11px;color:#8f8;margin-bottom:4px;">🔑 ORBITAL KEY MATERIAL DEMO (truncated 64B - every 1s)</div>
-  <span id="key-material">Waiting for key generation...</span>
-</div>
+<div id="pipeline-tooltip"></div>
 <div id="controls-hint">
   <div><span class="key">🖱</span> Drag to rotate</div>
   <div><span class="key">🔄</span> Scroll to zoom</div>
@@ -471,15 +590,25 @@ function totalEnergy(bodies, G) {
 }
 
 // ─── Key material generation (320 bytes = 640 hex chars) ──────────────────
-// Matches the Rust extract_seed_extended() which produces 5× SHA3-512 output.
+// Matches the Rust feed_orbital_state() which includes instantaneous
+// gravitational acceleration vectors alongside positions, velocities,
+// and masses in the SHA3-512 hash input.
 // Uses FNV-1a hash in counter mode to produce 320 bytes of key material.
 function hashState(bodies, step) {
+  // Compute instantaneous gravitational accelerations (matches Rust
+  // feed_orbital_state which feeds acc.x, acc.y, acc.z per body)
+  const accelerations = computeAccelerations(bodies, CONFIG.softening, CONFIG.G);
+
   // Build a deterministic string from the orbital state
   let data = '';
-  for (const b of bodies) {
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    const acc = accelerations[i];
     data += b.pos.map(v => v.toFixed(12)).join(',') + '|';
     data += b.vel.map(v => v.toFixed(12)).join(',') + '|';
     data += b.mass.toExponential(6) + '|';
+    // Instantaneous G force vector (acceleration) — matches Rust extractor
+    data += acc.map(v => v.toExponential(6)).join(',') + '|';
   }
   data += step;
 
@@ -499,9 +628,11 @@ function hashState(bodies, step) {
   for (let counter = 0; counter < 80; counter++) {
     const mix = data + ':' + counter + ':' + step;
     let h = fnv1a(mix);
-    // Second pass with body positions for avalanche
-    for (const b of bodies) {
-      for (const v of [...b.pos, ...b.vel]) {
+    // Second pass with body positions, velocities, and accelerations for avalanche
+    for (let i = 0; i < bodies.length; i++) {
+      const b = bodies[i];
+      const acc = accelerations[i];
+      for (const v of [...b.pos, ...b.vel, ...acc]) {
         h ^= (Math.floor(Math.abs(v * 1e9)) & 0xFFFFFFFF);
         h = Math.imul(h, 0x01000193);
       }
@@ -645,7 +776,7 @@ function buildBodies(newBodies) {
   bodies = newBodies;
   step = 0;
   currentKey = '';
-  document.getElementById('key-material').textContent = 'Waiting for key generation...';
+  document.getElementById('key-material-box').textContent = 'Waiting for key generation...';
 
   for (let i = 0; i < bodies.length; i++) {
     const b = bodies[i];
@@ -717,12 +848,43 @@ const gDisplay = document.getElementById('g-display');
 const energyDisplay = document.getElementById('energy-display');
 const statusDot = document.getElementById('status-dot');
 const statusText = document.getElementById('status-text');
-const keyMaterial = document.getElementById('key-material');
+const keyMaterialBox = document.getElementById('key-material-box');
+const rawStateBox = document.getElementById('raw-state-box');
+const pipelineTooltip = document.getElementById('pipeline-tooltip');
 const speedSlider = document.getElementById('speed-slider');
 const speedValue = document.getElementById('speed-value');
 const fileName = document.getElementById('file-name');
 const jsonFileInput = document.getElementById('json-file');
 const resetBtn = document.getElementById('reset-btn');
+
+// ─── Pipeline Tooltip (hover over KDF stages) ────────────────────────────
+const pipelineStages = document.querySelectorAll('.pipeline-stage');
+let tooltipTimer = null;
+
+function showTooltip(el) {
+  const title = el.dataset.ttTitle || '';
+  const desc = el.dataset.ttDesc || '';
+  const size = el.dataset.ttSize || '';
+  pipelineTooltip.innerHTML =
+    `<div class="tt-title">${title}</div>` +
+    `<div class="tt-desc">${desc}</div>` +
+    (size ? `<div class="tt-size">${size}</div>` : '');
+  pipelineTooltip.classList.add('visible');
+}
+
+function hideTooltip() {
+  pipelineTooltip.classList.remove('visible');
+}
+
+for (const stage of pipelineStages) {
+  stage.addEventListener('mouseenter', () => {
+    clearTimeout(tooltipTimer);
+    showTooltip(stage);
+  });
+  stage.addEventListener('mouseleave', () => {
+    tooltipTimer = setTimeout(hideTooltip, 200);
+  });
+}
 
 // ─── Speed Slider ─────────────────────────────────────────────────────────
 speedSlider.addEventListener('input', () => {
@@ -822,11 +984,23 @@ function animate() {
     stepDisplay.textContent = step.toLocaleString();
     energyDisplay.textContent = totalEnergy(bodies, currentG).toFixed(6);
 
-    // Update key material display every 1 second (throttled)
+    // Update key material display and raw orbital state every 1 second (throttled)
     const now = Date.now();
     if (now - lastKeyUpdate >= 1000) {
       lastKeyUpdate = now;
-      keyMaterial.textContent = currentKey.slice(0, 128);
+      keyMaterialBox.textContent = currentKey.slice(0, 64);
+
+      // Raw orbital state for body 1 (skip sun at index 0 — stationary)
+      if (bodies.length > 1) {
+        const b1 = bodies[1];
+        const accs = computeAccelerations(bodies, currentSoftening, currentG);
+        const a1 = accs[1];
+        rawStateBox.textContent =
+          `(${b1.pos[0].toFixed(2)},${b1.pos[1].toFixed(2)},${b1.pos[2].toFixed(2)}) ` +
+          `(${b1.vel[0].toFixed(2)},${b1.vel[1].toFixed(2)},${b1.vel[2].toFixed(2)}) ` +
+          `${b1.mass.toExponential(1)} ` +
+          `(${a1[0].toExponential(1)},${a1[1].toExponential(1)},${a1[2].toExponential(1)})`;
+      }
     }
 
     // ─── Stability Monitoring ──────────────────────────────────────────
