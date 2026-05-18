@@ -10,7 +10,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use kelvin::{Fixed, Kelvin, OrbitalBody, OrbitalConfig, Vec3};
+use kelvin::{Fixed, Kelvin, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3};
 use ml_kem::KeyExport;
 use rand::Rng;
 use std::fs;
@@ -105,8 +105,8 @@ fn main() -> Result<()> {
         Commands::Identify { config, all, ecc, kem } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
             let config = OrbitalConfig::from_json(&config_json)?;
-            let k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
-            let kp = k.asymmetric_keypair();
+            println!("Deriving keys from orbital configuration (this may take a moment)...");
+            let kp = OrbitalKeyPair::derive(&config).map_err(|e| anyhow::anyhow!("Key derivation failed: {:?}", e))?;
 
             let mut shown = false;
 
@@ -188,7 +188,11 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
     let (n_bodies, steps) = match level {
         "standard" => (5, 1_000_000),
         "paranoid" => (5, 10_000_000),
-        "maximum" => (10, 100_000_000),
+        "maximum" => {
+            eprintln!("Warning: 'maximum' level uses 10 bodies and 100,000,000 simulation steps.");
+            eprintln!("This will take significantly longer than 'standard' or 'paranoid'.");
+            (10, 100_000_000)
+        },
         _ => {
             anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level)
         },
@@ -315,7 +319,7 @@ fn process_file(
 
 fn run_benchmark() -> Result<()> {
     println!("Running Kelvin Benchmarks...");
-    let levels = ["standard", "paranoid"];
+    let levels = ["standard", "paranoid", "maximum"];
 
     for level in levels {
         println!("\nLevel: {}", level);

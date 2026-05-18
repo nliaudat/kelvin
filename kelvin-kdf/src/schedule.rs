@@ -64,15 +64,34 @@ pub struct KeySchedule {
     keys_generated: u64,
     /// Maximum keys before exhaustion.
     max_keys: u64,
+    /// Maximum safe bytes per key (configurable).
+    max_bytes_per_key: u64,
 }
+
 
 impl KeySchedule {
     /// Create a new key schedule.
     ///
     /// `seed` is the initial 2048-byte seed from SHAKE256 extraction.
+    /// `max_bytes_per_key` is the safe byte limit per key (default: 4 GiB).
     pub fn new(seed: [u8; 2048], total_steps: u64, reseed_interval: u64, safe_steps: u64) -> Self {
-        // Each reseed produces one key, and each key can encrypt ~256 GiB
-        // (ChaCha20 limit). We limit to safe_steps / reseed_interval keys.
+        Self::with_max_bytes_per_key(seed, total_steps, reseed_interval, safe_steps, 1 << 32)
+    }
+
+    /// Create a new key schedule with a configurable byte limit per key.
+    ///
+    /// `max_bytes_per_key` must be >= 1 and <= 256 GiB.
+    /// Larger values reduce key rotation frequency at the cost of
+    /// increased exposure if a key is compromised.
+    pub fn with_max_bytes_per_key(
+        seed: [u8; 2048],
+        total_steps: u64,
+        reseed_interval: u64,
+        safe_steps: u64,
+        max_bytes_per_key: u64,
+    ) -> Self {
+        // Each reseed produces one key, and each key can encrypt max_bytes_per_key bytes.
+        // We limit to safe_steps / reseed_interval keys.
         let max_keys = if reseed_interval > 0 {
             safe_steps.checked_div(reseed_interval).map(|v| v.max(1)).unwrap_or(1)
         } else {
@@ -87,8 +106,10 @@ impl KeySchedule {
             state: ScheduleState::Active,
             keys_generated: 0,
             max_keys,
+            max_bytes_per_key,
         }
     }
+
 
     /// Get the next key and nonce using HKDF-SHA512.
     ///
@@ -160,17 +181,16 @@ impl KeySchedule {
         self.keys_generated
     }
 
-    /// Get the remaining safe bytes (each key can encrypt ~256 GiB).
-    ///
-    /// This is a conservative estimate based on remaining keys.
+    /// Get the remaining safe bytes based on remaining keys and the
+    /// configured `max_bytes_per_key` limit.
     pub fn remaining_bytes(&self) -> u64 {
         if self.state == ScheduleState::Exhausted {
             return 0;
         }
         let remaining_keys = self.max_keys.saturating_sub(self.keys_generated);
-        // Each key can safely encrypt 2^32 bytes (4 GiB) — conservative
-        remaining_keys.saturating_mul(1 << 32)
+        remaining_keys.saturating_mul(self.max_bytes_per_key)
     }
+
 
     /// Reset the schedule with a new seed.
     pub fn reset(&mut self, seed: [u8; 2048]) {
@@ -190,7 +210,9 @@ impl Drop for KeySchedule {
         self.safe_steps.zeroize();
         self.keys_generated.zeroize();
         self.max_keys.zeroize();
+        self.max_bytes_per_key.zeroize();
     }
+
 }
 
 #[cfg(test)]

@@ -20,8 +20,10 @@ use zeroize::Zeroize;
 ///
 /// Layout: min_separation(16) + ejection_energy_threshold(16) + monitor_interval(8)
 ///         + min_bodies(4) + max_bodies(4) + min_dt(16) + max_dt(16)
-///         + min_g(16) + max_g(16) = 112 bytes
-const BINARY_EXTRA_SIZE: usize = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16;
+///         + min_g(16) + max_g(16) + expansion_factor(8) + max_bytes_per_key(8)
+///         = 128 bytes
+const BINARY_EXTRA_SIZE: usize = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16 + 8 + 8;
+
 
 /// Orbital configuration — the shared secret.
 ///
@@ -80,7 +82,26 @@ pub struct OrbitalConfig {
     /// Maximum allowed gravitational constant.
     /// Default: 1000.0.
     pub max_g: Fixed,
+
+    // ── Key schedule expansion ──
+    /// Multiplier for the virtual step budget (safe_steps).
+    ///
+    /// Each key schedule reseed consumes `reseed_interval` virtual steps.
+    /// The total virtual budget is `min_chaos_steps × expansion_factor`.
+    /// Default: 1 (no expansion). Max: 10,000.
+    ///
+    /// Cryptographically safe: HKDF-SHA512 can derive millions of keys
+    /// from a single 2048-byte seed. The expansion factor only affects
+    /// the exhaustion limit, not the key derivation itself.
+    pub expansion_factor: u64,
+    /// Maximum safe bytes per key before automatic rotation.
+    ///
+    /// Default: 4 GiB (1 << 32). Max: 256 GiB (RFC 8439 ChaCha20 limit).
+    /// Larger values reduce key rotation frequency at the cost of
+    /// increased exposure if a key is compromised.
+    pub max_bytes_per_key: u64,
 }
+
 
 impl OrbitalConfig {
     /// Create a new orbital configuration.
@@ -136,6 +157,40 @@ impl OrbitalConfig {
         min_g: Fixed,
         max_g: Fixed,
     ) -> Result<Self, ConfigError> {
+        OrbitalConfig::new_full_ext(
+            bodies, total_steps, reseed_interval, dt, softening, g,
+            min_separation, ejection_energy_threshold, monitor_interval,
+            min_bodies, max_bodies, min_dt, max_dt, min_g, max_g,
+            1,       // default expansion_factor
+            1 << 32, // default max_bytes_per_key (4 GiB)
+        )
+    }
+
+    /// Create a new orbital configuration with all parameters including
+    /// key schedule expansion settings.
+    ///
+    /// `expansion_factor` multiplies the virtual step budget (default: 1, max: 10,000).
+    /// `max_bytes_per_key` sets the safe byte limit per key (default: 4 GiB, max: 256 GiB).
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_full_ext(
+        bodies: Vec<OrbitalBody>,
+        total_steps: u64,
+        reseed_interval: u64,
+        dt: Fixed,
+        softening: Fixed,
+        g: Fixed,
+        min_separation: Fixed,
+        ejection_energy_threshold: Fixed,
+        monitor_interval: u64,
+        min_bodies: usize,
+        max_bodies: usize,
+        min_dt: Fixed,
+        max_dt: Fixed,
+        min_g: Fixed,
+        max_g: Fixed,
+        expansion_factor: u64,
+        max_bytes_per_key: u64,
+    ) -> Result<Self, ConfigError> {
         let config = OrbitalConfig {
             bodies,
             total_steps,
@@ -152,10 +207,13 @@ impl OrbitalConfig {
             max_dt,
             min_g,
             max_g,
+            expansion_factor,
+            max_bytes_per_key,
         };
         config.validate()?;
         Ok(config)
     }
+
 
     /// Validate the configuration.
     ///
@@ -256,6 +314,23 @@ impl OrbitalConfig {
             return Err(ConfigError::InvalidMonitorInterval);
         }
 
+        // ── Key schedule expansion ──
+        if self.expansion_factor < 1 {
+            return Err(ConfigError::InvalidExpansionFactor(self.expansion_factor));
+        }
+        if self.expansion_factor > 10_000 {
+            return Err(ConfigError::InvalidExpansionFactor(self.expansion_factor));
+        }
+        if self.max_bytes_per_key < 1 {
+            return Err(ConfigError::InvalidMaxBytesPerKey(self.max_bytes_per_key));
+        }
+        // Max 256 GiB (RFC 8439 ChaCha20 limit: 2^32 - 1 blocks × 64 bytes)
+        let max_allowed_bytes: u64 = (1u64 << 32).saturating_sub(1) * 64;
+        if self.max_bytes_per_key > max_allowed_bytes {
+            return Err(ConfigError::InvalidMaxBytesPerKey(self.max_bytes_per_key));
+        }
+
+
         // ── Bodyguard: reject bad systems at creation time ──
 
         // 1. Check for identical positions (zero distance)
@@ -317,6 +392,7 @@ impl OrbitalConfig {
     ///         [min_separation: i128][ejection_energy_threshold: i128]
     ///         [monitor_interval: u64][min_bodies: u32][max_bodies: u32]
     ///         [min_dt: i128][max_dt: i128][min_g: i128][max_g: i128]
+    ///         [expansion_factor: u64][max_bytes_per_key: u64]
     pub fn to_binary(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(
             4 + self.bodies.len() * 112 + 8 + 8 + 16 + 16 + 16 + BINARY_EXTRA_SIZE,
@@ -356,8 +432,13 @@ impl OrbitalConfig {
         buf.extend_from_slice(&self.min_g.to_raw().to_le_bytes());
         buf.extend_from_slice(&self.max_g.to_raw().to_le_bytes());
 
+        // Key schedule expansion
+        buf.extend_from_slice(&self.expansion_factor.to_le_bytes());
+        buf.extend_from_slice(&self.max_bytes_per_key.to_le_bytes());
+
         buf
     }
+
 
     /// Deserialize from binary format.
     ///
@@ -538,6 +619,21 @@ impl OrbitalConfig {
         ));
         offset += 16;
 
+        // Key schedule expansion
+        let expansion_factor = u64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .map_err(|_| ConfigError::InvalidBinary("expansion_factor read failed".into()))?,
+        );
+        offset += 8;
+
+        let max_bytes_per_key = u64::from_le_bytes(
+            data[offset..offset + 8]
+                .try_into()
+                .map_err(|_| ConfigError::InvalidBinary("max_bytes_per_key read failed".into()))?,
+        );
+        offset += 8;
+
         // Check for trailing bytes — reject malformed data
         if offset != data.len() {
             return Err(ConfigError::InvalidBinary(format!(
@@ -563,9 +659,12 @@ impl OrbitalConfig {
             max_dt,
             min_g,
             max_g,
+            expansion_factor,
+            max_bytes_per_key,
         };
         config.validate()?;
         Ok(config)
+
     }
 }
 
@@ -590,7 +689,11 @@ impl Drop for OrbitalConfig {
         self.max_dt.zeroize();
         self.min_g.zeroize();
         self.max_g.zeroize();
+        // Zeroize key schedule expansion
+        self.expansion_factor.zeroize();
+        self.max_bytes_per_key.zeroize();
     }
+
 }
 
 /// Errors from configuration validation.
@@ -700,7 +803,16 @@ pub enum ConfigError {
     #[error("monitor_interval must be > 0")]
     InvalidMonitorInterval,
 
+    // ── Key schedule expansion errors ──
+    /// Expansion factor must be >= 1 and <= 10,000.
+    #[error("expansion_factor must be >= 1 and <= 10,000, got {0}")]
+    InvalidExpansionFactor(u64),
+    /// Max bytes per key must be >= 1 and <= 256 GiB.
+    #[error("max_bytes_per_key must be >= 1 and <= 256 GiB, got {0}")]
+    InvalidMaxBytesPerKey(u64),
+
     // ── Bodyguard errors ──
+
     /// Two bodies have identical positions (zero distance).
     #[error("bodies {body_i} and {body_j} have identical positions")]
     IdenticalPositions {
@@ -733,7 +845,8 @@ pub enum ConfigError {
 impl serde::Serialize for OrbitalConfig {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut state = serializer.serialize_struct("OrbitalConfig", 15)?;
+        let mut state = serializer.serialize_struct("OrbitalConfig", 17)?;
+
         state.serialize_field("bodies", &self.bodies)?;
         state.serialize_field("total_steps", &self.total_steps)?;
         state.serialize_field("reseed_interval", &self.reseed_interval)?;
@@ -752,7 +865,10 @@ impl serde::Serialize for OrbitalConfig {
         state.serialize_field("max_dt", &self.max_dt.to_raw())?;
         state.serialize_field("min_g", &self.min_g.to_raw())?;
         state.serialize_field("max_g", &self.max_g.to_raw())?;
+        state.serialize_field("expansion_factor", &self.expansion_factor)?;
+        state.serialize_field("max_bytes_per_key", &self.max_bytes_per_key)?;
         state.end()
+
     }
 }
 
@@ -779,7 +895,10 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
             max_dt_raw: Option<i128>,
             min_g_raw: Option<i128>,
             max_g_raw: Option<i128>,
+            expansion_factor: Option<u64>,
+            max_bytes_per_key: Option<u64>,
         }
+
 
         struct ConfigVisitor;
 
@@ -811,9 +930,12 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                         "max_dt" => fields.max_dt_raw = Some(map.next_value()?),
                         "min_g" => fields.min_g_raw = Some(map.next_value()?),
                         "max_g" => fields.max_g_raw = Some(map.next_value()?),
+                        "expansion_factor" => fields.expansion_factor = Some(map.next_value()?),
+                        "max_bytes_per_key" => fields.max_bytes_per_key = Some(map.next_value()?),
                         _ => {
                             let _: serde_json::Value = map.next_value()?;
                         },
+
                     }
                 }
 
@@ -848,7 +970,11 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                 let max_g =
                     Fixed::from_raw(fields.max_g_raw.unwrap_or(Fixed::from_int(1000).to_raw()));
 
-                OrbitalConfig::new_full(
+                // Key schedule expansion (optional, use defaults)
+                let expansion_factor = fields.expansion_factor.unwrap_or(1);
+                let max_bytes_per_key = fields.max_bytes_per_key.unwrap_or(1 << 32);
+
+                OrbitalConfig::new_full_ext(
                     bodies,
                     total_steps,
                     reseed_interval,
@@ -864,8 +990,11 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                     max_dt,
                     min_g,
                     max_g,
+                    expansion_factor,
+                    max_bytes_per_key,
                 )
                 .map_err(de::Error::custom)
+
             }
         }
 
@@ -1242,7 +1371,80 @@ mod tests {
         assert_eq!(config.max_dt.to_raw(), restored.max_dt.to_raw());
         assert_eq!(config.min_g.to_raw(), restored.min_g.to_raw());
         assert_eq!(config.max_g.to_raw(), restored.max_g.to_raw());
+        assert_eq!(config.expansion_factor, restored.expansion_factor);
+        assert_eq!(config.max_bytes_per_key, restored.max_bytes_per_key);
     }
+
+    #[test]
+    fn test_expansion_factor_default() {
+        let config = valid_config();
+        assert_eq!(config.expansion_factor, 1);
+    }
+
+    #[test]
+    fn test_max_bytes_per_key_default() {
+        let config = valid_config();
+        assert_eq!(config.max_bytes_per_key, 1 << 32);
+    }
+
+    #[test]
+    fn test_expansion_factor_validation() {
+        let config = valid_config();
+        let result = OrbitalConfig::new_full_ext(
+            config.bodies.clone(),
+            config.total_steps,
+            config.reseed_interval,
+            config.dt,
+            config.softening,
+            config.g,
+            config.min_separation,
+            config.ejection_energy_threshold,
+            config.monitor_interval,
+            config.min_bodies,
+            config.max_bodies,
+            config.min_dt,
+            config.max_dt,
+            config.min_g,
+            config.max_g,
+            0, // invalid: < 1
+            config.max_bytes_per_key,
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InvalidExpansionFactor(0) => {},
+            other => panic!("expected InvalidExpansionFactor(0), got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_max_bytes_per_key_validation() {
+        let config = valid_config();
+        let result = OrbitalConfig::new_full_ext(
+            config.bodies.clone(),
+            config.total_steps,
+            config.reseed_interval,
+            config.dt,
+            config.softening,
+            config.g,
+            config.min_separation,
+            config.ejection_energy_threshold,
+            config.monitor_interval,
+            config.min_bodies,
+            config.max_bodies,
+            config.min_dt,
+            config.max_dt,
+            config.min_g,
+            config.max_g,
+            1,
+            0, // invalid: < 1
+        );
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            ConfigError::InvalidMaxBytesPerKey(0) => {},
+            other => panic!("expected InvalidMaxBytesPerKey(0), got: {:?}", other),
+        }
+    }
+
 
     #[cfg(feature = "serde")]
     #[test]

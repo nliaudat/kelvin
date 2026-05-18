@@ -118,6 +118,18 @@ println!("ML-DSA-65:  {:x?}", kp.dsa_public.to_bytes());
 
 ## 4. Security Recommendations
 
+### Security Level Recommendations
+
+Kelvin provides three security levels that control the number of bodies and simulation steps:
+
+| Level | Bodies | Steps | Use Case |
+|-------|--------|-------|----------|
+| `standard` | 5 | 1,000,000 | General purpose — fast setup, strong chaos |
+| `paranoid` | 5 | 10,000,000 | Sensitive data — deeper simulation, higher entropy |
+| `maximum` | 10 | 100,000,000 | **Highest security** — maximum bodies and steps for strongest entropy |
+
+**Recommendation:** Use `standard` for everyday encryption, `paranoid` for sensitive data, and `maximum` for the strongest possible security (note: `maximum` takes significantly longer to generate).
+
 ### Chaotic Regime Enforcement
 Kelvin will refuse to initialize if the `total_steps` requested in the configuration are less than the **Lyapunov Horizon**.
 - **Always use `keygen`** to create configurations, as it selects parameters that reach the chaotic regime within the requested steps.

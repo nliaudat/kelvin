@@ -59,14 +59,27 @@ impl AesGcmStream {
     /// Create a new AES-256-GCM authenticated stream cipher.
     ///
     /// `key` must be 32 bytes, `nonce` must be 12 bytes (standard GCM IV).
+    /// Uses a conservative 4 GiB limit per key.
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
+        Self::with_max_bytes(key, nonce, 1 << 32)
+    }
+
+    /// Create a new AES-256-GCM stream cipher with a configurable byte limit.
+    ///
+    /// `max_bytes` must be >= 1 and <= 256 GiB (NIST SP 800-38D limit).
+    /// Larger values reduce key rotation frequency at the cost of
+    /// increased exposure if a key is compromised.
+    pub fn with_max_bytes(key: [u8; 32], nonce: [u8; 12], max_bytes: u64) -> Self {
         let cipher = Aes256Gcm::new_from_slice(&key).expect("AES-256-GCM key must be 32 bytes");
 
-        // Conservative 4 GiB limit per key
-        let max_bytes = 1 << 32;
+        // AES-GCM max: 2^32 - 1 invocations per key (NIST SP 800-38D, Section 8.3)
+        // At 16-byte minimum messages, this is ~64 GiB. We cap at 256 GiB for consistency.
+        let max_allowed = ((1u64 << 32) - 1) * 64;
+        let max_bytes = max_bytes.min(max_allowed).max(1);
 
         AesGcmStream { cipher, nonce, position: 0, max_bytes }
     }
+
 
     /// Rekey the cipher with a new key and nonce.
     ///

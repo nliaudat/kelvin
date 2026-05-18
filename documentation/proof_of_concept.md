@@ -175,7 +175,7 @@ The KDF pipeline operates in two distinct time domains:
 │                   safe=73)                           │
 │  ↓ max_keys = 7                                      │
 │  ↓ Each next_key() increments step by 10             │
-│  ↓ Exhausted at step 70 (or 73 if interval divides)  │
+│  ↓ Exhausted at step 70 (7 keys × 10; safe_steps=73)  │
 │  ↓ Each key provides 4 GiB of safe encryption        │
 └─────────────────────────────────────────────────────┘
 ```
@@ -187,11 +187,11 @@ All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at 
 
 ## 5. Performance Benchmarks
 
-| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
-|-----------|-------------------------------|-------------------------------|
-| Setup + Keygen (CLI) | ~1.1s | ~12.5s |
-| ML-DSA Signature | ~2ms | ~2ms |
-| ML-KEM Encapsulation | ~1ms | ~1ms |
+| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) | Maximum (10 bodies, 100M steps) |
+|-----------|-------------------------------|-------------------------------|---------------------------------|
+| Setup + Keygen (CLI) | ~1.1s | ~12.5s | ~several minutes |
+| ML-DSA Signature | ~2ms | ~2ms | ~2ms |
+| ML-KEM Encapsulation | ~1ms | ~1ms | ~1ms |
 
 ---
 

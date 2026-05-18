@@ -282,7 +282,7 @@
   <div class="pipeline-stage" style="border-color:#0f0;border-left-width:1px;background:rgba(0,255,0,0.02);cursor:default;"
        data-tt-title="📡 Raw orbital state (all bodies)"
        data-tt-desc="Instantaneous position, velocity, mass, and gravitational acceleration fed into SHAKE256 every step."
-       data-tt-size="7 × i128 per body = 1008 B total for 9 bodies">
+       data-tt-size="10 × i128 per body = 1440 B total for 9 bodies">
     <span class="stage-icon">📡</span>
     <span class="stage-name" style="font-size:10px;">raw state</span>
     <span class="stage-detail" style="font-size:9px;white-space:normal;text-align:right;" id="raw-state-box">waiting...</span>
@@ -292,7 +292,7 @@
   <div class="pipeline-stage" style="border-color:#0f0;"
        data-tt-title="① EXTRACT — SHAKE256 XOF"
        data-tt-desc="Feeds orbital state (pos, vel, mass, acceleration) into SHAKE256 extendable-output function. Produces a 2048-byte entropy pool."
-       data-tt-size="Input: 9 bodies × 7× i128 = 1008 B → Output: 2048 B entropy pool">
+       data-tt-size="Input: 9 bodies × 10 × i128 = 1440 B → Output: 2048 B entropy pool">
     <span class="stage-icon">🟢</span>
     <span class="stage-name">Extract</span>
     <span class="stage-detail">SHAKE256 → 2048 B</span>
@@ -318,7 +318,7 @@
   <div class="pipeline-stage" style="border-color:#f4f;"
        data-tt-title="③ ENCRYPT — ChaCha20 Stream Cipher"
        data-tt-desc="ChaCha20 generates a keystream XORed with plaintext (one-time pad equivalent). Each 32-byte key encrypts up to ~256 GiB. Grover's quantum search reduces effective security to 128-bit."
-       data-tt-size="Key: 32 B | Nonce: 12 B | Limit: ~256 GiB per key | Grover: 128-bit">
+       data-tt-size="Key: 32 B | Nonce: 12 B | Safe budget: ~4 GiB per key (ChaCha20 max: 256 GiB) | Grover: 128-bit">
     <span class="stage-icon">🟣</span>
     <span class="stage-name">Encrypt</span>
     <span class="stage-detail">ChaCha20 (Grover 128-bit)</span>
@@ -597,7 +597,7 @@ function totalEnergy(bodies, G) {
 function hashState(bodies, step) {
   // Compute instantaneous gravitational accelerations (matches Rust
   // feed_orbital_state which feeds acc.x, acc.y, acc.z per body)
-  const accelerations = computeAccelerations(bodies, CONFIG.softening, CONFIG.G);
+  const accelerations = computeAccelerations(bodies, currentSoftening, currentG);
 
   // Build a deterministic string from the orbital state
   let data = '';
@@ -629,10 +629,19 @@ function hashState(bodies, step) {
     const mix = data + ':' + counter + ':' + step;
     let h = fnv1a(mix);
     // Second pass with body positions, velocities, and accelerations for avalanche
+    // Iterate directly to avoid GC overhead from spread operator in hot loop
     for (let i = 0; i < bodies.length; i++) {
       const b = bodies[i];
       const acc = accelerations[i];
-      for (const v of [...b.pos, ...b.vel, ...acc]) {
+      for (const v of b.pos) {
+        h ^= (Math.floor(Math.abs(v * 1e9)) & 0xFFFFFFFF);
+        h = Math.imul(h, 0x01000193);
+      }
+      for (const v of b.vel) {
+        h ^= (Math.floor(Math.abs(v * 1e9)) & 0xFFFFFFFF);
+        h = Math.imul(h, 0x01000193);
+      }
+      for (const v of acc) {
         h ^= (Math.floor(Math.abs(v * 1e9)) & 0xFFFFFFFF);
         h = Math.imul(h, 0x01000193);
       }

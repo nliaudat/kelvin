@@ -129,11 +129,23 @@ impl Kelvin {
         seed.copy_from_slice(&seed_vec);
         seed_vec.zeroize();
 
-        // Create key schedule
-        let schedule =
-            KeySchedule::new(seed, config.total_steps, config.reseed_interval, result.min_chaos_steps);
+        // Apply expansion factor to safe_steps
+        let safe_steps = result
+            .min_chaos_steps
+            .saturating_mul(config.expansion_factor.max(1));
 
-        Ok(InitState { config, bodies, schedule, safe_steps: result.min_chaos_steps })
+        // Create key schedule with configurable byte limit per key
+        let schedule = KeySchedule::with_max_bytes_per_key(
+            seed,
+            config.total_steps,
+            config.reseed_interval,
+            safe_steps,
+            config.max_bytes_per_key,
+        );
+
+
+        Ok(InitState { config, bodies, schedule, safe_steps })
+
     }
 
     /// Create a new Kelvin instance from a validated configuration.
@@ -146,8 +158,10 @@ impl Kelvin {
         // Get first key
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
 
-        // Create stream cipher (nonce is already [u8; 12])
-        let stream = Box::new(ChaChaStream::new(key, nonce));
+        // Create stream cipher with configurable byte limit
+        let stream = Box::new(ChaChaStream::with_max_bytes(
+            key, nonce, state.config.max_bytes_per_key,
+        ));
 
         Ok(Kelvin {
             config: state.config,
@@ -156,6 +170,7 @@ impl Kelvin {
             stream,
             bytes_processed: 0,
         })
+
     }
 
     /// Create a new Kelvin instance using the hardware-accelerated AES-256-GCM fallback.
@@ -168,8 +183,11 @@ impl Kelvin {
         // Get first key
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
 
-        // Create AES-256-GCM stream cipher (nonce is already [u8; 12])
-        let stream = Box::new(AesGcmStream::new(key, nonce));
+        // Create AES-256-GCM stream cipher with configurable byte limit
+        let stream = Box::new(AesGcmStream::with_max_bytes(
+            key, nonce, state.config.max_bytes_per_key,
+        ));
+
 
         Ok(Kelvin {
             config: state.config,
