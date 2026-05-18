@@ -94,10 +94,10 @@ impl Kelvin {
             LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
         let result = lyapunov.estimate(1000, config.total_steps)?;
 
-        if config.total_steps < result.safe_steps {
+        if config.total_steps < result.min_chaos_steps {
             return Err(KelvinError::InsufficientChaos {
                 requested: config.total_steps,
-                horizon: result.safe_steps,
+                horizon: result.min_chaos_steps,
             });
         }
 
@@ -131,9 +131,9 @@ impl Kelvin {
 
         // Create key schedule
         let schedule =
-            KeySchedule::new(seed, config.total_steps, config.reseed_interval, result.safe_steps);
+            KeySchedule::new(seed, config.total_steps, config.reseed_interval, result.min_chaos_steps);
 
-        Ok(InitState { config, bodies, schedule, safe_steps: result.safe_steps })
+        Ok(InitState { config, bodies, schedule, safe_steps: result.min_chaos_steps })
     }
 
     /// Create a new Kelvin instance from a validated configuration.

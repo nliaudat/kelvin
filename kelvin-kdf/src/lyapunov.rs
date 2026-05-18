@@ -38,12 +38,35 @@ pub enum LyapunovConfidence {
 }
 
 /// Result of Lyapunov time estimation.
+///
+/// ## Understanding the fields
+///
+/// - `lyapunov_steps`: The estimated Lyapunov time in simulation steps.
+///   This is the timescale over which nearby trajectories diverge by e-fold.
+///   Beyond this horizon, the system is in the chaotic regime.
+///
+/// - `min_chaos_steps`: The **minimum** number of simulation steps required
+///   to reach the chaotic regime. This is `lyapunov_steps / margin_factor`,
+///   where `margin_factor` is dynamically computed (base 10, increased if
+///   shadow orbits disagree). The config's `total_steps` must be >= this
+///   value, otherwise the simulation hasn't entered the chaotic regime.
+///
+///   ⚠️ **Dual role**: This value is used as a **lower bound** in the init
+///   check (`total_steps >= min_chaos_steps`), but also passed to
+///   `KeySchedule` as an **upper bound** on virtual step consumption.
+///   See `KeySchedule` docs for details.
 #[derive(Clone, Debug)]
 pub struct LyapunovResult {
     /// Estimated Lyapunov time in simulation steps.
     pub lyapunov_steps: u64,
-    /// Maximum safe steps (typically Lyapunov_steps / 10).
-    pub safe_steps: u64,
+    /// Minimum simulation steps needed to reach the chaotic regime.
+    /// Config's total_steps must be >= this value.
+    ///
+    /// ⚠️ **Dual role**: This value is used as a **lower bound** in the init
+    /// check (`total_steps >= min_chaos_steps`), but also passed to
+    /// `KeySchedule` as an **upper bound** on virtual step consumption.
+    /// See `KeySchedule` docs for details.
+    pub min_chaos_steps: u64,
     /// Confidence level.
     pub confidence: LyapunovConfidence,
     /// Number of shadow orbits used.
@@ -87,7 +110,7 @@ impl<'a> LyapunovEstimator<'a> {
     /// `shadow_steps` is the number of steps to run each shadow orbit.
     /// `max_steps` is the maximum number of steps to consider.
     ///
-    /// Returns the estimated Lyapunov time and safe steps.
+    /// Returns the estimated Lyapunov time and minimum chaos steps.
     pub fn estimate(
         &self,
         shadow_steps: u64,
@@ -149,7 +172,7 @@ impl<'a> LyapunovEstimator<'a> {
             // No detectable divergence — system is stable
             return Ok(LyapunovResult {
                 lyapunov_steps: u64::MAX,
-                safe_steps: u64::MAX,
+                min_chaos_steps: u64::MAX,
                 confidence: LyapunovConfidence::Low,
                 shadow_count: divergences.len() as u32,
             });
@@ -225,8 +248,10 @@ impl<'a> LyapunovEstimator<'a> {
             10
         };
 
-        // Safe steps = Lyapunov time / dynamic_margin_factor
-        let safe_steps = (lyapunov_time_steps / margin_factor).max(1);
+        // min_chaos_steps = Lyapunov time / dynamic_margin_factor
+        // This is the minimum number of simulation steps needed to reach
+        // the chaotic regime. Config's total_steps must be >= this value.
+        let min_chaos_steps = (lyapunov_time_steps / margin_factor).max(1);
 
         // Determine confidence
         let confidence = if shadow_steps >= 10000 {
@@ -239,7 +264,7 @@ impl<'a> LyapunovEstimator<'a> {
 
         Ok(LyapunovResult {
             lyapunov_steps: lyapunov_time_steps,
-            safe_steps,
+            min_chaos_steps,
             confidence,
             shadow_count: divergences.len() as u32,
         })
@@ -307,8 +332,8 @@ mod tests {
         );
         let result = estimator.estimate(100, 10000).unwrap();
         assert!(result.lyapunov_steps > 0);
-        assert!(result.safe_steps > 0);
-        assert!(result.safe_steps <= result.lyapunov_steps);
+        assert!(result.min_chaos_steps > 0);
+        assert!(result.min_chaos_steps <= result.lyapunov_steps);
         assert!(result.shadow_count > 0);
     }
 

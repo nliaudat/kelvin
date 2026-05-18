@@ -124,10 +124,87 @@ Kelvin will refuse to initialize if the `total_steps` requested in the configura
 - If you manually edit a JSON config, ensure the simulation time is long enough to fully "scramble" the state.
 
 ### Large Files and Reseeding
-Kelvin automatically reseeds the keystream by advancing the orbital simulation. 
+Kelvin automatically reseeds the keystream by advancing through the **key schedule's virtual step counter** (not by re-running the simulation).
 - Large files (GBs) will trigger multiple reseeding events.
-- If the simulation time is exhausted, the library will return a `SeedExhausted` error.
+- If the key schedule is exhausted, the library will return a `SeedExhausted` error.
+- Each key can safely encrypt ~4 GiB of data. The total safe encryption capacity is `max_keys × 4 GiB`.
 
 ### Integrity & AEAD
 > [!CAUTION]
 > Kelvin is a **stream cipher**, not an AEAD. It does not provide built-in message authentication. For production use, wrap the output in a MAC (like HMAC-SHA256) to prevent tampering.
+
+---
+
+## 5. Understanding Time Evolution
+
+Kelvin's KDF pipeline operates in two distinct time domains. Understanding the difference is critical for correct usage.
+
+### 5.1 Real Time (Orbital Simulation)
+
+The **real simulation** runs once during `Kelvin::new()`:
+
+```
+OrbitalConfig → simulate_with_monitoring(bodies, total_steps)
+                ↓
+                Final orbital state (positions, velocities, forces)
+                ↓
+                extract_seed(state) → 2048-byte entropy pool
+```
+
+- Runs for `config.total_steps` iterations of Verlet integration
+- Monitored for stability (ejections, collapses)
+- The Lyapunov estimator verifies the system has entered the chaotic regime
+- **This simulation runs exactly once** — it is never re-run during encryption
+
+### 5.2 Virtual Time (Key Schedule)
+
+The **key schedule** manages a virtual step counter that tracks how much of the orbital "time budget" has been consumed:
+
+```
+2048-byte seed → KeySchedule::new(seed, total_steps, reseed_interval, safe_steps)
+                 ↓
+                 max_keys = safe_steps / reseed_interval
+                 ↓
+                 Each next_key() call:
+                   1. Derives key+nonce via HKDF-SHA512 from current seed
+                   2. Advances virtual step: step += reseed_interval
+                   3. Reseeds entropy pool via BLAKE3
+                   4. Checks exhaustion: step >= safe_steps?
+```
+
+- **Virtual steps** are not real simulation iterations — they are a counter
+- The schedule is **exhausted** when `step >= min(safe_steps, total_steps)`
+- Once exhausted, no more keys can be derived (returns `None`)
+
+### 5.3 The Dual Role of `min_chaos_steps`
+
+The Lyapunov estimator computes `min_chaos_steps` — the minimum simulation steps needed to reach the chaotic regime. This value serves **two roles**:
+
+| Role | Context | Meaning |
+|------|---------|---------|
+| **Lower bound** | Initialization check | `total_steps >= min_chaos_steps` — the simulation must run long enough to enter chaos |
+| **Upper bound** | Key schedule (`safe_steps`) | Virtual steps cannot exceed `min_chaos_steps` — you cannot derive keys beyond the reliable horizon |
+
+### 5.4 Practical Example
+
+```
+Configuration:
+  total_steps = 200        (real simulation runs 200 steps)
+  reseed_interval = 10     (each key consumes 10 virtual steps)
+  min_chaos_steps = 73     (from Lyapunov estimation)
+
+Key Schedule:
+  max_keys = 73 / 10 = 7   (integer division)
+  Key 1:  step=10,  keys=1,  ~28 GiB remaining
+  Key 2:  step=20,  keys=2,  ~24 GiB remaining
+  ...
+  Key 7:  step=70,  keys=7,  ~0  GiB remaining → EXHAUSTED
+```
+
+### 5.5 Checking Remaining Capacity
+
+```rust
+let remaining = k.remaining_safe_bytes();  // bytes before exhaustion
+```
+
+This returns `remaining_keys × 4 GiB` (conservative estimate). When it reaches 0, the `Kelvin` instance can no longer encrypt or decrypt — you must create a new instance with a different configuration.

@@ -128,9 +128,57 @@ Parties can:
 
 ### 4.5 Chaotic Regime Enforcement
 Kelvin enforces a mandatory **Lyapunov Horizon Check** in all critical paths:
-- **Rule**: `total_steps >= safe_steps` (the horizon of unpredictability).
+- **Rule**: `total_steps >= min_chaos_steps` (the horizon of unpredictability).
 - **Security Goal**: This ensures that key material is extracted only after the simulation has reached the chaotic regime, where the state is maximally decoupled from the initial configuration.
 - **Enforcement**: This check is mandatory in both the main `Kelvin` initialization and the `OrbitalKeyPair::derive` pathway, preventing any extraction of entropy from the predictable (non-chaotic) phase of the simulation.
+
+### 4.6 The Dual Role of `min_chaos_steps`
+
+The Lyapunov estimator's output (`min_chaos_steps`) serves **two distinct roles** in the pipeline:
+
+| Role | Context | Meaning |
+|------|---------|---------|
+| **Lower bound** | Initialization check | `total_steps >= min_chaos_steps` — the simulation must run long enough to enter chaos |
+| **Upper bound** | Key schedule (`safe_steps`) | Virtual steps cannot exceed `min_chaos_steps` — you cannot derive keys beyond the reliable horizon |
+
+This means: you must simulate *at least* `min_chaos_steps` to enter chaos, but you can only derive keys for *at most* `min_chaos_steps` worth of virtual steps. The actual simulation runs for `total_steps` (which is >= `min_chaos_steps`), but the key schedule limits you to `min_chaos_steps` worth of reseeds.
+
+### 4.7 Real-Time vs Virtual-Time Architecture
+
+The KDF pipeline operates in two distinct time domains:
+
+**Real Time (Orbital Simulation):**
+- Runs once during `Kelvin::new()` for `total_steps` iterations
+- Uses Verlet integration to evolve the n-body system
+- Monitored for stability (ejections, collapses)
+- Final state is extracted into a 2048-byte entropy pool via SHAKE256
+
+**Virtual Time (Key Schedule):**
+- Manages a counter (`step`) that increments by `reseed_interval` per key
+- Each key is derived via HKDF-SHA512 from the current entropy pool
+- After each key, the pool is reseeded via BLAKE3
+- Exhausted when `step >= min(safe_steps, total_steps)`
+- **The simulation is never re-run** — the key schedule is purely cryptographic
+
+```
+┌─────────────────────────────────────────────────────┐
+│                    REAL TIME                         │
+│  simulate_with_monitoring(bodies, total_steps=200)   │
+│  ↓ output: final orbital state                       │
+│  ↓ extract_seed(state) → 2048-byte seed              │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│                  VIRTUAL TIME                        │
+│  KeySchedule::new(seed, total=200, interval=10,     │
+│                   safe=73)                           │
+│  ↓ max_keys = 7                                      │
+│  ↓ Each next_key() increments step by 10             │
+│  ↓ Exhausted at step 70 (or 73 if interval divides)  │
+│  ↓ Each key provides 4 GiB of safe encryption        │
+└─────────────────────────────────────────────────────┘
+```
 
 ### 4.3 Memory Safety
 All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at compile time. This eliminates entire classes of vulnerabilities (buffer overflows, use-after-free, etc.).

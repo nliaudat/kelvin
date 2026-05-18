@@ -55,6 +55,22 @@ All parameters are serialized in **little-endian** format to ensure deterministi
 - **Domain Separation** prevents "key leakage" where a seed used for one purpose (e.g., signing) might inadvertently be identical to a seed used for another (e.g., encryption).
 - **Full State Hashing**: Including mass, position, and velocity ensures that the entire physical degree of freedom of the system is captured.
 
+## Feeding the Key Schedule
+
+The 2048-byte entropy pool produced by SHAKE256 extraction is passed directly to the `KeySchedule`:
+
+```rust
+let schedule = KeySchedule::new(seed, total_steps, reseed_interval, safe_steps);
+```
+
+The key schedule then manages **virtual time evolution** — it does not re-run the simulation, but cryptographically derives keys from the seed:
+
+1. **HKDF-SHA512** derives each 32-byte cipher key + 12-byte nonce from the current pool
+2. **BLAKE3 reseeding** produces a fresh 2048-byte pool after each key derivation
+3. **Exhaustion detection** stops key production when virtual steps exceed `safe_steps` (the Lyapunov horizon)
+
+This means the 2048-byte seed is the **sole bridge** between the physical simulation (real time) and the cryptographic key schedule (virtual time). The seed's size (2048 bytes) provides a massive internal state that resists quantum search and ensures forward secrecy across reseeds.
+
 ## Empirical Verification
 
 The robustness of this extraction process has been verified through large-scale statistical testing:
@@ -63,9 +79,10 @@ The robustness of this extraction process has been verified through large-scale 
 - **Detailed Findings**: See the [Entropy Analysis Report](entropy_report.md) for full statistical data.
 
 ---
-*Last Updated: 2026-05-11*
+*Last Updated: 2026-05-18*
 
 ## Avalanche Effect
+
 
 Due to the chaotic nature of the underlying N-body problem, the extraction process exhibits a "Double Avalanche":
 1. **Physical Avalanche**: Microscopic changes in initial conditions grow exponentially over time due to positive Lyapunov exponents.
