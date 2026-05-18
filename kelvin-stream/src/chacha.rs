@@ -60,16 +60,27 @@ impl ChaChaStream {
     /// Create a new ChaCha20Poly1305 authenticated stream cipher.
     ///
     /// `key` must be 32 bytes, `nonce` must be 12 bytes (IETF variant).
+    /// `max_bytes` is the safe byte limit per key (default: 4 GiB, max: 256 GiB).
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
+        Self::with_max_bytes(key, nonce, 1 << 32)
+    }
+
+    /// Create a new ChaCha20Poly1305 stream cipher with a configurable byte limit.
+    ///
+    /// `max_bytes` must be >= 1 and <= 256 GiB (RFC 8439 ChaCha20 limit).
+    /// Larger values reduce key rotation frequency at the cost of
+    /// increased exposure if a key is compromised.
+    pub fn with_max_bytes(key: [u8; 32], nonce: [u8; 12], max_bytes: u64) -> Self {
         let cipher =
             ChaCha20Poly1305::new_from_slice(&key).expect("ChaCha20Poly1305 key must be 32 bytes");
 
         // ChaCha20 IETF max: 2^32 - 1 blocks × 64 bytes ≈ 256 GiB
-        // We use a conservative 4 GiB limit per key
-        let max_bytes = 1 << 32;
+        let max_allowed = ((1u64 << 32) - 1) * 64;
+        let max_bytes = max_bytes.min(max_allowed).max(1);
 
         ChaChaStream { cipher, nonce, position: 0, max_bytes }
     }
+
 
     /// Rekey the cipher with a new key and nonce.
     ///
