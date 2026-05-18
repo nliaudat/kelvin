@@ -203,6 +203,29 @@ configurations** that can be generated — one per unique RNG seed.
 **Conclusion:** The keyspace is sufficient for 256-bit security. The RNG seed
 (256-bit ChaCha12) is the bottleneck, not the orbital generation process.
 
+### Practical Encryption Limit (Key Schedule Exhaustion)
+
+While the keyspace is astronomically large, the **practical encryption capacity** of a single `Kelvin` instance is limited by the key schedule's virtual step budget:
+
+```
+max_keys = safe_steps / reseed_interval
+```
+
+For a standard-level configuration:
+- `safe_steps` ≈ 73 (from Lyapunov estimation)
+- `reseed_interval` = 10
+- `max_keys` = 7
+
+Each key provides ~4 GiB of safe encryption (conservative estimate). So a single
+`Kelvin` instance can encrypt at most **~28 GiB** before the key schedule is
+exhausted. Beyond this, a new configuration must be generated.
+
+This is not a keyspace limitation — it is a **forward secrecy** safeguard. The
+Lyapunov horizon ensures that even if an attacker compromises the current key,
+they cannot derive past or future keys beyond the chaotic regime's predictability
+horizon.
+
+
 ## Per-Config Size
 
 A typical standard-level JSON configuration:

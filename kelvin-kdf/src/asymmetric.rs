@@ -141,7 +141,7 @@ impl OrbitalKeyPair {
             .estimate(config.total_steps / 10, config.total_steps)
             .map_err(|_| AsymmetricError::SimulationError)?;
 
-        if config.total_steps < result.safe_steps {
+        if config.total_steps < result.min_chaos_steps {
             return Err(AsymmetricError::InsufficientChaos);
         }
 
