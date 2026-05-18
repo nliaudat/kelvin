@@ -175,7 +175,7 @@ The KDF pipeline operates in two distinct time domains:
 │                   safe=73)                           │
 │  ↓ max_keys = 7                                      │
 │  ↓ Each next_key() increments step by 10             │
-│  ↓ Exhausted at step 70 (or 73 if interval divides)  │
+│  ↓ Exhausted at step 70 (7 keys × 10; safe_steps=73)  │
 │  ↓ Each key provides 4 GiB of safe encryption        │
 └─────────────────────────────────────────────────────┘
 ```
