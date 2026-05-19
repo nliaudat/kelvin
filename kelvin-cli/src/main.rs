@@ -107,21 +107,20 @@ fn main() -> Result<()> {
         },
         Commands::Identify { config, all, ecc, kem, fast } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
-            let mut config = OrbitalConfig::from_json(&config_json)?;
+            let config = OrbitalConfig::from_json(&config_json)?;
 
             if fast {
-                // Cap simulation steps for quick identification
-                let fast_steps = std::cmp::min(config.total_steps, 10000);
-                if fast_steps < config.total_steps {
-                    println!("Fast mode: reducing simulation from {} to {} steps", config.total_steps, fast_steps);
-                    config.total_steps = fast_steps;
-                    config.reseed_interval = fast_steps / 10;
-                }
+                // The --fast flag is intentionally ignored for identification.
+                // Identification must be deterministic: reducing simulation steps
+                // would produce a different public key than the one used for
+                // encryption/decryption with the same config.
+                println!("Warning: --fast flag is ignored for identification. Using full {} steps for deterministic key derivation.", config.total_steps);
             }
 
             println!("Deriving keys from orbital configuration (this may take a moment)...");
             let kp = OrbitalKeyPair::derive(&config)
                 .map_err(|e| anyhow::anyhow!("Key derivation failed: {:?}", e))?;
+
 
             let mut shown = false;
 

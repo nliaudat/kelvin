@@ -357,10 +357,19 @@ impl KelvinStreaming {
 
     /// Process a chunk of data: advance simulation, extract keystream, XOR.
     ///
-    /// This is the core operation. It:
+    /// This is the core operation. It processes the input in fixed-size chunks
+    /// of `bytes_per_step` bytes, advancing the simulation by one Verlet step
+    /// for each chunk. This ensures the keystream is deterministic regardless
+    /// of how the caller chunks the data, as long as call sizes are multiples
+    /// of `bytes_per_step`.
+    ///
+    /// For each chunk:
     /// 1. Advances the n-body simulation by one Verlet step
     /// 2. Extracts `bytes_per_step` bytes of keystream from the current state
-    /// 3. XORs the data with the keystream
+    /// 3. XORs the chunk with the keystream
+    ///
+    /// A final partial chunk still advances the simulation by one step, but
+    /// only XORs the needed bytes.
     ///
     /// The same operation encrypts and decrypts (XOR is its own inverse).
     pub fn process_chunk(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
@@ -368,29 +377,40 @@ impl KelvinStreaming {
             return Ok(());
         }
 
-        // 1. Advance simulation by one step
-        kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
-        self.step += 1;
+        let bps = self.bytes_per_step as usize;
+        let mut offset = 0;
 
-        // 2. Extract keystream from current orbital state via SHAKE256 XOF
-        let keystream = extract_shake256(
-            &self.bodies,
-            self.step,
-            self.g,
-            self.softening,
-            &self.domain_separator,
-            data.len(),
-        );
+        while offset < data.len() {
+            let remaining = data.len() - offset;
+            let chunk_size = std::cmp::min(remaining, bps);
 
-        // 3. XOR data with keystream
-        for (d, k) in data.iter_mut().zip(keystream.iter()) {
-            *d ^= k;
+            // 1. Advance simulation by one step
+            kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
+            self.step += 1;
+
+            // 2. Extract keystream from current orbital state via SHAKE256 XOF
+            let keystream = extract_shake256(
+                &self.bodies,
+                self.step,
+                self.g,
+                self.softening,
+                &self.domain_separator,
+                bps, // Always extract bytes_per_step bytes for determinism
+            );
+
+            // 3. XOR chunk with keystream
+            for (d, k) in data[offset..offset + chunk_size].iter_mut().zip(keystream[..chunk_size].iter()) {
+                *d ^= k;
+            }
+
+            offset += chunk_size;
         }
 
         self.bytes_processed += data.len() as u64;
 
         Ok(())
     }
+
 
     /// Encrypt data in-place (same as process_chunk).
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
