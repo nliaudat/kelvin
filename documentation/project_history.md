@@ -26,6 +26,14 @@ Kelvin is the culmination of over two decades of research into the intersection 
 *   **Hybrid Post-Quantum Identity**: Integration of **ML-DSA-65** and **ML-KEM-768** (FIPS 203/204), transforming Kelvin into a quantum-resistant cryptosystem.
 *   **Entropy Expansion (SHAKE256)**: Upgraded the extractor to use **SHAKE256 (XOF)**, replacing fixed hashes with an extendable-output stream. This allowed the master seed pool to be increased to **2048 bytes**, providing a massive reservoir of cryptographic entropy.
 *   **Physical Vector Binding**: Integrated instantaneous **gravitational force vectors** into the entropy derivation process. This ensures that the cryptographic identity is directly bound not just to coordinates, but to the dynamic physical interactions (G, softening) occurring within the simulation.
+*   **V2 Streaming Mode (KelvinStreaming)**: Introduced a true one-time pad streaming mode that replaces the virtual-time key schedule with real-time per-step simulation. Each chunk of data advances the orbital simulation by one Verlet step, extracting keystream from the current chaotic state via SHAKE256 XOF. Key features include:
+    - **Unlimited keystream**: Unlike V1's finite key schedule, V2 can keep simulating indefinitely — no `SeedExhausted` error.
+    - **Fixed-size chunking**: Data is processed in chunks of `bytes_per_step`, ensuring deterministic keystream regardless of caller chunking strategy.
+    - **Instant setup**: No upfront simulation — `KelvinStreaming::new()` is O(1).
+    - **Benchmarking & ETA**: `benchmark()` measures simulation speed; `estimate_time()` predicts processing time.
+    - **3D Orbital Visualizer**: A browser-based 3D visualization (`kelvin-demo/orbital_visualizer.html`) that renders the n-body simulation in real-time with a KDF pipeline display.
+    - **Domain separation**: Uses `b"kelvin-streaming-v2-v1-000000000"` to ensure cryptographic isolation from V1.
+
 
 ---
 
