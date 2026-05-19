@@ -24,7 +24,6 @@ use zeroize::Zeroize;
 ///         = 128 bytes
 const BINARY_EXTRA_SIZE: usize = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16 + 8 + 8;
 
-
 /// Orbital configuration — the shared secret.
 ///
 /// Contains:
@@ -102,7 +101,6 @@ pub struct OrbitalConfig {
     pub max_bytes_per_key: u64,
 }
 
-
 impl OrbitalConfig {
     /// Create a new orbital configuration.
     ///
@@ -158,9 +156,21 @@ impl OrbitalConfig {
         max_g: Fixed,
     ) -> Result<Self, ConfigError> {
         OrbitalConfig::new_full_ext(
-            bodies, total_steps, reseed_interval, dt, softening, g,
-            min_separation, ejection_energy_threshold, monitor_interval,
-            min_bodies, max_bodies, min_dt, max_dt, min_g, max_g,
+            bodies,
+            total_steps,
+            reseed_interval,
+            dt,
+            softening,
+            g,
+            min_separation,
+            ejection_energy_threshold,
+            monitor_interval,
+            min_bodies,
+            max_bodies,
+            min_dt,
+            max_dt,
+            min_g,
+            max_g,
             1,       // default expansion_factor
             1 << 32, // default max_bytes_per_key (4 GiB)
         )
@@ -213,7 +223,6 @@ impl OrbitalConfig {
         config.validate()?;
         Ok(config)
     }
-
 
     /// Validate the configuration.
     ///
@@ -330,7 +339,6 @@ impl OrbitalConfig {
             return Err(ConfigError::InvalidMaxBytesPerKey(self.max_bytes_per_key));
         }
 
-
         // ── Bodyguard: reject bad systems at creation time ──
 
         // 1. Check for identical positions (zero distance)
@@ -438,7 +446,6 @@ impl OrbitalConfig {
 
         buf
     }
-
 
     /// Deserialize from binary format.
     ///
@@ -664,7 +671,6 @@ impl OrbitalConfig {
         };
         config.validate()?;
         Ok(config)
-
     }
 }
 
@@ -693,7 +699,6 @@ impl Drop for OrbitalConfig {
         self.expansion_factor.zeroize();
         self.max_bytes_per_key.zeroize();
     }
-
 }
 
 /// Errors from configuration validation.
@@ -812,7 +817,6 @@ pub enum ConfigError {
     InvalidMaxBytesPerKey(u64),
 
     // ── Bodyguard errors ──
-
     /// Two bodies have identical positions (zero distance).
     #[error("bodies {body_i} and {body_j} have identical positions")]
     IdenticalPositions {
@@ -868,7 +872,6 @@ impl serde::Serialize for OrbitalConfig {
         state.serialize_field("expansion_factor", &self.expansion_factor)?;
         state.serialize_field("max_bytes_per_key", &self.max_bytes_per_key)?;
         state.end()
-
     }
 }
 
@@ -898,7 +901,6 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
             expansion_factor: Option<u64>,
             max_bytes_per_key: Option<u64>,
         }
-
 
         struct ConfigVisitor;
 
@@ -935,7 +937,6 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                         _ => {
                             let _: serde_json::Value = map.next_value()?;
                         },
-
                     }
                 }
 
@@ -994,7 +995,6 @@ impl<'de> serde::Deserialize<'de> for OrbitalConfig {
                     max_bytes_per_key,
                 )
                 .map_err(de::Error::custom)
-
             }
         }
 
@@ -1444,7 +1444,6 @@ mod tests {
             other => panic!("expected InvalidMaxBytesPerKey(0), got: {:?}", other),
         }
     }
-
 
     #[cfg(feature = "serde")]
     #[test]

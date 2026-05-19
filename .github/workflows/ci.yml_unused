@@ -10,6 +10,7 @@
 #   - Unit tests pass (ChaCha + AES-GCM code paths)
 #   - Integration tests pass (full pipeline round-trip)
 #   - Chaos test passes (Lyapunov estimation)
+#   - V2 Streaming example builds and runs
 # ==============================================================================
 
 name: CI
@@ -50,6 +51,12 @@ jobs:
 
       - name: Build kelvin with AES-NI feature
         run: cargo build -p kelvin --features aes-ni
+
+      - name: Build V2 Streaming example
+        run: cargo build --example simple_streaming -p kelvin
+
+      - name: Build kelvin-demo binaries
+        run: cargo build -p kelvin-demo
 
   # ---------------------------------------------------------------------------
   # Lint — clippy + rustfmt
@@ -105,7 +112,7 @@ jobs:
       - name: Test kelvin-stream (AES-GCM)
         run: cargo test --lib -p kelvin-stream --features aes-ni
 
-      # Top-level Kelvin orchestrator
+      # Top-level Kelvin orchestrator (V1 + V2 Streaming)
       - name: Test kelvin
         run: cargo test --lib -p kelvin
 
@@ -124,11 +131,14 @@ jobs:
       - name: Restore cargo cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Full pipeline integration tests
+      - name: Full pipeline integration tests (V1 + V2 Streaming)
         run: cargo test -p kelvin --test full_pipeline
 
       - name: Chaos test (Lyapunov estimation)
         run: cargo test -p kelvin-kdf --test chaos_test
+
+      - name: Client/Server self-test (V1 + V2 Streaming)
+        run: cargo run -p kelvin-test-client
 
   # ---------------------------------------------------------------------------
   # Security audit — check for known vulnerabilities in dependencies

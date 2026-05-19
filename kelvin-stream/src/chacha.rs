@@ -81,7 +81,6 @@ impl ChaChaStream {
         ChaChaStream { cipher, nonce, position: 0, max_bytes }
     }
 
-
     /// Rekey the cipher with a new key and nonce.
     ///
     /// Resets the position counter.

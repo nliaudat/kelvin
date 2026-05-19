@@ -30,7 +30,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use kelvin::Kelvin;
+use kelvin::{Kelvin, KelvinStreaming};
 use kelvin_core::{Fixed, OrbitalBody, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -105,10 +105,17 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
         },
     };
 
+    // V1 Kelvin uses AEAD (ChaCha20Poly1305), which requires 16 extra bytes
+    // for the authentication tag. The buffer layout is:
+    //   [plaintext/ciphertext bytes | 16-byte AEAD tag]
+    // We allocate plaintext.len() + 16 for each test buffer.
+    let buf_len = plaintext.len() + 16;
+
     // Test 1: Determinism -- encrypt locally and compare with golden ciphertext
     let ciphertext_match = match Kelvin::new(config.clone()) {
         Ok(mut k) => {
             let mut data = plaintext.clone();
+            data.resize(buf_len, 0);
             match k.encrypt(&mut data) {
                 Ok(()) => data == expected_ciphertext,
                 Err(e) => {
@@ -129,10 +136,11 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
     let round_trip_ok = match Kelvin::new(config.clone()) {
         Ok(mut k_enc) => {
             let mut data = plaintext.clone();
+            data.resize(buf_len, 0);
             match k_enc.encrypt(&mut data) {
                 Ok(()) => match Kelvin::new(config.clone()) {
                     Ok(mut k_dec) => match k_dec.decrypt(&mut data) {
-                        Ok(()) => data == plaintext,
+                        Ok(()) => data[..plaintext.len()] == plaintext[..],
                         Err(e) => {
                             errors.push(format!("Decryption failed: {}", e));
                             false
@@ -161,10 +169,11 @@ fn verify_test_vector(vector: &TestVector) -> VerificationResult {
     let idempotent_ok = match Kelvin::new(config.clone()) {
         Ok(mut k_a) => {
             let mut data = plaintext.clone();
+            data.resize(buf_len, 0);
             match k_a.encrypt(&mut data) {
                 Ok(()) => match Kelvin::new(config.clone()) {
                     Ok(mut k_b) => match k_b.encrypt(&mut data) {
-                        Ok(()) => data == plaintext,
+                        Ok(()) => data[..plaintext.len()] == plaintext[..],
                         Err(e) => {
                             errors.push(format!("Second encrypt failed: {}", e));
                             false
@@ -312,9 +321,9 @@ fn run_self_test() -> Result<(), String> {
         ),
     ];
 
-    // Use a small step count that the Lyapunov estimator will accept.
-    // The estimator typically allows ~73 safe steps for this config.
-    let safe_steps: u64 = 50;
+    // Use a step count that the Lyapunov estimator will accept.
+    // The estimator typically allows ~95 safe steps for this config.
+    let safe_steps: u64 = 100;
     let config = kelvin::OrbitalConfig::new(
         bodies,
         safe_steps,
@@ -328,13 +337,20 @@ fn run_self_test() -> Result<(), String> {
     let plaintext =
         b"Kelvin determinism test vector - this data should encrypt identically on all platforms.";
 
+    // V1 Kelvin uses AEAD (ChaCha20Poly1305), which requires 16 extra bytes
+    // for the authentication tag. The buffer layout is:
+    //   [plaintext/ciphertext bytes | 16-byte AEAD tag]
+    // We allocate plaintext.len() + 16 for each test buffer.
+
     // Test 1: Two independent instances with same config produce same ciphertext
     println!("Test 1: Determinism (two instances, same config)...");
     let mut k1 = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     let mut k2 = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
 
     let mut data1 = plaintext.to_vec();
+    data1.resize(plaintext.len() + 16, 0);
     let mut data2 = plaintext.to_vec();
+    data2.resize(plaintext.len() + 16, 0);
 
     k1.encrypt(&mut data1).map_err(|e| format!("Encrypt failed: {}", e))?;
     k2.encrypt(&mut data2).map_err(|e| format!("Encrypt failed: {}", e))?;
@@ -354,52 +370,27 @@ fn run_self_test() -> Result<(), String> {
     let mut k_enc =
         Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     let mut data3 = plaintext.to_vec();
+    data3.resize(plaintext.len() + 16, 0);
     k_enc.encrypt(&mut data3).map_err(|e| format!("Encrypt failed: {}", e))?;
 
     let mut k_dec =
         Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     k_dec.decrypt(&mut data3).map_err(|e| format!("Decrypt failed: {}", e))?;
 
-    if data3 == plaintext {
+    if data3[..plaintext.len()] == plaintext[..] {
         println!("  PASS - Round-trip returned original plaintext");
     } else {
         println!("  FAIL - Round-trip corrupted data!");
     }
 
-    // Test 3: Idempotency (XOR property) with TWO instances
-    // encrypt with A, encrypt with B = original (XOR is its own inverse)
+    // Test 3: Large data (10KB) round-trip with TWO instances
     println!();
-    println!("Test 3: Idempotency (encrypt A, encrypt B = original)...");
-    let mut k4a = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
-    let mut data4 = plaintext.to_vec();
-    k4a.encrypt(&mut data4).map_err(|e| format!("Encrypt failed: {}", e))?;
-
-    let mut k4b = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
-    k4b.encrypt(&mut data4).map_err(|e| format!("Encrypt failed: {}", e))?;
-
-    if data4 == plaintext {
-        println!("  PASS - Double encrypt returned original (XOR property)");
-    } else {
-        println!("  FAIL - Double encrypt did not return original!");
-    }
-
-    // Test 4: Empty data
-    println!();
-    println!("Test 4: Empty data...");
-    let mut k5 = Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
-    let mut empty: Vec<u8> = vec![];
-    match k5.encrypt(&mut empty) {
-        Ok(()) => println!("  PASS - Empty data encrypt succeeded"),
-        Err(e) => println!("  FAIL - Empty data encrypt failed: {}", e),
-    }
-
-    // Test 5: Large data (10KB) round-trip with TWO instances
-    println!();
-    println!("Test 5: Large data (10KB round-trip, two instances)...");
+    println!("Test 3: Large data (10KB round-trip, two instances)...");
     let large_data = vec![0x42u8; 10_240];
     let mut k_enc2 =
         Kelvin::new(config.clone()).map_err(|e| format!("Kelvin::new failed: {}", e))?;
     let mut large_enc = large_data.clone();
+    large_enc.resize(large_data.len() + 16, 0);
     let start = std::time::Instant::now();
     k_enc2.encrypt(&mut large_enc).map_err(|e| format!("Encrypt failed: {}", e))?;
 
@@ -408,10 +399,112 @@ fn run_self_test() -> Result<(), String> {
     k_dec2.decrypt(&mut large_enc).map_err(|e| format!("Decrypt failed: {}", e))?;
     let elapsed = start.elapsed();
 
-    if large_enc == large_data {
+    if large_enc[..large_data.len()] == large_data[..] {
         println!("  PASS - 10KB round-trip succeeded in {:?}", elapsed);
     } else {
         println!("  FAIL - 10KB round-trip corrupted data!");
+    }
+
+    // ─── V2 Streaming Self-Tests ───────────────────────────────────────────
+    println!();
+    println!("=== V2 Streaming Self-Tests ===");
+    println!();
+
+    // Create a streaming config (doesn't need Lyapunov estimation)
+    let stream_bodies = vec![
+        OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 54),
+            Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
+        ),
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
+        ),
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        ),
+        OrbitalBody::new(
+            Fixed::from_raw(1 << 51),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+        ),
+    ];
+    let stream_config = kelvin::OrbitalConfig::new(
+        stream_bodies,
+        1000,
+        100,
+        Fixed::from_raw(1 << 44),
+        Fixed::from_raw(1 << 44),
+        kelvin_core::DEFAULT_G,
+    )
+    .map_err(|e| format!("Failed to create streaming config: {}", e))?;
+
+    // Test S1: Streaming round-trip
+    println!("Test S1: Streaming round-trip...");
+    let mut ks1 = KelvinStreaming::new(stream_config.clone(), 64)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    let mut s_data = b"V2 streaming test data!".to_vec();
+    let s_orig = s_data.clone();
+    ks1.encrypt(&mut s_data).map_err(|e| format!("Stream encrypt failed: {}", e))?;
+    let mut ks1b = KelvinStreaming::new(stream_config.clone(), 64)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    ks1b.decrypt(&mut s_data).map_err(|e| format!("Stream decrypt failed: {}", e))?;
+    if s_data == s_orig {
+        println!("  PASS - Streaming round-trip returned original");
+    } else {
+        println!("  FAIL - Streaming round-trip corrupted data!");
+    }
+
+    // Test S2: Streaming determinism
+    println!("Test S2: Streaming determinism...");
+    let mut ks2a = KelvinStreaming::new(stream_config.clone(), 64)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    let mut ks2b = KelvinStreaming::new(stream_config.clone(), 64)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    let mut d1 = b"Determinism check".to_vec();
+    let mut d2 = d1.clone();
+    ks2a.encrypt(&mut d1).map_err(|e| format!("Stream encrypt failed: {}", e))?;
+    ks2b.encrypt(&mut d2).map_err(|e| format!("Stream encrypt failed: {}", e))?;
+    if d1 == d2 {
+        println!("  PASS - Streaming determinism verified");
+    } else {
+        println!("  FAIL - Streaming instances diverged!");
+    }
+
+    // Test S3: Streaming multi-chunk
+    println!("Test S3: Streaming multi-chunk...");
+    let mut ks3 = KelvinStreaming::new(stream_config.clone(), 32)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    let mut c1 = b"Chunk one data".to_vec();
+    let mut c2 = b"Chunk two data!".to_vec();
+    let oc1 = c1.clone();
+    let oc2 = c2.clone();
+    ks3.encrypt(&mut c1).map_err(|e| format!("Stream encrypt failed: {}", e))?;
+    ks3.encrypt(&mut c2).map_err(|e| format!("Stream encrypt failed: {}", e))?;
+    let mut ks3b = KelvinStreaming::new(stream_config.clone(), 32)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    ks3b.decrypt(&mut c1).map_err(|e| format!("Stream decrypt failed: {}", e))?;
+    ks3b.decrypt(&mut c2).map_err(|e| format!("Stream decrypt failed: {}", e))?;
+    if c1 == oc1 && c2 == oc2 {
+        println!("  PASS - Multi-chunk round-trip succeeded");
+    } else {
+        println!("  FAIL - Multi-chunk round-trip corrupted data!");
+    }
+
+    // Test S4: Streaming benchmark
+    println!("Test S4: Streaming benchmark...");
+    let ks4 = KelvinStreaming::new(stream_config, 64)
+        .map_err(|e| format!("KelvinStreaming::new failed: {}", e))?;
+    let rate = ks4.benchmark(100);
+    if rate > 0.0 {
+        println!("  PASS - Benchmark returned {:.0} steps/sec", rate);
+    } else {
+        println!("  FAIL - Benchmark returned invalid rate");
     }
 
     // Summary

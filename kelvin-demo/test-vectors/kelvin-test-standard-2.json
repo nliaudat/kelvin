@@ -1,0 +1,11 @@
+{
+  "description": "Standard level, empty plaintext (5 bodies)",
+  "level": "Standard",
+  "config_json": "{\n  \"bodies\": [\n    {\n      \"mass\": 18446744073709551616,\n      \"position\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 0,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 18446744073709551616,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 110680464442257309696,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 18014398509481984,\n      \"position\": {\n        \"x\": 27670116110564327424,\n        \"y\": 0,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 0,\n        \"y\": 4896710557980672,\n        \"z\": 4611686018427387904\n      }\n    },\n    {\n      \"mass\": 9007199254740992,\n      \"position\": {\n        \"x\": -18446744073709551616,\n        \"y\": -18446744073709551616,\n        \"z\": 0\n      },\n      \"velocity\": {\n        \"x\": 55340232221128654848,\n        \"y\": -36893488147419103232,\n        \"z\": 0\n      }\n    },\n    {\n      \"mass\": 4503599627370496,\n      \"position\": {\n        \"x\": 36893488147419103232,\n        \"y\": -18446744073709551616,\n        \"z\": 18446744073709551616\n      },\n      \"velocity\": {\n        \"x\": -36893488147419103232,\n        \"y\": 55340232221128654848,\n        \"z\": 0\n      }\n    }\n  ],\n  \"total_steps\": 50,\n  \"reseed_interval\": 10,\n  \"dt\": 18014398509481984,\n  \"softening\": 17592186044416,\n  \"g\": 728248265982611292160,\n  \"min_separation\": 1099511627776,\n  \"ejection_energy_threshold\": 1048576,\n  \"monitor_interval\": 10000,\n  \"min_bodies\": 5,\n  \"max_bodies\": 100,\n  \"min_dt\": 17179869184,\n  \"max_dt\": 1152921504606846976,\n  \"min_g\": 18446744073709551616,\n  \"max_g\": 18446744073709551616000,\n  \"expansion_factor\": 1,\n  \"max_bytes_per_key\": 4294967296\n}",
+  "plaintext_hex": "",
+  "ciphertext_hex": "48a4889d81449bdf92bafb86752b4f53",
+  "keystream_hex": "",
+  "num_bodies": 5,
+  "total_steps": 50,
+  "generation_time_s": 0.387274
+}
