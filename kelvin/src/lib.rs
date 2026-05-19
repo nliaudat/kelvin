@@ -55,17 +55,23 @@
 mod decrypt;
 mod encrypt;
 mod error;
+mod photon;
+mod quantum;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_G};
 pub use kelvin_kdf::{
     extract_seed, extract_shake256, AsymmetricError, KeySchedule, OrbitalConfig, OrbitalKeyPair,
-    ScheduleState,
+    OrbitalState, ScheduleState,
 };
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
 #[cfg(feature = "aes-ni")]
 pub use kelvin_stream::AesGcmStream;
+
+pub use photon::KelvinPhoton;
+pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_VERLET_STEPS};
+
 
 use kelvin_core::simulate_with_monitoring;
 use kelvin_kdf::LyapunovEstimator;
