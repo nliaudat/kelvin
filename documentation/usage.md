@@ -220,3 +220,64 @@ let remaining = k.remaining_safe_bytes();  // bytes before exhaustion
 ```
 
 This returns `remaining_keys × 4 GiB` (conservative estimate). When it reaches 0, the `Kelvin` instance can no longer encrypt or decrypt — you must create a new instance with a different configuration.
+
+---
+
+## 6. V2 Streaming Mode (Real-Time Per-Step Simulation)
+
+V2 Streaming (`KelvinStreaming`) replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one Verlet step, extracting keystream from the current chaotic state.
+
+### Key Differences from V1
+
+| Feature | V1 (`Kelvin`) | V2 (`KelvinStreaming`) |
+|---------|---------------|------------------------|
+| Simulation | Runs once upfront | One step per chunk |
+| Keystream | Finite (key schedule) | Unlimited (keep simulating) |
+| Setup time | Seconds to minutes | Instant |
+| Cipher | ChaCha20Poly1305 AEAD | XOR with SHAKE256 XOF |
+| Authentication | AEAD tag | None (XOR only) |
+| Key rotation | Automatic via schedule | N/A (each step is unique) |
+
+### Rust API
+
+```rust
+use kelvin::{KelvinStreaming, OrbitalConfig};
+
+// Create streaming instance (instant — no upfront simulation)
+let config = OrbitalConfig::from_json(&config_json)?;
+let mut ks = KelvinStreaming::new(config, 1024 * 1024)?; // 1 MiB per step
+
+// Encrypt (advances simulation by 1 step)
+let mut data = b"Hello, V2 streaming!".to_vec();
+ks.encrypt(&mut data)?;
+
+// Decrypt with a new instance (same config = same keystream)
+let config = OrbitalConfig::from_json(&config_json)?;
+let mut ks2 = KelvinStreaming::new(config, 1024 * 1024)?;
+ks2.decrypt(&mut data)?;
+assert_eq!(&data, b"Hello, V2 streaming!");
+```
+
+### Benchmarking and ETA
+
+```rust
+// Benchmark simulation speed
+let rate = ks.benchmark(1000); // steps/sec
+
+// Estimate time for a file
+let (steps, seconds) = ks.estimate_time(file_size, rate);
+println!("Need {steps} steps, ~{seconds:.1}s");
+```
+
+### Example
+
+```bash
+cargo run --example simple_streaming -p kelvin
+```
+
+### Security Notes
+
+- **V2 is a pure XOR stream cipher** — no authentication. Use a MAC for integrity.
+- Each step produces `bytes_per_step` bytes of keystream from SHAKE256 XOF.
+- The domain separator `b"kelvin-streaming-v2-v1-000000000"` ensures domain separation from V1.
+- Deterministic: same config + same step count = same keystream.

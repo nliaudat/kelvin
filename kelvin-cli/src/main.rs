@@ -72,6 +72,9 @@ enum Commands {
         /// Show ML-KEM-768 Public Key
         #[arg(long)]
         kem: bool,
+        /// Fast mode: use fewer simulation steps for quicker identification
+        #[arg(long)]
+        fast: bool,
     },
     /// Run performance benchmarks
     Benchmark,
@@ -102,11 +105,23 @@ fn main() -> Result<()> {
         Commands::Decrypt { config, input, output } => {
             process_file(&config, &input, &output, false)?;
         },
-        Commands::Identify { config, all, ecc, kem } => {
+        Commands::Identify { config, all, ecc, kem, fast } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
-            let config = OrbitalConfig::from_json(&config_json)?;
+            let mut config = OrbitalConfig::from_json(&config_json)?;
+
+            if fast {
+                // Cap simulation steps for quick identification
+                let fast_steps = std::cmp::min(config.total_steps, 10000);
+                if fast_steps < config.total_steps {
+                    println!("Fast mode: reducing simulation from {} to {} steps", config.total_steps, fast_steps);
+                    config.total_steps = fast_steps;
+                    config.reseed_interval = fast_steps / 10;
+                }
+            }
+
             println!("Deriving keys from orbital configuration (this may take a moment)...");
-            let kp = OrbitalKeyPair::derive(&config).map_err(|e| anyhow::anyhow!("Key derivation failed: {:?}", e))?;
+            let kp = OrbitalKeyPair::derive(&config)
+                .map_err(|e| anyhow::anyhow!("Key derivation failed: {:?}", e))?;
 
             let mut shown = false;
 

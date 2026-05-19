@@ -68,7 +68,6 @@ pub struct KeySchedule {
     max_bytes_per_key: u64,
 }
 
-
 impl KeySchedule {
     /// Create a new key schedule.
     ///
@@ -109,7 +108,6 @@ impl KeySchedule {
             max_bytes_per_key,
         }
     }
-
 
     /// Get the next key and nonce using HKDF-SHA512.
     ///
@@ -191,7 +189,6 @@ impl KeySchedule {
         remaining_keys.saturating_mul(self.max_bytes_per_key)
     }
 
-
     /// Reset the schedule with a new seed.
     pub fn reset(&mut self, seed: [u8; 2048]) {
         self.seed = seed;
@@ -212,7 +209,6 @@ impl Drop for KeySchedule {
         self.max_keys.zeroize();
         self.max_bytes_per_key.zeroize();
     }
-
 }
 
 #[cfg(test)]

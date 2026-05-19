@@ -110,7 +110,7 @@ fn paranoid_config() -> (Vec<OrbitalBody>, u64, u64) {
     let bodies = vec![
         // Central body
         OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-        // Planet 1: inner orbit
+        // Planet 1: inner orbit at 0.75 AU
         OrbitalBody::new(
             Fixed::from_raw(1 << 54),
             Vec3::new(Fixed::from_raw(3 << 62), Fixed::ZERO, Fixed::ZERO), // 0.75 AU
@@ -122,25 +122,25 @@ fn paranoid_config() -> (Vec<OrbitalBody>, u64, u64) {
             Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
             Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
         ),
-        // Planet 3: at 1.8 AU, inclined
+        // Planet 3: at 1.5 AU, inclined
         OrbitalBody::new(
             Fixed::from_raw(1 << 54),
             Vec3::new(
-                Fixed::from_raw(4611686018427387904i128), // ~2.0 AU
+                Fixed::from_raw(3 << 63), // 1.5 AU
                 Fixed::ZERO,
                 Fixed::ZERO,
             ),
-            Vec3::new(Fixed::ZERO, Fixed::from_int(4), Fixed::from_raw(1 << 62)),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(5), Fixed::from_raw(1 << 62)),
         ),
-        // Planet 4: outer, retrograde
+        // Planet 4: outer at 2.5 AU, prograde
         OrbitalBody::new(
             Fixed::from_raw(1 << 54),
             Vec3::new(
-                Fixed::from_raw(6 << 63), // 3.0 AU
+                Fixed::from_raw(5 << 63), // 2.5 AU
                 Fixed::ZERO,
                 Fixed::ZERO,
             ),
-            Vec3::new(Fixed::ZERO, Fixed::from_int(-3), Fixed::ZERO),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(4), Fixed::ZERO),
         ),
     ];
     let total_steps = 50;
@@ -174,8 +174,11 @@ fn generate_test_vector(
         serde_json::to_string_pretty(&config).map_err(|e| format!("JSON error: {}", e))?;
 
     // Create Kelvin instance and encrypt
+    // V1 Kelvin uses AEAD (ChaCha20Poly1305), which requires 16 extra bytes
+    // for the authentication tag.
     let mut k = Kelvin::new(config).map_err(|e| format!("Kelvin error: {}", e))?;
     let mut data = plaintext.to_vec();
+    data.resize(plaintext.len() + 16, 0);
     k.encrypt(&mut data).map_err(|e| format!("Encrypt error: {}", e))?;
 
     let elapsed = start.elapsed().as_secs_f64();

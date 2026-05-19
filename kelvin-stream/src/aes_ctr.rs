@@ -73,13 +73,12 @@ impl AesGcmStream {
         let cipher = Aes256Gcm::new_from_slice(&key).expect("AES-256-GCM key must be 32 bytes");
 
         // AES-GCM max: 2^32 - 1 invocations per key (NIST SP 800-38D, Section 8.3)
-        // At 16-byte minimum messages, this is ~64 GiB. We cap at 256 GiB for consistency.
-        let max_allowed = ((1u64 << 32) - 1) * 64;
+        // At 16-byte minimum messages that is ~64 GiB, so we cap at 64 GiB.
+        let max_allowed = 1u64 << 36; // 2^32 invocations × 16 bytes = 64 GiB
         let max_bytes = max_bytes.min(max_allowed).max(1);
 
         AesGcmStream { cipher, nonce, position: 0, max_bytes }
     }
-
 
     /// Rekey the cipher with a new key and nonce.
     ///

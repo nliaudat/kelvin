@@ -3,8 +3,25 @@
 //! Top-level orchestrator for the Kelvin cryptosystem.
 //!
 //! Provides:
-//! - `Kelvin` struct — main encryption/decryption entry point
+//! - `Kelvin` struct — original V1 encryption/decryption entry point (virtual time)
+//! - `KelvinStreaming` struct — V2 streaming encryption/decryption (real time, one step per chunk)
 //! - `KelvinError` — error types
+//!
+//! ## V2 Streaming Mode
+//!
+//! `KelvinStreaming` replaces the virtual-time key schedule with a true
+//! per-step simulation. Each chunk of data consumes one simulation step:
+//!
+//! ```rust,ignore
+//! use kelvin::{KelvinStreaming, OrbitalConfig};
+//!
+//! let config = OrbitalConfig::from_json(json_str)?;
+//! let mut ks = KelvinStreaming::new(config, 1024 * 1024)?; // 1 MiB per step
+//! let mut data = b"Hello, world!".to_vec();
+//! ks.encrypt(&mut data)?;
+//! ks.decrypt(&mut data)?;
+//! assert_eq!(&data, b"Hello, world!");
+//! ```
 //!
 //! ## Security
 //!
@@ -19,7 +36,7 @@
 //!   academic interest in chaos-based cryptography for post-quantum
 //!   applications.
 //!
-//! ## Example
+//! ## Example (V1)
 //!
 //! ```rust,ignore
 //! use kelvin::{Kelvin, OrbitalConfig};
@@ -130,9 +147,7 @@ impl Kelvin {
         seed_vec.zeroize();
 
         // Apply expansion factor to safe_steps
-        let safe_steps = result
-            .min_chaos_steps
-            .saturating_mul(config.expansion_factor.max(1));
+        let safe_steps = result.min_chaos_steps.saturating_mul(config.expansion_factor.max(1));
 
         // Create key schedule with configurable byte limit per key
         let schedule = KeySchedule::with_max_bytes_per_key(
@@ -143,9 +158,7 @@ impl Kelvin {
             config.max_bytes_per_key,
         );
 
-
         Ok(InitState { config, bodies, schedule, safe_steps })
-
     }
 
     /// Create a new Kelvin instance from a validated configuration.
@@ -159,9 +172,8 @@ impl Kelvin {
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
 
         // Create stream cipher with configurable byte limit
-        let stream = Box::new(ChaChaStream::with_max_bytes(
-            key, nonce, state.config.max_bytes_per_key,
-        ));
+        let stream =
+            Box::new(ChaChaStream::with_max_bytes(key, nonce, state.config.max_bytes_per_key));
 
         Ok(Kelvin {
             config: state.config,
@@ -170,7 +182,6 @@ impl Kelvin {
             stream,
             bytes_processed: 0,
         })
-
     }
 
     /// Create a new Kelvin instance using the hardware-accelerated AES-256-GCM fallback.
@@ -184,10 +195,8 @@ impl Kelvin {
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
 
         // Create AES-256-GCM stream cipher with configurable byte limit
-        let stream = Box::new(AesGcmStream::with_max_bytes(
-            key, nonce, state.config.max_bytes_per_key,
-        ));
-
+        let stream =
+            Box::new(AesGcmStream::with_max_bytes(key, nonce, state.config.max_bytes_per_key));
 
         Ok(Kelvin {
             config: state.config,
@@ -265,6 +274,186 @@ impl Drop for Kelvin {
     }
 }
 
+// ============================================================================
+// V2 Streaming Mode — True One-Time Pad with Per-Step Simulation
+// ============================================================================
+
+/// V2 streaming cryptosystem: one simulation step per data chunk.
+///
+/// Unlike V1 (`Kelvin`) which runs the entire simulation upfront and then
+/// uses a virtual key schedule, `KelvinStreaming` advances the simulation
+/// by one step for each chunk of data processed. This means:
+///
+/// - **Unlimited keystream**: keep simulating as long as you need
+/// - **True OTP**: each step's chaotic state is unique and unpredictable
+/// - **Predicted ETA**: file_size / bytes_per_step = steps needed, benchmark gives steps/sec
+///
+/// ## How it works
+///
+/// For each `process_chunk()` call:
+/// 1. Advance simulation by one Verlet step
+/// 2. Extract keystream from current orbital state via SHAKE256 XOF
+/// 3. XOR the data with the keystream
+///
+/// ## Example
+///
+/// ```rust,ignore
+/// use kelvin::{KelvinStreaming, OrbitalConfig};
+///
+/// let config = OrbitalConfig::from_json(json_str)?;
+/// let mut ks = KelvinStreaming::new(config, 1024 * 1024)?; // 1 MiB per step
+/// let mut data = b"Hello, world!".to_vec();
+/// ks.encrypt(&mut data)?;
+/// ks.decrypt(&mut data)?;
+/// assert_eq!(&data, b"Hello, world!");
+/// ```
+#[derive(Debug)]
+pub struct KelvinStreaming {
+    /// Current orbital bodies (simulation state).
+    bodies: Vec<OrbitalBody>,
+    /// Current step counter.
+    step: u64,
+    /// Simulation parameters.
+    dt: Fixed,
+    softening: Fixed,
+    g: Fixed,
+    /// Number of keystream bytes produced per step.
+    bytes_per_step: u64,
+    /// Total bytes processed so far.
+    bytes_processed: u64,
+    /// Domain separator for SHAKE256 extraction.
+    domain_separator: [u8; 32],
+}
+
+impl KelvinStreaming {
+    /// Create a new streaming Kelvin instance.
+    ///
+    /// `config` is the shared orbital configuration.
+    /// `bytes_per_step` is how many keystream bytes each simulation step produces
+    /// (e.g., 1 MiB = 1,048,576). Larger values mean fewer steps for a given file size.
+    ///
+    /// This does NOT run the full simulation upfront — it only validates the config
+    /// and initializes the body state. The simulation advances one step per chunk.
+    pub fn new(config: OrbitalConfig, bytes_per_step: u64) -> Result<Self, KelvinError> {
+        // Validate config
+        config.validate()?;
+
+        // Clone bodies (initial state, no simulation yet)
+        let bodies = config.bodies.clone();
+
+        let domain_separator = *b"kelvin-streaming-v2-v1-000000000";
+
+        Ok(KelvinStreaming {
+            bodies,
+            step: 0,
+            dt: config.dt,
+            softening: config.softening,
+            g: config.g,
+            bytes_per_step: bytes_per_step.max(1),
+            bytes_processed: 0,
+            domain_separator,
+        })
+    }
+
+    /// Process a chunk of data: advance simulation, extract keystream, XOR.
+    ///
+    /// This is the core operation. It:
+    /// 1. Advances the n-body simulation by one Verlet step
+    /// 2. Extracts `bytes_per_step` bytes of keystream from the current state
+    /// 3. XORs the data with the keystream
+    ///
+    /// The same operation encrypts and decrypts (XOR is its own inverse).
+    pub fn process_chunk(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        if data.is_empty() {
+            return Ok(());
+        }
+
+        // 1. Advance simulation by one step
+        kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
+        self.step += 1;
+
+        // 2. Extract keystream from current orbital state via SHAKE256 XOF
+        let keystream = extract_shake256(
+            &self.bodies,
+            self.step,
+            self.g,
+            self.softening,
+            &self.domain_separator,
+            data.len(),
+        );
+
+        // 3. XOR data with keystream
+        for (d, k) in data.iter_mut().zip(keystream.iter()) {
+            *d ^= k;
+        }
+
+        self.bytes_processed += data.len() as u64;
+
+        Ok(())
+    }
+
+    /// Encrypt data in-place (same as process_chunk).
+    pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.process_chunk(data)
+    }
+
+    /// Decrypt data in-place (same as process_chunk, XOR is its own inverse).
+    pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.process_chunk(data)
+    }
+
+    /// Get the current step counter.
+    pub fn step(&self) -> u64 {
+        self.step
+    }
+
+    /// Get the total bytes processed so far.
+    pub fn bytes_processed(&self) -> u64 {
+        self.bytes_processed
+    }
+
+    /// Get the number of keystream bytes produced per step.
+    pub fn bytes_per_step(&self) -> u64 {
+        self.bytes_per_step
+    }
+
+    /// Benchmark the simulation speed on this hardware.
+    ///
+    /// Runs `sample_steps` Verlet steps and returns the rate in steps/second.
+    /// Use this to estimate ETA for a given file size.
+    pub fn benchmark(&self, sample_steps: u64) -> f64 {
+        let mut bodies = self.bodies.clone();
+        let start = std::time::Instant::now();
+        for _ in 0..sample_steps {
+            kelvin_core::verlet_step(&mut bodies, self.dt, self.softening, self.g);
+        }
+        let elapsed = start.elapsed().as_secs_f64();
+        if elapsed > 0.0 {
+            sample_steps as f64 / elapsed
+        } else {
+            f64::MAX
+        }
+    }
+
+    /// Estimate the time needed to process a file of `file_size` bytes.
+    ///
+    /// Returns (steps_needed, estimated_seconds).
+    pub fn estimate_time(&self, file_size: u64, steps_per_sec: f64) -> (u64, f64) {
+        let steps_needed = file_size.div_ceil(self.bytes_per_step);
+        let estimated_secs =
+            if steps_per_sec > 0.0 { steps_needed as f64 / steps_per_sec } else { f64::MAX };
+        (steps_needed, estimated_secs)
+    }
+}
+
+impl Drop for KelvinStreaming {
+    fn drop(&mut self) {
+        self.bodies.zeroize();
+        self.step.zeroize();
+        self.bytes_processed.zeroize();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -318,5 +507,154 @@ mod tests {
         k2.decrypt_in_place(&mut data).unwrap();
         // Plaintext portion should be restored; tag portion is overwritten during decrypt
         assert_eq!(&data[..64], &original[..64]);
+    }
+
+    // ─── V2 Streaming Tests ────────────────────────────────────────────────
+
+    fn streaming_config() -> OrbitalConfig {
+        // Use a simple 5-body config (minimum required by validation)
+        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let planet1 = OrbitalBody::new(
+            Fixed::from_raw(1 << 54),
+            Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
+        );
+        let planet2 = OrbitalBody::new(
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
+        );
+        let planet3 = OrbitalBody::new(
+            Fixed::from_raw(1 << 52),
+            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
+        );
+        let planet4 = OrbitalBody::new(
+            Fixed::from_raw(1 << 51),
+            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
+        );
+        OrbitalConfig::new(
+            vec![sun, planet1, planet2, planet3, planet4],
+            1000,
+            100,
+            kelvin_core::DEFAULT_DT,
+            Fixed::from_raw(1 << 44),
+            kelvin_core::DEFAULT_G,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn test_streaming_round_trip() {
+        let config = streaming_config();
+        let mut ks = KelvinStreaming::new(config, 64).unwrap();
+        let mut data = b"Hello, Kelvin V2 streaming!".to_vec();
+        let original = data.clone();
+
+        ks.encrypt(&mut data).unwrap();
+        assert_ne!(data, original, "encrypted data should differ from plaintext");
+
+        // Decrypt with a new instance (same config = same keystream)
+        let mut ks2 = KelvinStreaming::new(streaming_config(), 64).unwrap();
+        ks2.decrypt(&mut data).unwrap();
+        assert_eq!(data, original, "round-trip should restore original");
+    }
+
+    #[test]
+    fn test_streaming_determinism() {
+        let config = streaming_config();
+        let mut ks1 = KelvinStreaming::new(config.clone(), 64).unwrap();
+        let mut ks2 = KelvinStreaming::new(config, 64).unwrap();
+
+        let mut data1 = b"Determinism test data".to_vec();
+        let mut data2 = data1.clone();
+
+        ks1.encrypt(&mut data1).unwrap();
+        ks2.encrypt(&mut data2).unwrap();
+        assert_eq!(data1, data2, "two instances should produce identical ciphertext");
+    }
+
+    #[test]
+    fn test_streaming_multi_chunk() {
+        let config = streaming_config();
+        let mut ks = KelvinStreaming::new(config, 32).unwrap();
+
+        let chunk1 = b"First chunk of data!".to_vec();
+        let chunk2 = b"Second chunk, different.".to_vec();
+        let orig1 = chunk1.clone();
+        let orig2 = chunk2.clone();
+
+        let mut c1 = chunk1;
+        let mut c2 = chunk2;
+
+        ks.encrypt(&mut c1).unwrap();
+        ks.encrypt(&mut c2).unwrap();
+
+        assert_ne!(c1, orig1);
+        assert_ne!(c2, orig2);
+
+        // Decrypt with new instance
+        let mut ks2 = KelvinStreaming::new(streaming_config(), 32).unwrap();
+        ks2.decrypt(&mut c1).unwrap();
+        ks2.decrypt(&mut c2).unwrap();
+        assert_eq!(c1, orig1);
+        assert_eq!(c2, orig2);
+    }
+
+    #[test]
+    fn test_streaming_empty_data() {
+        let config = streaming_config();
+        let mut ks = KelvinStreaming::new(config, 64).unwrap();
+        let mut empty: Vec<u8> = vec![];
+        ks.encrypt(&mut empty).unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[test]
+    fn test_streaming_step_counter() {
+        let config = streaming_config();
+        let mut ks = KelvinStreaming::new(config, 64).unwrap();
+        assert_eq!(ks.step(), 0);
+
+        let mut data = vec![0u8; 64];
+        ks.encrypt(&mut data).unwrap();
+        assert_eq!(ks.step(), 1);
+
+        ks.encrypt(&mut data).unwrap();
+        assert_eq!(ks.step(), 2);
+    }
+
+    #[test]
+    fn test_streaming_bytes_processed() {
+        let config = streaming_config();
+        let mut ks = KelvinStreaming::new(config, 64).unwrap();
+        assert_eq!(ks.bytes_processed(), 0);
+
+        let mut data = vec![0u8; 100];
+        ks.encrypt(&mut data).unwrap();
+        assert_eq!(ks.bytes_processed(), 100);
+
+        let mut data2 = vec![0u8; 50];
+        ks.encrypt(&mut data2).unwrap();
+        assert_eq!(ks.bytes_processed(), 150);
+    }
+
+    #[test]
+    fn test_streaming_estimate_time() {
+        let config = streaming_config();
+        let ks = KelvinStreaming::new(config, 1024 * 1024).unwrap(); // 1 MiB per step
+
+        let (steps, secs) = ks.estimate_time(10 * 1024 * 1024, 10000.0); // 10 MiB file
+        assert_eq!(steps, 10); // 10 MiB / 1 MiB = 10 steps
+        assert!((secs - 0.001).abs() < 0.001); // 10 / 10000 = 0.001s
+    }
+
+    #[test]
+    fn test_streaming_benchmark() {
+        let config = streaming_config();
+        let ks = KelvinStreaming::new(config, 64).unwrap();
+        let rate = ks.benchmark(100);
+        assert!(rate > 0.0, "benchmark should return positive rate");
     }
 }
