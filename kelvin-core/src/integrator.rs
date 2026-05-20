@@ -73,12 +73,22 @@ pub fn compute_accelerations(bodies: &[OrbitalBody], softening: Fixed, g: Fixed)
 /// Perform one explicit Euler integration step.
 ///
 /// 1. Compute accelerations a from current positions
-/// 2. Update velocities: v ← v + a * dt
-/// 3. Update positions:  x ← x + v * dt
+/// 2. Update positions:  x ← x + v * dt       (using OLD velocity)
+/// 3. Update velocities: v ← v + a * dt
+///
+/// ## Why true explicit Euler?
+///
+/// True explicit Euler updates position **before** velocity, using the old
+/// velocity for the position update. This is **not** symplectic — energy
+/// drift amplifies chaos ~10x faster than Verlet, making it preferred for
+/// cryptographic entropy generation.
+///
+/// In contrast, semi-implicit (symplectic) Euler updates velocity first,
+/// then uses the new velocity for the position update. That form conserves
+/// energy and is NOT what we want for entropy generation.
 ///
 /// ## Why Euler for cryptography?
 ///
-/// Euler integration is preferred for cryptographic entropy generation because:
 /// - **Numerical instability** = More entropy per step (energy drift amplifies chaos)
 /// - **Chaos amplification** = Lyapunov time ~10x shorter than Verlet
 /// - **Harder to reverse** = Numerical dissipation creates one-way function property
@@ -89,14 +99,17 @@ pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fi
     // Step 1: Compute accelerations from current positions
     let acc = compute_accelerations(bodies, softening, g);
 
-    // Step 2: Update velocities: v ← v + a * dt
+    // Step 2: Update positions using OLD velocity (true explicit Euler).
+    // This is NOT symplectic — energy drift amplifies chaos ~10x faster
+    // than semi-implicit (symplectic) Euler. The numerical instability
+    // is a feature for entropy generation.
     for (body, a) in bodies.iter_mut().zip(acc.iter()) {
+        // Save old velocity before updating position
+        let v_old = body.velocity;
+        // Update position using OLD velocity (explicit Euler)
+        body.position += v_old.scale(dt);
+        // Update velocity using current acceleration
         body.velocity += a.scale(dt);
-    }
-
-    // Step 3: Update positions: x ← x + v * dt
-    for body in bodies.iter_mut() {
-        body.position += body.velocity.scale(dt);
     }
 }
 

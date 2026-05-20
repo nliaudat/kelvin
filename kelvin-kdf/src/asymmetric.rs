@@ -138,7 +138,7 @@ impl OrbitalKeyPair {
         );
 
         let result = estimator
-            .estimate(config.total_steps / 10, config.total_steps)
+            .estimate(config.total_steps, config.total_steps)
             .map_err(|_| AsymmetricError::SimulationError)?;
 
         if config.total_steps < result.min_chaos_steps {
@@ -282,7 +282,7 @@ mod tests {
 
         OrbitalConfig::new(
             vec![sun, planet1, planet2, planet3, planet4],
-            50,
+            1000,
             10,
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),

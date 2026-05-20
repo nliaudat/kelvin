@@ -52,6 +52,7 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
+mod authenticated;
 mod decrypt;
 mod encrypt;
 mod error;
@@ -69,6 +70,7 @@ pub use kelvin_stream::{ChaChaStream, StreamCipher};
 #[cfg(feature = "aes-ni")]
 pub use kelvin_stream::AesGcmStream;
 
+pub use authenticated::{KelvinPhotonAuthenticated, KelvinQuantumAuthenticated};
 pub use photon::KelvinPhoton;
 pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_ORBITAL_STEPS};
 
@@ -163,18 +165,17 @@ pub fn simulate_and_extract_seed_with_method(
         },
     }
 
-    // Extract initial 2048-byte seed (using SHAKE256 XOF)
-    let mut seed_vec = extract_shake256(
+    // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
+    // a fixed-size array — avoids an unnecessary Vec allocation.
+    let mut seed = [0u8; 2048];
+    extract_shake256_into(
         &bodies,
         config.total_steps,
         config.g,
         config.softening,
         b"kelvin-orbital-state-v1",
-        2048,
+        &mut seed,
     );
-    let mut seed = [0u8; 2048];
-    seed.copy_from_slice(&seed_vec);
-    seed_vec.zeroize();
 
     Ok((seed, bodies))
 }
@@ -262,18 +263,17 @@ impl Kelvin {
             },
         }
 
-        // Extract initial 2048-byte seed (using SHAKE256 XOF)
-        let mut seed_vec = extract_shake256(
+        // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
+        // a fixed-size array — avoids an unnecessary Vec allocation.
+        let mut seed = [0u8; 2048];
+        extract_shake256_into(
             &bodies,
             config.total_steps,
             config.g,
             config.softening,
             b"kelvin-orbital-state-v1",
-            2048,
+            &mut seed,
         );
-        let mut seed = [0u8; 2048];
-        seed.copy_from_slice(&seed_vec);
-        seed_vec.zeroize();
 
         // Apply expansion factor to safe_steps
         let safe_steps = result.min_chaos_steps.saturating_mul(config.expansion_factor.max(1));

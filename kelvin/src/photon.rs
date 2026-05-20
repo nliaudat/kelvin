@@ -151,31 +151,32 @@ impl KelvinPhoton {
     /// XOR is its own inverse, so encryption and decryption are the same operation.
     ///
     /// Processes data in 1 MB chunks to avoid allocating a full-size keystream
-    /// buffer for the entire input. Each chunk allocates a temporary buffer of
-    /// at most 1 MB, preventing OOM crashes when processing large (multi-GB) data.
-    /// The temporary buffer is zeroized after use.
+    /// buffer for the entire input. A single reusable buffer of at most 1 MB
+    /// is allocated once and reused across chunks, preventing OOM crashes when
+    /// processing large (multi-GB) data. The buffer is zeroized after use.
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
         if data.is_empty() {
             return Ok(());
         }
+        // Allocate a reusable keystream buffer once (max CHUNK_SIZE = 1 MB).
+        // Reusing the buffer avoids thousands of allocations for multi-GB inputs.
+        let mut keystream = vec![0u8; Self::CHUNK_SIZE];
         let mut offset = 0;
         while offset < data.len() {
             let remaining = data.len() - offset;
             let chunk_size = std::cmp::min(remaining, Self::CHUNK_SIZE);
             let chunk = &mut data[offset..offset + chunk_size];
 
-            // Generate keystream into a temporary buffer, then XOR into data.
-            // The temp buffer is at most CHUNK_SIZE (1 MB), preventing OOM
-            // even for multi-GB inputs. The buffer is zeroized after use.
-            let mut keystream = vec![0u8; chunk_size];
-            self.generate_keystream_into(&mut keystream)?;
-            for (d, k) in chunk.iter_mut().zip(keystream.iter()) {
+            // Generate keystream into the reusable buffer (only the portion
+            // needed for this chunk), then XOR into data.
+            self.generate_keystream_into(&mut keystream[..chunk_size])?;
+            for (d, k) in chunk.iter_mut().zip(keystream[..chunk_size].iter()) {
                 *d ^= k;
             }
-            keystream.zeroize();
 
             offset += chunk_size;
         }
+        keystream.zeroize();
         self.bytes_processed += data.len() as u64;
         Ok(())
     }
