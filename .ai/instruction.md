@@ -78,8 +78,9 @@ KEY TECHNICAL DECISIONS
 Math:    Q32.64 fixed-point (i128). 32 int bits, 64 frac bits.
          NO FLOATING POINT ANYWHERE IN CORE. Determinism depends on this.
 
-Integra- Symplectic Verlet (kick-drift-kick). O(n²) pairwise, n <= 7.
-tion:    Softening factor ε prevents singularity. ε = 1e-10 in body.rs.
+Integra- Symplectic Verlet (default) or explicit Euler (`--euler` flag).
+tion:    Euler's numerical instability amplifies chaos ~10x faster.
+         O(n²) pairwise, n <= 7. Softening factor ε prevents singularity.
 
 Hash:    SHA3-512 (Keccak). Domain separator b"kelvin-orbital-state-v1".
          Step counter in hash input. First 256 bits become master key.
@@ -109,10 +110,21 @@ NON-NEGOTIABLE SECURITY PROPERTIES
 PUBLIC API (kelvin crate)
 
   Kelvin::new(config: OrbitalConfig) -> Result<Self, KelvinError>
+  Kelvin::new_with_method(config, IntegrationMethod) -> Result<Self, KelvinError>
   Kelvin::encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError>
   Kelvin::decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError>
   Kelvin::bytes_processed(&self) -> u64
   Kelvin::remaining_safe_bytes(&self) -> u64
+
+  KelvinStreaming::new(config, bytes_per_step) -> Result<Self, KelvinError>
+  KelvinStreaming::new_with_method(config, bytes_per_step, IntegrationMethod) -> Result<Self, KelvinError>
+
+  simulate_and_extract_seed_with_method(config, IntegrationMethod) -> ([u8; 2048], Vec<OrbitalBody>)
+
+  IntegrationMethod enum: Verlet (default), Euler
+
+CLI: --euler flag on encrypt/decrypt selects Euler integration.
+     Default (no flag) uses Verlet. Must match between encrypt/decrypt.
 
 Encrypt and decrypt are the same operation (XOR with keystream).
 

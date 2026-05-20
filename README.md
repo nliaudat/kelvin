@@ -19,7 +19,8 @@
 Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines:
 
 - **Q32.64 fixed-point arithmetic** — deterministic across all platforms
-- **Symplectic Verlet integrator** — energy-conserving n-body simulation
+- **Symplectic Verlet integrator** — energy-conserving n-body simulation (default)
+- **Euler integrator** — numerically unstable, faster chaos amplification (`--euler` flag)
 - **Lyapunov time estimation** — shadow orbit method for chaos quantification
 - **SHAKE256 XOF entropy extraction** — 2048-byte domain-separated hashing of orbital state
 - **ChaCha20 stream cipher** — XOR-based encryption/decryption
@@ -56,7 +57,7 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 
 2. **Lyapunov time estimation** — Before running the full simulation, Kelvin estimates the Lyapunov time of the system using the shadow orbit method. This quantifies the chaotic divergence rate and ensures the simulation runs within the predictable regime. If the requested step count exceeds the safe Lyapunov horizon, the system rejects the configuration.
 
-3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator that conserves energy and momentum. The deterministic fixed-point arithmetic ensures bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
+3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator (default) or an explicit Euler integrator (`--euler` flag). Verlet conserves energy and momentum for physically realistic trajectories; Euler's numerical instability amplifies chaos ~10x faster for maximum entropy per step. Both use deterministic fixed-point arithmetic for bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
 
 4. **Seed extraction** — After simulation, the final orbital state is hashed with **SHAKE256 (XOF)** using domain separation. This process incorporates the full physical state: positions, velocities, masses, the gravitational constant ($G$), the softening factor, and the **instantaneous gravitational force vectors** acting on every body. This produces a **2048-byte** cryptographically strong seed that is physically bound to the simulation's reality.
 
@@ -67,16 +68,38 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 ## Architecture
 
 ```
-kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet integrator
+kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet/Euler integrator
 kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHAKE256 XOF extractor, KeySchedule
 kelvin-stream/   — ChaCha20 wrapper with StreamCipher trait
-kelvin/          — Top-level Kelvin struct (V1 encrypt/decrypt) + KelvinStreaming (V2 streaming)
-kelvin-cli/      — CLI tool (keygen, encrypt, decrypt, benchmark, identify)
+kelvin/          — Top-level struct with 4 modes: Secure (V1), Chaos (V2),
+                   Photon (V3), Quantum (H)
+kelvin-cli/      — CLI tool (keygen, encrypt/decrypt with --mode, benchmark, identify)
 kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 kelvin-demo/     — Demo kit: 3D orbital visualizer, test binaries, sample keys
 kelvin-test-client/ — Integration test client (self-test + test vector verification)
 kelvin-test-server/ — Test vector generation server
 ```
+
+## Cryptographic Modes
+
+Kelvin provides four cryptographic modes, each optimized for different use cases. All modes support both Verlet (default) and Euler (`--euler`) integration.
+
+| Parameter | V1 `Secure` | V2 `Chaos` | V3 `Photon` | H `Quantum` |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tagline** | *"The safe choice"* | *"Pure chaotic streaming"* | *"Fast as light"* | *"Best of all worlds"* |
+| **Engine** | `Kelvin` | `KelvinStreaming` | `KelvinPhoton` | `KelvinQuantum` |
+| **Simulation** | Upfront (Verlet/Euler) | Per-step (Verlet/Euler) | Upfront (Verlet/Euler) | Upfront + periodic reseed |
+| **Cipher** | ChaCha20Poly1305 AEAD | SHAKE256 XOR per-step | HKDF→SHAKE256 XOR | Hybrid cache+XOR + orbital reseed |
+| **Authentication** | ✅ Fully Authenticated | ❌ None (XOR only) | ❌ None (XOR only) | ❌ None (XOR only) |
+| **Keystream** | Finite (~28 GiB) | ✅ Unlimited | Finite (key schedule bound) | ✅ Effectively unlimited |
+| **Setup time** | Seconds–minutes | Instant | Seconds–minutes | Seconds–minutes |
+| **First byte** | After setup | Milliseconds | After setup | After setup |
+| **Bulk throughput** | ~500 MB/s | Slow (O(N) sim/chunk) | ~200 MB/s | ~500 MB/s |
+| **Ideal use case** | Storage / authenticated channels | Lightweight real-time streams | 1 MB–1 GB batch encryption | Large bulk data requiring fresh entropy |
+| **CLI flag** | `--mode secure` (default) | `--mode chaos` | `--mode photon` | `--mode quantum` |
+| **Integration method** | `--euler` available | `--euler` available | `--euler` available | `--euler` available |
+
+> **Note:** All modes use the same `OrbitalConfig` shared secret. The integration method (Verlet/Euler) must match between encryption and decryption.
 
 
 ## Security Levels

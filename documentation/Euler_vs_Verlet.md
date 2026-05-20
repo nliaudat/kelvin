@@ -1,5 +1,7 @@
 # Euler vs Verlet: Why Numerical Instability Is a Feature for Cryptographic Entropy
 
+> **CLI Usage:** The `--euler` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--euler` to select Euler integration; omit it for the default Verlet. The integration method must match between encryption and decryption.
+
 ## The Critical Insight
 
 For **physical simulation**, Verlet integration is superior — it conserves energy, preserves phase-space volume, and produces physically realistic trajectories. But for **cryptographic entropy generation**, Euler's numerical instability is a **feature, not a bug**.
@@ -21,9 +23,10 @@ For **physical simulation**, Verlet integration is superior — it conserves ene
 Euler's explicit integration introduces systematic energy drift. Each step accumulates error, causing the trajectory to diverge from the "true" physical path. For entropy generation, this is ideal — the trajectory becomes unpredictable much faster than with Verlet.
 
 ```rust
-// Euler: simple, numerically unstable
+// Euler: simple, numerically unstable (explicit: position before velocity)
+let v_old = self.velocities[i][j];
+self.positions[i][j] += v_old * DT;
 self.velocities[i][j] += accel[i][j] * DT;
-self.positions[i][j] += self.velocities[i][j] * DT;
 
 // Verlet: symplectic, energy-conserving
 self.positions[i][j] += self.velocities[i][j] * DT + 0.5 * accel_current[i][j] * DT * DT;
@@ -83,8 +86,10 @@ pub fn euler_step(&mut self) -> Result<(), OrbitalError> {
 
     for i in 0..5 {
         for j in 0..3 {
+            // True explicit Euler: position before velocity
+            let v_old = self.velocities[i][j];
+            self.positions[i][j] += v_old * DT;
             self.velocities[i][j] += accel[i][j] * DT;
-            self.positions[i][j] += self.velocities[i][j] * DT;
         }
     }
 

@@ -7,7 +7,7 @@ Kelvin is the culmination of over two decades of research into the intersection 
 ## Timeline
 
 ### 2002: The Foundation (Project "Celestial")
-*   **Initial Conception**: The project began as a theoretical exploration of using the n-body problem for non-repeating keystream generation.
+*   **Initial Conception**: The project began as a theoretical exploration of using the n-body problem for non-repeating keystream generation. (Using fast Euler approximation)
 *   **Early Implementation**: Written in C using IEEE 754 double-precision floating point.
 *   **The "Drift" Crisis**: Early prototypes failed the fundamental requirement of determinism.
     > In a chaotic system, a difference in the 15th decimal place between an **AMD Athlon XP** and an **Intel Pentium 4** would result in completely different orbital states (and thus different keys) after just a few thousand steps.

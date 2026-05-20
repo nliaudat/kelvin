@@ -49,8 +49,11 @@ pub use constants::{
     SOLAR_MASS,
 };
 pub use fixed_math::Fixed;
-pub use integrator::{compute_accelerations, simulate, verlet_step};
-pub use stability::{detect_collapse, is_body_ejected, simulate_with_monitoring, StabilityError};
+pub use integrator::{compute_accelerations, euler_step, simulate, verlet_step};
+pub use stability::{
+    detect_collapse, is_body_ejected, simulate_with_monitoring, simulate_with_monitoring_euler,
+    StabilityError,
+};
 
 #[cfg(test)]
 mod tests {

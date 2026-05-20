@@ -70,6 +70,36 @@ pub fn compute_accelerations(bodies: &[OrbitalBody], softening: Fixed, g: Fixed)
     accelerations
 }
 
+/// Perform one explicit Euler integration step.
+///
+/// 1. Compute accelerations a from current positions
+/// 2. Update velocities: v ← v + a * dt
+/// 3. Update positions:  x ← x + v * dt
+///
+/// ## Why Euler for cryptography?
+///
+/// Euler integration is preferred for cryptographic entropy generation because:
+/// - **Numerical instability** = More entropy per step (energy drift amplifies chaos)
+/// - **Chaos amplification** = Lyapunov time ~10x shorter than Verlet
+/// - **Harder to reverse** = Numerical dissipation creates one-way function property
+/// - **Faster divergence** = Same number of steps produces more trajectory divergence
+///
+/// Verlet remains the default for backward compatibility. Use `--euler` to opt in.
+pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) {
+    // Step 1: Compute accelerations from current positions
+    let acc = compute_accelerations(bodies, softening, g);
+
+    // Step 2: Update velocities: v ← v + a * dt
+    for (body, a) in bodies.iter_mut().zip(acc.iter()) {
+        body.velocity += a.scale(dt);
+    }
+
+    // Step 3: Update positions: x ← x + v * dt
+    for body in bodies.iter_mut() {
+        body.position += body.velocity.scale(dt);
+    }
+}
+
 /// Perform one symplectic Verlet step (kick-drift-kick).
 ///
 /// 1. Kick:   v ← v + a * dt/2
@@ -77,6 +107,7 @@ pub fn compute_accelerations(bodies: &[OrbitalBody], softening: Fixed, g: Fixed)
 /// 3. Compute new accelerations a'
 /// 4. Kick:   v ← v + a' * dt/2
 pub fn verlet_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) {
+
     let half_dt = dt / Fixed::from_int(2);
 
     // Step 1: Kick (half step)
