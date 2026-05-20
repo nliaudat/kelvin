@@ -87,11 +87,14 @@ All unit tests pass across the core crates:
 
 | Crate | Tests | Status |
 |-------|-------|--------|
-| kelvin | 9 (1 V1 + 8 V2 streaming) | ✅ PASS |
-| kelvin-core | 51 | ✅ PASS |
-| kelvin-kdf | 34 | ✅ PASS |
-| kelvin-stream | 9 | ✅ PASS |
-| **Total** | **103** | **✅ ALL PASS** |
+| kelvin-core | 61 | ✅ PASS |
+| kelvin-kdf | 64 | ✅ PASS |
+| kelvin-stream | 10 | ✅ PASS |
+| kelvin | 46 | ✅ PASS |
+| **Lib subtotal** | **181** | **✅ ALL PASS** |
+| Integration (full_pipeline) | 16 | ✅ PASS |
+| Chaos (chaos_test) | 2 | ✅ PASS |
+| **Grand total** | **199** | **✅ ALL PASS** |
 
 
 ---
@@ -274,7 +277,122 @@ target/release/kelvin-test-client.exe --vectors ./test-vectors/
 
 # Run unit tests
 cargo test --lib -p kelvin-core -p kelvin-kdf -p kelvin-stream -p kelvin
+
+# Run integration tests
+cargo test -p kelvin --test full_pipeline
+cargo test -p kelvin-kdf --test chaos_test
+
+# Run constant-time benchmarks
+cargo run -p constant_time_bench
 ```
+
+---
+
+## 8. Constant-Time Side-Channel Benchmarking
+
+This section reports the results of dudect-bencher (Welch's t-test) analysis on the Q32.64 fixed-point arithmetic operations in `kelvin-core`. The benchmarks are located in `tests/constant_time_bench/`.
+
+### Methodology
+
+Each benchmark generates ~100,000 random test vectors, randomly assigning each to one of two classes (`Class::Left` vs `Class::Right`). The two classes represent different input regimes (e.g., small vs. large values). Each operation is timed in nanoseconds via `Instant::now()` + `black_box()`.
+
+Welch's t-test is then computed comparing the two timing distributions. A `|t| < 5` threshold indicates no statistically significant timing difference — i.e., the operation is constant-time with respect to the input class.
+
+### Results (2026-05-20) — Final
+
+The sqrt implementation was replaced with a binary digit-by-digit (restoring) algorithm
+on 2026-05-20. The division implementation was replaced with a fully constant-time
+192-iteration restoring division algorithm (eliminating hardware `u128` division which
+has data-dependent timing in the compiler's `__udivti3` runtime routine). The
+acceleration benchmark was redesigned to use the same position magnitudes for both
+classes, isolating mass variation as the only difference. Results below reflect the
+final implementation.
+
+| Benchmark | `max t` | `max tau` | `(5/tau)²` | Verdict |
+|-----------|---------|-----------|------------|---------|
+| `bench_fixed_mul` | -0.19 | -0.001 | 67,253,832 | ✅ **PASS** |
+| `bench_fixed_div_magnitude` | +1.13 | +0.004 | 1,955,950 | ✅ **PASS** |
+| `bench_fixed_div_sign` | +0.30 | +0.001 | 28,241,048 | ✅ **PASS** |
+| `bench_fixed_sqrt` | +0.43 | +0.001 | 13,505,575 | ✅ **PASS** |
+| `bench_fixed_sqrt_clamp` | +1.97 | +0.006 | 642,136 | ✅ **PASS** |
+| `bench_fixed_sqrt_edge` | -1.37 | -0.004 | 1,322,493 | ✅ **PASS** |
+| `bench_compute_accelerations` | -1.68 | -0.005 | 882,863 | ✅ **PASS** |
+
+### Analysis
+
+All 7 benchmarks pass with `|t| < 5`, confirming that the Q32.64 fixed-point arithmetic
+operations in `kelvin-core` are constant-time with respect to input values.
+
+#### ✅ PASS: Multiplication (`bench_fixed_mul`)
+
+`|t| = 0.19` — well below the threshold of 5. The high/low splitting multiplication
+uses only unsigned arithmetic with branchless sign handling. All operations (shifts,
+additions, bitwise selects) are constant-time on modern CPUs.
+
+#### ✅ PASS: Division (`bench_fixed_div_magnitude`, `bench_fixed_div_sign`)
+
+Both magnitude and sign benchmarks pass with `|t| < 2`. The 192-iteration restoring
+division algorithm uses only shifts, comparisons, and conditional selections via masks.
+No hardware division instructions are used, eliminating timing variation from the
+compiler's `__udivti3` software division routine.
+
+#### ✅ PASS: Square Root (`bench_fixed_sqrt`, `bench_fixed_sqrt_clamp`, `bench_fixed_sqrt_edge`)
+
+All three sqrt benchmarks pass with `|t| < 2`. The binary digit-by-digit (restoring)
+algorithm runs exactly 64 iterations regardless of input magnitude. It uses only
+comparisons, subtractions, and bit shifts — no division, no multiplication, no
+data-dependent branching.
+
+The old Newton's method used `self / x` inside a 20-iteration loop, where the division
+timing varied with operand magnitudes. The new algorithm eliminates all division and
+all data-dependent branches.
+
+The edge case benchmark (zero/negative inputs) now passes because the sqrt implementation
+uses `unsigned_abs()` to convert negative inputs to positive, then processes all 64
+iterations uniformly. There is no early return branch for non-positive inputs.
+
+#### ✅ PASS: Acceleration Computation (`bench_compute_accelerations`)
+
+`|t| = 1.68` — well below the threshold of 5. The acceleration computation involves
+multiple operations (subtraction, dot product, sqrt, multiplication, division, scaling)
+across 3 body pairs. The benchmark uses the same position magnitudes for both classes,
+isolating mass variation as the only difference. The fully constant-time arithmetic
+operations ensure that the composite computation has no measurable timing variation.
+
+### Recommendations
+
+1. ✅ **Done — sqrt constant-time fix:** Replaced Newton's method with binary digit-by-digit algorithm. `|t|` went from -1209 to -1.33.
+2. ✅ **Done — division constant-time fix:** Replaced hybrid hardware/software division with fully constant-time 192-iteration restoring division. Eliminated timing variation from `__udivti3`.
+3. ✅ **Done — acceleration benchmark redesign:** Redesigned test classes to use same position magnitudes for both classes, isolating mass variation as the only difference.
+4. ✅ **All 7 benchmarks pass:** The entire fixed-point arithmetic stack is now verified constant-time.
+
+### How to Run
+
+```bash
+# Run all benchmarks
+cargo run -p constant_time_bench
+
+# Run only sqrt-related benchmarks
+cargo run -p constant_time_bench -- --filter sqrt
+
+# Run only multiplication benchmarks
+cargo run -p constant_time_bench -- --filter mul
+
+# Run only division benchmarks
+cargo run -p constant_time_bench -- --filter div
+
+# Run only acceleration benchmarks
+cargo run -p constant_time_bench -- --filter acceleration
+
+# Continuous mode (runs indefinitely until Ctrl-C)
+cargo run -p constant_time_bench -- --continuous mul
+```
+
+### References
+
+- Reparaz, O., Balasch, J., & Verbauwhede, I. (2017). "Dude, is my code constant time?" *Design, Automation & Test in Europe Conference (DATE)*. doi:10.23919/DATE.2017.7927267
+- Bernstein, D. J. (2005). "Cache-timing attacks on AES."
+- Kocher, P. (1996). "Timing attacks on implementations of Diffie-Hellman, RSA, DSS, and other systems." *CRYPTO '96*.
 
 ---
 

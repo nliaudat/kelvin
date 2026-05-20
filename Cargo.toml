@@ -8,5 +8,6 @@ members = [
     "kelvin-ffi",
     "kelvin-test-server",
     "kelvin-test-client",
+    "tests/constant_time_bench",
 ]
 resolver = "2"
