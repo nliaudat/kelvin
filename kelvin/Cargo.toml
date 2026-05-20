@@ -14,10 +14,14 @@ kelvin-core = { path = "../kelvin-core" }
 kelvin-kdf = { path = "../kelvin-kdf" }
 kelvin-stream = { path = "../kelvin-stream" }
 aead = "0.5"
+blake3 = "1.5"
+hkdf = "0.12"
+sha3 = { version = "0.10", default-features = false }
 thiserror = "1.0"
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
+
 
 [features]
 default = []

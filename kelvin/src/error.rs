@@ -43,9 +43,14 @@ pub enum KelvinError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Authentication failed (for future KMAC integration).
+    #[error("authentication failed: {0}")]
+    AuthenticationFailed(String),
+
     /// Serialization error.
     #[error("serialization error: {0}")]
     Serialization(String),
+
 }
 
 impl From<kelvin_kdf::ConfigError> for KelvinError {

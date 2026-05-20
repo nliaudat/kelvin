@@ -966,10 +966,8 @@ function animate() {
     for (let s = 0; s < stepsPerFrame; s++) {
       verletStep(bodies, currentDt, currentSoftening, currentG);
       step++;
-
-      // Generate key material on every step (stored for later use)
-      currentKey = hashState(bodies, step);
     }
+
 
     for (let i = 0; i < bodies.length; i++) {
       const b = bodies[i];
@@ -997,7 +995,10 @@ function animate() {
     const now = Date.now();
     if (now - lastKeyUpdate >= 1000) {
       lastKeyUpdate = now;
+      // Generate key material only when display is refreshed (performance optimization)
+      currentKey = hashState(bodies, step);
       keyMaterialBox.textContent = currentKey.slice(0, 64);
+
 
       // Raw orbital state for body 1 (skip sun at index 0 — stationary)
       if (bodies.length > 1) {

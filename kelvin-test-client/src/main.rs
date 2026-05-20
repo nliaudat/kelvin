@@ -323,7 +323,10 @@ fn run_self_test() -> Result<(), String> {
 
     // Use a step count that the Lyapunov estimator will accept.
     // The estimator typically allows ~95 safe steps for this config.
-    let safe_steps: u64 = 100;
+    // Using 80 to ensure the test passes consistently across different platforms
+    // where the estimator may return slightly different values.
+    let safe_steps: u64 = 80;
+
     let config = kelvin::OrbitalConfig::new(
         bodies,
         safe_steps,

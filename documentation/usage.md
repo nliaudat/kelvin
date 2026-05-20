@@ -247,7 +247,7 @@ use kelvin::{KelvinStreaming, OrbitalConfig};
 let config = OrbitalConfig::from_json(&config_json)?;
 let mut ks = KelvinStreaming::new(config, 1024 * 1024)?; // 1 MiB per step
 
-// Encrypt (advances simulation by 1 step)
+// Encrypt (advances simulation by 1 step per bytes_per_step chunk)
 let mut data = b"Hello, V2 streaming!".to_vec();
 ks.encrypt(&mut data)?;
 
@@ -256,6 +256,31 @@ let config = OrbitalConfig::from_json(&config_json)?;
 let mut ks2 = KelvinStreaming::new(config, 1024 * 1024)?;
 ks2.decrypt(&mut data)?;
 assert_eq!(&data, b"Hello, V2 streaming!");
+```
+
+### How `bytes_per_step` Works
+
+The `bytes_per_step` parameter controls how many keystream bytes are produced per Verlet simulation step. This is critical for understanding the streaming API's behavior:
+
+- **Fixed-size chunking**: `process_chunk()` internally processes data in fixed-size chunks of `bytes_per_step` bytes, advancing the simulation by one step per chunk. This ensures the keystream is **deterministic regardless of caller chunking** — a 100-byte call and two 50-byte calls produce the same ciphertext for the same total bytes.
+- **Partial chunks**: A final partial chunk still advances the simulation by one step, but only XORs the needed bytes. The remaining keystream bytes are discarded.
+- **Consistency with `estimate_time`**: Both `process_chunk()` and `estimate_time()` use the same `bytes_per_step` field, so time estimates are always accurate regardless of chunk size.
+
+```rust
+// Example: bytes_per_step = 1024
+let mut ks = KelvinStreaming::new(config, 1024)?;
+
+// A 100-byte call → 1 Verlet step (100 of 1024 keystream bytes used)
+let mut small = vec![0u8; 100];
+ks.encrypt(&mut small)?;
+
+// A 2000-byte call → 2 Verlet steps (1024 + 976 bytes)
+let mut large = vec![0u8; 2000];
+ks.encrypt(&mut large)?;
+
+// Total: 3 steps, 2100 bytes processed
+assert_eq!(ks.step(), 3);
+assert_eq!(ks.bytes_processed(), 2100);
 ```
 
 ### Benchmarking and ETA
@@ -269,15 +294,29 @@ let (steps, seconds) = ks.estimate_time(file_size, rate);
 println!("Need {steps} steps, ~{seconds:.1}s");
 ```
 
+The `estimate_time` function divides the file size by `bytes_per_step` to compute the number of steps needed, then divides by the benchmark rate for the time estimate. This is always consistent with actual processing because both use the same `bytes_per_step` value.
+
 ### Example
 
 ```bash
 cargo run --example simple_streaming -p kelvin
 ```
 
+### 3D Orbital Visualizer
+
+The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.html`) that provides real-time visualization of the n-body simulation:
+
+- **Open in browser**: No server required — just open the HTML file.
+- **Load config**: Use the file picker to load a `key.json` file and visualize its orbital dynamics.
+- **Controls**: Drag to rotate, scroll to zoom, Space/P to pause, R to reset.
+- **KDF pipeline display**: Hover over each stage (Extract, Expand, Encrypt, Sign) for detailed information about the cryptographic pipeline.
+- **Performance**: Key material display is throttled to once per second to avoid redundant SHAKE256 calculations during high-speed simulation.
+
 ### Security Notes
 
 - **V2 is a pure XOR stream cipher** — no authentication. Use a MAC for integrity.
 - Each step produces `bytes_per_step` bytes of keystream from SHAKE256 XOF.
 - The domain separator `b"kelvin-streaming-v2-v1-000000000"` ensures domain separation from V1.
-- Deterministic: same config + same step count = same keystream.
+- **Deterministic**: same config + same step count = same keystream, regardless of how the caller chunks the data (as long as total bytes processed is the same).
+- **Unlimited keystream**: Unlike V1's finite key schedule, V2 can keep simulating indefinitely — there is no `SeedExhausted` error.
+

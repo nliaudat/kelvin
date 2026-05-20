@@ -7,5 +7,5 @@
   "keystream_hex": "2c5db7e88905b37e916c1e89e10934b834f7461957e4cf16e12cd2cdde50b999028c660ee0084efcf34c5cd252e69a983aa2696fccb13561f7b362702b3b56cdfc8ddd4e",
   "num_bodies": 5,
   "total_steps": 50,
-  "generation_time_s": 0.376863
+  "generation_time_s": 0.378614
 }

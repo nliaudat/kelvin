@@ -31,6 +31,7 @@ mod asymmetric;
 mod config;
 mod extractor;
 mod lyapunov;
+mod orbital_state;
 mod schedule;
 
 pub use config::{ConfigError, OrbitalConfig};
@@ -38,4 +39,6 @@ pub use extractor::{extract_seed, extract_shake256};
 pub use lyapunov::{LyapunovConfidence, LyapunovError, LyapunovEstimator, LyapunovResult};
 
 pub use asymmetric::{AsymmetricError, OrbitalKeyPair};
+pub use orbital_state::{OrbitalError, OrbitalState, MAX_VERLET_STEPS};
 pub use schedule::{KeySchedule, ScheduleState};
+

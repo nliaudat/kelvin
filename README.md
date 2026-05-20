@@ -70,10 +70,14 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet integrator
 kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHAKE256 XOF extractor, KeySchedule
 kelvin-stream/   — ChaCha20 wrapper with StreamCipher trait
-kelvin/          — Top-level Kelvin struct (encrypt/decrypt)
-kelvin-cli/      — CLI tool (keygen, encrypt, decrypt, benchmark)
+kelvin/          — Top-level Kelvin struct (V1 encrypt/decrypt) + KelvinStreaming (V2 streaming)
+kelvin-cli/      — CLI tool (keygen, encrypt, decrypt, benchmark, identify)
 kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
+kelvin-demo/     — Demo kit: 3D orbital visualizer, test binaries, sample keys
+kelvin-test-client/ — Integration test client (self-test + test vector verification)
+kelvin-test-server/ — Test vector generation server
 ```
+
 
 ## Security Levels
 
