@@ -162,7 +162,101 @@ pub fn detect_collapse(
     None
 }
 
-/// Run the simulation with periodic stability monitoring.
+/// Type alias for a step function used by the simulation loop.
+type StepFn = fn(&mut [OrbitalBody], Fixed, Fixed, Fixed);
+
+/// Shared implementation for simulation with periodic stability monitoring.
+///
+/// Both [`simulate_with_monitoring`] and [`simulate_with_monitoring_euler`]
+/// delegate to this function, differing only in which step function they pass.
+/// This eliminates ~120 lines of duplicated logic and ensures that any future
+/// changes to stability monitoring logic apply to both integrators automatically.
+///
+/// # Arguments
+/// * `bodies` — Mutable slice of orbital bodies (modified in-place).
+/// * `steps` — Total number of simulation steps.
+/// * `dt` — Time step.
+/// * `softening` — Softening factor.
+/// * `g` — Gravitational constant.
+/// * `min_separation` — Minimum allowed distance between bodies.
+/// * `monitor_interval` — Steps between stability checks.
+/// * `ejection_energy_threshold` — Energy threshold for ejection detection.
+/// * `step_fn` — The integration step function to use (e.g., `verlet_step` or `euler_step`).
+///
+/// # Returns
+/// `Ok(())` if the simulation completed without stability violations.
+/// `Err(StabilityError)` if ejection or collapse was detected.
+#[allow(clippy::too_many_arguments)]
+fn simulate_with_monitoring_inner(
+    bodies: &mut [OrbitalBody],
+    steps: u64,
+    dt: Fixed,
+    softening: Fixed,
+    g: Fixed,
+    min_separation: Fixed,
+    monitor_interval: u64,
+    ejection_energy_threshold: Fixed,
+    step_fn: StepFn,
+) -> Result<(), StabilityError> {
+    let effective_interval =
+        if monitor_interval == 0 { MONITOR_INTERVAL } else { monitor_interval };
+
+    // Ensure we check at least once at the end
+    let check_interval = effective_interval.min(steps);
+
+    // Check initial configuration before any steps
+    if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
+        return Err(StabilityError::BodyCollision {
+            body_i: i,
+            body_j: j,
+            step: 0,
+            distance: dist.to_f64(),
+        });
+    }
+    for i in 0..bodies.len() {
+        if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
+            let energy = (bodies[i].kinetic_energy()
+                + gravitational_potential(i, bodies, g, softening))
+            .to_f64();
+            return Err(StabilityError::BodyEjected { body_index: i, step: 0, energy });
+        }
+    }
+
+    for step in 0..steps {
+        step_fn(bodies, dt, softening, g);
+
+        // Check stability at intervals and at the final step
+        if (step + 1) % check_interval == 0 || step + 1 == steps {
+            // Check for collapse first (geometric check, cheaper)
+            if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
+                return Err(StabilityError::BodyCollision {
+                    body_i: i,
+                    body_j: j,
+                    step: step + 1,
+                    distance: dist.to_f64(),
+                });
+            }
+
+            // Check for ejection (energy-based check)
+            for i in 0..bodies.len() {
+                if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
+                    let energy = (bodies[i].kinetic_energy()
+                        + gravitational_potential(i, bodies, g, softening))
+                    .to_f64();
+                    return Err(StabilityError::BodyEjected {
+                        body_index: i,
+                        step: step + 1,
+                        energy,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Run the simulation with periodic stability monitoring using Verlet integration.
 ///
 /// Wraps the standard `simulate()` loop with periodic checks for:
 /// - Body ejection (unbound orbit energy)
@@ -196,62 +290,10 @@ pub fn simulate_with_monitoring(
     monitor_interval: u64,
     ejection_energy_threshold: Fixed,
 ) -> Result<(), StabilityError> {
-    let effective_interval =
-        if monitor_interval == 0 { MONITOR_INTERVAL } else { monitor_interval };
-
-    // Ensure we check at least once at the end
-    let check_interval = effective_interval.min(steps);
-
-    // Check initial configuration before any steps
-    if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
-        return Err(StabilityError::BodyCollision {
-            body_i: i,
-            body_j: j,
-            step: 0,
-            distance: dist.to_f64(),
-        });
-    }
-    for i in 0..bodies.len() {
-        if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
-            let energy = (bodies[i].kinetic_energy()
-                + gravitational_potential(i, bodies, g, softening))
-            .to_f64();
-            return Err(StabilityError::BodyEjected { body_index: i, step: 0, energy });
-        }
-    }
-
-    for step in 0..steps {
-        verlet_step(bodies, dt, softening, g);
-
-        // Check stability at intervals and at the final step
-        if (step + 1) % check_interval == 0 || step + 1 == steps {
-            // Check for collapse first (geometric check, cheaper)
-            if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
-                return Err(StabilityError::BodyCollision {
-                    body_i: i,
-                    body_j: j,
-                    step: step + 1,
-                    distance: dist.to_f64(),
-                });
-            }
-
-            // Check for ejection (energy-based check)
-            for i in 0..bodies.len() {
-                if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
-                    let energy = (bodies[i].kinetic_energy()
-                        + gravitational_potential(i, bodies, g, softening))
-                    .to_f64();
-                    return Err(StabilityError::BodyEjected {
-                        body_index: i,
-                        step: step + 1,
-                        energy,
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(())
+    simulate_with_monitoring_inner(
+        bodies, steps, dt, softening, g, min_separation,
+        monitor_interval, ejection_energy_threshold, verlet_step,
+    )
 }
 
 /// Run the simulation with periodic stability monitoring using Euler integration.
@@ -273,58 +315,10 @@ pub fn simulate_with_monitoring_euler(
     monitor_interval: u64,
     ejection_energy_threshold: Fixed,
 ) -> Result<(), StabilityError> {
-    let effective_interval =
-        if monitor_interval == 0 { MONITOR_INTERVAL } else { monitor_interval };
-
-    let check_interval = effective_interval.min(steps);
-
-    // Check initial configuration before any steps
-    if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
-        return Err(StabilityError::BodyCollision {
-            body_i: i,
-            body_j: j,
-            step: 0,
-            distance: dist.to_f64(),
-        });
-    }
-    for i in 0..bodies.len() {
-        if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
-            let energy = (bodies[i].kinetic_energy()
-                + gravitational_potential(i, bodies, g, softening))
-            .to_f64();
-            return Err(StabilityError::BodyEjected { body_index: i, step: 0, energy });
-        }
-    }
-
-    for step in 0..steps {
-        euler_step(bodies, dt, softening, g);
-
-        if (step + 1) % check_interval == 0 || step + 1 == steps {
-            if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
-                return Err(StabilityError::BodyCollision {
-                    body_i: i,
-                    body_j: j,
-                    step: step + 1,
-                    distance: dist.to_f64(),
-                });
-            }
-
-            for i in 0..bodies.len() {
-                if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
-                    let energy = (bodies[i].kinetic_energy()
-                        + gravitational_potential(i, bodies, g, softening))
-                    .to_f64();
-                    return Err(StabilityError::BodyEjected {
-                        body_index: i,
-                        step: step + 1,
-                        energy,
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(())
+    simulate_with_monitoring_inner(
+        bodies, steps, dt, softening, g, min_separation,
+        monitor_interval, ejection_energy_threshold, euler_step,
+    )
 }
 
 /// Compute the gravitational potential energy of a single body with respect

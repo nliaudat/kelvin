@@ -165,18 +165,17 @@ pub fn simulate_and_extract_seed_with_method(
         },
     }
 
-    // Extract initial 2048-byte seed (using SHAKE256 XOF)
-    let mut seed_vec = extract_shake256(
+    // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
+    // a fixed-size array — avoids an unnecessary Vec allocation.
+    let mut seed = [0u8; 2048];
+    extract_shake256_into(
         &bodies,
         config.total_steps,
         config.g,
         config.softening,
         b"kelvin-orbital-state-v1",
-        2048,
+        &mut seed,
     );
-    let mut seed = [0u8; 2048];
-    seed.copy_from_slice(&seed_vec);
-    seed_vec.zeroize();
 
     Ok((seed, bodies))
 }
@@ -264,18 +263,17 @@ impl Kelvin {
             },
         }
 
-        // Extract initial 2048-byte seed (using SHAKE256 XOF)
-        let mut seed_vec = extract_shake256(
+        // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
+        // a fixed-size array — avoids an unnecessary Vec allocation.
+        let mut seed = [0u8; 2048];
+        extract_shake256_into(
             &bodies,
             config.total_steps,
             config.g,
             config.softening,
             b"kelvin-orbital-state-v1",
-            2048,
+            &mut seed,
         );
-        let mut seed = [0u8; 2048];
-        seed.copy_from_slice(&seed_vec);
-        seed_vec.zeroize();
 
         // Apply expansion factor to safe_steps
         let safe_steps = result.min_chaos_steps.saturating_mul(config.expansion_factor.max(1));

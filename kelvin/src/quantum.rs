@@ -146,10 +146,18 @@ impl KelvinQuantum {
             // Perturb body positions using seed-derived material.
             // The perturbation magnitude (~1e-12) is small enough to stay within
             // the chaotic regime but large enough to cause rapid divergence.
+            //
+            // SAFETY: We interpret the raw bytes as a u64 fraction in [0, 1)
+            // and scale by 1e-12. This avoids producing NaN or Infinity, which
+            // would silently corrupt the orbital state. Raw f64::from_le_bytes
+            // can produce NaN when the exponent bits are all 1 and mantissa is
+            // non-zero — with 8 independent perturbations, the probability of
+            // hitting at least one NaN is ~0.4%.
             let perturb = |bytes: &[u8]| -> f64 {
                 let mut buf = [0u8; 8];
                 buf.copy_from_slice(&bytes[..8.min(bytes.len())]);
-                f64::from_le_bytes(buf) * 1e-12
+                let bits = u64::from_le_bytes(buf);
+                (bits as f64 / u64::MAX as f64) * 1e-12
             };
 
             state.positions[0][0] += perturb(&p[0..8]);
@@ -219,10 +227,6 @@ impl KelvinQuantum {
             remaining -= take;
         }
 
-        // Zeroize the result before returning to prevent keystream material
-        // from lingering on the heap if the caller forgets to zeroize.
-        // The caller still owns the Vec and should zeroize it after use.
-        // This is a defense-in-depth measure.
         Ok(result)
     }
 
