@@ -28,3 +28,5 @@ test-vectors/kelvin-test-standard-1.json
 test-vectors/kelvin-test-standard-2.json
 test-vectors/kelvin-test-standard-3.json
 .clinerules
+gemini_code_review_report.md
+production_readiness_plan.md

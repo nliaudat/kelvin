@@ -27,7 +27,7 @@ use core::fmt;
 
 use crate::body::OrbitalBody;
 use crate::constants::MONITOR_INTERVAL;
-use crate::integrator::verlet_step;
+use crate::integrator::{euler_step, verlet_step};
 use crate::Fixed;
 
 /// Errors from stability monitoring.
@@ -236,6 +236,79 @@ pub fn simulate_with_monitoring(
             }
 
             // Check for ejection (energy-based check)
+            for i in 0..bodies.len() {
+                if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
+                    let energy = (bodies[i].kinetic_energy()
+                        + gravitational_potential(i, bodies, g, softening))
+                    .to_f64();
+                    return Err(StabilityError::BodyEjected {
+                        body_index: i,
+                        step: step + 1,
+                        energy,
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Run the simulation with periodic stability monitoring using Euler integration.
+///
+/// Identical to [`simulate_with_monitoring`] but uses `euler_step` instead of
+/// `verlet_step`. Euler integration amplifies chaos ~10x faster due to
+/// numerical instability (energy drift), making it preferred for cryptographic
+/// entropy generation.
+///
+/// See [`simulate_with_monitoring`] for parameter documentation.
+#[allow(clippy::too_many_arguments)]
+pub fn simulate_with_monitoring_euler(
+    bodies: &mut [OrbitalBody],
+    steps: u64,
+    dt: Fixed,
+    softening: Fixed,
+    g: Fixed,
+    min_separation: Fixed,
+    monitor_interval: u64,
+    ejection_energy_threshold: Fixed,
+) -> Result<(), StabilityError> {
+    let effective_interval =
+        if monitor_interval == 0 { MONITOR_INTERVAL } else { monitor_interval };
+
+    let check_interval = effective_interval.min(steps);
+
+    // Check initial configuration before any steps
+    if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
+        return Err(StabilityError::BodyCollision {
+            body_i: i,
+            body_j: j,
+            step: 0,
+            distance: dist.to_f64(),
+        });
+    }
+    for i in 0..bodies.len() {
+        if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
+            let energy = (bodies[i].kinetic_energy()
+                + gravitational_potential(i, bodies, g, softening))
+            .to_f64();
+            return Err(StabilityError::BodyEjected { body_index: i, step: 0, energy });
+        }
+    }
+
+    for step in 0..steps {
+        euler_step(bodies, dt, softening, g);
+
+        if (step + 1) % check_interval == 0 || step + 1 == steps {
+            if let Some((i, j, dist)) = detect_collapse(bodies, min_separation) {
+                return Err(StabilityError::BodyCollision {
+                    body_i: i,
+                    body_j: j,
+                    step: step + 1,
+                    distance: dist.to_f64(),
+                });
+            }
+
             for i in 0..bodies.len() {
                 if is_body_ejected(i, bodies, g, softening, ejection_energy_threshold) {
                     let energy = (bodies[i].kinetic_energy()

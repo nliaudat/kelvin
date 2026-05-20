@@ -95,15 +95,31 @@ pub fn extract_shake256(
     domain_separator: &[u8],
     output_len: usize,
 ) -> Vec<u8> {
+    let mut output = vec![0u8; output_len];
+    extract_shake256_into(bodies, step, g, softening, domain_separator, &mut output);
+    output
+}
+
+/// Extract SHAKE256 entropy directly into a pre-allocated buffer.
+///
+/// This avoids the allocation overhead of [`extract_shake256`] when processing
+/// data in chunks, such as in streaming encryption where the same buffer size
+/// is reused across many iterations.
+pub fn extract_shake256_into(
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
+    domain_separator: &[u8],
+    output: &mut [u8],
+) {
     let mut hasher = Shake256::default();
 
     // Feed all orbital state into the XOF hasher
     feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator);
 
-    let mut output = vec![0u8; output_len];
     let mut reader = hasher.finalize_xof();
-    XofReader::read(&mut reader, &mut output);
-    output
+    XofReader::read(&mut reader, output);
 }
 
 /// Legacy wrapper for extract_shake256.

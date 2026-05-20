@@ -34,14 +34,22 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 Kelvin uses the orbital simulation to generate a chaotic **Orbital Keystream** for encryption.
 
 ```bash
+# Default: Verlet integration (symplectic, energy-conserving)
 ./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
+
+# Euler integration: faster chaos amplification, more entropy per step
+./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --euler
 ```
 
 ### Decrypt a File
-Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config must be used.
+Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config and integration method must be used.
 
 ```bash
+# Default: Verlet integration
 ./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar
+
+# Euler integration (must match encryption)
+./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --euler
 ```
 
 ### Identity (Asymmetric Keys)
@@ -75,9 +83,20 @@ Add `kelvin` to your `Cargo.toml`:
 kelvin = { git = "https://github.com/nliaudat/kelvin", features = ["serde"] }
 ```
 
+### Integration Method: Verlet vs Euler
+
+Kelvin supports two integration methods for the orbital simulation:
+
+| Method | CLI Flag | Property | Best For |
+|--------|----------|----------|----------|
+| **Verlet** (default) | *(none)* | Symplectic, energy-conserving, physically realistic | Standard encryption, backward compatibility |
+| **Euler** | `--euler` | 1st-order, numerically unstable, faster chaos amplification | Maximum entropy per step, shorter Lyapunov time |
+
+Euler's numerical instability amplifies chaos ~10x faster than Verlet, producing more entropy per CPU cycle. See [`Euler_vs_Verlet.md`](Euler_vs_Verlet.md) for the full theoretical analysis.
+
 ### Basic Encryption/Decryption
 ```rust
-use kelvin::{Kelvin, OrbitalConfig};
+use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 use std::fs;
 
 fn main() -> anyhow::Result<()> {
@@ -102,6 +121,35 @@ fn main() -> anyhow::Result<()> {
     assert_eq!(&data, b"Hello Kelvin Chaos!");
     Ok(())
 }
+```
+
+### Using Euler Integration
+
+To use Euler integration instead of the default Verlet, pass `IntegrationMethod::Euler` to the constructor:
+
+```rust
+use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
+
+let config = OrbitalConfig::from_json(&config_json)?;
+
+// Euler integration: faster chaos amplification
+let mut k = Kelvin::new_with_method(config, IntegrationMethod::Euler)?;
+
+// Encrypt/decrypt works identically
+let mut data = b"Hello Kelvin Chaos!".to_vec();
+k.encrypt(&mut data)?;
+```
+
+The same applies to `KelvinStreaming`:
+
+```rust
+use kelvin::{IntegrationMethod, KelvinStreaming, OrbitalConfig};
+
+let config = OrbitalConfig::from_json(&config_json)?;
+
+// V2 streaming with Euler integration
+let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMethod::Euler)?;
+ks.encrypt(&mut data)?;
 ```
 
 ### Accessing Asymmetric Keys
@@ -225,7 +273,7 @@ This returns `remaining_keys × 4 GiB` (conservative estimate). When it reaches 
 
 ## 6. V2 Streaming Mode (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one Verlet step, extracting keystream from the current chaotic state.
+V2 Streaming (`KelvinStreaming`) replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state.
 
 ### Key Differences from V1
 
@@ -260,7 +308,7 @@ assert_eq!(&data, b"Hello, V2 streaming!");
 
 ### How `bytes_per_step` Works
 
-The `bytes_per_step` parameter controls how many keystream bytes are produced per Verlet simulation step. This is critical for understanding the streaming API's behavior:
+The `bytes_per_step` parameter controls how many keystream bytes are produced per simulation step (Verlet or Euler). This is critical for understanding the streaming API's behavior:
 
 - **Fixed-size chunking**: `process_chunk()` internally processes data in fixed-size chunks of `bytes_per_step` bytes, advancing the simulation by one step per chunk. This ensures the keystream is **deterministic regardless of caller chunking** — a 100-byte call and two 50-byte calls produce the same ciphertext for the same total bytes.
 - **Partial chunks**: A final partial chunk still advances the simulation by one step, but only XORs the needed bytes. The remaining keystream bytes are discarded.
@@ -270,11 +318,11 @@ The `bytes_per_step` parameter controls how many keystream bytes are produced pe
 // Example: bytes_per_step = 1024
 let mut ks = KelvinStreaming::new(config, 1024)?;
 
-// A 100-byte call → 1 Verlet step (100 of 1024 keystream bytes used)
+// A 100-byte call → 1 simulation step (100 of 1024 keystream bytes used)
 let mut small = vec![0u8; 100];
 ks.encrypt(&mut small)?;
 
-// A 2000-byte call → 2 Verlet steps (1024 + 976 bytes)
+// A 2000-byte call → 2 simulation steps (1024 + 976 bytes)
 let mut large = vec![0u8; 2000];
 ks.encrypt(&mut large)?;
 

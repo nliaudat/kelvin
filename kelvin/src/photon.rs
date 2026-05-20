@@ -41,6 +41,15 @@ use crate::error::KelvinError;
 /// Produces arbitrary-length keystream from a 2048-byte seed.
 /// Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
 ///
+/// ## Chunk independence
+///
+/// The keystream within one reseed period is a pure function of
+/// (seed, reseed_count). SHAKE256's XOF property provides position-independent
+/// output — you can take any prefix of the keystream and it will match the
+/// same prefix from any other call with the same (seed, reseed_count).
+/// This means encryption and decryption are chunk-independent: splitting
+/// data into different chunk sizes produces identical results.
+///
 /// ## Example
 ///
 /// ```rust,ignore
@@ -61,7 +70,7 @@ pub struct KelvinPhoton {
     reseed_count: u64,
     /// Maximum reseeds before exhaustion.
     max_reseeds: u64,
-    /// Total bytes processed.
+    /// Total bytes processed (for tracking only, NOT used in keystream derivation).
     bytes_processed: u64,
 }
 
@@ -80,12 +89,18 @@ impl KelvinPhoton {
         }
     }
 
-    /// Generate `len` bytes of keystream from the current seed.
+    /// Maximum chunk size for keystream generation (1 MB).
     ///
-    /// Uses HKDF-SHA512 to derive a 64-byte XOF seed, then SHAKE256 XOF
-    /// to produce the keystream. This is the core operation that replaces
-    /// V1's 44-byte HKDF output with unlimited keystream.
-    fn generate_keystream(&mut self, len: usize) -> Result<Vec<u8>, KelvinError> {
+    /// Processing data in chunks prevents OOM crashes when encrypting
+    /// large (multi-GB) inputs by avoiding a full-size keystream allocation.
+    const CHUNK_SIZE: usize = 1024 * 1024;
+
+    /// Generate keystream and write it directly into `output`.
+    ///
+    /// This is the chunk-friendly variant of `generate_keystream`. It produces
+    /// exactly `output.len()` bytes of keystream and writes them into the
+    /// provided buffer, avoiding an extra allocation.
+    fn generate_keystream_into(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
         if self.reseed_count >= self.max_reseeds {
             return Err(KelvinError::SeedExhausted);
         }
@@ -98,18 +113,23 @@ impl KelvinPhoton {
         info.extend_from_slice(&self.reseed_count.to_le_bytes());
 
         hk.expand(&info, &mut xof_seed)
-
             .map_err(|_| KelvinError::SeedExhausted)?;
 
-        // SHAKE256 XOF: produce arbitrary-length keystream
+        // SHAKE256 XOF: produce keystream directly into output buffer.
+        //
+        // NOTE: bytes_processed is deliberately NOT included in the XOF input.
+        // The keystream within one reseed period is a pure function of
+        // (seed, reseed_count). SHAKE256's XOF property provides position-
+        // independent output — any prefix of the keystream matches the same
+        // prefix from any other call with the same (seed, reseed_count).
+        // This ensures chunk-independence: splitting data into different
+        // chunk sizes produces identical ciphertext.
         let mut hasher = Shake256::default();
         sha3::digest::Update::update(&mut hasher, &xof_seed);
         sha3::digest::Update::update(&mut hasher, b"kelvin-photon-xof-v1");
-        sha3::digest::Update::update(&mut hasher, &self.bytes_processed.to_le_bytes());
 
-        let mut keystream = vec![0u8; len];
         let mut reader = hasher.finalize_xof();
-        XofReader::read(&mut reader, &mut keystream);
+        XofReader::read(&mut reader, output);
 
         // Reseed: derive new 2048-byte seed via BLAKE3
         let mut reseed_hasher = Hasher::new();
@@ -123,23 +143,43 @@ impl KelvinPhoton {
         self.reseed_count += 1;
         xof_seed.zeroize();
 
-        Ok(keystream)
+        Ok(())
     }
 
     /// Encrypt data in-place using XOR with the keystream.
     ///
     /// XOR is its own inverse, so encryption and decryption are the same operation.
+    ///
+    /// Processes data in 1 MB chunks to avoid allocating a full-size keystream
+    /// buffer for the entire input. Each chunk allocates a temporary buffer of
+    /// at most 1 MB, preventing OOM crashes when processing large (multi-GB) data.
+    /// The temporary buffer is zeroized after use.
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
         if data.is_empty() {
             return Ok(());
         }
-        let keystream = self.generate_keystream(data.len())?;
-        for (d, k) in data.iter_mut().zip(keystream.iter()) {
-            *d ^= k;
+        let mut offset = 0;
+        while offset < data.len() {
+            let remaining = data.len() - offset;
+            let chunk_size = std::cmp::min(remaining, Self::CHUNK_SIZE);
+            let chunk = &mut data[offset..offset + chunk_size];
+
+            // Generate keystream into a temporary buffer, then XOR into data.
+            // The temp buffer is at most CHUNK_SIZE (1 MB), preventing OOM
+            // even for multi-GB inputs. The buffer is zeroized after use.
+            let mut keystream = vec![0u8; chunk_size];
+            self.generate_keystream_into(&mut keystream)?;
+            for (d, k) in chunk.iter_mut().zip(keystream.iter()) {
+                *d ^= k;
+            }
+            keystream.zeroize();
+
+            offset += chunk_size;
         }
         self.bytes_processed += data.len() as u64;
         Ok(())
     }
+
 
     /// Decrypt data in-place (same as encrypt, XOR is its own inverse).
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {

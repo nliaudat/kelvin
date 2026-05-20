@@ -2,19 +2,44 @@
 //!
 //! Provides a command-line interface for:
 //! - Generating orbital configurations (Keygen)
-//! - Encrypting/Decrypting files
+//! - Encrypting/Decrypting files (with mode selection)
 //! - Inspecting public keys (Identify)
 //! - Benchmarking
+//!
+//! ## Modes
+//!
+//! | Mode | Engine | Cipher | Auth |
+//! |------|--------|--------|------|
+//! | `secure` (V1, default) | `Kelvin` | ChaCha20Poly1305 AEAD | ✅ |
+//! | `chaos` (V2) | `KelvinStreaming` | SHAKE256 XOR per-step | ❌ |
+//! | `photon` (V3) | `KelvinPhoton` | HKDF→SHAKE256 XOR | ❌ |
+//! | `quantum` (H) | `KelvinQuantum` | Hybrid cache+XOR + orbital reseed | ❌ |
 
 #![deny(unsafe_code)]
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
-use kelvin::{Fixed, Kelvin, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3};
+use clap::{Parser, Subcommand, ValueEnum};
+use kelvin::{
+    simulate_and_extract_seed_with_method, Fixed, IntegrationMethod, Kelvin, KelvinPhoton,
+    KelvinQuantum, KelvinStreaming, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3,
+};
 use ml_kem::KeyExport;
 use rand::Rng;
 use std::fs;
 use std::io::{Read, Write};
+
+/// Cryptographic mode for encrypt/decrypt operations.
+#[derive(ValueEnum, Clone, Debug)]
+enum CryptoMode {
+    /// V1: ChaCha20Poly1305 AEAD (default)
+    Secure,
+    /// V2: Per-step SHAKE256 XOR streaming
+    Chaos,
+    /// V3: Fast HKDF→SHAKE256 XOR OTP
+    Photon,
+    /// H: Hybrid V3 bulk speed + V2 orbital entropy reseed
+    Quantum,
+}
 
 #[derive(Parser)]
 #[command(name = "kelvin", version, about = "Orbital Chaos KDF Cryptosystem")]
@@ -36,6 +61,9 @@ enum Commands {
     },
     /// Encrypt a file
     Encrypt {
+        /// Cryptographic mode: secure, chaos, photon, or quantum
+        #[arg(long, default_value = "secure")]
+        mode: CryptoMode,
         /// Path to orbital config JSON
         #[arg(long)]
         config: String,
@@ -45,9 +73,18 @@ enum Commands {
         /// Output file path
         #[arg(long)]
         output: String,
+        /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
+        #[arg(long, default_value = "1048576")]
+        bytes_per_step: u64,
+        /// Use Euler integration instead of Verlet for maximum chaos amplification
+        #[arg(long)]
+        euler: bool,
     },
     /// Decrypt a file
     Decrypt {
+        /// Cryptographic mode: secure, chaos, photon, or quantum
+        #[arg(long, default_value = "secure")]
+        mode: CryptoMode,
         /// Path to orbital config JSON
         #[arg(long)]
         config: String,
@@ -57,6 +94,12 @@ enum Commands {
         /// Output file path
         #[arg(long)]
         output: String,
+        /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
+        #[arg(long, default_value = "1048576")]
+        bytes_per_step: u64,
+        /// Use Euler integration instead of Verlet for maximum chaos amplification
+        #[arg(long)]
+        euler: bool,
     },
     /// Identify the Public Key associated with a configuration
     Identify {
@@ -99,28 +142,25 @@ fn main() -> Result<()> {
                 println!("{}", json);
             }
         },
-        Commands::Encrypt { config, input, output } => {
-            process_file(&config, &input, &output, true)?;
+        Commands::Encrypt { mode, config, input, output, bytes_per_step, euler } => {
+            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
+            process_file_mode(&mode, &config, &input, &output, true, bytes_per_step, method)?;
         },
-        Commands::Decrypt { config, input, output } => {
-            process_file(&config, &input, &output, false)?;
+        Commands::Decrypt { mode, config, input, output, bytes_per_step, euler } => {
+            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
+            process_file_mode(&mode, &config, &input, &output, false, bytes_per_step, method)?;
         },
         Commands::Identify { config, all, ecc, kem, fast } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
             let config = OrbitalConfig::from_json(&config_json)?;
 
             if fast {
-                // The --fast flag is intentionally ignored for identification.
-                // Identification must be deterministic: reducing simulation steps
-                // would produce a different public key than the one used for
-                // encryption/decryption with the same config.
                 println!("Warning: --fast flag is ignored for identification. Using full {} steps for deterministic key derivation.", config.total_steps);
             }
 
             println!("Deriving keys from orbital configuration (this may take a moment)...");
             let kp = OrbitalKeyPair::derive(&config)
                 .map_err(|e| anyhow::anyhow!("Key derivation failed: {:?}", e))?;
-
 
             let mut shown = false;
 
@@ -133,7 +173,6 @@ fn main() -> Result<()> {
                 shown = true;
             }
 
-            // Default: Show ML-DSA-65
             if all || (!ecc && !kem) {
                 println!("ML-DSA-65  (PQ-Sig):    {}", hex::encode(&kp.dsa_public.to_bytes()));
                 shown = true;
@@ -149,13 +188,11 @@ fn main() -> Result<()> {
 
             println!("Analyzing Cryptographic Quality...");
 
-            // 1. Base Key
             println!("Deriving Base Key...");
             let k1 = Kelvin::new(config.clone()).context("Failed to init first instance")?;
             let kp1 = k1.asymmetric_keypair();
             let key1 = kp1.curve_public.as_bytes();
 
-            // 2. Flip 1 bit in input (Sun mass)
             println!("Flipping 1 bit in initial conditions...");
             config.bodies[0].mass = Fixed::from_raw(config.bodies[0].mass.to_raw() ^ 1);
 
@@ -164,7 +201,6 @@ fn main() -> Result<()> {
             let kp2 = k2.asymmetric_keypair();
             let key2 = kp2.curve_public.as_bytes();
 
-            // 3. Compare (Avalanche)
             let mut diff_bits = 0;
             let mut set_bits = 0;
             for i in 0..32 {
@@ -214,13 +250,9 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
 
     let mut bodies = Vec::with_capacity(n_bodies);
 
-    // Sun near center with non-zero jitter and variable mass
-    // Mass varies in [0.75, 1.25] solar masses for additional entropy
-    // while remaining safely bound (ejection threshold at M ≤ 0.5)
     let sun_mass = loop {
         let raw: i128 = (1 << 64) + rng.gen_range(-(1i128 << 62)..(1i128 << 62) + 1);
         let m = Fixed::from_raw(raw);
-        // Accept only in [0.75, 1.25] solar masses
         if m >= Fixed::from_raw(3 << 62) && m <= Fixed::from_raw(5 << 62) {
             break m;
         }
@@ -239,12 +271,10 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         ),
     ));
 
-    // Add planets at stable orbits with full 3D randomization
     for i in 1..n_bodies {
         let radius = (i as i64 + 1) * 50;
         let mass = Fixed::from_raw(rng.gen_range(1 << 30..1 << 35));
 
-        // Uniform spherical sampling for position
         let theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
         let phi = (rng.gen_range(-1.0..1.0f64)).acos();
 
@@ -252,7 +282,6 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         let y = (radius as f64) * phi.sin() * theta.sin();
         let z = (radius as f64) * phi.cos();
 
-        // Velocity: uniform direction, fixed magnitude
         let v_theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
         let v_phi = (rng.gen_range(-1.0..1.0f64)).acos();
         let v_mag = 1.0 / (radius as f64).sqrt() * 6.3;
@@ -279,36 +308,55 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
     OrbitalConfig::new(
         bodies,
         steps,
-        steps / 10,               // reseed interval
-        Fixed::from_raw(1 << 54), // dt = 1/1024
-        Fixed::from_raw(1 << 48), // Large softening for stability
+        steps / 10,
+        Fixed::from_raw(1 << 54),
+        Fixed::from_raw(1 << 48),
         kelvin::DEFAULT_G,
     )
     .map_err(|e| anyhow::anyhow!(e))
 }
 
-fn process_file(
+/// Dispatch to the correct processing function based on mode.
+fn process_file_mode(
+    mode: &CryptoMode,
     config_path: &str,
     input_path: &str,
     output_path: &str,
     encrypt: bool,
+    bytes_per_step: u64,
+    method: IntegrationMethod,
+) -> Result<()> {
+    match mode {
+        CryptoMode::Secure => process_file_secure(config_path, input_path, output_path, encrypt, method),
+        CryptoMode::Chaos => process_file_chaos(config_path, input_path, output_path, encrypt, bytes_per_step, method),
+        CryptoMode::Photon => process_file_photon(config_path, input_path, output_path, encrypt, method),
+        CryptoMode::Quantum => process_file_quantum(config_path, input_path, output_path, encrypt, method),
+    }
+}
+
+/// V1 Secure: ChaCha20Poly1305 AEAD (original Kelvin).
+fn process_file_secure(
+    config_path: &str,
+    input_path: &str,
+    output_path: &str,
+    encrypt: bool,
+    method: IntegrationMethod,
 ) -> Result<()> {
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
 
-    println!("Initializing Kelvin (this may take a few seconds)...");
-    let mut k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
+    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    println!("Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...", method_name);
+    let mut k = Kelvin::new_with_method(config, method).context("Failed to initialize Kelvin")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
-    let _metadata = input_file.metadata()?;
-
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
 
-    println!("Processing...");
-    let mut buffer = vec![0u8; 64 * 1024]; // 64KB buffer
+    println!("Processing (ChaCha20Poly1305 AEAD)...");
+    let mut buffer = vec![0u8; 64 * 1024 + 16];
     let mut total_processed = 0u64;
     loop {
-        let bytes_read = input_file.read(&mut buffer)?;
+        let bytes_read = input_file.read(&mut buffer[..64 * 1024])?;
         if bytes_read == 0 {
             break;
         }
@@ -317,6 +365,159 @@ fn process_file(
             k.encrypt(&mut buffer[..bytes_read])?;
         } else {
             k.decrypt(&mut buffer[..bytes_read])?;
+        }
+
+        output_file.write_all(&buffer[..bytes_read])?;
+        total_processed += bytes_read as u64;
+        if total_processed.is_multiple_of(1024 * 1024) {
+            print!(".");
+            let _ = std::io::stdout().flush();
+        }
+    }
+
+    println!("\n{} complete.", if encrypt { "Encryption" } else { "Decryption" });
+    Ok(())
+}
+
+/// V2 Chaos: Per-step SHAKE256 XOR streaming.
+fn process_file_chaos(
+    config_path: &str,
+    input_path: &str,
+    output_path: &str,
+    encrypt: bool,
+    bytes_per_step: u64,
+    method: IntegrationMethod,
+) -> Result<()> {
+    let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
+    let config = OrbitalConfig::from_json(&config_json)?;
+
+    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    println!("Initializing Kelvin Chaos (V2, {} integration, instant setup)...", method_name);
+    let mut ks = KelvinStreaming::new_with_method(config, bytes_per_step, method)
+        .context("Failed to initialize KelvinStreaming")?;
+
+    let rate = ks.benchmark(100);
+    let file_size = fs::metadata(input_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let (steps_needed, est_secs) = ks.estimate_time(file_size, rate);
+    if file_size > 0 {
+        println!("Estimated: {} steps, ~{:.1}s ({:.0} steps/sec)", steps_needed, est_secs, rate);
+    }
+
+    let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
+    let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
+
+    println!("Processing (SHAKE256 XOR)...");
+    let mut buffer = vec![0u8; 64 * 1024];
+    let mut total_processed = 0u64;
+    loop {
+        let bytes_read = input_file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        if encrypt {
+            ks.encrypt(&mut buffer[..bytes_read])?;
+        } else {
+            ks.decrypt(&mut buffer[..bytes_read])?;
+        }
+
+        output_file.write_all(&buffer[..bytes_read])?;
+        total_processed += bytes_read as u64;
+        if total_processed.is_multiple_of(1024 * 1024) {
+            print!(".");
+            let _ = std::io::stdout().flush();
+        }
+    }
+
+    println!("\n{} complete.", if encrypt { "Encryption" } else { "Decryption" });
+    Ok(())
+}
+
+/// V3 Photon: Fast HKDF→SHAKE256 XOR OTP from upfront simulation.
+fn process_file_photon(
+    config_path: &str,
+    input_path: &str,
+    output_path: &str,
+    encrypt: bool,
+    method: IntegrationMethod,
+) -> Result<()> {
+    let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
+    let config = OrbitalConfig::from_json(&config_json)?;
+
+    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    println!("Initializing Kelvin Photon (V3, {} integration, running orbital simulation)...", method_name);
+    let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
+        .context("Failed to run orbital simulation")?;
+
+    let mut photon = KelvinPhoton::new(seed, 100_000);
+
+    let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
+    let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
+
+    println!("Processing (HKDF→SHAKE256 XOR)...");
+    let mut buffer = vec![0u8; 64 * 1024];
+    let mut total_processed = 0u64;
+    loop {
+        let bytes_read = input_file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        if encrypt {
+            photon.encrypt(&mut buffer[..bytes_read])?;
+        } else {
+            photon.decrypt(&mut buffer[..bytes_read])?;
+        }
+
+        output_file.write_all(&buffer[..bytes_read])?;
+        total_processed += bytes_read as u64;
+        if total_processed.is_multiple_of(1024 * 1024) {
+            print!(".");
+            let _ = std::io::stdout().flush();
+        }
+    }
+
+    println!("\n{} complete.", if encrypt { "Encryption" } else { "Decryption" });
+    Ok(())
+}
+
+/// H Quantum: Hybrid V3 bulk speed + V2 orbital entropy reseed.
+fn process_file_quantum(
+    config_path: &str,
+    input_path: &str,
+    output_path: &str,
+    encrypt: bool,
+    method: IntegrationMethod,
+) -> Result<()> {
+    let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
+    let config = OrbitalConfig::from_json(&config_json)?;
+
+    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    println!("Initializing Kelvin Quantum (H, {} integration, running orbital simulation)...", method_name);
+    let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
+        .context("Failed to run orbital simulation")?;
+
+    let mut quantum = KelvinQuantum::with_config(seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024)
+        .context("Failed to initialize KelvinQuantum")?;
+
+    let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
+    let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
+
+    println!("Processing (Hybrid cache+XOR + orbital reseed)...");
+    let mut buffer = vec![0u8; 64 * 1024];
+    let mut total_processed = 0u64;
+    loop {
+        let bytes_read = input_file.read(&mut buffer)?;
+        if bytes_read == 0 {
+            break;
+        }
+
+        if encrypt {
+            quantum.encrypt(&mut buffer[..bytes_read])?;
+        } else {
+            quantum.decrypt(&mut buffer[..bytes_read])?;
         }
 
         output_file.write_all(&buffer[..bytes_read])?;
@@ -343,8 +544,7 @@ fn run_benchmark() -> Result<()> {
         let duration = start.elapsed();
         println!("  Setup Time: {:?}", duration);
 
-        // Throughput test
-        let mut data = vec![0u8; 1024 * 1024]; // 1MB
+        let mut data = vec![0u8; 1024 * 1024];
         let mut k = Kelvin::new(generate_config(level)?)?;
         let start = std::time::Instant::now();
         k.encrypt(&mut data)?;

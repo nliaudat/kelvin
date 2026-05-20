@@ -61,8 +61,8 @@ mod quantum;
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_G};
 pub use kelvin_kdf::{
-    extract_seed, extract_shake256, AsymmetricError, KeySchedule, OrbitalConfig, OrbitalKeyPair,
-    OrbitalState, ScheduleState,
+    extract_seed, extract_shake256, extract_shake256_into, AsymmetricError, KeySchedule,
+    OrbitalConfig, OrbitalKeyPair, OrbitalState, ScheduleState,
 };
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
 
@@ -70,12 +70,114 @@ pub use kelvin_stream::{ChaChaStream, StreamCipher};
 pub use kelvin_stream::AesGcmStream;
 
 pub use photon::KelvinPhoton;
-pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_VERLET_STEPS};
+pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_ORBITAL_STEPS};
 
-
-use kelvin_core::simulate_with_monitoring;
+use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};
 use kelvin_kdf::LyapunovEstimator;
 use zeroize::Zeroize;
+
+/// Integration method for the n-body gravitational simulation.
+///
+/// - **Verlet** (default): Symplectic Velocity Verlet. Energy-conserving,
+///   time-reversible. Used by default for backward compatibility.
+/// - **Euler**: Explicit Euler integration. Numerical instability amplifies
+///   chaos ~10x faster than Verlet, producing more entropy per step.
+///   Use `--euler` to opt in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntegrationMethod {
+    /// Symplectic Velocity Verlet (default, backward compatible).
+    Verlet,
+    /// Explicit Euler (maximum chaos amplification).
+    Euler,
+}
+
+impl Default for IntegrationMethod {
+    fn default() -> Self {
+        IntegrationMethod::Verlet
+    }
+}
+
+/// Run the full orbital simulation pipeline and extract a 2048-byte seed.
+///
+/// This is the shared initialization used by V1 (`Kelvin`), V3 (`KelvinPhoton`),
+/// and H (`KelvinQuantum`). It performs:
+/// 1. Config validation
+/// 2. Lyapunov time estimation
+/// 3. Full orbital simulation with stability monitoring
+/// 4. SHAKE256 seed extraction
+///
+/// Returns the 2048-byte seed and the simulated bodies.
+pub fn simulate_and_extract_seed(config: &OrbitalConfig) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
+    simulate_and_extract_seed_with_method(config, IntegrationMethod::Verlet)
+}
+
+/// Like [`simulate_and_extract_seed`] but with a configurable integration method.
+pub fn simulate_and_extract_seed_with_method(
+    config: &OrbitalConfig,
+    method: IntegrationMethod,
+) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
+
+    // Validate config
+    config.validate()?;
+
+    // Estimate Lyapunov time
+    let lyapunov =
+        LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
+    let result = lyapunov.estimate(1000, config.total_steps)?;
+
+    if config.total_steps < result.min_chaos_steps {
+        return Err(KelvinError::InsufficientChaos {
+            requested: config.total_steps,
+            horizon: result.min_chaos_steps,
+        });
+    }
+
+    // Clone bodies for simulation
+    let mut bodies = config.bodies.clone();
+
+    // Run initial simulation with stability monitoring (Verlet or Euler)
+    match method {
+        IntegrationMethod::Verlet => {
+            simulate_with_monitoring(
+                &mut bodies,
+                config.total_steps,
+                config.dt,
+                config.softening,
+                config.g,
+                config.min_separation,
+                config.monitor_interval,
+                config.ejection_energy_threshold,
+            )?;
+        },
+        IntegrationMethod::Euler => {
+            simulate_with_monitoring_euler(
+                &mut bodies,
+                config.total_steps,
+                config.dt,
+                config.softening,
+                config.g,
+                config.min_separation,
+                config.monitor_interval,
+                config.ejection_energy_threshold,
+            )?;
+        },
+    }
+
+    // Extract initial 2048-byte seed (using SHAKE256 XOF)
+    let mut seed_vec = extract_shake256(
+        &bodies,
+        config.total_steps,
+        config.g,
+        config.softening,
+        b"kelvin-orbital-state-v1",
+        2048,
+    );
+    let mut seed = [0u8; 2048];
+    seed.copy_from_slice(&seed_vec);
+    seed_vec.zeroize();
+
+    Ok((seed, bodies))
+}
 
 /// Main entry point for the Kelvin cryptosystem.
 ///
@@ -109,6 +211,11 @@ impl Kelvin {
     /// Run the shared initialization pipeline (validation, Lyapunov estimation,
     /// simulation, seed extraction, key schedule creation).
     fn init(config: OrbitalConfig) -> Result<InitState, KelvinError> {
+        Self::init_with_method(config, IntegrationMethod::Verlet)
+    }
+
+    /// Like [`init`] but with a configurable integration method.
+    fn init_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<InitState, KelvinError> {
         // Validate config
         config.validate()?;
 
@@ -127,17 +234,33 @@ impl Kelvin {
         // Clone bodies for simulation
         let mut bodies = config.bodies.clone();
 
-        // Run initial simulation with stability monitoring
-        simulate_with_monitoring(
-            &mut bodies,
-            config.total_steps,
-            config.dt,
-            config.softening,
-            config.g,
-            config.min_separation,
-            config.monitor_interval,
-            config.ejection_energy_threshold,
-        )?;
+        // Run initial simulation with stability monitoring (Verlet or Euler)
+        match method {
+            IntegrationMethod::Verlet => {
+                simulate_with_monitoring(
+                    &mut bodies,
+                    config.total_steps,
+                    config.dt,
+                    config.softening,
+                    config.g,
+                    config.min_separation,
+                    config.monitor_interval,
+                    config.ejection_energy_threshold,
+                )?;
+            },
+            IntegrationMethod::Euler => {
+                simulate_with_monitoring_euler(
+                    &mut bodies,
+                    config.total_steps,
+                    config.dt,
+                    config.softening,
+                    config.g,
+                    config.min_separation,
+                    config.monitor_interval,
+                    config.ejection_energy_threshold,
+                )?;
+            },
+        }
 
         // Extract initial 2048-byte seed (using SHAKE256 XOF)
         let mut seed_vec = extract_shake256(
@@ -172,7 +295,16 @@ impl Kelvin {
     /// This runs the Lyapunov time estimator and initial orbital simulation.
     /// Setup time depends on the security level (seconds to minutes).
     pub fn new(config: OrbitalConfig) -> Result<Self, KelvinError> {
-        let mut state = Self::init(config)?;
+        Self::new_with_method(config, IntegrationMethod::Verlet)
+    }
+
+    /// Create a new Kelvin instance with a configurable integration method.
+    ///
+    /// Use `IntegrationMethod::Euler` for maximum chaos amplification
+    /// (numerical instability produces ~10x more entropy per step).
+    /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
+    pub fn new_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<Self, KelvinError> {
+        let mut state = Self::init_with_method(config, method)?;
 
         // Get first key
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
@@ -195,7 +327,15 @@ impl Kelvin {
     /// Available when the `aes-ni` feature is enabled.
     #[cfg(feature = "aes-ni")]
     pub fn new_aes(config: OrbitalConfig) -> Result<Self, KelvinError> {
-        let mut state = Self::init(config)?;
+        Self::new_aes_with_method(config, IntegrationMethod::Verlet)
+    }
+
+    /// Create a new Kelvin instance using AES-256-GCM with a configurable integration method.
+    ///
+    /// Available when the `aes-ni` feature is enabled.
+    #[cfg(feature = "aes-ni")]
+    pub fn new_aes_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<Self, KelvinError> {
+        let mut state = Self::init_with_method(config, method)?;
 
         // Get first key
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
@@ -329,6 +469,10 @@ pub struct KelvinStreaming {
     bytes_processed: u64,
     /// Domain separator for SHAKE256 extraction.
     domain_separator: [u8; 32],
+    /// Reusable keystream buffer to avoid repeated allocations.
+    keystream_buf: Vec<u8>,
+    /// Integration method (Verlet or Euler).
+    integration_method: IntegrationMethod,
 }
 
 impl KelvinStreaming {
@@ -341,6 +485,19 @@ impl KelvinStreaming {
     /// This does NOT run the full simulation upfront — it only validates the config
     /// and initializes the body state. The simulation advances one step per chunk.
     pub fn new(config: OrbitalConfig, bytes_per_step: u64) -> Result<Self, KelvinError> {
+        Self::new_with_method(config, bytes_per_step, IntegrationMethod::Verlet)
+    }
+
+    /// Create a new streaming Kelvin instance with a configurable integration method.
+    ///
+    /// Use `IntegrationMethod::Euler` for maximum chaos amplification
+    /// (numerical instability produces ~10x more entropy per step).
+    /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
+    pub fn new_with_method(
+        config: OrbitalConfig,
+        bytes_per_step: u64,
+        method: IntegrationMethod,
+    ) -> Result<Self, KelvinError> {
         // Validate config
         config.validate()?;
 
@@ -349,28 +506,45 @@ impl KelvinStreaming {
 
         let domain_separator = *b"kelvin-streaming-v2-v1-000000000";
 
+        let bps = bytes_per_step.max(1) as usize;
+
         Ok(KelvinStreaming {
             bodies,
             step: 0,
             dt: config.dt,
             softening: config.softening,
             g: config.g,
-            bytes_per_step: bytes_per_step.max(1),
+            bytes_per_step: bps as u64,
             bytes_processed: 0,
             domain_separator,
+            keystream_buf: vec![0u8; bps],
+            integration_method: method,
         })
+    }
+
+    /// Advance the simulation by one step using the configured integration method.
+    fn advance_step(&mut self) {
+        match self.integration_method {
+            IntegrationMethod::Verlet => {
+                kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
+            },
+            IntegrationMethod::Euler => {
+                kelvin_core::euler_step(&mut self.bodies, self.dt, self.softening, self.g);
+            },
+        }
+        self.step += 1;
     }
 
     /// Process a chunk of data: advance simulation, extract keystream, XOR.
     ///
     /// This is the core operation. It processes the input in fixed-size chunks
-    /// of `bytes_per_step` bytes, advancing the simulation by one Verlet step
+    /// of `bytes_per_step` bytes, advancing the simulation by one step
     /// for each chunk. This ensures the keystream is deterministic regardless
     /// of how the caller chunks the data, as long as call sizes are multiples
     /// of `bytes_per_step`.
     ///
     /// For each chunk:
-    /// 1. Advances the n-body simulation by one Verlet step
+    /// 1. Advances the n-body simulation by one step (Verlet or Euler)
     /// 2. Extracts `bytes_per_step` bytes of keystream from the current state
     /// 3. XORs the chunk with the keystream
     ///
@@ -390,22 +564,22 @@ impl KelvinStreaming {
             let remaining = data.len() - offset;
             let chunk_size = std::cmp::min(remaining, bps);
 
-            // 1. Advance simulation by one step
-            kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
-            self.step += 1;
+            // 1. Advance simulation by one step (Verlet or Euler)
+            self.advance_step();
 
-            // 2. Extract keystream from current orbital state via SHAKE256 XOF
-            let keystream = extract_shake256(
+            // 2. Extract keystream into the reusable buffer via SHAKE256 XOF
+            //    This avoids allocating a new Vec<u8> for every chunk iteration.
+            extract_shake256_into(
                 &self.bodies,
                 self.step,
                 self.g,
                 self.softening,
                 &self.domain_separator,
-                bps, // Always extract bytes_per_step bytes for determinism
+                &mut self.keystream_buf,
             );
 
             // 3. XOR chunk with keystream
-            for (d, k) in data[offset..offset + chunk_size].iter_mut().zip(keystream[..chunk_size].iter()) {
+            for (d, k) in data[offset..offset + chunk_size].iter_mut().zip(self.keystream_buf[..chunk_size].iter()) {
                 *d ^= k;
             }
 
@@ -445,13 +619,21 @@ impl KelvinStreaming {
 
     /// Benchmark the simulation speed on this hardware.
     ///
-    /// Runs `sample_steps` Verlet steps and returns the rate in steps/second.
+    /// Runs `sample_steps` steps using the configured integration method
+    /// and returns the rate in steps/second.
     /// Use this to estimate ETA for a given file size.
     pub fn benchmark(&self, sample_steps: u64) -> f64 {
         let mut bodies = self.bodies.clone();
         let start = std::time::Instant::now();
         for _ in 0..sample_steps {
-            kelvin_core::verlet_step(&mut bodies, self.dt, self.softening, self.g);
+            match self.integration_method {
+                IntegrationMethod::Verlet => {
+                    kelvin_core::verlet_step(&mut bodies, self.dt, self.softening, self.g);
+                },
+                IntegrationMethod::Euler => {
+                    kelvin_core::euler_step(&mut bodies, self.dt, self.softening, self.g);
+                },
+            }
         }
         let elapsed = start.elapsed().as_secs_f64();
         if elapsed > 0.0 {

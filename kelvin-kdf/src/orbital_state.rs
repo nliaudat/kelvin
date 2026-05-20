@@ -43,7 +43,12 @@ pub const MAX_EULER_STEPS: u64 = 100_000_000;
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrbitalError {
     /// Simulation exceeded the maximum step limit.
-    OrbitalOverflow { step: u64, max_steps: u64 },
+    OrbitalOverflow {
+        /// The step at which the overflow occurred.
+        step: u64,
+        /// The maximum allowed steps.
+        max_steps: u64,
+    },
 }
 
 impl core::fmt::Display for OrbitalError {
@@ -76,8 +81,12 @@ pub struct OrbitalState {
     pub positions: [[f64; 3]; 5],
     /// Velocities of the 5 bodies (x, y, z each).
     pub velocities: [[f64; 3]; 5],
-    /// Current step counter.
+    /// Total step counter (sum of all integration steps).
     pub step: u64,
+    /// Euler-specific step counter (checked against MAX_EULER_STEPS).
+    pub euler_steps: u64,
+    /// Verlet-specific step counter (checked against MAX_VERLET_STEPS).
+    pub verlet_steps: u64,
     /// Estimated Lyapunov exponent (updated periodically).
     pub lyapunov_estimate: f64,
 }
@@ -109,6 +118,8 @@ impl OrbitalState {
                 [0.1, 0.2, -0.05],
             ],
             step: 0,
+            euler_steps: 0,
+            verlet_steps: 0,
             lyapunov_estimate: 0.0,
         }
     }
@@ -118,15 +129,15 @@ impl OrbitalState {
     /// Uses the Velocity Verlet algorithm for symplectic integration
     /// (preserves phase-space volume, important for long-term stability).
     ///
-    /// Returns `OrbitalError::OrbitalOverflow` if step exceeds `MAX_VERLET_STEPS`.
+    /// Returns `OrbitalError::OrbitalOverflow` if Verlet steps exceed `MAX_VERLET_STEPS`.
     pub fn verlet_step(&mut self) -> Result<(), OrbitalError> {
         const DT: f64 = 0.01;
         const G: f64 = 1.0;
         const EPSILON: f64 = 1e-6;
 
-        if self.step >= MAX_VERLET_STEPS {
+        if self.verlet_steps >= MAX_VERLET_STEPS {
             return Err(OrbitalError::OrbitalOverflow {
-                step: self.step,
+                step: self.verlet_steps,
                 max_steps: MAX_VERLET_STEPS,
             });
         }
@@ -159,13 +170,15 @@ impl OrbitalState {
         }
 
         self.step += 1;
+        self.verlet_steps += 1;
         Ok(())
     }
 
     /// Advance the simulation by `n` Verlet steps.
     ///
-    /// More efficient than calling `verlet_step()` in a loop for small `n`,
-    /// but for large `n` the loop is equivalent.
+    /// This is a convenience wrapper that calls `verlet_step()` in a loop.
+    /// For large `n`, the loop is equivalent to calling `verlet_step()`
+    /// directly.
     pub fn verlet_steps(&mut self, n: u64) -> Result<(), OrbitalError> {
         for _ in 0..n {
             self.verlet_step()?;
@@ -189,15 +202,15 @@ impl OrbitalState {
     /// Uses a smaller timestep (dt=0.001) than Verlet (dt=0.01) to maintain
     /// stability for ~1000+ steps while still amplifying chaos ~10x faster.
     ///
-    /// Returns `OrbitalError::OrbitalOverflow` if step exceeds `MAX_EULER_STEPS`.
+    /// Returns `OrbitalError::OrbitalOverflow` if Euler steps exceed `MAX_EULER_STEPS`.
     pub fn euler_step(&mut self) -> Result<(), OrbitalError> {
         const DT: f64 = 0.001;
         const G: f64 = 1.0;
         const EPSILON: f64 = 1e-6;
 
-        if self.step >= MAX_EULER_STEPS {
+        if self.euler_steps >= MAX_EULER_STEPS {
             return Err(OrbitalError::OrbitalOverflow {
-                step: self.step,
+                step: self.euler_steps,
                 max_steps: MAX_EULER_STEPS,
             });
         }
@@ -208,22 +221,31 @@ impl OrbitalState {
             &self.positions, &self.masses, &mut accel, G, EPSILON,
         );
 
-        // Euler integration: explicit, numerically unstable
+        // True explicit Euler integration: position before velocity.
+        // This is NOT symplectic — energy drift amplifies chaos ~10x faster
+        // than semi-implicit (symplectic) Euler. The numerical instability
+        // is a feature for entropy generation.
         for i in 0..5 {
             for j in 0..3 {
+                // Save current velocity before updating position
+                let v_old = self.velocities[i][j];
+                // Update position using OLD velocity (explicit Euler)
+                self.positions[i][j] += v_old * DT;
+                // Update velocity using current acceleration
                 self.velocities[i][j] += accel[i][j] * DT;
-                self.positions[i][j] += self.velocities[i][j] * DT;
             }
         }
 
         self.step += 1;
+        self.euler_steps += 1;
         Ok(())
     }
 
     /// Advance the simulation by `n` Euler steps.
     ///
-    /// More efficient than calling `euler_step()` in a loop for small `n`,
-    /// but for large `n` the loop is equivalent.
+    /// This is a convenience wrapper that calls `euler_step()` in a loop.
+    /// For large `n`, the loop is equivalent to calling `euler_step()`
+    /// directly.
     pub fn euler_steps(&mut self, n: u64) -> Result<(), OrbitalError> {
         for _ in 0..n {
             self.euler_step()?;
@@ -273,14 +295,35 @@ impl OrbitalState {
     /// Extract entropy from the current orbital state into a byte buffer.
     ///
     /// Uses SHAKE256 XOF to produce `output_len` bytes of deterministic
-    /// entropy from the current positions, velocities, and masses.
+    /// entropy from the current positions, velocities, masses, accelerations,
+    /// and physical constants (G, softening).
+    ///
+    /// ## Physical parameter binding
+    ///
+    /// The gravitational constant (G), softening factor (ε), and instantaneous
+    /// acceleration vectors are bound into the entropy derivation. This prevents
+    /// shortcut attacks where an attacker could substitute different physical
+    /// parameters while keeping positions/velocities the same.
     pub fn extract_entropy(&self, output: &mut [u8]) {
         use sha3::digest::{ExtendableOutput, XofReader};
         use sha3::Shake256;
 
+        const G: f64 = 1.0;
+        const EPSILON: f64 = 1e-6;
+
         let mut hasher = Shake256::default();
         sha3::digest::Update::update(&mut hasher, b"kelvin-orbital-entropy-v1");
         sha3::digest::Update::update(&mut hasher, &self.step.to_le_bytes());
+
+        // Bind physical constants to prevent parameter substitution attacks
+        sha3::digest::Update::update(&mut hasher, &G.to_le_bytes());
+        sha3::digest::Update::update(&mut hasher, &EPSILON.to_le_bytes());
+
+        // Compute instantaneous accelerations for all bodies
+        let mut accelerations = [[0.0; 3]; 5];
+        Self::compute_accelerations(
+            &self.positions, &self.masses, &mut accelerations, G, EPSILON,
+        );
 
         for i in 0..5 {
             sha3::digest::Update::update(&mut hasher, &self.masses[i].to_le_bytes());
@@ -290,6 +333,12 @@ impl OrbitalState {
             sha3::digest::Update::update(&mut hasher, &self.velocities[i][0].to_le_bytes());
             sha3::digest::Update::update(&mut hasher, &self.velocities[i][1].to_le_bytes());
             sha3::digest::Update::update(&mut hasher, &self.velocities[i][2].to_le_bytes());
+
+            // Bind instantaneous gravitational force vector (acceleration)
+            // to prevent shortcut attacks that ignore the force model
+            sha3::digest::Update::update(&mut hasher, &accelerations[i][0].to_le_bytes());
+            sha3::digest::Update::update(&mut hasher, &accelerations[i][1].to_le_bytes());
+            sha3::digest::Update::update(&mut hasher, &accelerations[i][2].to_le_bytes());
         }
 
         let mut reader = hasher.finalize_xof();
@@ -379,6 +428,8 @@ impl Zeroize for OrbitalState {
             }
         }
         self.step.zeroize();
+        self.euler_steps.zeroize();
+        self.verlet_steps.zeroize();
         self.lyapunov_estimate.zeroize();
     }
 }
@@ -482,7 +533,7 @@ mod tests {
     #[test]
     fn test_overflow_safety() {
         let mut state = OrbitalState::chaotic_default();
-        state.step = MAX_VERLET_STEPS;
+        state.verlet_steps = MAX_VERLET_STEPS;
         let result = state.verlet_step();
         assert!(result.is_err());
         assert_eq!(
@@ -525,9 +576,11 @@ mod tests {
     #[test]
     fn test_euler_step_changes_state() {
         let mut state = OrbitalState::chaotic_default();
-        let pos_before = state.positions[0][0];
+        // Body 3 (Moon-like) has non-zero x-velocity (2.01), so its
+        // x-position should change after one explicit Euler step.
+        let pos_before = state.positions[3][0];
         state.euler_step().unwrap();
-        let pos_after = state.positions[0][0];
+        let pos_after = state.positions[3][0];
         assert_ne!(pos_before, pos_after, "position should change after Euler step");
     }
 
@@ -572,7 +625,7 @@ mod tests {
     #[test]
     fn test_euler_overflow_safety() {
         let mut state = OrbitalState::chaotic_default();
-        state.step = MAX_EULER_STEPS;
+        state.euler_steps = MAX_EULER_STEPS;
         let result = state.euler_step();
         assert!(result.is_err());
         assert_eq!(

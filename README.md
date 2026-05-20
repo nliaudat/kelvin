@@ -19,7 +19,8 @@
 Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines:
 
 - **Q32.64 fixed-point arithmetic** — deterministic across all platforms
-- **Symplectic Verlet integrator** — energy-conserving n-body simulation
+- **Symplectic Verlet integrator** — energy-conserving n-body simulation (default)
+- **Euler integrator** — numerically unstable, faster chaos amplification (`--euler` flag)
 - **Lyapunov time estimation** — shadow orbit method for chaos quantification
 - **SHAKE256 XOF entropy extraction** — 2048-byte domain-separated hashing of orbital state
 - **ChaCha20 stream cipher** — XOR-based encryption/decryption
@@ -56,7 +57,7 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 
 2. **Lyapunov time estimation** — Before running the full simulation, Kelvin estimates the Lyapunov time of the system using the shadow orbit method. This quantifies the chaotic divergence rate and ensures the simulation runs within the predictable regime. If the requested step count exceeds the safe Lyapunov horizon, the system rejects the configuration.
 
-3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator that conserves energy and momentum. The deterministic fixed-point arithmetic ensures bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
+3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator (default) or an explicit Euler integrator (`--euler` flag). Verlet conserves energy and momentum for physically realistic trajectories; Euler's numerical instability amplifies chaos ~10x faster for maximum entropy per step. Both use deterministic fixed-point arithmetic for bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
 
 4. **Seed extraction** — After simulation, the final orbital state is hashed with **SHAKE256 (XOF)** using domain separation. This process incorporates the full physical state: positions, velocities, masses, the gravitational constant ($G$), the softening factor, and the **instantaneous gravitational force vectors** acting on every body. This produces a **2048-byte** cryptographically strong seed that is physically bound to the simulation's reality.
 

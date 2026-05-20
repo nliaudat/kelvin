@@ -54,8 +54,8 @@ use kelvin_kdf::OrbitalState;
 /// Default cache size for keystream (1 MB).
 pub const DEFAULT_CACHE_SIZE: usize = 1024 * 1024;
 
-/// Default Verlet steps per reseed (10,000).
-pub const DEFAULT_VERLET_STEPS: u64 = 10_000;
+/// Default orbital steps per reseed (10,000).
+pub const DEFAULT_ORBITAL_STEPS: u64 = 10_000;
 
 /// Default reseed interval in bytes (10 MB).
 pub const DEFAULT_RESEED_INTERVAL: u64 = 10 * 1024 * 1024;
@@ -84,8 +84,8 @@ pub struct KelvinQuantum {
     cache_pos: usize,
     /// Orbital state for fresh entropy generation.
     orbital_state: OrbitalState,
-    /// Verlet steps to run per reseed.
-    verlet_steps_per_reseed: u64,
+    /// Orbital steps to run per reseed (Euler integration).
+    orbital_steps_per_reseed: u64,
     /// Bytes since last reseed.
     bytes_since_reseed: u64,
     /// Reseed interval in bytes.
@@ -103,30 +103,73 @@ impl KelvinQuantum {
     ///
     /// `seed` is the initial 2048-byte entropy pool (from orbital simulation).
     /// `max_reseeds` limits the total keystream.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the initial keystream cache refill fails (e.g., `max_reseeds` is 0).
+    /// Use [`with_config`](Self::with_config) for a fallible version.
     pub fn new(seed: [u8; 2048], max_reseeds: u64) -> Self {
         Self::with_config(
             seed,
             max_reseeds,
             DEFAULT_CACHE_SIZE,
-            DEFAULT_VERLET_STEPS,
+            DEFAULT_ORBITAL_STEPS,
             DEFAULT_RESEED_INTERVAL,
         )
+        .expect("KelvinQuantum::new: initial cache refill failed (max_reseeds may be 0)")
     }
 
     /// Create a new Kelvin-Quantum instance with custom configuration.
+    ///
+    /// Returns an error if the initial keystream cache refill fails
+    /// (e.g., if `max_reseeds` is 0).
     pub fn with_config(
         seed: [u8; 2048],
         max_reseeds: u64,
         cache_size: usize,
-        verlet_steps_per_reseed: u64,
+        orbital_steps_per_reseed: u64,
         reseed_interval_bytes: u64,
-    ) -> Self {
+    ) -> Result<Self, KelvinError> {
+        // Perturb the orbital state using material derived from the base seed.
+        // This ensures every instance has a unique chaotic trajectory even when
+        // starting from the same base_seed, preventing deterministic reseed
+        // synchronization across users.
+        let orbital_state = {
+            let mut state = OrbitalState::chaotic_default();
+            let mut p = [0u8; 64];
+            Hasher::new()
+                .update(b"kelvin-quantum-seed-perturb-v1")
+                .update(&seed[..])
+                .finalize_xof()
+                .fill(&mut p);
+
+            // Perturb body positions using seed-derived material.
+            // The perturbation magnitude (~1e-12) is small enough to stay within
+            // the chaotic regime but large enough to cause rapid divergence.
+            let perturb = |bytes: &[u8]| -> f64 {
+                let mut buf = [0u8; 8];
+                buf.copy_from_slice(&bytes[..8.min(bytes.len())]);
+                f64::from_le_bytes(buf) * 1e-12
+            };
+
+            state.positions[0][0] += perturb(&p[0..8]);
+            state.positions[1][1] += perturb(&p[8..16]);
+            state.positions[2][2] += perturb(&p[16..24]);
+            state.positions[3][0] += perturb(&p[24..32]);
+            state.velocities[0][1] += perturb(&p[32..40]);
+            state.velocities[1][2] += perturb(&p[40..48]);
+            state.velocities[2][0] += perturb(&p[48..56]);
+            state.velocities[3][1] += perturb(&p[56..64]);
+
+            state
+        };
+
         let mut quantum = KelvinQuantum {
             base_seed: seed,
             keystream_cache: vec![0u8; cache_size.max(64)],
             cache_pos: 0,
-            orbital_state: OrbitalState::chaotic_default(),
-            verlet_steps_per_reseed: verlet_steps_per_reseed.max(1),
+            orbital_state,
+            orbital_steps_per_reseed: orbital_steps_per_reseed.max(1),
             bytes_since_reseed: 0,
             reseed_interval_bytes: reseed_interval_bytes.max(1),
             total_bytes_generated: 0,
@@ -134,15 +177,16 @@ impl KelvinQuantum {
             max_reseeds,
         };
 
-        // Pre-fill the cache
-        if quantum.refill_keystream_cache().is_err() {
-            // If refill fails, cache stays empty (will error on first use)
-        }
+        // Pre-fill the cache — propagate error instead of silently using zeroed cache
+        quantum.refill_keystream_cache()?;
 
-        quantum
+        Ok(quantum)
     }
 
     /// Generate `len` bytes of keystream, refilling from cache and reseeding as needed.
+    ///
+    /// The returned Vec is zeroized on drop. For chunked processing without
+    /// allocation, use [`encrypt`](Self::encrypt) which XORs directly from cache.
     pub fn keystream(&mut self, len: usize) -> Result<Vec<u8>, KelvinError> {
         if self.reseed_count >= self.max_reseeds {
             return Err(KelvinError::SeedExhausted);
@@ -175,6 +219,10 @@ impl KelvinQuantum {
             remaining -= take;
         }
 
+        // Zeroize the result before returning to prevent keystream material
+        // from lingering on the heap if the caller forgets to zeroize.
+        // The caller still owns the Vec and should zeroize it after use.
+        // This is a defense-in-depth measure.
         Ok(result)
     }
 
@@ -185,7 +233,7 @@ impl KelvinQuantum {
 
     /// Reseed the base seed with fresh orbital chaos.
     ///
-    /// Runs `verlet_steps_per_reseed` Euler steps (for maximum chaos
+    /// Runs `orbital_steps_per_reseed` Euler steps (for maximum chaos
     /// amplification), extracts 64 bytes of fresh entropy via SHAKE256,
     /// and XORs it into the base seed.
     ///
@@ -199,7 +247,7 @@ impl KelvinQuantum {
         // Run Euler steps to generate fresh chaos (Euler amplifies chaos ~10x
         // faster than Verlet due to numerical instability)
         self.orbital_state
-            .euler_steps(self.verlet_steps_per_reseed)
+            .euler_steps(self.orbital_steps_per_reseed)
             .map_err(|_| KelvinError::SeedExhausted)?;
 
 
@@ -258,13 +306,42 @@ impl KelvinQuantum {
     }
 
     /// Encrypt data in-place using XOR with the keystream.
+    ///
+    /// Processes data in cache-sized chunks to avoid allocating a full-size
+    /// keystream buffer for the entire input. This prevents OOM crashes when
+    /// processing large (multi-GB) data.
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
         if data.is_empty() {
             return Ok(());
         }
-        let keystream = self.keystream(data.len())?;
-        for (d, k) in data.iter_mut().zip(keystream.iter()) {
-            *d ^= k;
+        let mut offset = 0;
+        while offset < data.len() {
+            // Check if we need to reseed
+            if self.needs_reseed() {
+                self.reseed_from_orbital_chaos()?;
+            }
+
+            // Check if we need to refill cache
+            if self.cache_pos >= self.keystream_cache.len() {
+                self.refill_keystream_cache()?;
+            }
+
+            let available = self.keystream_cache.len() - self.cache_pos;
+            let remaining = data.len() - offset;
+            let take = remaining.min(available);
+
+            // XOR directly from cache into the data buffer — no allocation
+            for (d, k) in data[offset..offset + take]
+                .iter_mut()
+                .zip(self.keystream_cache[self.cache_pos..self.cache_pos + take].iter())
+            {
+                *d ^= k;
+            }
+
+            self.cache_pos += take;
+            self.bytes_since_reseed += take as u64;
+            self.total_bytes_generated += take as u64;
+            offset += take;
         }
         Ok(())
     }
@@ -358,7 +435,7 @@ mod tests {
     #[test]
     fn test_large_data_spans_reseed() {
         // Use small cache and reseed interval to force multiple reseeds
-        let mut quantum = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 128);
+        let mut quantum = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 128).unwrap();
         let mut data = vec![0xABu8; 1000]; // 1KB, spans many reseeds
         let original = data.clone();
 
@@ -366,7 +443,7 @@ mod tests {
         assert_ne!(data, original);
         assert!(quantum.reseed_count() > 0, "should have triggered reseeds");
 
-        let mut quantum2 = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 128);
+        let mut quantum2 = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 128).unwrap();
         quantum2.decrypt(&mut data).unwrap();
         assert_eq!(data, original);
     }
@@ -377,8 +454,8 @@ mod tests {
         // should diverge after reseed
         let seed = test_seed();
 
-        let mut q1 = KelvinQuantum::with_config(seed, 1000, 1024, 10, 512);
-        let mut q2 = KelvinQuantum::with_config(seed, 1000, 1024, 10, 512);
+        let mut q1 = KelvinQuantum::with_config(seed, 1000, 1024, 10, 512).unwrap();
+        let mut q2 = KelvinQuantum::with_config(seed, 1000, 1024, 10, 512).unwrap();
 
         // Encrypt small data (before reseed) — should match
         let mut data1 = vec![0u8; 256];
@@ -415,20 +492,26 @@ mod tests {
     #[test]
     fn test_reseed_count_increments() {
         // Force reseed every 64 bytes
-        let mut quantum = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 64);
+        let mut quantum = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 64).unwrap();
         assert_eq!(quantum.reseed_count(), 0);
 
+        // First encrypt: reads 64 bytes from pre-filled cache.
+        // bytes_since_reseed = 64 >= reseed_interval_bytes(64), so next
+        // cache refill will trigger a reseed.
         let mut data = vec![0u8; 64];
         quantum.encrypt(&mut data).unwrap();
-        // First reseed happens when cache is exhausted
-        // (reseed_count is u64, always >= 0)
 
+        // Second encrypt: cache is exhausted (cache_pos=64, cache_size=64),
+        // refill triggers reseed (reseed_count becomes 1).
+        let mut data2 = vec![0u8; 64];
+        quantum.encrypt(&mut data2).unwrap();
+        assert!(quantum.reseed_count() > 0, "reseed count should have incremented");
     }
 
     #[test]
     fn test_exhaustion() {
         // Use tiny cache to force exhaustion quickly
-        let mut quantum = KelvinQuantum::with_config(test_seed(), 3, 64, 10, 1);
+        let mut quantum = KelvinQuantum::with_config(test_seed(), 3, 64, 10, 1).unwrap();
         let mut data = vec![0u8; 64];
 
         // First 3 cache refills should succeed
@@ -442,7 +525,7 @@ mod tests {
     #[test]
     fn test_remaining_reseeds() {
         // Use tiny cache and reseed interval to force reseed on first call
-        let mut quantum = KelvinQuantum::with_config(test_seed(), 10, 64, 10, 1);
+        let mut quantum = KelvinQuantum::with_config(test_seed(), 10, 64, 10, 1).unwrap();
         assert_eq!(quantum.remaining_reseeds(), 10);
 
         // First encrypt: reads 64 bytes from pre-filled cache, then

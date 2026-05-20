@@ -16,20 +16,21 @@ Security is the primary requirement for production readiness. We must move beyon
 ### 1.2 Cryptographic Hardening
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
 - [x] **Initial Condition Entropy**: Implement $\pm 25\%$ Sun mass randomization to significantly increase the bit-distinct expression space. *(Completed 2026-05-11)*
-- [ ] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(In Progress)*
+- [x] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(Completed 2026-05-20)*
+- [ ] **Stream Authentication**: Integrate NIST SP 800-185 standard KMAC128 or HMAC-SHA256 authenticated tagging into the fast V3 (Photon) and H (Quantum) stream ciphers to defeat ciphertext malleability.
 
-### 1.2 Side-Channel Resistance
+### 1.3 Side-Channel Resistance
 - [ ] **Constant-Time Audit**: Use tools like `dudect-bencher` to verify that all secret-dependent code (Phase 1 simulation) is constant-time.
-- [ ] **Zeroization Verification**: Ensure all secret material is effectively cleared from memory. Verify that compiler optimizations do not remove `Zeroize` calls.
+- [/] **Zeroization Verification**: Ensure all secret material is effectively cleared from memory. *(Completed: Zeroize implemented and unit-tested for all critical buffers/states; Pending: assembly audit for compiler optimization removal)*
 
-### 1.3 Fuzzing
+### 1.4 Fuzzing
 - [ ] **Continuous Fuzzing**: Implement `cargo-fuzz` (libFuzzer) for:
     - `OrbitalConfig` deserialization (JSON and Binary).
     - The simulation state machine (detecting infinite loops or hangs).
     - `Kelvin` API entry points.
 - [ ] **Differential Fuzzing**: Compare the Rust implementation against a high-precision reference (e.g., Python `mpmath`) to detect edge-case divergence.
 
-### 1.4 External Audit
+### 1.5 External Audit
 - [ ] **Audit Readiness**: Prepare a "Security Target" document explaining the mathematical foundations and security proofs.
 - [ ] **Third-Party Engagement**: Schedule a professional security audit by a specialized firm (e.g., Trail of Bits, NCC Group, or Kudelski Security).
 

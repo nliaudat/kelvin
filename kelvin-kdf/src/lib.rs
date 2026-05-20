@@ -35,7 +35,7 @@ mod orbital_state;
 mod schedule;
 
 pub use config::{ConfigError, OrbitalConfig};
-pub use extractor::{extract_seed, extract_shake256};
+pub use extractor::{extract_seed, extract_shake256, extract_shake256_into};
 pub use lyapunov::{LyapunovConfidence, LyapunovError, LyapunovEstimator, LyapunovResult};
 
 pub use asymmetric::{AsymmetricError, OrbitalKeyPair};
