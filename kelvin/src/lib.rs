@@ -52,6 +52,7 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
+mod authenticated;
 mod decrypt;
 mod encrypt;
 mod error;
@@ -69,6 +70,7 @@ pub use kelvin_stream::{ChaChaStream, StreamCipher};
 #[cfg(feature = "aes-ni")]
 pub use kelvin_stream::AesGcmStream;
 
+pub use authenticated::{KelvinPhotonAuthenticated, KelvinQuantumAuthenticated};
 pub use photon::KelvinPhoton;
 pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_ORBITAL_STEPS};
 
