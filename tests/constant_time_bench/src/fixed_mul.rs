@@ -1,23 +1,14 @@
-//! Benchmark: Fixed-point multiplication — direct path vs. high/low splitting.
+//! Benchmark: Fixed-point multiplication — small vs. large values.
 //!
-//! The `Fixed::mul` implementation has two code paths:
-//! 1. **Direct path:** When `checked_mul` succeeds (no i128 overflow), the
-//!    product is computed as `(a * b) >> 64` with rounding.
-//! 2. **Fallback path:** When `checked_mul` overflows i128, the operands are
-//!    split into high/low 64-bit halves and the result is computed via
-//!    multi-term addition.
-//!
-//! This benchmark tests whether these two paths have measurably different
-//! execution times. If they do, an attacker who can control input magnitudes
-//! could distinguish which path was taken, leaking information about the
-//! values being multiplied.
+//! The `Fixed::mul` implementation always uses high/low 64-bit splitting
+//! (the `checked_mul` branch was removed in the constant-time rewrite).
+//! This benchmark verifies that the single code path runs in constant time
+//! regardless of operand magnitude.
 //!
 //! ## Classes
 //!
-//! - **Left (small values):** Values in [-10⁴, 10⁴] where `checked_mul`
-//!   succeeds (no overflow).
-//! - **Right (large values):** Values in [10⁹, 10¹²] where `checked_mul`
-//!   overflows i128 and the high/low splitting fallback is used.
+//! - **Left (small values):** Values in [-10⁴, 10⁴]
+//! - **Right (large values):** Values in [10⁹, 10¹²]
 
 use dudect_bencher::{rand::RngExt, BenchRng, Class, CtRunner};
 use kelvin_core::Fixed;
@@ -35,7 +26,7 @@ pub fn bench_fixed_mul(runner: &mut CtRunner, rng: &mut BenchRng) {
     for _ in 0..NUM_SAMPLES {
         // Randomly assign to Left or Right distribution
         if rng.random::<bool>() {
-            // Left class: small values where checked_mul succeeds
+            // Left class: small values
             // Range: [-10_000, 10_000] in Q32.64
             let a_int: i64 = rng.random_range(-10_000i64..=10_000);
             let b_int: i64 = rng.random_range(-10_000i64..=10_000);
@@ -43,13 +34,8 @@ pub fn bench_fixed_mul(runner: &mut CtRunner, rng: &mut BenchRng) {
             inputs_b.push(Fixed::from_int(b_int));
             classes.push(Class::Left);
         } else {
-            // Right class: large values where checked_mul overflows i128
-            // Range: [10^9, 10^12] — product ~10^18 to 10^24, exceeds i128 max (~1.7e38)
-            // Actually i128 max is ~1.7e38, so we need values where a*b > 2^127
-            // 2^127 ≈ 1.7e38. With Q32.64 scaling, a*b in raw i128 must exceed i128::MAX.
-            // For values ~10^9 in Q32.64: raw = 10^9 * 2^64 ≈ 1.8e28
-            // Product of two such values: ~3.4e56 which overflows i128.
-            // So values >= 10^9 will trigger the fallback.
+            // Right class: large values
+            // Range: [10^9, 10^12] in Q32.64
             let a_int: i64 = rng.random_range(1_000_000_000i64..=10_000_000_000i64);
             let b_int: i64 = rng.random_range(1_000_000_000i64..=10_000_000_000i64);
             inputs_a.push(Fixed::from_int(a_int));

@@ -32,7 +32,7 @@ use blake3::Hasher;
 use hkdf::Hkdf;
 use sha3::digest::{ExtendableOutput, XofReader};
 use sha3::{Sha3_512, Shake256};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::KelvinError;
 
@@ -158,9 +158,13 @@ impl KelvinPhoton {
         if data.is_empty() {
             return Ok(());
         }
-        // Allocate a reusable keystream buffer once (max CHUNK_SIZE = 1 MB).
-        // Reusing the buffer avoids thousands of allocations for multi-GB inputs.
-        let mut keystream = vec![0u8; Self::CHUNK_SIZE];
+        // Allocate a reusable keystream buffer (up to CHUNK_SIZE = 1 MB).
+        // For small inputs, cap the allocation to the actual data length
+        // to avoid allocating a full 1 MB buffer for tiny messages.
+        // Reusing the buffer across chunks avoids thousands of allocations
+        // for multi-GB inputs.
+        let buf_size = std::cmp::min(data.len(), Self::CHUNK_SIZE);
+        let mut keystream = Zeroizing::new(vec![0u8; buf_size]);
         let mut offset = 0;
         while offset < data.len() {
             let remaining = data.len() - offset;
@@ -176,7 +180,6 @@ impl KelvinPhoton {
 
             offset += chunk_size;
         }
-        keystream.zeroize();
         self.bytes_processed += data.len() as u64;
         Ok(())
     }
