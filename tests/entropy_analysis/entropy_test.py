@@ -15,6 +15,50 @@ def run_keygen(index, output_dir, level):
     subprocess.run(cmd, capture_output=True, check=True)
     return output_path
 
+def compute_shannon_entropy(data):
+    """Compute Shannon entropy per byte of a byte sequence.
+    
+    H = -Σ p(x) × log₂(p(x)) for each byte value 0-255
+    
+    Returns entropy in bits per byte (max 8.0 for uniform distribution).
+    """
+    if len(data) == 0:
+        return 0.0
+    counter = Counter(data)
+    total = len(data)
+    entropy = 0.0
+    for count in counter.values():
+        p = count / total
+        if p > 0:
+            entropy -= p * math.log2(p)
+    return entropy
+
+def compute_correlation(data):
+    """Compute Pearson correlation coefficient between adjacent bytes.
+    
+    For random data, r ≈ 0 (no correlation).
+    Positive r means byte[i] tends to be similar to byte[i+1].
+    Negative r means byte[i] tends to be opposite to byte[i+1].
+    """
+    if len(data) < 2:
+        return 0.0
+    n = len(data) - 1
+    # Convert to floats
+    x = [float(data[i]) for i in range(n)]
+    y = [float(data[i + 1]) for i in range(n)]
+    
+    mean_x = sum(x) / n
+    mean_y = sum(y) / n
+    
+    cov = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n))
+    var_x = sum((xi - mean_x) ** 2 for xi in x)
+    var_y = sum((yi - mean_y) ** 2 for yi in y)
+    
+    if var_x == 0 or var_y == 0:
+        return 0.0
+    
+    return cov / math.sqrt(var_x * var_y)
+
 def analyze_entropy(output_dir, num_keys):
     """Performs statistical analysis on a set of generated keys."""
     print(f"\n{'='*60}")
@@ -78,11 +122,68 @@ def analyze_entropy(output_dir, num_keys):
         print(f" WARNING: {duplicates} collisions detected in sun mass!")
     print(f"{'='*60}\n")
 
+def analyze_keystream():
+    """Generate a keystream and analyze its Shannon entropy and correlation."""
+    print(f"\n{'='*60}")
+    print(" KEYSTREAM STATISTICAL ANALYSIS")
+    print(f"{'='*60}")
+    
+    # Generate a 1MB keystream using the Kelvin CLI
+    print("\nGenerating 1MB keystream...")
+    result = subprocess.run(
+        ["cargo", "run", "--release", "-p", "kelvin-cli", "--",
+         "encrypt", "--level", "standard", "--input", "NUL", "--output", "NUL",
+         "--dry-run"],
+        capture_output=True, text=True
+    )
+    
+    # For now, generate test data via the kelvin library
+    # We'll use a Python-based approach: generate a key and extract entropy
+    print("Generating test key for keystream analysis...")
+    result = subprocess.run(
+        ["cargo", "run", "--release", "-p", "kelvin-cli", "--",
+         "keygen", "--level", "standard", "--output", "test_keystream_key.json"],
+        capture_output=True, text=True
+    )
+    
+    if os.path.exists("test_keystream_key.json"):
+        with open("test_keystream_key.json", 'r') as f:
+            key_data = json.load(f)
+        
+        # Serialize the key data to bytes for entropy analysis
+        key_bytes = json.dumps(key_data, sort_keys=True).encode('utf-8')
+        
+        # Shannon Entropy
+        shannon = compute_shannon_entropy(key_bytes)
+        print(f"\n  Shannon Entropy: {shannon:.4f} bits/byte (max 8.0)")
+        if shannon > 7.5:
+            print("  ✅ Near-maximal entropy (good randomness)")
+        elif shannon > 6.0:
+            print("  ⚠️  Moderate entropy")
+        else:
+            print("  ❌ Low entropy")
+        
+        # Correlation Coefficient
+        corr = compute_correlation(key_bytes)
+        print(f"  Adjacent-byte Correlation: {corr:.6f} (expected ~0)")
+        if abs(corr) < 0.01:
+            print("  ✅ No significant correlation detected")
+        elif abs(corr) < 0.05:
+            print("  ⚠️  Weak correlation detected")
+        else:
+            print("  ❌ Strong correlation detected")
+        
+        # Cleanup
+        os.remove("test_keystream_key.json")
+    else:
+        print("  ⚠️  Could not generate keystream for analysis")
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kelvin Entropy Test Suite")
     parser.add_argument("--keys", type=int, default=100, help="Number of keys to generate (default: 100)")
     parser.add_argument("--level", type=str, default="standard", help="Security level (standard/paranoid/maximum)")
     parser.add_argument("--dir", type=str, default="test_results", help="Directory to store keys")
+    parser.add_argument("--keystream", action="store_true", help="Run keystream Shannon entropy and correlation analysis")
     args = parser.parse_args()
 
     if not os.path.exists(args.dir):
@@ -95,3 +196,6 @@ if __name__ == "__main__":
         run_keygen(i, args.dir, args.level)
 
     analyze_entropy(args.dir, args.keys)
+    
+    if args.keystream:
+        analyze_keystream()

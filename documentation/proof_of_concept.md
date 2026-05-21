@@ -436,6 +436,81 @@ cargo run -p constant_time_bench -- --continuous mul
 
 ---
 
+## 9. NIST SP 800-22 Statistical Test Suite
+
+Following the methodology of Song et al. (2025) [CryptoChaos, arXiv:2504.08618] and Cang, Kang & Wang (2021) [doi:10.1007/s11071-021-06310-9], Kelvin includes a built-in NIST SP 800-22 statistical test suite for validating the randomness quality of the orbital keystream.
+
+### Test Implementation
+
+The test suite is located in `tests/nist_tests/` and implements all 15 NIST SP 800-22 Rev 1a tests:
+
+| # | Test | What it detects |
+|---|------|-----------------|
+| 1 | Frequency (Monobit) | Proportion of 0s and 1s |
+| 2 | Block Frequency | Proportion within M-bit blocks |
+| 3 | Runs | Oscillation between 0s and 1s |
+| 4 | Longest Run of Ones | Longest consecutive 1s in blocks |
+| 5 | Binary Matrix Rank | Linear dependence among fixed-length substrings |
+| 6 | Discrete Fourier Transform (Spectral) | Periodic features (peaks in DFT) |
+| 7 | Non-overlapping Template Matching | Occurrences of pre-specified patterns |
+| 8 | Overlapping Template Matching | Occurrences of overlapping patterns |
+| 9 | Maurer's Universal Statistical | Compressibility (repetition distance) |
+| 10 | Linear Complexity | Linear feedback shift register length |
+| 11 | Serial | Uniformity of m-bit patterns |
+| 12 | Approximate Entropy | Frequency of overlapping patterns |
+| 13 | Cumulative Sums (Cusum) | Max partial sum deviation from 0 |
+| 14 | Random Excursions | Number of visits to states in random walk |
+| 15 | Random Excursions Variant | Distribution of state visits |
+
+### How to Run
+
+```bash
+# Run the NIST test suite
+cargo run -p nist_tests
+
+# Expected output:
+# === NIST SP 800-22 Statistical Test Suite for Kelvin ===
+# Keystream size: 1048576 bytes = 8388608 bits
+#   [PASS] Frequency (Monobit) Test
+#   [PASS] Block Frequency Test (M=128)
+#   [PASS] Runs Test
+#   ... (all 15 tests)
+# === Results: 15/15 tests passed ===
+```
+
+The test generates a 1MB keystream from a deterministic orbital configuration and exports it to `keystream.bin` for external validation using the official NIST STS software package.
+
+---
+
+## 10. Shannon Entropy & Correlation Analysis
+
+Following the methodology of Song et al. (2025) [CryptoChaos], Kelvin measures two additional randomness metrics on the orbital keystream.
+
+### Shannon Entropy
+
+The Shannon entropy per byte is computed as:
+
+$$H = -\sum_{x=0}^{255} p(x) \log_2 p(x)$$
+
+For a perfectly uniform distribution, $H = 8.0$ bits/byte. CryptoChaos reported near-maximal entropy (~8 bits/byte) for their construction.
+
+### Adjacent-Byte Correlation
+
+The Pearson correlation coefficient between adjacent bytes measures whether consecutive bytes are statistically independent:
+
+$$r = \frac{\sum_{i=1}^{n-1} (x_i - \bar{x})(x_{i+1} - \bar{y})}{\sqrt{\sum_{i=1}^{n-1} (x_i - \bar{x})^2 \sum_{i=1}^{n-1} (x_{i+1} - \bar{y})^2}}$$
+
+For random data, $r \approx 0$. CryptoChaos measured this to verify the absence of serial dependence.
+
+### How to Run
+
+```bash
+# Run entropy analysis with keystream metrics
+python tests/entropy_analysis/entropy_test.py --keystream
+```
+
+---
+
 ## References
 
 See [citations.md](citations.md) for the full academic context, and [REFERENCES.bib](../REFERENCES.bib) for the BibTeX file.

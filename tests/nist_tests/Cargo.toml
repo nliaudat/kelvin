@@ -1,0 +1,10 @@
+[package]
+name = "nist_tests"
+version = "0.1.0"
+edition = "2021"
+description = "NIST SP 800-22 statistical test suite for Kelvin orbital keystream"
+
+[dependencies]
+kelvin = { path = "../../kelvin" }
+kelvin-core = { path = "../../kelvin-core" }
+hex = "0.4"
