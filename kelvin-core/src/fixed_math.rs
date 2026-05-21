@@ -91,29 +91,31 @@ impl Fixed {
 
     /// Compute square root using binary digit-by-digit (restoring) algorithm.
     ///
-    /// This is a constant-time implementation that runs exactly 64 iterations
+    /// This is a constant-time implementation that runs exactly 96 iterations
     /// regardless of input magnitude. It uses only comparisons, subtractions,
     /// and bit shifts — no division, no multiplication, no data-dependent
     /// branching. This guarantees timing is independent of the input value.
     ///
     /// The algorithm processes the 128-bit input 2 bits at a time, building
-    /// a 64-bit result. The result is then shifted into Q32.64 format.
+    /// a 96-bit result (32 integer + 64 fractional bits). The result is
+    /// directly in Q32.64 format — no post-shift needed.
     ///
     /// # Constant-time guarantee
     ///
-    /// This implementation runs exactly 64 iterations for **all** inputs,
+    /// This implementation runs exactly 96 iterations for **all** inputs,
     /// including zero and negative values. There is no early return branch.
-    /// For non-positive inputs, the result is zero (the algorithm naturally
-    /// produces zero since all input bits are zero).
+    /// For negative inputs, a constant-time sign mask zeros out the result.
     pub fn sqrt(self) -> Self {
         // Binary digit-by-digit (restoring) square root.
         //
         // The input `a` is in Q32.64 format (i128, 1.0 = 2^64).
         // We process the 128-bit input as 64 pairs of bits (2 bits per
-        // iteration), building a 64-bit result.
+        // iteration), building a 64-bit integer sqrt. Then we continue
+        // for 32 more iterations with zero input bits to compute the
+        // fractional part, giving a 96-bit result.
         //
-        // The result is in Q16.48 format internally. To convert to Q32.64,
-        // we shift left by 16 (since Q16.48 << 16 = Q32.64).
+        // The 96-bit result is sqrt(input) * 2^32, which is exactly
+        // the Q32.64 representation of sqrt(value).
         //
         // Algorithm per iteration:
         //   remainder = (remainder << 2) | (next 2 bits of input)
@@ -125,47 +127,53 @@ impl Fixed {
         //       result_bit = 0
         //   result = (result << 1) | result_bit
 
-        // Use unsigned_abs so negative values produce zero result
-        // (all bits are zero, so the algorithm naturally produces zero).
+        // Capture the sign before taking absolute value.
+        // We'll apply a constant-time mask to zero the result for negative inputs.
+        let sign = self.0 < 0;
         let a = self.0.unsigned_abs();
-        let mut result: u64 = 0;
+        let mut result: u128 = 0;
         let mut remainder: u128 = 0;
 
-        // Process 64 bits of result, 2 input bits at a time
+        // Phase 1: Process all 128 bits of the input (64 iterations, 2 bits each)
         for i in (0..64).rev() {
-            // Bring down the next 2 bits from the input
             let bit_pos = i * 2;
             let input_bits = (a >> bit_pos) & 0x3;
             remainder = (remainder << 2) | input_bits;
 
-            // Trial: (result << 2) | 1
-            let trial = ((result as u128) << 2) | 1;
+            let trial = (result << 2) | 1;
 
-            // Constant-time select: compute both possible remainders,
-            // then select using a mask derived from the comparison.
-            // This avoids the data-dependent branch.
-            // Mask: all 1s if remainder >= trial, all 0s otherwise.
-            // The borrow flag from wrapping_sub gives us the comparison result:
-            //   remainder.wrapping_sub(trial) sets borrow if remainder < trial
-            //   So !borrow means remainder >= trial
+            // Constant-time select using borrow flag
             let remainder_if_sub = remainder.wrapping_sub(trial);
-            // Compute borrow: 1 if remainder < trial, 0 otherwise
             let borrow = (remainder_if_sub > remainder) as u128;
-            // Mask: all 1s if remainder >= trial (no borrow), all 0s otherwise
             let mask = borrow.wrapping_sub(1); // 0 -> !0, 1 -> 0
             remainder = (remainder & !mask) | (remainder_if_sub & mask);
-            // Extract the bit from the mask: mask is either 0 or !0.
-            // (mask >> 127) gives 0 when mask=0, 1 when mask=!0.
-            let bit = (mask >> 127) as u64;
+            let bit = (mask >> 127) as u128;
 
-            // Append the bit to the result
             result = (result << 1) | bit;
         }
 
-        // The 64-bit result is the integer sqrt of the 128-bit input.
-        // Since input = value * 2^64, sqrt(input) = sqrt(value) * 2^32.
-        // To convert to Q32.64 format (sqrt(value) * 2^64), shift left by 32.
-        Fixed((result as i128) << 32)
+        // Phase 2: Continue for 32 more iterations with zero input bits
+        // to compute the fractional part of the sqrt.
+        for _ in 0..32 {
+            remainder <<= 2;
+
+            let trial = (result << 2) | 1;
+
+            let remainder_if_sub = remainder.wrapping_sub(trial);
+            let borrow = (remainder_if_sub > remainder) as u128;
+            let mask = borrow.wrapping_sub(1);
+            remainder = (remainder & !mask) | (remainder_if_sub & mask);
+            let bit = (mask >> 127) as u128;
+
+            result = (result << 1) | bit;
+        }
+
+        // Constant-time sign mask: zero the result for negative inputs.
+        // sign_mask = !0 if sign == false (positive), 0 if sign == true (negative).
+        let sign_mask = (sign as u128).wrapping_sub(1);
+        result &= sign_mask;
+
+        Fixed(result as i128)
     }
 
     /// Absolute value.
@@ -278,11 +286,13 @@ impl Mul for Fixed {
         let lo_hi = (a_lo as u128) * (b_hi as u128); // u64 * u64 fits in u128
         let lo_lo = (a_lo as u128) * (b_lo as u128); // u64 * u64 fits in u128
 
-        // (a * b) >> 64 = hi_hi * 2^64 + hi_lo + lo_hi + (lo_lo >> 64)
+        // (a * b) >> 64 = hi_hi * 2^64 + hi_lo + lo_hi + ((lo_lo + 2^63) >> 64)
+        // The rounding bit (1 << 63) implements round-to-nearest on the
+        // lower 64 bits before shifting, matching the old checked_mul behavior.
         let result_abs = (hi_hi << 64)
             .wrapping_add(hi_lo)
             .wrapping_add(lo_hi)
-            .wrapping_add(lo_lo >> 64);
+            .wrapping_add(lo_lo.wrapping_add(1 << 63) >> 64);
 
         // Constant-time sign application
         let sign_mask = 0u128.wrapping_sub(sign as u128);
@@ -477,15 +487,25 @@ mod tests {
     #[test]
     fn test_sqrt() {
         let result = Fixed::from_int(9).sqrt();
-        assert!((result.to_f64() - 3.0).abs() < 0.001);
+        assert!(
+            (result.to_f64() - 3.0).abs() < 0.001,
+            "sqrt(9) = {}, expected ~3.0",
+            result.to_f64()
+        );
 
         let result = Fixed::from_int(0).sqrt();
         assert_eq!(result, Fixed::ZERO);
 
         let result = Fixed::from_int(2).sqrt();
         let expected = 2.0f64.sqrt();
-        assert!((result.to_f64() - expected).abs() < 0.001);
+        assert!(
+            (result.to_f64() - expected).abs() < 0.001,
+            "sqrt(2) = {}, expected ~{}",
+            result.to_f64(),
+            expected
+        );
     }
+
 
     #[test]
     fn test_abs() {

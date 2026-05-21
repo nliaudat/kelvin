@@ -145,7 +145,11 @@ Kelvin builds on foundational work across numerical analysis, chaos theory, and 
 - **Nir & Langley (2018)** — ChaCha20 IETF standard (RFC 8439) [doi:10.17487/RFC8439]
 
 ### Related Work
-- **CryptoChaos (Harvard, 2025)** — Hybrid chaos-based cryptographic framework
+- **Song et al. (2025)** — CryptoChaos: hybrid chaos-based cryptographic framework (arXiv:2504.08618)
+- **Cang, Kang & Wang (2021)** — PRNG based on generalized conservative Sprott-A system [doi:10.1007/s11071-021-06310-9]
+- **Halayka (2012)** — N-body dynamics for PRNG (computationally expensive vs. LFSR)
+- **Vuckovac (2021)** — N-body puzzles for PoW (no full cryptosystem implemented)
+- **Kraicha et al. (2025)** — Orbital-inspired encryption using Phobos/Deimos positions (metaphorical, not simulated)
 
 ### Security & Side Channels
 - **Koeune & Standaert (2005)** — Side-channel attack methodology [doi:10.1007/11554578_3]
