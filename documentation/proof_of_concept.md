@@ -189,7 +189,47 @@ All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at 
 
 ---
 
-## 4.8 V2 Streaming Mode (Real-Time Per-Step Simulation)
+## 4.8 Finite Precision Periodicity Analysis (Cang et al. 2021)
+
+Cang, Kang & Wang (2021) identified a critical problem for chaos-based cryptography: when chaotic systems are implemented on digital computers with finite precision, *dynamical degradation* occurs — the system's trajectory becomes periodic rather than truly chaotic, compromising security. They proposed a Finite Precision Period Calculation (FPPC) algorithm to detect and quantify this degradation.
+
+### Relevance to Kelvin
+
+Kelvin's Q32.64 fixed-point arithmetic imposes a finite state space of ~2^64 states per variable. While this is far larger than the 64-bit floating-point precision used in the Sprott-A PRNG paper, the same theoretical concern applies: the orbital state could eventually repeat.
+
+### Kelvin's Mitigations
+
+Kelvin already addresses finite precision degradation through several architectural features that go beyond the FPPC approach:
+
+| Mitigation | Sprott-A (FPPC) | Kelvin |
+|-----------|-----------------|--------|
+| Period detection | Explicit FPPC algorithm | Not yet implemented |
+| State refresh | Scrambling post-processing | Continuous reseeding via SHAKE256 XOF |
+| Entropy extraction | Binary quantization | 2048-byte domain-separated hash of full orbital state |
+| Forward secrecy | None | BLAKE3 reseed per key |
+| State space | 3 variables × f64 | 30 variables × Q32.64 fixed-point |
+
+**Continuous reseeding** is Kelvin's primary defense. The key schedule refreshes the entropy pool via SHAKE256 at configurable intervals (default: every 10 virtual steps). Even if the orbital state were to enter a short cycle, the reseeding operation mixes in fresh entropy from the hash function's sponge state, breaking any periodicity.
+
+**Lyapunov horizon enforcement** provides a secondary defense. Kelvin rejects configurations where the simulation runs beyond the Lyapunov time (~1,000 steps for standard configurations). This ensures that key material is extracted only from the chaotic regime, before any finite-precision periodicity could manifest.
+
+### Recommended Additions
+
+Following the Cang et al. methodology, Kelvin should adopt:
+
+1. **NIST SP 800-22 Statistical Test Suite** — Validate the orbital keystream against all 15 NIST tests (frequency, block frequency, runs, longest run, rank, FFT, linear complexity, etc.) to provide independent verification of randomness quality.
+
+2. **Approximate Entropy (ApEn)** — Measure the complexity of the orbital keystream against the theoretical maximum, using the same metric as the Sprott-A paper.
+
+3. **Periodicity Detection** — Implement an FPPC-inspired test that hashes orbital states and checks for repetitions over extended simulation runs, quantifying the effective period of the Q32.64 fixed-point n-body system.
+
+### Conservative Chaos Validation
+
+The Sprott-A system is conservative (Hamiltonian), preserving phase-space volume — the same mathematical class as n-body gravitational dynamics. The paper's successful PRNG design validates Kelvin's core premise: conservative chaotic systems produce high-quality pseudo-random sequences suitable for cryptographic applications. Kelvin's n-body approach extends this principle to a higher-dimensional (30 DOF vs. 3 DOF), physically-grounded system with stronger security properties.
+
+---
+
+## 4.9 V2 Streaming Mode (Real-Time Per-Step Simulation)
 
 V2 Streaming (`KelvinStreaming`) introduces a true one-time pad streaming mode where each chunk of data advances the orbital simulation by one Verlet step. This is verified by the built-in self-test:
 
