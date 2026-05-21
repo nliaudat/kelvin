@@ -140,8 +140,8 @@ Kelvin-Quantum is strictly more advanced — higher dimension, better security p
 
 Halayka proposed using n-body gravitational dynamics as a pseudo-random number generator (PRNG). The approach was found to be computationally expensive compared to traditional LFSR-based PRNGs, limiting its practical applicability. Kelvin addresses this by using n-body dynamics specifically as a KDF (not a general PRNG), where the computational cost is a security feature rather than a drawback — the simulation cost is paid once during key derivation, not per-byte of output.
 
-### Vuckovac (2021) — N-Body PoW Puzzles
-> **Vuckovac, M. (2021).** N-Body Puzzles for Proof-of-Work.
+### Vuckovac (2021) — Cryptographic Puzzles and Complex Systems
+> **Vuckovac, R. (2021).** Cryptographic Puzzles and Complex Systems. *Complex Systems*, 30(3), 375–390. doi:10.25088/ComplexSystems.30.3.375
 
 Vuckovac suggested using n-body gravitational simulations as computational puzzles for proof-of-work (PoW) consensus mechanisms. The work identified n-body integration as a naturally hard problem suitable for Sybil resistance but did not extend the concept to a full encryption or key derivation system. Kelvin builds on this insight by using the same computational hardness as the foundation for a complete cryptosystem, including key derivation, stream encryption, and post-quantum identity.
 
