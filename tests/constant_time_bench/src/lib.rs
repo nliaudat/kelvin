@@ -36,3 +36,8 @@ pub mod fixed_sqrt;
 pub mod fixed_sqrt_clamp;
 pub mod fixed_sqrt_edge;
 pub mod acceleration;
+pub mod verlet_step;
+pub mod euler_step;
+pub mod simulate;
+pub mod extract_seed;
+pub mod key_schedule;
