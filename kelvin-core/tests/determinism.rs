@@ -181,16 +181,6 @@ fn test_accelerations_deterministic() {
     let hash: [u8; 32] = hasher.finalize().into();
     let hash_hex = hex::encode(hash);
 
-    if std::env::var("CARGO_UPDATE_GOLDEN").is_ok() {
-        if GOLDEN_ACCEL_INITIAL == "0000000000000000000000000000000000000000000000000000000000000000" {
-            panic!(
-                "GOLDEN_ACCEL_INITIAL needs to be set. Run test without CARGO_UPDATE_GOLDEN to get the value.\n\
-                 Hash: {}",
-                hash_hex
-            );
-        }
-    }
-
     assert_eq!(
         hash_hex, GOLDEN_ACCEL_INITIAL,
         "compute_accelerations golden hash mismatch!\n\
@@ -294,17 +284,6 @@ fn test_verlet_golden_hash() {
     let hash = hash_state(&bodies);
     let hash_hex = hex::encode(hash);
 
-    // Check if golden hash needs to be set
-    if GOLDEN_VERLET_1000 == "0000000000000000000000000000000000000000000000000000000000000000" {
-        if std::env::var("CARGO_UPDATE_GOLDEN").is_ok() {
-            panic!(
-                "GOLDEN_VERLET_1000 needs to be set. Run test without CARGO_UPDATE_GOLDEN to get the value.\n\
-                 Hash: {}",
-                hash_hex
-            );
-        }
-    }
-
     assert_eq!(
         hash_hex, GOLDEN_VERLET_1000,
         "Verlet golden hash mismatch!\n\
@@ -332,16 +311,6 @@ fn test_euler_golden_hash() {
 
     let hash = hash_state(&bodies);
     let hash_hex = hex::encode(hash);
-
-    if GOLDEN_EULER_1000 == "0000000000000000000000000000000000000000000000000000000000000000" {
-        if std::env::var("CARGO_UPDATE_GOLDEN").is_ok() {
-            panic!(
-                "GOLDEN_EULER_1000 needs to be set. Run test without CARGO_UPDATE_GOLDEN to get the value.\n\
-                 Hash: {}",
-                hash_hex
-            );
-        }
-    }
 
     assert_eq!(
         hash_hex, GOLDEN_EULER_1000,

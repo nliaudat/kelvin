@@ -43,3 +43,4 @@ tests/entropy_analysis/run_keystream_test.py
 /libs/python/kelvin_pyo3/.venv
 *.pyd
 *.pyc
+production_readiness_review.md
