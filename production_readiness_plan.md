@@ -47,7 +47,12 @@ Security is the primary requirement for production readiness. We must move beyon
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
 - [x] **Initial Condition Entropy**: Implement $\pm 25\%$ Sun mass randomization to significantly increase the bit-distinct expression space. *(Completed 2026-05-11)*
 - [x] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(Completed 2026-05-20)*
-- [ ] **Stream Authentication**: Integrate NIST SP 800-185 standard KMAC128 or HMAC-SHA256 authenticated tagging into the fast V3 (Photon) and H (Quantum) stream ciphers to defeat ciphertext malleability.
+- [x] **Stream Authentication**: BLAKE3-keyed MAC authenticated tagging (32-byte tag) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*
+    - `KelvinPhotonAuthenticated` and `KelvinQuantumAuthenticated` wrappers in `kelvin/src/authenticated.rs`
+    - MAC key derived via HKDF-SHA512 with domain separator `b"kelvin-mac-key-v1"`
+    - Constant-time tag verification via `subtle::ConstantTimeEq`
+    - Wire format: `ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)`
+    - **16 tests** covering round-trip, tampered ciphertext, tampered tag, determinism, empty data, short data, bytes processed, reseed preservation, and cross-mode differentiation
 
 ### 1.3 Side-Channel Resistance
 - [x] **Constant-Time Audit**: Use tools like `dudect-bencher` to verify that all secret-dependent code (Phase 1 simulation) is constant-time. *(Completed 2026-05-22)*
@@ -94,7 +99,11 @@ Security is the primary requirement for production readiness. We must move beyon
 Production use cases often require Kelvin to run in non-Rust environments. We will generate high-level libraries ("wrappers") around the core.
 
 ### 2.1 Python (`kelvin-py`)
-- [ ] **Implementation**: Build a high-level Python package using [PyO3](https://pyo3.rs/) or [cffi](https://cffi.readthedocs.io/).
+- [x] **Implementation**: Build a high-level Python package using [PyO3](https://pyo3.rs/). *(Completed 2026-05-22)*
+    - `libs/python/kelvin_pyo3/` — maturin-based PyO3 project
+    - Wraps all 6 encryption modes: `Kelvin` (V1 AEAD), `KelvinPhoton` (V3), `KelvinQuantum` (H), `KelvinPhotonAuthenticated`, `KelvinQuantumAuthenticated`, `KelvinStreaming` (V2)
+    - `generate_config()` helper creates a random 5-body orbital configuration as JSON
+    - All modes tested: V1 AEAD round-trip, V2 streaming round-trip
 - [ ] **Distribution**: Publish to PyPI with pre-built wheels for Linux, macOS, and Windows.
 
 ### 2.2 JavaScript/TypeScript (`kelvin-js`)
@@ -148,7 +157,7 @@ Automate everything to ensure quality and prevent regressions.
 | Phase | Focus | Duration | Status |
 | :--- | :--- | :--- | :--- |
 | **I: Hardening** | Kani, SP 800-90B, Fuzzing, CT-Audit | 4 Weeks | ✅ All complete |
-| **II: Ecosystem** | Python & JS Bindings | 3 Weeks | ⬜ Not started |
+| **II: Ecosystem** | Python & JS Bindings | 3 Weeks | 🔄 In progress (Python done) |
 | **III: Operations** | CI/CD, Security Policies, Docs | 2 Weeks | ⬜ Not started |
 | **IV: Audit** | Third-party review & fixes | 4-8 Weeks | ⬜ Not started |
 

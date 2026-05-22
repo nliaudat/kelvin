@@ -1,0 +1,23 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "kelvin-pyo3"
+version = "0.1.0"
+description = "Python bindings for the Kelvin Orbital Chaos KDF Cryptosystem"
+requires-python = ">=3.7"
+authors = [
+    { name = "Nicolas Liaudat" },
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security :: Cryptography",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+]
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+module-name = "kelvin_pyo3._core"

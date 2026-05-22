@@ -30,7 +30,7 @@ This downloads and installs MSYS2 to the default location (`C:\msys64`).
 C:\msys64\usr\bin\dlltool.exe
 ```
 
-You need to add `C:\msys64\usr\bin` to your system `PATH` environment variable.
+You need to add `C:\msys64\usr\bin` to your system `PATH` environment variable. (or C:\msys64\mingw64\bin)
 
 #### Option A: Via PowerShell (Admin)
 
@@ -47,7 +47,7 @@ You need to add `C:\msys64\usr\bin` to your system `PATH` environment variable.
 1. Press <kbd>Win</kbd> + <kbd>R</kbd>, type `sysdm.cpl`, and press Enter.
 2. Go to the **Advanced** tab → **Environment Variables**.
 3. Under **System variables**, select `Path` → **Edit**.
-4. Click **New** and add: `C:\msys64\usr\bin` or `C:\msys64\mingw64\bin` 
+4. Click **New** and add: `C:\msys64\usr\bin` or C:\msys64\mingw64\bin
 5. Click **OK** on all dialogs.
 
 ### 3. Verify the fix
