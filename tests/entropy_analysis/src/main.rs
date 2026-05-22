@@ -246,9 +246,12 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
     }
 
     let expected_runs = total_bits as f64 / 2.0;
-    // NIST SP 800-22 §2.3 z-statistic: z = |runs - expected| / sqrt(total_bits)
+    // NIST SP 800-22 §2.3 z-statistic:
+    //   Expected runs: n/2
+    //   Variance: n/4 → std. dev.: √n/2
+    //   z = |runs - n/2| / (√n/2) = 2|runs - n/2| / √n
     // Reject if |z| >= 2.576 (significance level α = 0.01)
-    let z = (runs as f64 - expected_runs).abs() / (total_bits as f64).sqrt();
+    let z = 2.0 * (runs as f64 - expected_runs).abs() / (total_bits as f64).sqrt();
     let ok = z < 2.576;
 
     (ok, runs, expected_runs as u64)
@@ -359,36 +362,36 @@ fn analyze_keystream() -> String {
     out.push_str("\n  ── SP 800-90B Entropy Health Tests ──\n");
 
     // Repetition Test (§4.4.1)
-    let (ok, max_cons) = repetition_test(&keystream);
+    let (rep_pass, max_cons) = repetition_test(&keystream);
     out.push_str(&format!(
         "  [{}] Repetition Test (max {} consecutive identical bytes)\n",
-        if ok { "PASS" } else { "FAIL" },
+        if rep_pass { "PASS" } else { "FAIL" },
         max_cons
     ));
 
     // Adaptive Proportion Test (§4.4.2)
-    let (ok, worst_count, worst_off) = adaptive_proportion_test(&keystream, 512);
+    let (apt_pass, worst_count, worst_off) = adaptive_proportion_test(&keystream, 512);
     out.push_str(&format!(
         "  [{}] Adaptive Proportion Test (worst window: {}/512 at offset {})\n",
-        if ok { "PASS" } else { "FAIL" },
+        if apt_pass { "PASS" } else { "FAIL" },
         worst_count,
         worst_off
     ));
 
     // Runs Test (§2.3 simplified)
-    let (ok, runs, expected_runs) = runs_test_bit_level(&keystream);
+    let (runs_pass, runs, expected_runs) = runs_test_bit_level(&keystream);
     out.push_str(&format!(
         "  [{}] Runs Test ({} runs, expected ~{})\n",
-        if ok { "PASS" } else { "FAIL" },
+        if runs_pass { "PASS" } else { "FAIL" },
         runs,
         expected_runs
     ));
 
     // Longest Run Test (§2.4 simplified)
-    let (ok, longest, max_allowed) = longest_run_bit_test(&keystream);
+    let (longest_pass, longest, max_allowed) = longest_run_bit_test(&keystream);
     out.push_str(&format!(
         "  [{}] Longest Run Test (longest: {} bits, max allowed: {})\n",
-        if ok { "PASS" } else { "FAIL" },
+        if longest_pass { "PASS" } else { "FAIL" },
         longest,
         max_allowed
     ));
@@ -400,13 +403,13 @@ fn analyze_keystream() -> String {
     let dist_pass = missing == 0 && chi_square < 310.0;
 
     let results = [
-        ("Shannon Entropy",        shannon_pass, format!("{:.4} bits/byte", shannon)),
-        ("Correlation",            corr_pass,    format!("{:.6}", corr)),
-        ("Byte Distribution",      dist_pass,    format!("min={}, max={}", min_count, max_count)),
-        ("Repetition Test",        ok,           format!("max {} consecutive", max_cons)),
-        ("Adaptive Proportion",    ok,           format!("worst {}/512", worst_count)),
-        ("Runs Test",              ok,           format!("{} runs", runs)),
-        ("Longest Run Test",       ok,           format!("longest {} bits", longest)),
+        ("Shannon Entropy",        shannon_pass,  format!("{:.4} bits/byte", shannon)),
+        ("Correlation",            corr_pass,     format!("{:.6}", corr)),
+        ("Byte Distribution",      dist_pass,     format!("min={}, max={}", min_count, max_count)),
+        ("Repetition Test",        rep_pass,      format!("max {} consecutive", max_cons)),
+        ("Adaptive Proportion",    apt_pass,      format!("worst {}/512", worst_count)),
+        ("Runs Test",              runs_pass,     format!("{} runs", runs)),
+        ("Longest Run Test",       longest_pass,  format!("longest {} bits", longest)),
     ];
 
     let passed = results.iter().filter(|(_, ok, _)| *ok).count();
@@ -494,7 +497,7 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             0
         } else {
             let mut sorted: Vec<&T> = values.iter().collect();
-            sorted.sort_by(|a, b| a.total_cmp(b));
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
             let mut count = 1;
             for i in 1..n {
                 if sorted[i] != sorted[i - 1] {
@@ -554,13 +557,13 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
     };
     let pos_unique = {
         let mut s = positions.clone();
-        s.sort_by(|a, b| a.total_cmp(b));
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         s.dedup();
         s.len()
     };
     let vel_unique = {
         let mut s = velocities.clone();
-        s.sort_by(|a, b| a.total_cmp(b));
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         s.dedup();
         s.len()
     };

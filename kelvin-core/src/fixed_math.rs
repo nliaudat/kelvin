@@ -761,9 +761,11 @@ mod kani_proofs {
         // (conservative lower bound for the denominator)
         kani::assume(den_raw >= SOFTENING_SQ_RAW || den_raw <= -SOFTENING_SQ_RAW);
         // Also bound the denominator from above: max dist ≈ 200 AU
-        // dist_cubed_max_raw = (200 << 64)³ >> 128 ≈ 8×10⁶ << 64
-        kani::assume(den_raw >= -(200 * AU).pow(3) >> 128);
-        kani::assume(den_raw <= (200 * AU).pow(3) >> 128);
+        // dist_cubed_max_raw = 200³ × 2⁶⁴ = 8×10⁶ × 2⁶⁴ (fits in i128)
+        // Pre-computed as a constant to avoid overflow in Kani's instrumentation.
+        const DIST_CUBED_MAX_RAW: i128 = 8_000_000 * AU;
+        kani::assume(den_raw >= -DIST_CUBED_MAX_RAW);
+        kani::assume(den_raw <= DIST_CUBED_MAX_RAW);
 
         let num = Fixed::from_raw(num_raw);
         let den = Fixed::from_raw(den_raw);
