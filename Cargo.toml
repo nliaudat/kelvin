@@ -12,6 +12,7 @@ members = [
     "tests/nist_tests",
     "tests/entropy_analysis",
     "fuzz",
+    "libs/python/kelvin_pyo3",
 ]
 
 resolver = "2"

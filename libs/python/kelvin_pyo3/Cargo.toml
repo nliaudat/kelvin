@@ -1,0 +1,16 @@
+[package]
+name = "kelvin-pyo3"
+version = "0.1.0"
+edition = "2021"
+description = "Python bindings for the Kelvin Orbital Chaos KDF Cryptosystem (PyO3)"
+license = "CC-BY-NC-SA-4.0"
+
+[lib]
+name = "kelvin_pyo3"
+crate-type = ["cdylib"]
+
+[dependencies]
+kelvin = { path = "../../../kelvin", features = ["serde"] }
+kelvin-core = { path = "../../../kelvin-core" }
+pyo3 = { version = "0.23", features = ["extension-module"] }
+serde_json = "1"

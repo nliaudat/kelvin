@@ -99,7 +99,11 @@ Security is the primary requirement for production readiness. We must move beyon
 Production use cases often require Kelvin to run in non-Rust environments. We will generate high-level libraries ("wrappers") around the core.
 
 ### 2.1 Python (`kelvin-py`)
-- [ ] **Implementation**: Build a high-level Python package using [PyO3](https://pyo3.rs/) or [cffi](https://cffi.readthedocs.io/).
+- [x] **Implementation**: Build a high-level Python package using [PyO3](https://pyo3.rs/). *(Completed 2026-05-22)*
+    - `libs/python/kelvin_pyo3/` — maturin-based PyO3 project
+    - Wraps all 6 encryption modes: `Kelvin` (V1 AEAD), `KelvinPhoton` (V3), `KelvinQuantum` (H), `KelvinPhotonAuthenticated`, `KelvinQuantumAuthenticated`, `KelvinStreaming` (V2)
+    - `generate_config()` helper creates a random 5-body orbital configuration as JSON
+    - All modes tested: V1 AEAD round-trip, V2 streaming round-trip
 - [ ] **Distribution**: Publish to PyPI with pre-built wheels for Linux, macOS, and Windows.
 
 ### 2.2 JavaScript/TypeScript (`kelvin-js`)
@@ -153,7 +157,7 @@ Automate everything to ensure quality and prevent regressions.
 | Phase | Focus | Duration | Status |
 | :--- | :--- | :--- | :--- |
 | **I: Hardening** | Kani, SP 800-90B, Fuzzing, CT-Audit | 4 Weeks | ✅ All complete |
-| **II: Ecosystem** | Python & JS Bindings | 3 Weeks | ⬜ Not started |
+| **II: Ecosystem** | Python & JS Bindings | 3 Weeks | 🔄 In progress (Python done) |
 | **III: Operations** | CI/CD, Security Policies, Docs | 2 Weeks | ⬜ Not started |
 | **IV: Audit** | Third-party review & fixes | 4-8 Weeks | ⬜ Not started |
 
