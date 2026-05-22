@@ -54,7 +54,7 @@ pub fn bench_simulate(runner: &mut CtRunner, rng: &mut BenchRng) {
 
     for ((m1, m2, m3, d1, d2, d3), class) in params.into_iter().zip(classes) {
         runner.run_one(class, || {
-            let mut bodies = vec![
+            let mut bodies = [
                 OrbitalBody::new(
                     Fixed::from_int(m1),
                     Vec3::new(Fixed::from_int(d1), Fixed::ZERO, Fixed::ZERO),

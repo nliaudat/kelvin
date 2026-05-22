@@ -19,7 +19,7 @@ generation (Phase 2).
 The shared secret is an OrbitalConfig: masses, 3D positions, 3D velocities
 for n bodies. Brute-forcing requires running the full simulation per guess.
 
-Status: Implementation complete. All 93 tests pass across 6 crates.
+Status: Implementation complete. All 181 tests pass across 4 crates.
 
 For operational instructions (build commands, Windows quirks, CLI usage),
 see `.clinerules`.
@@ -141,13 +141,18 @@ ai/instruction.md         This file (session restoration)
 
 CURRENT STATE
 
-Implementation complete. All 93 tests pass across 6 crates.
-- kelvin-core: 51 tests (fixed math, body, integrator, constants)
-- kelvin-kdf: 32 tests (config, Lyapunov, extractor, schedule)
-- kelvin-stream: 9 tests (ChaCha20 stream cipher)
-- kelvin: 1 test (round-trip encrypt/decrypt)
-- kelvin-cli: binary (no tests yet)
-- kelvin-ffi: C API wrapper (no tests yet)
+Implementation complete. All 181 tests pass across 4 crates.
+- kelvin-core: 61 tests (fixed math, body, integrator, constants, stability)
+- kelvin-kdf: 64 tests (config, Lyapunov, extractor, schedule, asymmetric)
+- kelvin-stream: 10 tests (ChaCha20 stream cipher, AEAD, rekey)
+- kelvin: 46 tests (photon/quantum stream, authenticated encryption, streaming)
+
+Additional test infrastructure:
+- fuzz/ — cargo-fuzz targets for config deserialization, simulation state, API encrypt, differential acceleration
+- tests/constant_time_bench/ — dudect-bencher suite for constant-time verification of euler_step, verlet_step, simulate, extract_seed
+- tests/differential_fuzzing/ — Python reference model for differential fuzzing
+- tests/entropy_analysis/ — entropy quality analysis scripts
+- tests/nist_tests/ — NIST statistical test suite integration
 
 Next actions: integration tests, known-answer vectors, benchmarks.
 

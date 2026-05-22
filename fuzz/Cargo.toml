@@ -6,6 +6,8 @@ description = "Property-based fuzz tests for Kelvin cryptosystem deserialization
 license = "CC-BY-NC-SA-4.0"
 
 [dependencies]
+kelvin = { path = "../kelvin" }
+kelvin-core = { path = "../kelvin-core" }
 kelvin-kdf = { path = "../kelvin-kdf", features = ["serde"] }
 
 # Override blake3 to use pure Rust implementation (avoids C compiler dependency on Windows GNU)
@@ -17,4 +19,19 @@ proptest = "1.4"
 [[test]]
 name = "deserialize_config"
 path = "fuzz_targets/deserialize_config.rs"
+harness = true
+
+[[test]]
+name = "simulate_state"
+path = "fuzz_targets/simulate_state.rs"
+harness = true
+
+[[test]]
+name = "api_encrypt"
+path = "fuzz_targets/api_encrypt.rs"
+harness = true
+
+[[test]]
+name = "differential_accel"
+path = "fuzz_targets/differential_accel.rs"
 harness = true

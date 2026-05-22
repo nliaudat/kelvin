@@ -49,7 +49,7 @@ pub fn bench_extract_seed(runner: &mut CtRunner, rng: &mut BenchRng) {
 
     for ((m1, m2, d1, d2, step), class) in params.into_iter().zip(classes) {
         runner.run_one(class, || {
-            let bodies = vec![
+            let bodies = [
                 OrbitalBody::new(
                     Fixed::from_int(m1),
                     Vec3::new(Fixed::from_int(d1), Fixed::ZERO, Fixed::ZERO),
