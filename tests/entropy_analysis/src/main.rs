@@ -13,7 +13,6 @@
 use std::fs;
 use std::path::Path;
 
-
 use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 
 // ── CLI argument parsing (no clap dependency) ─────────────────────────────────
@@ -23,6 +22,7 @@ struct Args {
     num_keys: usize,
     level: String,
     dir: String,
+    output: Option<String>,
 }
 
 fn parse_args() -> Args {
@@ -31,6 +31,7 @@ fn parse_args() -> Args {
     let mut num_keys = 100usize;
     let mut level = "standard".to_string();
     let mut dir = "test_results".to_string();
+    let mut output: Option<String> = None;
 
     let mut i = 1;
     while i < args.len() {
@@ -54,6 +55,12 @@ fn parse_args() -> Args {
                     dir = args[i].clone();
                 }
             }
+            "--output" | "-o" => {
+                i += 1;
+                if i < args.len() {
+                    output = Some(args[i].clone());
+                }
+            }
             _ => {}
         }
         i += 1;
@@ -63,6 +70,7 @@ fn parse_args() -> Args {
         num_keys,
         level,
         dir,
+        output,
     }
 }
 
@@ -274,41 +282,42 @@ fn longest_run_bit_test(data: &[u8]) -> (bool, u64, u64) {
     (longest <= max_allowed, longest, max_allowed)
 }
 
-// ── Keystream analysis ────────────────────────────────────────────────────────
+// ── Keystream analysis (returns report string) ────────────────────────────────
 
-fn analyze_keystream() {
-    println!();
-    println!("{:=^60}", "");
-    println!(" KEYSTREAM STATISTICAL ANALYSIS");
-    println!("{:=^60}", "");
+fn analyze_keystream() -> String {
+    let mut out = String::new();
 
-    println!("\nGenerating 1MB keystream via Kelvin (V1 Verlet)...");
+    out.push_str(&format!("\n{:=^60}\n", ""));
+    out.push_str(&format!(" KEYSTREAM STATISTICAL ANALYSIS\n"));
+    out.push_str(&format!("{:=^60}\n", ""));
+
+    out.push_str(&format!("\nGenerating 1MB keystream via Kelvin (V1 Verlet)...\n"));
     let keystream = generate_keystream();
-    println!("  Keystream size: {} bytes", keystream.len());
+    out.push_str(&format!("  Keystream size: {} bytes\n", keystream.len()));
 
     // ── Shannon Entropy ────────────────────────────────────────────────────
     let shannon = compute_shannon_entropy(&keystream);
-    println!("  Shannon Entropy: {:.4} bits/byte (max 8.0)", shannon);
+    out.push_str(&format!("  Shannon Entropy: {:.4} bits/byte (max 8.0)\n", shannon));
     if shannon > 7.5 {
-        println!("  [PASS] Near-maximal entropy (good randomness)");
+        out.push_str("  [PASS] Near-maximal entropy (good randomness)\n");
     } else if shannon > 6.0 {
-        println!("  [WARN] Moderate entropy");
+        out.push_str("  [WARN] Moderate entropy\n");
     } else {
-        println!("  [FAIL] Low entropy");
+        out.push_str("  [FAIL] Low entropy\n");
     }
 
     // ── Correlation Coefficient ─────────────────────────────────────────────
     let corr = compute_correlation(&keystream);
-    println!("  Adjacent-byte Correlation: {:.6} (expected ~0)", corr);
+    out.push_str(&format!("  Adjacent-byte Correlation: {:.6} (expected ~0)\n", corr));
     if corr.abs() < 0.01 {
-        println!("  [PASS] No significant correlation detected");
+        out.push_str("  [PASS] No significant correlation detected\n");
     } else if corr.abs() < 0.05 {
-        println!("  [WARN] Weak correlation detected");
+        out.push_str("  [WARN] Weak correlation detected\n");
     } else {
-        println!("  [FAIL] Strong correlation detected");
+        out.push_str("  [FAIL] Strong correlation detected\n");
     }
 
-    // ── Byte value distribution ─────────────────────────────────────────────
+    // ── Byte value distribution (chi-square test) ──────────────────────────
     let mut counts = [0u64; 256];
     for &b in &keystream {
         counts[b as usize] += 1;
@@ -317,59 +326,93 @@ fn analyze_keystream() {
     let max_count = *counts.iter().max().unwrap_or(&0);
     let expected = keystream.len() as f64 / 256.0;
     let missing: usize = counts.iter().filter(|&&c| c == 0).count();
-    println!(
-        "  Byte value distribution: min={}, max={}, expected={:.0}",
-        min_count, max_count, expected
-    );
+    let chi_square: f64 = counts.iter().map(|&c| {
+        let diff = c as f64 - expected;
+        diff * diff / expected
+    }).sum();
+    out.push_str(&format!(
+        "  Byte value distribution: min={}, max={}, expected={:.0}, χ²={:.1}\n",
+        min_count, max_count, expected, chi_square
+    ));
     if missing > 0 {
-        println!("  [FAIL] {} byte values never appear in keystream", missing);
-    } else if (max_count as f64 - min_count as f64) < 2.0 * expected.sqrt() {
-        println!("  [PASS] Byte distribution is uniform");
+        out.push_str(&format!("  [FAIL] {} byte values never appear in keystream\n", missing));
+    } else if chi_square < 310.0 {
+        out.push_str(&format!("  [PASS] Chi-square = {:.1} (critical: 310, df=255)\n", chi_square));
     } else {
-        println!("  [WARN] Byte distribution shows some variation");
+        out.push_str(&format!("  [FAIL] Chi-square = {:.1} exceeds critical value 310\n", chi_square));
     }
 
     // ── SP 800-90B Entropy Health Tests ────────────────────────────────────
-    println!();
-    println!("  ── SP 800-90B Entropy Health Tests ──");
+    out.push_str("\n  ── SP 800-90B Entropy Health Tests ──\n");
 
     // Repetition Test (§4.4.1)
     let (ok, max_cons) = repetition_test(&keystream);
-    println!(
-        "  [{}] Repetition Test (max {} consecutive identical bytes)",
+    out.push_str(&format!(
+        "  [{}] Repetition Test (max {} consecutive identical bytes)\n",
         if ok { "PASS" } else { "FAIL" },
         max_cons
-    );
+    ));
 
     // Adaptive Proportion Test (§4.4.2)
     let (ok, worst_count, worst_off) = adaptive_proportion_test(&keystream, 512);
-    println!(
-        "  [{}] Adaptive Proportion Test (worst window: {}/512 at offset {})",
+    out.push_str(&format!(
+        "  [{}] Adaptive Proportion Test (worst window: {}/512 at offset {})\n",
         if ok { "PASS" } else { "FAIL" },
         worst_count,
         worst_off
-    );
+    ));
 
     // Runs Test (§2.3 simplified)
     let (ok, runs, expected_runs) = runs_test_bit_level(&keystream);
-    println!(
-        "  [{}] Runs Test ({} runs, expected ~{})",
+    out.push_str(&format!(
+        "  [{}] Runs Test ({} runs, expected ~{})\n",
         if ok { "PASS" } else { "FAIL" },
         runs,
         expected_runs
-    );
+    ));
 
     // Longest Run Test (§2.4 simplified)
     let (ok, longest, max_allowed) = longest_run_bit_test(&keystream);
-    println!(
-        "  [{}] Longest Run Test (longest: {} bits, max allowed: {})",
+    out.push_str(&format!(
+        "  [{}] Longest Run Test (longest: {} bits, max allowed: {})\n",
         if ok { "PASS" } else { "FAIL" },
         longest,
         max_allowed
-    );
+    ));
+
+    // ── Summary ────────────────────────────────────────────────────────────
+    let shannon_pass = shannon > 7.5;
+    let corr_pass = corr.abs() < 0.01;
+    let dist_pass = missing == 0 && chi_square < 310.0;
+    let (rep_pass, _) = repetition_test(&keystream);
+    let (apt_pass, _, _) = adaptive_proportion_test(&keystream, 512);
+    let (runs_pass, _, _) = runs_test_bit_level(&keystream);
+    let (longest_pass, _, _) = longest_run_bit_test(&keystream);
+
+    let results = [
+        ("Shannon Entropy",        shannon_pass, format!("{:.4} bits/byte", shannon)),
+        ("Correlation",            corr_pass,    format!("{:.6}", corr)),
+        ("Byte Distribution",      dist_pass,    format!("min={}, max={}", min_count, max_count)),
+        ("Repetition Test",        rep_pass,     format!("max {} consecutive", max_cons)),
+        ("Adaptive Proportion",    apt_pass,     format!("worst {}/512", worst_count)),
+        ("Runs Test",              runs_pass,    format!("{} runs", runs)),
+        ("Longest Run Test",       longest_pass, format!("longest {} bits", longest)),
+    ];
+
+    let passed = results.iter().filter(|(_, ok, _)| *ok).count();
+    let total = results.len();
+
+    out.push_str("\n  ── Summary ──\n");
+    for (name, ok, detail) in &results {
+        let icon = if *ok { "✓" } else { "✗" };
+        out.push_str(&format!("  {} {}: {} [{}]\n", icon, name, detail, if *ok { "PASS" } else { "FAIL" }));
+    }
+    out.push_str(&format!("  Result: {}/{} tests passed {}\n", passed, total, if passed == total { "✅" } else { "⚠️" }));
+
+    out
 }
 
-// ── Key entropy analysis ──────────────────────────────────────────────────────
+// ── Key entropy analysis (returns report string) ──────────────────────────────
 
 #[derive(serde::Deserialize)]
 struct KeyData {
@@ -390,20 +433,17 @@ struct Vec3Data {
     z: f64,
 }
 
+fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
+    let mut out = String::new();
 
-
-fn analyze_key_entropy(dir: &str, num_keys: usize) {
-    println!();
-    println!("{:=^60}", "");
-    println!(" KELVIN ENTROPY ANALYSIS: {} KEYS", num_keys);
-    println!("{:=^60}", "");
+    out.push_str(&format!("\n{:=^60}\n", ""));
+    out.push_str(&format!(" KELVIN ENTROPY ANALYSIS: {} KEYS\n", num_keys));
+    out.push_str(&format!("{:=^60}\n", ""));
 
     let mut sun_masses: Vec<f64> = Vec::new();
     let mut planet_masses: Vec<f64> = Vec::new();
     let mut positions: Vec<(f64, f64, f64)> = Vec::new();
     let mut velocities: Vec<(f64, f64, f64)> = Vec::new();
-
-
 
     for i in 0..num_keys {
         let path = format!("{}/key_{:05}.json", dir, i);
@@ -422,7 +462,6 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) {
             }
         };
 
-
         if key_data.bodies.is_empty() {
             continue;
         }
@@ -436,10 +475,10 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) {
             positions.push((body.position.x, body.position.y, body.position.z));
             velocities.push((body.velocity.x, body.velocity.y, body.velocity.z));
         }
-
     }
 
-    fn print_stat<T: std::fmt::Debug + PartialOrd>(label: &str, values: &[T]) {
+    fn print_stat<T: std::fmt::Debug + PartialOrd>(label: &str, values: &[T]) -> String {
+        let mut s = String::new();
         let n = values.len();
         let unique_count = if n == 0 {
             0
@@ -460,21 +499,21 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) {
         } else {
             0.0
         };
-        println!("\n[ {} ]", label);
-        println!("  Samples:    {}", n);
-        println!(
-            "  Unique:     {} ({:.2}%)",
+        s.push_str(&format!("\n[ {} ]\n", label));
+        s.push_str(&format!("  Samples:    {}\n", n));
+        s.push_str(&format!(
+            "  Unique:     {} ({:.2}%)\n",
             unique_count,
             if n > 0 { unique_count as f64 / n as f64 * 100.0 } else { 0.0 }
-        );
-        println!("  Sample Entropy: ~{:.2} bits", empirical_bits);
+        ));
+        s.push_str(&format!("  Sample Entropy: ~{:.2} bits\n", empirical_bits));
+        s
     }
 
-
-    print_stat("Sun Mass", &sun_masses);
-    print_stat("Planet Masses", &planet_masses);
-    print_stat("Position Vectors (3D)", &positions);
-    print_stat("Velocity Vectors (3D)", &velocities);
+    out.push_str(&print_stat("Sun Mass", &sun_masses));
+    out.push_str(&print_stat("Planet Masses", &planet_masses));
+    out.push_str(&print_stat("Position Vectors (3D)", &positions));
+    out.push_str(&print_stat("Velocity Vectors (3D)", &velocities));
 
     // Collision check (sort and dedup for f64)
     let mut sorted_suns = sun_masses.clone();
@@ -482,14 +521,78 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) {
     sorted_suns.dedup();
     let duplicates = sun_masses.len() - sorted_suns.len();
 
-    println!();
-    println!("{:=^60}", "");
+    out.push_str(&format!("\n{:=^60}\n", ""));
     if duplicates == 0 {
-        println!(" SUCCESS: No collisions detected in sun mass or configurations.");
+        out.push_str(" SUCCESS: No collisions detected in sun mass or configurations.\n");
     } else {
-        println!(" WARNING: {} collisions detected in sun mass!", duplicates);
+        out.push_str(&format!(" WARNING: {} collisions detected in sun mass!\n", duplicates));
     }
-    println!("{:=^60}", "");
+    out.push_str(&format!("{:=^60}\n", ""));
+
+    // ── Summary ────────────────────────────────────────────────────────────
+    let sun_unique = {
+        let mut s = sun_masses.clone();
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.dedup();
+        s.len()
+    };
+    let planet_unique = {
+        let mut s = planet_masses.clone();
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.dedup();
+        s.len()
+    };
+    let pos_unique = {
+        let mut s = positions.clone();
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.dedup();
+        s.len()
+    };
+    let vel_unique = {
+        let mut s = velocities.clone();
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.dedup();
+        s.len()
+    };
+
+    let sun_ok = sun_unique == sun_masses.len();
+    let planet_ok = planet_unique == planet_masses.len();
+    let pos_ok = pos_unique == positions.len();
+    let vel_ok = vel_unique == velocities.len();
+    let coll_ok = duplicates == 0;
+
+    let key_results = [
+        ("Sun Mass",      sun_ok,    format!("{} samples, {} unique ({}%)", sun_masses.len(), sun_unique, if sun_masses.is_empty() { 0 } else { (sun_unique as f64 / sun_masses.len() as f64 * 100.0) as usize })),
+        ("Planet Masses", planet_ok, format!("{} samples, {} unique ({}%)", planet_masses.len(), planet_unique, if planet_masses.is_empty() { 0 } else { (planet_unique as f64 / planet_masses.len() as f64 * 100.0) as usize })),
+        ("Positions",     pos_ok,    format!("{} samples, {} unique ({}%)", positions.len(), pos_unique, if positions.is_empty() { 0 } else { (pos_unique as f64 / positions.len() as f64 * 100.0) as usize })),
+        ("Velocities",    vel_ok,    format!("{} samples, {} unique ({}%)", velocities.len(), vel_unique, if velocities.is_empty() { 0 } else { (vel_unique as f64 / velocities.len() as f64 * 100.0) as usize })),
+        ("Collisions",    coll_ok,   if coll_ok { "none detected".to_string() } else { format!("{} collisions", duplicates) }),
+    ];
+
+    let key_passed = key_results.iter().filter(|(_, ok, _)| *ok).count();
+    let key_total = key_results.len();
+
+    out.push_str("\n  ── Summary ──\n");
+    out.push_str(&format!("  Mode: Key Entropy Analysis ({} keys)\n", num_keys));
+    for (name, ok, detail) in &key_results {
+        let icon = if *ok { "✓" } else { "✗" };
+        out.push_str(&format!("    {} {}: {} [{}]\n", icon, name, detail, if *ok { "PASS" } else { "FAIL" }));
+    }
+    out.push_str(&format!("  Result: {}/{} checks passed {}\n", key_passed, key_total, if key_passed == key_total { "✅" } else { "⚠️" }));
+
+    out
+}
+
+// ── Output saving ─────────────────────────────────────────────────────────────
+
+fn save_output(output_path: &str, buffer: &str) {
+    if let Some(parent) = Path::new(output_path).parent() {
+        if !parent.as_os_str().is_empty() {
+            fs::create_dir_all(parent).expect("Failed to create output directory");
+        }
+    }
+    fs::write(output_path, buffer).expect("Failed to write output file");
+    println!("\nResults saved to: {}", output_path);
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -497,12 +600,21 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) {
 fn main() {
     let args = parse_args();
 
-    // Only run key generation if --keys was explicitly provided (num_keys != 100 default
-    // when --keystream is the only flag, or if num_keys was explicitly set)
+    // Determine output path: --output flag, or auto-generate timestamped filename
+    let output_path = args.output.clone().unwrap_or_else(|| {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        format!("test_results/entropy_report_{}.txt", ts)
+    });
+
+    let mut report = String::new();
+
+    // Only run key generation if --keys was explicitly provided
     let has_keys_flag = std::env::args().any(|a| a == "--keys");
 
     if has_keys_flag && args.num_keys > 0 {
-
         let dir = Path::new(&args.dir);
         if !dir.exists() {
             fs::create_dir_all(dir).expect("Failed to create output directory");
@@ -519,11 +631,20 @@ fn main() {
             run_keygen(i, &args.dir, &args.level);
         }
 
-        analyze_key_entropy(&args.dir, args.num_keys);
+        let key_report = analyze_key_entropy(&args.dir, args.num_keys);
+        print!("{}", key_report);
+        report.push_str(&key_report);
     }
 
     if args.keystream {
-        analyze_keystream();
+        let ks_report = analyze_keystream();
+        print!("{}", ks_report);
+        report.push_str(&ks_report);
+    }
+
+    // Save output to file
+    if !report.is_empty() {
+        save_output(&output_path, &report);
     }
 }
 
