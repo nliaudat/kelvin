@@ -497,7 +497,7 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             0
         } else {
             let mut sorted: Vec<&T> = values.iter().collect();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater));
+            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
             let mut count = 1;
             for i in 1..n {
                 if sorted[i] != sorted[i - 1] {
@@ -557,13 +557,13 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
     };
     let pos_unique = {
         let mut s = positions.clone();
-        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater));
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
         s.dedup();
         s.len()
     };
     let vel_unique = {
         let mut s = velocities.clone();
-        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Greater));
+        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Less));
         s.dedup();
         s.len()
     };
