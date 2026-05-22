@@ -27,8 +27,8 @@ fn main() {
 
     // ── V1 Secure: ChaCha20Poly1305 AEAD ──────────────────────────────────
     println!("--- V1 Secure (ChaCha20Poly1305 / Verlet) ---");
-    let keystream = generate_v1_keystream_verlet();
-    let data = BitsData::from_binary(keystream);
+    let v1_verlet_keystream = generate_v1_keystream_verlet();
+    let data = BitsData::from_binary(v1_verlet_keystream.clone());
     let (p, t) = run_all_tests(&data);
     all_passed.push(p);
     all_total.push(t);
@@ -92,9 +92,9 @@ fn main() {
         println!("  {}: {}/{} {}", label, all_passed[i], all_total[i], status);
     }
 
-    // Export keystream for external validation
+    // Export keystream for external validation (reuse V1 Verlet bytes from above)
     let mut f = File::create("keystream.bin").expect("Failed to create keystream.bin");
-    f.write_all(&generate_v1_keystream_verlet()).expect("Failed to write keystream");
+    f.write_all(&v1_verlet_keystream).expect("Failed to write keystream");
     println!();
     println!("Keystream exported to keystream.bin for external validation.");
 }
