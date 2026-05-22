@@ -123,60 +123,72 @@ def analyze_entropy(output_dir, num_keys):
     print(f"{'='*60}\n")
 
 def analyze_keystream():
-    """Generate a keystream and analyze its Shannon entropy and correlation."""
+    """Generate a keystream and analyze its Shannon entropy and correlation.
+    
+    This function generates raw keystream bytes by running the NIST test binary
+    (which exports keystream.bin), then analyzes the raw binary data directly.
+    """
     print(f"\n{'='*60}")
     print(" KEYSTREAM STATISTICAL ANALYSIS")
     print(f"{'='*60}")
     
-    # Generate a 1MB keystream using the Kelvin CLI
-    print("\nGenerating 1MB keystream...")
+    # Generate a 1MB keystream by running the NIST test binary
+    # which exports keystream.bin with raw keystream bytes
+    print("\nGenerating 1MB keystream via NIST test binary...")
     result = subprocess.run(
-        ["cargo", "run", "--release", "-p", "kelvin-cli", "--",
-         "encrypt", "--level", "standard", "--input", "NUL", "--output", "NUL",
-         "--dry-run"],
-        capture_output=True, text=True
+        ["cargo", "run", "--release", "-p", "nist_tests", "--"],
+        capture_output=True, text=False
     )
+    # Decode with error handling for Windows CP1252 compatibility
+    stdout = result.stdout.decode('utf-8', errors='replace')
+    stderr = result.stderr.decode('utf-8', errors='replace')
+    print(stdout)
+    if stderr.strip():
+        print(stderr)
     
-    # For now, generate test data via the kelvin library
-    # We'll use a Python-based approach: generate a key and extract entropy
-    print("Generating test key for keystream analysis...")
-    result = subprocess.run(
-        ["cargo", "run", "--release", "-p", "kelvin-cli", "--",
-         "keygen", "--level", "standard", "--output", "test_keystream_key.json"],
-        capture_output=True, text=True
-    )
-    
-    if os.path.exists("test_keystream_key.json"):
-        with open("test_keystream_key.json", 'r') as f:
-            key_data = json.load(f)
+    # Read the raw keystream bytes from the exported file
+    keystream_path = "keystream.bin"
+    if os.path.exists(keystream_path):
+        with open(keystream_path, 'rb') as f:
+            keystream_bytes = f.read()
         
-        # Serialize the key data to bytes for entropy analysis
-        key_bytes = json.dumps(key_data, sort_keys=True).encode('utf-8')
+        print(f"\n  Keystream size: {len(keystream_bytes)} bytes")
         
-        # Shannon Entropy
-        shannon = compute_shannon_entropy(key_bytes)
-        print(f"\n  Shannon Entropy: {shannon:.4f} bits/byte (max 8.0)")
+        # Shannon Entropy of raw bytes
+        shannon = compute_shannon_entropy(keystream_bytes)
+        print(f"  Shannon Entropy: {shannon:.4f} bits/byte (max 8.0)")
         if shannon > 7.5:
-            print("  ✅ Near-maximal entropy (good randomness)")
+            print("  [PASS] Near-maximal entropy (good randomness)")
         elif shannon > 6.0:
-            print("  ⚠️  Moderate entropy")
+            print("  [WARN] Moderate entropy")
         else:
-            print("  ❌ Low entropy")
+            print("  [FAIL] Low entropy")
         
-        # Correlation Coefficient
-        corr = compute_correlation(key_bytes)
+        # Correlation Coefficient of raw bytes
+        corr = compute_correlation(keystream_bytes)
         print(f"  Adjacent-byte Correlation: {corr:.6f} (expected ~0)")
         if abs(corr) < 0.01:
-            print("  ✅ No significant correlation detected")
+            print("  [PASS] No significant correlation detected")
         elif abs(corr) < 0.05:
-            print("  ⚠️  Weak correlation detected")
+            print("  [WARN] Weak correlation detected")
         else:
-            print("  ❌ Strong correlation detected")
+            print("  [FAIL] Strong correlation detected")
+        
+        # Byte value distribution analysis
+        counter = Counter(keystream_bytes)
+        min_count = min(counter.values())
+        max_count = max(counter.values())
+        expected = len(keystream_bytes) / 256
+        print(f"  Byte value distribution: min={min_count}, max={max_count}, expected={expected:.0f}")
+        if max_count - min_count < 2.0 * math.sqrt(expected):
+            print("  [PASS] Byte distribution is uniform")
+        else:
+            print("  [WARN] Byte distribution shows some variation")
         
         # Cleanup
-        os.remove("test_keystream_key.json")
+        os.remove(keystream_path)
     else:
-        print("  ⚠️  Could not generate keystream for analysis")
+        print("  [WARN] Could not generate keystream for analysis")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Kelvin Entropy Test Suite")
