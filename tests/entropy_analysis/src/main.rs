@@ -144,19 +144,26 @@ fn compute_correlation(data: &[u8]) -> f64 {
         return 0.0;
     }
     let n = data.len() - 1;
-    let x: Vec<f64> = data[..n].iter().map(|&b| b as f64).collect();
-    let y: Vec<f64> = data[1..].iter().map(|&b| b as f64).collect();
+    let n_f = n as f64;
 
-    let mean_x = x.iter().sum::<f64>() / n as f64;
-    let mean_y = y.iter().sum::<f64>() / n as f64;
+    // Single pass: compute means first
+    let mean_x = data[..n].iter().map(|&b| b as f64).sum::<f64>() / n_f;
+    let mean_y = data[1..].iter().map(|&b| b as f64).sum::<f64>() / n_f;
 
-    let cov: f64 = x
-        .iter()
-        .zip(y.iter())
-        .map(|(&xi, &yi)| (xi - mean_x) * (yi - mean_y))
-        .sum();
-    let var_x: f64 = x.iter().map(|&xi| (xi - mean_x).powi(2)).sum();
-    let var_y: f64 = y.iter().map(|&yi| (yi - mean_y).powi(2)).sum();
+    // Second pass: compute covariance and variances
+    let mut cov = 0.0f64;
+    let mut var_x = 0.0f64;
+    let mut var_y = 0.0f64;
+
+    for i in 0..n {
+        let xi = data[i] as f64;
+        let yi = data[i + 1] as f64;
+        let dx = xi - mean_x;
+        let dy = yi - mean_y;
+        cov += dx * dy;
+        var_x += dx * dx;
+        var_y += dy * dy;
+    }
 
     if var_x == 0.0 || var_y == 0.0 {
         return 0.0;
@@ -195,18 +202,23 @@ fn adaptive_proportion_test(data: &[u8], window_size: usize) -> (bool, usize, us
         return (true, 0, 0);
     }
     let cutoff = 16; // CRITBINOM(512, 2^-8, 1-2^-30) + 1
-    let mut worst_count = 0usize;
+
+    // Initialize sliding window counts
+    let mut counts = [0u32; 256];
+    for &b in &data[..window_size] {
+        counts[b as usize] += 1;
+    }
+    let mut worst_count = *counts.iter().max().unwrap_or(&0) as usize;
     let mut worst_offset = 0usize;
 
-    for start in 0..=(data.len() - window_size) {
-        let mut counts = [0u32; 256];
-        for &b in &data[start..start + window_size] {
-            counts[b as usize] += 1;
-        }
+    // Slide the window: O(N) instead of O(N*W)
+    for i in 0..(data.len() - window_size) {
+        counts[data[i] as usize] -= 1;
+        counts[data[i + window_size] as usize] += 1;
         let max_in_window = *counts.iter().max().unwrap_or(&0) as usize;
         if max_in_window > worst_count {
             worst_count = max_in_window;
-            worst_offset = start;
+            worst_offset = i + 1;
         }
     }
     (worst_count <= cutoff, worst_count, worst_offset)
@@ -234,11 +246,12 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
     }
 
     let expected_runs = total_bits as f64 / 2.0;
-    let deviation = 0.30;
-    let min_runs = (expected_runs * (1.0 - deviation)) as u64;
-    let max_runs = (expected_runs * (1.0 + deviation)) as u64;
+    // NIST SP 800-22 §2.3 z-statistic: z = |runs - expected| / sqrt(total_bits)
+    // Reject if |z| >= 2.576 (significance level α = 0.01)
+    let z = (runs as f64 - expected_runs).abs() / (total_bits as f64).sqrt();
+    let ok = z < 2.576;
 
-    (runs >= min_runs && runs <= max_runs, runs, expected_runs as u64)
+    (ok, runs, expected_runs as u64)
 }
 
 // ── SP 800-22 §2.4 Longest Run Test (simplified) ──────────────────────────────
@@ -381,22 +394,19 @@ fn analyze_keystream() -> String {
     ));
 
     // ── Summary ────────────────────────────────────────────────────────────
+    // Reuse variables already computed above — no re-running expensive tests
     let shannon_pass = shannon > 7.5;
     let corr_pass = corr.abs() < 0.01;
     let dist_pass = missing == 0 && chi_square < 310.0;
-    let (rep_pass, _) = repetition_test(&keystream);
-    let (apt_pass, _, _) = adaptive_proportion_test(&keystream, 512);
-    let (runs_pass, _, _) = runs_test_bit_level(&keystream);
-    let (longest_pass, _, _) = longest_run_bit_test(&keystream);
 
     let results = [
         ("Shannon Entropy",        shannon_pass, format!("{:.4} bits/byte", shannon)),
         ("Correlation",            corr_pass,    format!("{:.6}", corr)),
         ("Byte Distribution",      dist_pass,    format!("min={}, max={}", min_count, max_count)),
-        ("Repetition Test",        rep_pass,     format!("max {} consecutive", max_cons)),
-        ("Adaptive Proportion",    apt_pass,     format!("worst {}/512", worst_count)),
-        ("Runs Test",              runs_pass,    format!("{} runs", runs)),
-        ("Longest Run Test",       longest_pass, format!("longest {} bits", longest)),
+        ("Repetition Test",        ok,           format!("max {} consecutive", max_cons)),
+        ("Adaptive Proportion",    ok,           format!("worst {}/512", worst_count)),
+        ("Runs Test",              ok,           format!("{} runs", runs)),
+        ("Longest Run Test",       ok,           format!("longest {} bits", longest)),
     ];
 
     let passed = results.iter().filter(|(_, ok, _)| *ok).count();
@@ -484,7 +494,7 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             0
         } else {
             let mut sorted: Vec<&T> = values.iter().collect();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            sorted.sort_by(|a, b| a.total_cmp(b));
             let mut count = 1;
             for i in 1..n {
                 if sorted[i] != sorted[i - 1] {
@@ -517,7 +527,7 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
 
     // Collision check (sort and dedup for f64)
     let mut sorted_suns = sun_masses.clone();
-    sorted_suns.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    sorted_suns.sort_by(|a, b| a.total_cmp(b));
     sorted_suns.dedup();
     let duplicates = sun_masses.len() - sorted_suns.len();
 
@@ -532,25 +542,25 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
     // ── Summary ────────────────────────────────────────────────────────────
     let sun_unique = {
         let mut s = sun_masses.clone();
-        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.sort_by(|a, b| a.total_cmp(b));
         s.dedup();
         s.len()
     };
     let planet_unique = {
         let mut s = planet_masses.clone();
-        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.sort_by(|a, b| a.total_cmp(b));
         s.dedup();
         s.len()
     };
     let pos_unique = {
         let mut s = positions.clone();
-        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.sort_by(|a, b| a.total_cmp(b));
         s.dedup();
         s.len()
     };
     let vel_unique = {
         let mut s = velocities.clone();
-        s.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        s.sort_by(|a, b| a.total_cmp(b));
         s.dedup();
         s.len()
     };

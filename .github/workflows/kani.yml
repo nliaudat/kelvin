@@ -1,0 +1,73 @@
+# ==============================================================================
+# Kani Formal Verification — kelvin-core Fixed-Point Arithmetic
+# ==============================================================================
+#
+# Uses the model-checking/kani-github-action to run Kani model-checker proofs
+# on the Q32.64 fixed-point arithmetic engine in kelvin-core.
+#
+# The proof harnesses (in kelvin-core/src/fixed_math.rs) formally verify that
+# the arithmetic engine cannot overflow or panic under physically-realistic
+# orbital simulation bounds (r ∈ [10⁻⁶, 100] AU).
+#
+# Five harnesses are verified:
+#   1. verify_add_no_overflow  — add never wraps i128 for positions ∈ [−100, 100] AU
+#   2. verify_sub_no_overflow  — sub never wraps i128 for positions ∈ [−100, 100] AU
+#   3. verify_mul_no_overflow  — mul splitting handles all products ∈ [−100, 100] AU
+#   4. verify_div_no_panic     — div never panics for G / bounded_dist³
+#   5. verify_sqrt_bounded     — sqrt safe for all squared distances up to (200 AU)²
+#
+# Triggers:
+#   - On push/PR to main when kelvin-core files change
+#   - On a monthly schedule (1st of every month)
+#   - Manually via workflow_dispatch
+#
+# This is a SEPARATE workflow from the main CI pipeline because Kani
+# verification is a heavyweight formal analysis, not a quick test.
+# It does NOT block normal CI — it runs in parallel.
+# ==============================================================================
+
+name: Kani Formal Verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'kelvin-core/**'
+      - '.github/workflows/kani.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'kelvin-core/**'
+      - '.github/workflows/kani.yml'
+  schedule:
+    # Monthly formal verification (1st of every month at midnight UTC)
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+    # Manual trigger from GitHub UI — no arguments needed
+
+jobs:
+  verification:
+    name: Kani Model Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Kani verification on kelvin-core
+        uses: model-checking/kani-github-action@v1.1.0
+        with:
+          args: >
+            -p kelvin-core
+            --enable-unstable
+            --restrict-vtable
+            --default-unwind 5
+
+      - name: Upload Kani report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kani-report
+          path: |
+            **/kani*.log
+            **/kani*.txt
+          retention-days: 7
