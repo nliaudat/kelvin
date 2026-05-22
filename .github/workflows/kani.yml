@@ -56,7 +56,7 @@ jobs:
       - name: Run Kani verification on kelvin-core
         uses: model-checking/kani-github-action@v1.1
         with:
-          args: -p kelvin-core
+          args: -p kelvin-core --default-unwind 192
 
       - name: Upload Kani report (on failure)
         if: failure()
