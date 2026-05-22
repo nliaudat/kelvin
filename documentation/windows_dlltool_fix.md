@@ -47,7 +47,7 @@ You need to add `C:\msys64\usr\bin` to your system `PATH` environment variable.
 1. Press <kbd>Win</kbd> + <kbd>R</kbd>, type `sysdm.cpl`, and press Enter.
 2. Go to the **Advanced** tab → **Environment Variables**.
 3. Under **System variables**, select `Path` → **Edit**.
-4. Click **New** and add: `C:\msys64\usr\bin`
+4. Click **New** and add: `C:\msys64\mingw64\bin`
 5. Click **OK** on all dialogs.
 
 ### 3. Verify the fix
