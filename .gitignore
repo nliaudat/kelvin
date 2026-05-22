@@ -36,5 +36,8 @@ nist_output_final.txt
 keystream.bin
 entropy_output.txt
 entropy_output2.txt
-keystream.bin
 nist_output_nistrs.txt
+/tests/entropy_analysis/__pycache__
+tests/entropy_analysis/entropy_test.py
+tests/entropy_analysis/run_keystream_test.py
+tests/entropy_analysis/entropy_test.py
