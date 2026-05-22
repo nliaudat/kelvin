@@ -9,6 +9,6 @@ members = [
     "kelvin-test-server",
     "kelvin-test-client",
     "tests/constant_time_bench",
-    "tests/nist_tests",
+    "tests/nist_tests", "temp_nistrs_check",
 ]
 resolver = "2"

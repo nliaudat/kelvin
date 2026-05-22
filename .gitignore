@@ -30,3 +30,11 @@ test-vectors/kelvin-test-standard-3.json
 .clinerules
 gemini_code_review_report.md
 production_readiness_plan.md
+/test_results
+nist_output.txt
+nist_output_final.txt
+keystream.bin
+entropy_output.txt
+entropy_output2.txt
+keystream.bin
+nist_output_nistrs.txt
