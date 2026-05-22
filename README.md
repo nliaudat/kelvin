@@ -84,20 +84,20 @@ kelvin-test-server/ — Test vector generation server
 
 Kelvin provides four cryptographic modes, each optimized for different use cases. All modes support both Verlet (default) and Euler (`--euler`) integration.
 
-| Parameter | V1 `Secure` | V2 `Chaos` | V3 `Photon` | H `Quantum` |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tagline** | *"The safe choice"* | *"Pure chaotic streaming"* | *"Fast as light"* | *"Best of all worlds"* |
-| **Engine** | `Kelvin` | `KelvinStreaming` | `KelvinPhoton` | `KelvinQuantum` |
-| **Simulation** | Upfront (Verlet/Euler) | Per-step (Verlet/Euler) | Upfront (Verlet/Euler) | Upfront + periodic reseed |
-| **Cipher** | ChaCha20Poly1305 AEAD | SHAKE256 XOR per-step | HKDF→SHAKE256 XOR | Hybrid cache+XOR + orbital reseed |
-| **Authentication** | ✅ Fully Authenticated | ❌ None (XOR only) | ❌ None (XOR only) | ❌ None (XOR only) |
-| **Keystream** | Finite (~28 GiB) | ✅ Unlimited | Finite (key schedule bound) | ✅ Effectively unlimited |
-| **Setup time** | Seconds–minutes | Instant | Seconds–minutes | Seconds–minutes |
-| **First byte** | After setup | Milliseconds | After setup | After setup |
-| **Bulk throughput** | ~500 MB/s | Slow (O(N) sim/chunk) | ~200 MB/s | ~500 MB/s |
-| **Ideal use case** | Storage / authenticated channels | Lightweight real-time streams | 1 MB–1 GB batch encryption | Large bulk data requiring fresh entropy |
-| **CLI flag** | `--mode secure` (default) | `--mode chaos` | `--mode photon` | `--mode quantum` |
-| **Integration method** | `--euler` available | `--euler` available | `--euler` available | `--euler` available |
+| Parameter | V1 `Secure` | V2 `Chaos` | V3 `Photon` | V3 `Photon Auth` | H `Quantum` | H `Quantum Auth` |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **Tagline** | *"The safe choice"* | *"Pure chaotic streaming"* | *"Fast as light"* | *"Authenticated speed"* | *"Best of all worlds"* | *"Authenticated hybrid"* |
+| **Engine** | `Kelvin` | `KelvinStreaming` | `KelvinPhoton` | `KelvinPhotonAuthenticated` | `KelvinQuantum` | `KelvinQuantumAuthenticated` |
+| **Simulation** | Upfront (Verlet/Euler) | Per-step (Verlet/Euler) | Upfront (Verlet/Euler) | Upfront (Verlet/Euler) | Upfront + periodic reseed | Upfront + periodic reseed |
+| **Cipher** | ChaCha20Poly1305 AEAD | SHAKE256 XOR per-step | HKDF→SHAKE256 XOR | HKDF→SHAKE256 XOR + BLAKE3 MAC | Hybrid cache+XOR + orbital reseed | Hybrid cache+XOR + orbital reseed + BLAKE3 MAC |
+| **Authentication** | ✅ Fully Authenticated | ❌ None (XOR only) | ❌ None (XOR only) | ✅ BLAKE3-keyed MAC | ❌ None (XOR only) | ✅ BLAKE3-keyed MAC |
+| **Keystream** | Finite (~28 GiB) | ✅ Unlimited | Finite (key schedule bound) | Finite (key schedule bound) | ✅ Effectively unlimited | ✅ Effectively unlimited |
+| **Setup time** | Seconds–minutes | Instant | Seconds–minutes | Seconds–minutes | Seconds–minutes | Seconds–minutes |
+| **First byte** | After setup | Milliseconds | After setup | After setup | After setup | After setup |
+| **Bulk throughput** | ~500 MB/s | Slow (O(N) sim/chunk) | ~200 MB/s | ~200 MB/s | ~500 MB/s | ~500 MB/s |
+| **Ideal use case** | Storage / authenticated channels | Lightweight real-time streams | 1 MB–1 GB batch encryption | Authenticated batch encryption | Large bulk data requiring fresh entropy | Large authenticated bulk data |
+| **CLI flag** | `--mode secure` (default) | `--mode chaos` | `--mode photon` | `--mode photon-auth` | `--mode quantum` | `--mode quantum-auth` |
+| **Integration method** | `--euler` available | `--euler` available | `--euler` available | `--euler` available | `--euler` available | `--euler` available |
 
 > **Note:** All modes use the same `OrbitalConfig` shared secret. The integration method (Verlet/Euler) must match between encryption and decryption.
 
