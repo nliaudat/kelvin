@@ -211,11 +211,6 @@ struct InitState {
 impl Kelvin {
     /// Run the shared initialization pipeline (validation, Lyapunov estimation,
     /// simulation, seed extraction, key schedule creation).
-    fn init(config: OrbitalConfig) -> Result<InitState, KelvinError> {
-        Self::init_with_method(config, IntegrationMethod::Verlet)
-    }
-
-    /// Like [`init`] but with a configurable integration method.
     fn init_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<InitState, KelvinError> {
         // Validate config
         config.validate()?;
