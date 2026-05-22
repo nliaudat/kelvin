@@ -47,7 +47,12 @@ Security is the primary requirement for production readiness. We must move beyon
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
 - [x] **Initial Condition Entropy**: Implement $\pm 25\%$ Sun mass randomization to significantly increase the bit-distinct expression space. *(Completed 2026-05-11)*
 - [x] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(Completed 2026-05-20)*
-- [ ] **Stream Authentication**: Integrate NIST SP 800-185 standard KMAC128 or HMAC-SHA256 authenticated tagging into the fast V3 (Photon) and H (Quantum) stream ciphers to defeat ciphertext malleability.
+- [x] **Stream Authentication**: BLAKE3-keyed MAC authenticated tagging (32-byte tag) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*
+    - `KelvinPhotonAuthenticated` and `KelvinQuantumAuthenticated` wrappers in `kelvin/src/authenticated.rs`
+    - MAC key derived via HKDF-SHA512 with domain separator `b"kelvin-mac-key-v1"`
+    - Constant-time tag verification via `subtle::ConstantTimeEq`
+    - Wire format: `ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)`
+    - **16 tests** covering round-trip, tampered ciphertext, tampered tag, determinism, empty data, short data, bytes processed, reseed preservation, and cross-mode differentiation
 
 ### 1.3 Side-Channel Resistance
 - [x] **Constant-Time Audit**: Use tools like `dudect-bencher` to verify that all secret-dependent code (Phase 1 simulation) is constant-time. *(Completed 2026-05-22)*
