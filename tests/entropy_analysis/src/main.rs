@@ -490,14 +490,14 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
         }
     }
 
-    fn print_stat<T: std::fmt::Debug + PartialOrd>(label: &str, values: &[T]) -> String {
+    fn print_stat<T: std::fmt::Debug + PartialOrd>(label: &str, values: &[T]) -> (String, usize) {
         let mut s = String::new();
         let n = values.len();
         let unique_count = if n == 0 {
             0
         } else {
             let mut sorted: Vec<&T> = values.iter().collect();
-            sorted.sort_by(|a, b| a.partial_cmp(b).expect("partial_cmp returned None during entropy analysis"));
+            sorted.sort_by(|a, b| a.partial_cmp(b).expect("Incomparable values (e.g. NaN) detected during entropy analysis"));
             let mut count = 1;
             for i in 1..n {
                 if sorted[i] != sorted[i - 1] {
@@ -520,13 +520,17 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             if n > 0 { unique_count as f64 / n as f64 * 100.0 } else { 0.0 }
         ));
         s.push_str(&format!("  Sample Entropy: ~{:.2} bits\n", empirical_bits));
-        s
+        (s, unique_count)
     }
 
-    out.push_str(&print_stat("Sun Mass", &sun_masses));
-    out.push_str(&print_stat("Planet Masses", &planet_masses));
-    out.push_str(&print_stat("Position Vectors (3D)", &positions));
-    out.push_str(&print_stat("Velocity Vectors (3D)", &velocities));
+    let (sun_str, sun_unique) = print_stat("Sun Mass", &sun_masses);
+    out.push_str(&sun_str);
+    let (planet_str, planet_unique) = print_stat("Planet Masses", &planet_masses);
+    out.push_str(&planet_str);
+    let (pos_str, pos_unique) = print_stat("Position Vectors (3D)", &positions);
+    out.push_str(&pos_str);
+    let (vel_str, vel_unique) = print_stat("Velocity Vectors (3D)", &velocities);
+    out.push_str(&vel_str);
 
     // Collision check (sort and dedup for f64)
     let mut sorted_suns = sun_masses.clone();
@@ -543,31 +547,7 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
     out.push_str(&format!("{:=^60}\n", ""));
 
     // ── Summary ────────────────────────────────────────────────────────────
-    let sun_unique = {
-        let mut s = sun_masses.clone();
-        s.sort_by(|a, b| a.total_cmp(b));
-        s.dedup();
-        s.len()
-    };
-    let planet_unique = {
-        let mut s = planet_masses.clone();
-        s.sort_by(|a, b| a.total_cmp(b));
-        s.dedup();
-        s.len()
-    };
-    let pos_unique = {
-        let mut s: Vec<_> = positions.iter().collect();
-        s.sort_by(|a, b| a.partial_cmp(b).expect("partial_cmp returned None during entropy analysis"));
-        s.dedup();
-        s.len()
-    };
-    let vel_unique = {
-        let mut s: Vec<_> = velocities.iter().collect();
-        s.sort_by(|a, b| a.partial_cmp(b).expect("partial_cmp returned None during entropy analysis"));
-        s.dedup();
-        s.len()
-    };
-
+    // unique counts are already computed by print_stat calls above
     let sun_ok = sun_unique == sun_masses.len();
     let planet_ok = planet_unique == planet_masses.len();
     let pos_ok = pos_unique == positions.len();

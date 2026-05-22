@@ -1,0 +1,20 @@
+[package]
+name = "kelvin-fuzz"
+version = "0.1.0"
+edition = "2021"
+description = "Property-based fuzz tests for Kelvin cryptosystem deserialization"
+license = "CC-BY-NC-SA-4.0"
+
+[dependencies]
+kelvin-kdf = { path = "../kelvin-kdf", features = ["serde"] }
+
+# Override blake3 to use pure Rust implementation (avoids C compiler dependency on Windows GNU)
+blake3 = { version = "1.5", default-features = false, features = ["pure"] }
+
+[dev-dependencies]
+proptest = "1.4"
+
+[[test]]
+name = "deserialize_config"
+path = "fuzz_targets/deserialize_config.rs"
+harness = true
