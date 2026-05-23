@@ -551,7 +551,7 @@ impl KelvinStreaming {
         self.step += 1;
 
         // Periodic stability check every MONITOR_INTERVAL steps
-        if self.step.is_multiple_of(kelvin_core::MONITOR_INTERVAL) {
+        if self.step % kelvin_core::MONITOR_INTERVAL == 0 {
             // Check for gravitational collapse
 
             if let Some((i, j, dist)) =

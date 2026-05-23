@@ -276,11 +276,16 @@ impl OrbitalState {
     /// If either condition is detected, returns `OrbitalError::BodyEjected`
     /// or `OrbitalError::BodyCollision` respectively.
     pub fn euler_steps(&mut self, n: u64) -> Result<(), OrbitalError> {
-        for _ in 0..n {
+        for step in 0..n {
             self.euler_step()?;
+            // Periodic stability check to catch ejection/collapse early.
+            // Checking every 1000 steps ensures detection within a bounded
+            // window, preventing the simulation from running in a corrupted
+            // post-ejection state for the remainder of a large batch.
+            if (step + 1) % 1000 == 0 || step + 1 == n {
+                self.check_stability()?;
+            }
         }
-        // Check for ejection and collapse after the batch
-        self.check_stability()?;
         Ok(())
     }
 
@@ -304,7 +309,7 @@ impl OrbitalState {
                 let dy = self.positions[j][1] - self.positions[i][1];
                 let dz = self.positions[j][2] - self.positions[i][2];
                 let dist = (dx * dx + dy * dy + dz * dz).sqrt();
-                if dist < MIN_SEPARATION {
+                if dist.is_nan() || dist < MIN_SEPARATION {
                     return Err(OrbitalError::BodyCollision {
                         body_i: i,
                         body_j: j,
@@ -317,8 +322,8 @@ impl OrbitalState {
 
         // Check for body ejection (unbound orbit energy)
         for i in 0..5 {
-            if self.is_body_ejected(i, G, EPSILON, EJECTION_THRESHOLD) {
-                let energy = self.body_total_energy(i, G, EPSILON);
+            let energy = self.body_total_energy(i, G, EPSILON);
+            if energy.is_nan() || energy >= EJECTION_THRESHOLD {
                 return Err(OrbitalError::BodyEjected { body_index: i, step: self.step, energy });
             }
         }
@@ -326,44 +331,10 @@ impl OrbitalState {
         Ok(())
     }
 
-    /// Check whether a body is on an unbound (ejected) trajectory.
-    ///
-    /// Computes the total specific energy of the body:
-    ///   E_i = 0.5 * v_i² - Σ_{j≠i} G * m_j / sqrt(|r_ij|² + ε²)
-    ///
-    /// If E_i ≥ threshold, the body is on a hyperbolic/parabolic trajectory.
-    #[allow(clippy::disallowed_methods)]
-    fn is_body_ejected(&self, body_index: usize, g: f64, epsilon: f64, threshold: f64) -> bool {
-        if body_index >= 5 {
-            return false;
-        }
-
-        // Kinetic energy per unit mass: 0.5 * v²
-        let vx = self.velocities[body_index][0];
-        let vy = self.velocities[body_index][1];
-        let vz = self.velocities[body_index][2];
-        let kinetic = 0.5 * (vx * vx + vy * vy + vz * vz);
-
-        // Potential energy per unit mass: -Σ_{j≠i} G * m_j / sqrt(|r_ij|² + ε²)
-        let mut potential = 0.0;
-        for (j, other) in self.positions.iter().enumerate() {
-            if j == body_index {
-                continue;
-            }
-            let dx = other[0] - self.positions[body_index][0];
-            let dy = other[1] - self.positions[body_index][1];
-            let dz = other[2] - self.positions[body_index][2];
-            let dist = (dx * dx + dy * dy + dz * dz + epsilon * epsilon).sqrt();
-            if dist > 0.0 {
-                potential -= g * self.masses[j] / dist;
-            }
-        }
-
-        let total_energy = kinetic + potential;
-        total_energy >= threshold
-    }
-
     /// Compute the total specific energy of a body (for error reporting).
+    ///
+    /// Used by `check_stability()` to detect body ejection.
+    /// Returns NaN if the computation overflows or produces invalid values.
     #[allow(clippy::disallowed_methods)]
     fn body_total_energy(&self, body_index: usize, g: f64, epsilon: f64) -> f64 {
         let vx = self.velocities[body_index][0];
