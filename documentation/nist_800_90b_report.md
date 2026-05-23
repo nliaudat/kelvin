@@ -95,7 +95,7 @@
     {"mass": 1.36e-7, "position": [-1, -1, 0], "velocity": [3, -2, 0]},
     {"mass": 6.78e-8, "position": [2, -1, 1], "velocity": [-2, 3, 0]}
   ],
-  "total_steps": 1000,
+  "total_steps": 2000,
   "dt": 5.42e-7,
   "softening": 2.71e-6,
   "g": 39.478
@@ -135,42 +135,35 @@ Results from 1,048,576 bytes (1 MiB) of raw SHAKE256 XOR keystream, default 5-bo
 
 **Summary: 7/7 tests passed.** The keystream exhibits near-maximal Shannon entropy (7.9998 of 8.0), negligible adjacent-byte correlation, uniform byte distribution (χ² = 248.5, well below the 310 critical value), and passes all SP 800-90B health tests with comfortable margins.
 
-### 3.2 NIST ea_iid Results
+### 3.2 NIST ea_iid Results — Pending
 
-The official NIST SP 800-90B Entropy Assessment tool was run on 1,000,000 bytes (1 MB) of raw SHAKE256 XOR keystream (Verlet integration, default 5-body config). The 1 GiB sample could not be processed by the tool due to memory constraints — the NIST tool is designed for ~1 million samples.
+The official NIST SP 800-90B Entropy Assessment tool (`ea_iid`, `ea_non_iid`, `ea_restart`) has **not yet been successfully run** on a properly-sized keystream sample. The tool is designed for approximately 1 million samples.
 
-**IID Assessment (`ea_iid`):**
+**Previous attempts encountered issues:**
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| **H_original** | 7.877176 bits/byte | ✅ PASS |
-| **H_bitstring** | 0.998518 bits/bit | ✅ PASS |
-| **min(H_original, 8 × H_bitstring)** | 7.877176 bits/byte | ✅ PASS |
-| Chi square tests | — | ✅ PASS |
-| Longest repeated substring test | — | ✅ PASS |
-| IID permutation tests | — | ✅ PASS |
+| Attempt | Sample Size | Result | Cause |
+|---------|-------------|--------|-------|
+| 1 GiB sample | 1,073,741,824 bytes | `Killed` (OOM) | NIST tool cannot process files this large |
+| 1 MiB sample | 1,048,576 bytes (1 MiB) | `Error: data (len = 1048576) does not contain 1000000 samples` | NIST `ea_restart` expects exactly 1,000,000 samples |
 
-**Non-IID Assessment (`ea_non_iid`):**
+**Next steps:**
 
-| Metric | Value | Status |
-|--------|-------|--------|
-| **H_original** | 7.388520 bits/byte | ✅ PASS |
-| **H_bitstring** | 0.875277 bits/bit | ✅ PASS |
-| **min(H_original, 8 × H_bitstring)** | 7.002220 bits/byte | ✅ PASS |
+1. Generate a keystream file of exactly 1,000,000 bytes using the `--nist` flag:
+   ```bash
+   cargo run -p nist_800_90b -- generate --nist --output keystream_nist.bin
+   ```
+2. Build the NIST tool via Docker:
+   ```bash
+   tests\build-ea-iid.bat
+   ```
+3. Run the three NIST assessments:
+   ```bash
+   docker run --rm -v "%CD%:/data" ea_iid /src/ea_iid -i -a /data/keystream_nist.bin 8
+   docker run --rm -v "%CD%:/data" ea_iid /src/ea_non_iid -i -a /data/keystream_nist.bin 8
+   docker run --rm -v "%CD%:/data" ea_iid /src/ea_restart -i /data/keystream_nist.bin 8 <H_I_value>
+   ```
 
-**Restart Validation (`ea_restart`):**
-
-| Metric | Value | Status |
-|--------|-------|--------|
-| **H_I** (initial entropy estimate) | 7.881003 bits/byte | ✅ PASS |
-| **H_r** (restart entropy estimate) | 7.877176 bits/byte | ✅ PASS |
-| **H_c** (conditional restart estimate) | 7.877176 bits/byte | ✅ PASS |
-| **min(H_r, H_c, H_I)** | 7.877176 bits/byte | ✅ PASS |
-| Validation test | — | ✅ PASS |
-
-**Final min-entropy estimate: 7.002220 bits/byte** (from non-IID assessment, the most conservative estimate).
-
-**H_min per 64 KB output:** 7.002220 × 65536 = 458,977 bits ≈ 57.4 KB of entropy per 64 KB keystream block.
+Once completed, this section will be populated with the actual results.
 
 **Preliminary non-IID estimates (dj-on-github/SP800_90b_tests, 10,000 symbols, 1-bit):**
 
@@ -188,7 +181,7 @@ The official NIST SP 800-90B Entropy Assessment tool was run on 1,000,000 bytes 
 | LZ78Y Prediction | 0.946 |
 | **Minimum across all estimators** | **0.606 bits/bit** |
 
-> **Note:** The 1-bit estimates are inherently conservative — per-byte min-entropy is significantly higher (7.88 bits/byte from IID, 7.00 from non-IID). The official NIST non-IID assessment at 8-bit symbol granularity gives the definitive estimate of 7.002220 bits/byte.
+> **Note:** The 1-bit estimates are inherently conservative — per-byte min-entropy is expected to be significantly higher. The official NIST non-IID assessment at 8-bit symbol granularity will provide the definitive estimate once the tools are successfully run.
 
 ### 3.3 Conditioning Assessment (NIST SP 800-90C)
 
@@ -211,7 +204,7 @@ The conditioning component (SHAKE256) is a NIST-approved function per FIPS 202, 
 
 | Criterion | Status |
 |-----------|--------|
-| Entropy source validated per SP 800-90B | ✅ Partial (health tests ✅, ea_iid ✅) |
+| Entropy source validated per SP 800-90B | ✅ Partial (health tests ✅, ea_iid ⏳ pending) |
 | Conditioning component documented per SP 800-90C | ✅ Complete |
 | Health tests implemented and passing | ✅ 7/7 tests pass |
 | Continuous health test monitoring | ✅ Integrated into CI pipeline |
@@ -219,7 +212,7 @@ The conditioning component (SHAKE256) is a NIST-approved function per FIPS 202, 
 
 ### 4.2 Recommendations
 
-1. **Build and run the official NIST `ea_iid` tool** on a 1 GiB keystream sample to obtain the formal min-entropy estimate required for FIPS 140-3 submission. The tool is compiled via Docker: `tests\build-ea-iid.bat` (Windows) or `./tests/build-ea-iid.sh` (Unix).
+1. **Run the official NIST `ea_iid`, `ea_non_iid`, and `ea_restart` tools** on a properly truncated 1,000,000-byte keystream sample (use `--nist` flag) to obtain the formal min-entropy estimate required for FIPS 140-3 submission. See §3.2 for detailed instructions.
 2. **Run the full non-IID analysis** at 8-bit symbol granularity: `python tests/sp800_90b_non_iid/sp800_90b_tests.py keystream_1gb.bin -l 8 -s 1000000`
 3. **Test with Verlet integration** in addition to Euler to verify that the conditioning component masks any integration-specific patterns.
 4. **Test with custom orbital configurations** (e.g., 7-body, different mass distributions) to demonstrate entropy source flexibility.
@@ -264,46 +257,17 @@ file, bits_per_symbol, symbol_count, min_min_entropy, mcv, collision, markov, co
 keystream_1mb.bin,1,10000,0.605857426713888,0.9343508825361133,0.7044995271935961,0.9604877812208593,0.605857426713888,0.8967478110173451,0.9313882479938734,0.9512117140545103,0.9595104548208173,0.9346172345233134,0.9457732063823339
 ```
 
-### A.3 NIST ea_iid Output
+### A.3 NIST ea_iid Output — Pending
 
-```
-$ /src/ea_iid -i -a /data/keystream_1m.bin 8
-Calculating baseline statistics...
-H_original: 7.877176
-H_bitstring: 0.998518
-min(H_original, 8 X H_bitstring): 7.877176
-** Passed chi square tests
-** Passed length of longest repeated substring test
-** Passed IID permutation tests
+The NIST SP 800-90B Entropy Assessment tools have not yet been successfully run. See §3.2 for details.
 
-$ /src/ea_non_iid -i -a /data/keystream_1m.bin 8
-Running non-IID tests...
-Running Most Common Value Estimate...
-Running Entropic Statistic Estimates (bit strings only)...
-Running Tuple Estimates...
-Running Predictor Estimates...
-H_original: 7.388520
-H_bitstring: 0.875277
-min(H_original, 8 X H_bitstring): 7.002220
+Previous failed attempts (documented in §3.2):
+- 1 GiB sample: `Killed` (OOM — NIST tool designed for ~1 million samples)
+- 1 MiB sample (1,048,576 bytes): sample count mismatch error (NIST `ea_restart` expects exactly 1,000,000 samples)
 
-$ /src/ea_restart -i /data/keystream_1m.bin 8 7.881003
-H_I: 7.881003
-ALPHA: 5.0251553006530614e-06, X_cutoff: 20
-X_max: 17
-Calculating baseline statistics...
-Running IID tests...
-Running Most Common Value Estimate...
-** Passed chi square tests
-** Passed length of longest repeated substring test
-** Passed IID permutation tests
-H_r: 7.877176
-H_c: 7.877176
-H_I: 7.881003
-Validation Test Passed...
-min(H_r, H_c, H_I): 7.877176
-```
+Once the tools are successfully run on a properly truncated 1,000,000-byte sample, the output will be captured here.
 
-## Appendix B: Keystream Generation Command
+## Appendix B: Keystream Generation Commands
 
 ```bash
 # 1 GiB for formal validation
@@ -311,6 +275,9 @@ cargo run --release -p nist_800_90b -- generate --size 1073741824 --output keyst
 
 # 1 MiB for quick CI checks
 cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_1mb.bin
+
+# 1,000,000 bytes for NIST ea_iid/ea_restart compatibility
+cargo run --release -p nist_800_90b -- generate --nist --output keystream_nist.bin
 ```
 
 ## Appendix C: Build & Analysis Commands

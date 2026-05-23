@@ -48,3 +48,9 @@ production_readiness_review.md
 /scripts/test_results
 OrbitalConfig
 keystream_1gb.bin
+keystream_nist.bin
+
+# Transient NIST tool artifacts — failures are documented in nist_800_90b_report.md §3.2
+ea_iid_output.txt
+ea_restart_1mb.txt
+tests/ea_iid

@@ -75,6 +75,7 @@ fn parse_args() -> Args {
             let mut output = String::from("keystream.bin");
             let mut config: Option<String> = None;
             let mut verlet = false;
+            let mut nist = false;
 
             let mut i = 2;
             while i < args.len() {
@@ -98,9 +99,16 @@ fn parse_args() -> Args {
                         }
                     },
                     "--verlet" => verlet = true,
+                    "--nist" => nist = true,
                     _ => {},
                 }
                 i += 1;
+            }
+
+            // --nist flag overrides size to exactly 1,000,000 bytes
+            // (NIST ea_restart tool requires exactly 1,000,000 samples)
+            if nist {
+                size = 1_000_000;
             }
 
             Args { command: Command::Generate { size, output, config, verlet } }
@@ -348,10 +356,13 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
         }
     }
 
-    let expected_runs = total_bits as f64 / 2.0;
     // NIST SP 800-22 §2.3: z = |V_obs - 2nπ(1-π)| / (2·√(2n)·π·(1-π))
-    // For π = 0.5: numerator = |V_obs - n/2|, denominator = √(n/2)
-    let z = (runs as f64 - expected_runs).abs() / (total_bits as f64 / 2.0).sqrt();
+    // Compute actual proportion of ones (π) from the data for accuracy
+    let ones: u64 = data.iter().map(|&b| b.count_ones() as u64).sum();
+    let pi = ones as f64 / total_bits as f64;
+    let expected_runs = 2.0 * total_bits as f64 * pi * (1.0 - pi);
+    let z = (runs as f64 - expected_runs).abs()
+        / (2.0 * (2.0 * total_bits as f64).sqrt() * pi * (1.0 - pi));
     let ok = z < 2.576;
 
     (ok, runs, expected_runs as u64)
