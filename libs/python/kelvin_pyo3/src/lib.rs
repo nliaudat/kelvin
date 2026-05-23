@@ -7,7 +7,7 @@
 //! - `KelvinPhotonAuthenticated` — V3 + BLAKE3-keyed MAC tag
 //! - `KelvinQuantumAuthenticated` — H + BLAKE3-keyed MAC tag
 //! - `KelvinStreaming` — V2 streaming mode (one step per chunk)
-//! - `generate_config` — helper to create a random orbital configuration
+//! - `generate_config` — helper to create a fixed example orbital configuration
 //!
 //! ## Security
 //!
@@ -54,13 +54,13 @@ fn map_error(e: KelvinError) -> PyErr {
 }
 
 // ============================================================================
-// Helper: generate a random orbital configuration
+// Helper: generate a fixed example orbital configuration
 // ============================================================================
 
-/// Generate a random orbital configuration as a JSON string.
+/// Generate a fixed example orbital configuration as a JSON string.
 ///
 /// Creates a 5-body system (1 central mass + 4 orbiting bodies) with
-/// randomized masses and positions suitable for testing.
+/// fixed masses and positions suitable for testing.
 #[pyfunction]
 fn generate_config() -> String {
     use kelvin::Fixed;
@@ -284,9 +284,9 @@ impl KelvinQuantum {
         let inner = KelvinQuantumRust::with_config(
             seed_arr,
             max_reseeds,
-            cache_size.unwrap_or(64),
-            orbital_steps_per_reseed.unwrap_or(10),
-            reseed_interval_bytes.unwrap_or(128),
+            cache_size.unwrap_or(kelvin::DEFAULT_CACHE_SIZE),
+            orbital_steps_per_reseed.unwrap_or(kelvin::DEFAULT_ORBITAL_STEPS),
+            reseed_interval_bytes.unwrap_or(kelvin::DEFAULT_RESEED_INTERVAL),
         )
         .map_err(map_error)?;
 
@@ -332,8 +332,8 @@ impl KelvinQuantum {
 /// ```python
 /// a = kelvin_pyo3.KelvinPhotonAuthenticated(seed_bytes, max_reseeds=1000)
 /// data = bytearray(b"secret")
-/// a.encrypt(data)  # data now has 32 extra bytes (MAC tag)
-/// a.decrypt(data)  # tag verified, then stripped
+/// a.encrypt(data)  # data is now ciphertext (6 bytes) + MAC tag (32 bytes)
+/// a.decrypt(data)  # tag verified and stripped; data is back to b"secret"
 /// ```
 #[pyclass(unsendable)]
 struct KelvinPhotonAuthenticated {
@@ -356,33 +356,18 @@ impl KelvinPhotonAuthenticated {
     }
 
     fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let buf = get_bytes(data).to_vec();
-        let mut buf = buf;
+        let mut buf = data.to_vec();
         self.inner.encrypt(&mut buf).map_err(map_error)?;
-        let ba = get_mut_slice(data);
-        if buf.len() > ba.len() {
-            return Err(PyRuntimeError::new_err(
-                "buffer too small: need 32 extra bytes for MAC tag",
-            ));
-        }
-        ba.copy_from_slice(&buf);
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
         Ok(())
     }
 
     fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let buf = get_bytes(data).to_vec();
-        let mut buf = buf;
+        let mut buf = data.to_vec();
         self.inner.decrypt(&mut buf).map_err(map_error)?;
-        let ba = get_mut_slice(data);
-        if buf.len() > ba.len() {
-            return Err(PyRuntimeError::new_err(
-                "buffer too small for decrypted data",
-            ));
-        }
-        for b in ba.iter_mut() {
-            *b = 0;
-        }
-        ba[..buf.len()].copy_from_slice(&buf);
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
         Ok(())
     }
 
@@ -411,8 +396,8 @@ impl KelvinPhotonAuthenticated {
 /// ```python
 /// a = kelvin_pyo3.KelvinQuantumAuthenticated(seed_bytes, max_reseeds=1000)
 /// data = bytearray(b"secret")
-/// a.encrypt(data)  # data now has 32 extra bytes (MAC tag)
-/// a.decrypt(data)  # tag verified, then stripped
+/// a.encrypt(data)  # data is now ciphertext (6 bytes) + MAC tag (32 bytes)
+/// a.decrypt(data)  # tag verified and stripped; data is back to b"secret"
 /// ```
 #[pyclass(unsendable)]
 struct KelvinQuantumAuthenticated {
@@ -455,9 +440,9 @@ impl KelvinQuantumAuthenticated {
         let inner = KelvinQuantumAuthRust::with_config(
             seed_arr,
             max_reseeds,
-            cache_size.unwrap_or(64),
-            orbital_steps_per_reseed.unwrap_or(10),
-            reseed_interval_bytes.unwrap_or(128),
+            cache_size.unwrap_or(kelvin::DEFAULT_CACHE_SIZE),
+            orbital_steps_per_reseed.unwrap_or(kelvin::DEFAULT_ORBITAL_STEPS),
+            reseed_interval_bytes.unwrap_or(kelvin::DEFAULT_RESEED_INTERVAL),
         )
         .map_err(map_error)?;
 
@@ -465,33 +450,18 @@ impl KelvinQuantumAuthenticated {
     }
 
     fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let buf = get_bytes(data).to_vec();
-        let mut buf = buf;
+        let mut buf = data.to_vec();
         self.inner.encrypt(&mut buf).map_err(map_error)?;
-        let ba = get_mut_slice(data);
-        if buf.len() > ba.len() {
-            return Err(PyRuntimeError::new_err(
-                "buffer too small: need 32 extra bytes for MAC tag",
-            ));
-        }
-        ba.copy_from_slice(&buf);
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
         Ok(())
     }
 
     fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let buf = get_bytes(data).to_vec();
-        let mut buf = buf;
+        let mut buf = data.to_vec();
         self.inner.decrypt(&mut buf).map_err(map_error)?;
-        let ba = get_mut_slice(data);
-        if buf.len() > ba.len() {
-            return Err(PyRuntimeError::new_err(
-                "buffer too small for decrypted data",
-            ));
-        }
-        for b in ba.iter_mut() {
-            *b = 0;
-        }
-        ba[..buf.len()].copy_from_slice(&buf);
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
         Ok(())
     }
 

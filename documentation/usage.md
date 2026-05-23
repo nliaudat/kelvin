@@ -65,6 +65,25 @@ Kelvin derives multiple Post-Quantum (PQ) and classical asymmetric identities fr
 # Show specific identities
 ./kelvin identify --config my_secret.json --ecc --kem
 
+### Authenticated Encryption (`--auth`)
+V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte BLAKE3-keyed MAC tag to the ciphertext, defeating malleability.
+
+```bash
+# Chaos mode with authentication
+./kelvin encrypt --mode chaos --config my_secret.json --input file.txt --output file.enc --auth
+./kelvin decrypt --mode chaos --config my_secret.json --input file.enc --output file.txt --auth
+
+# Photon mode with authentication
+./kelvin encrypt --mode photon --config my_secret.json --input file.txt --output file.enc --auth
+./kelvin decrypt --mode photon --config my_secret.json --input file.enc --output file.txt --auth
+
+# Quantum mode with authentication
+./kelvin encrypt --mode quantum --config my_secret.json --input file.txt --output file.enc --auth
+./kelvin decrypt --mode quantum --config my_secret.json --input file.enc --output file.txt --auth
+```
+
+> **Note:** The `--auth` flag is ignored in `secure` mode (V1 ChaCha20Poly1305 AEAD has built-in authentication).
+
 ### Analyze Configuration Quality
 Verify that a configuration has sufficient chaos and sensitivity to initial conditions.
 ```bash
@@ -152,6 +171,40 @@ let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMe
 ks.encrypt(&mut data)?;
 ```
 
+### Authenticated Encryption (V2/V3/H + BLAKE3 MAC)
+
+For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a 32-byte BLAKE3-keyed MAC tag:
+
+```rust
+use kelvin::{
+    KelvinPhotonAuthenticated, KelvinStreamingAuthenticated,
+    KelvinQuantumAuthenticated, OrbitalConfig,
+};
+
+// V2 Chaos + BLAKE3 MAC
+let config = OrbitalConfig::from_json(&config_json)?;
+let mut ks = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
+let mut data = b"Hello authenticated streaming!".to_vec();
+ks.encrypt(&mut data)?; // ciphertext + 32-byte tag appended
+
+// V3 Photon + BLAKE3 MAC
+let (seed, _bodies) = kelvin::simulate_and_extract_seed_with_method(
+    &config, kelvin::IntegrationMethod::Verlet
+)?;
+let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
+let mut data = b"Hello authenticated photon!".to_vec();
+photon.encrypt(&mut data)?;
+
+// H Quantum + BLAKE3 MAC
+let mut quantum = KelvinQuantumAuthenticated::with_config(
+    seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024
+)?;
+let mut data = b"Hello authenticated quantum!".to_vec();
+quantum.encrypt(&mut data)?;
+```
+
+> **Important:** The authenticated wrappers append a 32-byte tag to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
+
 ### Accessing Asymmetric Keys
 ```rust
 let kp = k.asymmetric_keypair();
@@ -189,9 +242,13 @@ Kelvin automatically reseeds the keystream by advancing through the **key schedu
 - If the key schedule is exhausted, the library will return a `SeedExhausted` error.
 - Each key can safely encrypt ~4 GiB of data. The total safe encryption capacity is `max_keys × 4 GiB`.
 
-### Integrity & AEAD
+### Integrity & Authentication
 > [!CAUTION]
-> Kelvin is a **stream cipher**, not an AEAD. It does not provide built-in message authentication. For production use, wrap the output in a MAC (like HMAC-SHA256) to prevent tampering.
+> V2 (Chaos), V3 (Photon), and H (Quantum) modes are **pure XOR stream ciphers** — they do not provide built-in message authentication. Without authentication, an attacker can flip ciphertext bits and cause predictable plaintext changes (malleability).
+>
+> **Use `--auth`** to append a 32-byte BLAKE3-keyed MAC tag to the ciphertext, defeating malleability. The tag is verified in constant time during decryption.
+>
+> V1 (Secure) mode uses ChaCha20Poly1305 AEAD and has built-in authentication — the `--auth` flag is ignored for this mode.
 
 ---
 

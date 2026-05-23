@@ -33,6 +33,7 @@ Kelvin is the culmination of over two decades of research into the intersection 
     - **Benchmarking & ETA**: `benchmark()` measures simulation speed; `estimate_time()` predicts processing time.
     - **3D Orbital Visualizer**: A browser-based 3D visualization (`kelvin-demo/orbital_visualizer.html`) that renders the n-body simulation in real-time with a KDF pipeline display.
     - **Domain separation**: Uses `b"kelvin-streaming-v2-v1-000000000"` to ensure cryptographic isolation from V1.
+    - **Authenticated wrappers (BLAKE3-keyed MAC)**: Added `KelvinStreamingAuthenticated`, `KelvinPhotonAuthenticated`, and `KelvinQuantumAuthenticated` — drop-in authenticated wrappers that append a 32-byte BLAKE3-keyed MAC tag to defeat ciphertext malleability. Tag verification uses `subtle::ConstantTimeEq` for timing-attack resistance. The CLI exposes this via a shared `--auth` flag across chaos, photon, and quantum modes.
 
 
 ---
