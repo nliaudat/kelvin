@@ -84,18 +84,18 @@ use zeroize::Zeroize;
 
 /// Integration method for the n-body gravitational simulation.
 ///
-/// - **Verlet** (default): Symplectic Velocity Verlet. Energy-conserving,
-///   time-reversible. Used by default for backward compatibility.
-/// - **Euler**: Explicit Euler integration. Numerical instability amplifies
-///   chaos ~10x faster than Verlet, producing more entropy per step.
-///   Use `--euler` to opt in.
+/// - **Euler** (default): Explicit Euler integration. Numerical instability
+///   amplifies chaos ~10x faster than Verlet, producing more entropy per step.
+/// - **Verlet**: Symplectic Velocity Verlet. Energy-conserving,
+///   time-reversible. Use `--verlet` to switch back to Verlet; Euler is the
+///   CLI default.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntegrationMethod {
-    /// Symplectic Velocity Verlet (default, backward compatible).
+    /// Explicit Euler (default, maximum chaos amplification).
     #[default]
-    Verlet,
-    /// Explicit Euler (maximum chaos amplification).
     Euler,
+    /// Symplectic Velocity Verlet (energy-conserving).
+    Verlet,
 }
 
 /// Run the full orbital simulation pipeline and extract a 2048-byte seed.
@@ -111,7 +111,7 @@ pub enum IntegrationMethod {
 pub fn simulate_and_extract_seed(
     config: &OrbitalConfig,
 ) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
-    simulate_and_extract_seed_with_method(config, IntegrationMethod::Verlet)
+    simulate_and_extract_seed_with_method(config, IntegrationMethod::default())
 }
 
 /// Like [`simulate_and_extract_seed`] but with a configurable integration method.

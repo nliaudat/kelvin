@@ -309,7 +309,7 @@ fn generate_base_seed() -> ([u8; 2048], Vec<OrbitalBody>) {
     use kelvin::OrbitalConfig;
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+    let config = OrbitalConfig::new(bodies, 500, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("Failed to create config");
 
     kelvin::simulate_and_extract_seed(&config).expect("Failed to extract seed")
