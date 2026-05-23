@@ -1,6 +1,6 @@
 # Euler vs Verlet: Why Numerical Instability Is a Feature for Cryptographic Entropy
 
-> **CLI Usage:** The `--euler` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--euler` to select Euler integration; omit it for the default Verlet. The integration method must match between encryption and decryption.
+> **CLI Usage:** The `--verlet` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--verlet` to select Verlet integration; omit it for the default Euler. The integration method must match between encryption and decryption.
 
 ## The Critical Insight
 

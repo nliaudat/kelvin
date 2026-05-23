@@ -34,22 +34,22 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 Kelvin uses the orbital simulation to generate a chaotic **Orbital Keystream** for encryption.
 
 ```bash
-# Default: Verlet integration (symplectic, energy-conserving)
+# Default: Euler integration (faster chaos amplification, more entropy per step)
 ./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
 
-# Euler integration: faster chaos amplification, more entropy per step
-./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --euler
+# Verlet integration: symplectic, energy-conserving
+./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --verlet
 ```
 
 ### Decrypt a File
 Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config and integration method must be used.
 
 ```bash
-# Default: Verlet integration
+# Default: Euler integration
 ./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar
 
-# Euler integration (must match encryption)
-./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --euler
+# Verlet integration (must match encryption)
+./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --verlet
 ```
 
 ### Identity (Asymmetric Keys)
@@ -102,14 +102,14 @@ Add `kelvin` to your `Cargo.toml`:
 kelvin = { git = "https://github.com/nliaudat/kelvin", features = ["serde"] }
 ```
 
-### Integration Method: Verlet vs Euler
+### Integration Method: Euler vs Verlet
 
 Kelvin supports two integration methods for the orbital simulation:
 
 | Method | CLI Flag | Property | Best For |
 |--------|----------|----------|----------|
-| **Verlet** (default) | *(none)* | Symplectic, energy-conserving, physically realistic | Standard encryption, backward compatibility |
-| **Euler** | `--euler` | 1st-order, numerically unstable, faster chaos amplification | Maximum entropy per step, shorter Lyapunov time |
+| **Euler** (default) | *(none)* | 1st-order, numerically unstable, faster chaos amplification | Maximum entropy per step, shorter Lyapunov time |
+| **Verlet** | `--verlet` | Symplectic, energy-conserving, physically realistic | Standard encryption, backward compatibility |
 
 Euler's numerical instability amplifies chaos ~10x faster than Verlet, producing more entropy per CPU cycle. See [`Euler_vs_Verlet.md`](Euler_vs_Verlet.md) for the full theoretical analysis.
 
@@ -142,17 +142,17 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-### Using Euler Integration
+### Using Verlet Integration
 
-To use Euler integration instead of the default Verlet, pass `IntegrationMethod::Euler` to the constructor:
+To use Verlet integration instead of the default Euler, pass `IntegrationMethod::Verlet` to the constructor:
 
 ```rust
 use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
 let config = OrbitalConfig::from_json(&config_json)?;
 
-// Euler integration: faster chaos amplification
-let mut k = Kelvin::new_with_method(config, IntegrationMethod::Euler)?;
+// Verlet integration: symplectic, energy-conserving
+let mut k = Kelvin::new_with_method(config, IntegrationMethod::Verlet)?;
 
 // Encrypt/decrypt works identically
 let mut data = b"Hello Kelvin Chaos!".to_vec();
@@ -166,8 +166,8 @@ use kelvin::{IntegrationMethod, KelvinStreaming, OrbitalConfig};
 
 let config = OrbitalConfig::from_json(&config_json)?;
 
-// V2 streaming with Euler integration
-let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMethod::Euler)?;
+// V2 streaming with Verlet integration
+let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMethod::Verlet)?;
 ks.encrypt(&mut data)?;
 ```
 

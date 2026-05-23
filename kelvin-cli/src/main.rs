@@ -18,6 +18,9 @@
 //! Use `--auth` to append a 32-byte BLAKE3-keyed MAC tag to defeat ciphertext
 //! malleability. The `secure` mode has built-in AEAD authentication and ignores
 //! the `--auth` flag.
+//!
+//! Integration defaults to Euler (faster chaos amplification). Use `--verlet`
+//! for symplectic, energy-conserving integration.
 
 #![deny(unsafe_code)]
 
@@ -81,9 +84,9 @@ enum Commands {
         /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
         #[arg(long, default_value = "1048576")]
         bytes_per_step: u64,
-        /// Use Euler integration instead of Verlet for maximum chaos amplification
+        /// Use symplectic Verlet integration instead of default Euler (energy-conserving)
         #[arg(long)]
-        euler: bool,
+        verlet: bool,
         /// Append a 32-byte BLAKE3-keyed MAC tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
@@ -105,9 +108,9 @@ enum Commands {
         /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
         #[arg(long, default_value = "1048576")]
         bytes_per_step: u64,
-        /// Use Euler integration instead of Verlet for maximum chaos amplification
+        /// Use symplectic Verlet integration instead of default Euler (energy-conserving)
         #[arg(long)]
-        euler: bool,
+        verlet: bool,
         /// Append a 32-byte BLAKE3-keyed MAC tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
@@ -153,12 +156,12 @@ fn main() -> Result<()> {
                 println!("{}", json);
             }
         },
-        Commands::Encrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
-            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
+        Commands::Encrypt { mode, config, input, output, bytes_per_step, verlet, auth } => {
+            let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
             process_file_mode(&mode, &config, &input, &output, true, bytes_per_step, method, auth)?;
         },
-        Commands::Decrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
-            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
+        Commands::Decrypt { mode, config, input, output, bytes_per_step, verlet, auth } => {
+            let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
             process_file_mode(&mode, &config, &input, &output, false, bytes_per_step, method, auth)?;
         },
         Commands::Identify { config, all, ecc, kem, fast } => {
@@ -357,8 +360,8 @@ fn process_file_secure(
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
 
-    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
-    println!("Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...", method_name);
+    let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
+    println!("Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...", method_label);
     let mut k = Kelvin::new_with_method(config, method).context("Failed to initialize Kelvin")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
@@ -407,9 +410,9 @@ fn process_file_chaos(
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
 
-    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
     let auth_label = if auth { " + BLAKE3 MAC" } else { "" };
-    println!("Initializing Kelvin Chaos (V2, {} integration, instant setup{})...", method_name, auth_label);
+    println!("Initializing Kelvin Chaos (V2, {} integration, instant setup{})...", method_label, auth_label);
 
     if auth {
         let mut ks = KelvinStreamingAuthenticated::new_with_method(config, bytes_per_step, method)
@@ -501,9 +504,9 @@ fn process_file_photon(
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
 
-    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
     let auth_label = if auth { " + BLAKE3 MAC" } else { "" };
-    println!("Initializing Kelvin Photon (V3, {} integration, running orbital simulation{})...", method_name, auth_label);
+    println!("Initializing Kelvin Photon (V3, {} integration, running orbital simulation{})...", method_label, auth_label);
     let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
         .context("Failed to run orbital simulation")?;
 
@@ -582,9 +585,9 @@ fn process_file_quantum(
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
 
-    let method_name = if method == IntegrationMethod::Euler { "Euler" } else { "Verlet" };
+    let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
     let auth_label = if auth { " + BLAKE3 MAC" } else { "" };
-    println!("Initializing Kelvin Quantum (H, {} integration, running orbital simulation{})...", method_name, auth_label);
+    println!("Initializing Kelvin Quantum (H, {} integration, running orbital simulation{})...", method_label, auth_label);
     let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
         .context("Failed to run orbital simulation")?;
 
