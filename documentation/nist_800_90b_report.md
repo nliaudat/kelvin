@@ -135,17 +135,42 @@ Results from 1,048,576 bytes (1 MiB) of raw SHAKE256 XOR keystream, default 5-bo
 
 **Summary: 7/7 tests passed.** The keystream exhibits near-maximal Shannon entropy (7.9998 of 8.0), negligible adjacent-byte correlation, uniform byte distribution (χ² = 248.5, well below the 310 critical value), and passes all SP 800-90B health tests with comfortable margins.
 
-### 3.2 NIST ea_iid Results (Pending)
+### 3.2 NIST ea_iid Results
 
-The official NIST SP 800-90B Entropy Assessment tool (`ea_iid`) has been compiled via Docker and is available at `tests/ea_iid/`. It has not yet been run on the full 1 GiB sample. This section will be populated after execution.
+The official NIST SP 800-90B Entropy Assessment tool was run on 1,000,000 bytes (1 MB) of raw SHAKE256 XOR keystream (Verlet integration, default 5-body config). The 1 GiB sample could not be processed by the tool due to memory constraints — the NIST tool is designed for ~1 million samples.
+
+**IID Assessment (`ea_iid`):**
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **H_IID** (IID min-entropy estimate) | — | ⏳ Pending |
-| **H_non-IID** (non-IID min-entropy estimate) | — | ⏳ Pending |
-| **H_min** (final min-entropy estimate) | — | ⏳ Pending |
-| **H_min per 64 KB output** | — | ⏳ Pending |
-| **Passed restart tests** | — | ⏳ Pending |
+| **H_original** | 7.877176 bits/byte | ✅ PASS |
+| **H_bitstring** | 0.998518 bits/bit | ✅ PASS |
+| **min(H_original, 8 × H_bitstring)** | 7.877176 bits/byte | ✅ PASS |
+| Chi square tests | — | ✅ PASS |
+| Longest repeated substring test | — | ✅ PASS |
+| IID permutation tests | — | ✅ PASS |
+
+**Non-IID Assessment (`ea_non_iid`):**
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| **H_original** | 7.388520 bits/byte | ✅ PASS |
+| **H_bitstring** | 0.875277 bits/bit | ✅ PASS |
+| **min(H_original, 8 × H_bitstring)** | 7.002220 bits/byte | ✅ PASS |
+
+**Restart Validation (`ea_restart`):**
+
+| Metric | Value | Status |
+|--------|-------|--------|
+| **H_I** (initial entropy estimate) | 7.881003 bits/byte | ✅ PASS |
+| **H_r** (restart entropy estimate) | 7.877176 bits/byte | ✅ PASS |
+| **H_c** (conditional restart estimate) | 7.877176 bits/byte | ✅ PASS |
+| **min(H_r, H_c, H_I)** | 7.877176 bits/byte | ✅ PASS |
+| Validation test | — | ✅ PASS |
+
+**Final min-entropy estimate: 7.002220 bits/byte** (from non-IID assessment, the most conservative estimate).
+
+**H_min per 64 KB output:** 7.002220 × 65536 = 458,977 bits ≈ 57.4 KB of entropy per 64 KB keystream block.
 
 **Preliminary non-IID estimates (dj-on-github/SP800_90b_tests, 10,000 symbols, 1-bit):**
 
@@ -163,7 +188,7 @@ The official NIST SP 800-90B Entropy Assessment tool (`ea_iid`) has been compile
 | LZ78Y Prediction | 0.946 |
 | **Minimum across all estimators** | **0.606 bits/bit** |
 
-> **Note:** These are preliminary estimates at 1-bit symbol granularity. Full 8-bit symbol analysis requires running the tool with `-l 8 -s 1000000` (approximately 1 million 8-bit symbols). The 1-bit estimates are inherently conservative — per-byte min-entropy is expected to be significantly higher (≈7.9 bits/byte).
+> **Note:** The 1-bit estimates are inherently conservative — per-byte min-entropy is significantly higher (7.88 bits/byte from IID, 7.00 from non-IID). The official NIST non-IID assessment at 8-bit symbol granularity gives the definitive estimate of 7.002220 bits/byte.
 
 ### 3.3 Conditioning Assessment (NIST SP 800-90C)
 
@@ -186,7 +211,7 @@ The conditioning component (SHAKE256) is a NIST-approved function per FIPS 202, 
 
 | Criterion | Status |
 |-----------|--------|
-| Entropy source validated per SP 800-90B | ⏳ Partial (health tests ✅, ea_iid pending) |
+| Entropy source validated per SP 800-90B | ✅ Partial (health tests ✅, ea_iid ✅) |
 | Conditioning component documented per SP 800-90C | ✅ Complete |
 | Health tests implemented and passing | ✅ 7/7 tests pass |
 | Continuous health test monitoring | ✅ Integrated into CI pipeline |
@@ -242,7 +267,40 @@ keystream_1mb.bin,1,10000,0.605857426713888,0.9343508825361133,0.704499527193596
 ### A.3 NIST ea_iid Output
 
 ```
-(Pending — run from tests/ea_iid/ submodule)
+$ /src/ea_iid -i -a /data/keystream_1m.bin 8
+Calculating baseline statistics...
+H_original: 7.877176
+H_bitstring: 0.998518
+min(H_original, 8 X H_bitstring): 7.877176
+** Passed chi square tests
+** Passed length of longest repeated substring test
+** Passed IID permutation tests
+
+$ /src/ea_non_iid -i -a /data/keystream_1m.bin 8
+Running non-IID tests...
+Running Most Common Value Estimate...
+Running Entropic Statistic Estimates (bit strings only)...
+Running Tuple Estimates...
+Running Predictor Estimates...
+H_original: 7.388520
+H_bitstring: 0.875277
+min(H_original, 8 X H_bitstring): 7.002220
+
+$ /src/ea_restart -i /data/keystream_1m.bin 8 7.881003
+H_I: 7.881003
+ALPHA: 5.0251553006530614e-06, X_cutoff: 20
+X_max: 17
+Calculating baseline statistics...
+Running IID tests...
+Running Most Common Value Estimate...
+** Passed chi square tests
+** Passed length of longest repeated substring test
+** Passed IID permutation tests
+H_r: 7.877176
+H_c: 7.877176
+H_I: 7.881003
+Validation Test Passed...
+min(H_r, H_c, H_I): 7.877176
 ```
 
 ## Appendix B: Keystream Generation Command

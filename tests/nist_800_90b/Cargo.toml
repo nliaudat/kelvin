@@ -1,0 +1,10 @@
+[package]
+name = "nist_800_90b"
+version = "0.1.0"
+edition = "2021"
+description = "NIST SP 800-90B entropy source validation tool for Kelvin keystream"
+
+[dependencies]
+kelvin = { path = "../../kelvin", features = ["serde"] }
+kelvin-core = { path = "../../kelvin-core" }
+kelvin-kdf = { path = "../../kelvin-kdf" }
