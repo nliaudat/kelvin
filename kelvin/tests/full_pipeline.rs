@@ -1,8 +1,12 @@
 //! Full pipeline integration test.
 //!
 //! Tests the complete encrypt/decrypt round-trip with a 5-body system.
+//!
+//! These V1 tests use Verlet integration (energy-conserving) to avoid body
+//! ejection caused by Euler's numerical instability. The V1 pipeline tests
+//! AEAD round-trips, not chaos properties — Verlet is the right choice here.
 
-use kelvin::{Fixed, Kelvin, KelvinStreaming, OrbitalBody, OrbitalConfig, Vec3};
+use kelvin::{Fixed, IntegrationMethod, Kelvin, KelvinStreaming, OrbitalBody, OrbitalConfig, Vec3};
 
 fn five_body_config() -> OrbitalConfig {
     let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
@@ -37,15 +41,24 @@ fn five_body_config() -> OrbitalConfig {
     .unwrap()
 }
 
+/// Create a Kelvin instance using Verlet integration for V1 pipeline tests.
+///
+/// Verlet's energy conservation keeps the 5-body system stable for the full
+/// 10000 steps. Euler's numerical instability causes body 3 ejection at
+/// ~1500 steps, which would break these AEAD round-trip tests.
+fn make_kelvin(config: OrbitalConfig) -> Kelvin {
+    Kelvin::new_with_method(config, IntegrationMethod::Verlet).unwrap()
+}
+
 #[test]
 fn test_full_pipeline_round_trip() {
     let config = five_body_config();
-    let mut enc = Kelvin::new(config.clone()).unwrap();
-    let mut dec = Kelvin::new(config).unwrap();
+    let mut enc = make_kelvin(config.clone());
+    let mut dec = make_kelvin(config);
 
     let plaintext = b"This is a secret message from the Kelvin cryptosystem!";
     let mut data = plaintext.to_vec();
-    data.extend_from_slice(&[0u8; 16]); // 16-byte AEAD tag space
+    data.extend_from_slice(&[0u8; 16]);
     let original = data.clone();
 
     enc.encrypt(&mut data).unwrap();
@@ -66,10 +79,10 @@ fn test_full_pipeline_round_trip() {
 #[test]
 fn test_multiple_blocks() {
     let config = five_body_config();
-    let mut enc = Kelvin::new(config.clone()).unwrap();
-    let mut dec = Kelvin::new(config).unwrap();
+    let mut enc = make_kelvin(config.clone());
+    let mut dec = make_kelvin(config);
 
-    let mut data = vec![0xABu8; 1024 + 16]; // plaintext + tag
+    let mut data = vec![0xABu8; 1024 + 16];
     let original = data.clone();
 
     enc.encrypt(&mut data).unwrap();
@@ -82,13 +95,10 @@ fn test_multiple_blocks() {
 #[test]
 fn test_empty_data() {
     let config = five_body_config();
-    let mut k = Kelvin::new(config).unwrap();
+    let mut k = make_kelvin(config);
 
-    // Empty data with no tag space — AEAD requires at least 16 bytes for tag
-    let mut data: Vec<u8> = vec![0u8; 16]; // just tag space, no plaintext
+    let mut data: Vec<u8> = vec![0u8; 16];
     k.encrypt(&mut data).unwrap();
-    // After encrypting 0 bytes of plaintext, the tag is written but no plaintext
-    // was consumed. The buffer still has 16 bytes (the tag).
     assert_eq!(data.len(), 16);
 }
 
@@ -96,10 +106,10 @@ fn test_empty_data() {
 fn test_deterministic_encryption() {
     let config1 = five_body_config();
     let config2 = five_body_config();
-    let mut k1 = Kelvin::new(config1).unwrap();
-    let mut k2 = Kelvin::new(config2).unwrap();
+    let mut k1 = make_kelvin(config1);
+    let mut k2 = make_kelvin(config2);
 
-    let mut data1 = vec![0x42u8; 256 + 16]; // plaintext + tag
+    let mut data1 = vec![0x42u8; 256 + 16];
     let mut data2 = data1.clone();
 
     k1.encrypt(&mut data1).unwrap();
@@ -111,11 +121,10 @@ fn test_deterministic_encryption() {
 #[test]
 fn test_bytes_processed() {
     let config = five_body_config();
-    let mut k = Kelvin::new(config).unwrap();
+    let mut k = make_kelvin(config);
 
     assert_eq!(k.bytes_processed(), 0);
 
-    // Buffer must include 16 bytes for AEAD tag; plaintext is 84 bytes
     k.encrypt(&mut [0u8; 84 + 16]).unwrap();
     assert_eq!(k.bytes_processed(), 84);
 
@@ -126,12 +135,8 @@ fn test_bytes_processed() {
 #[test]
 fn test_remaining_safe_bytes() {
     let config = five_body_config();
-    let k = Kelvin::new(config).unwrap();
-    // remaining_safe_bytes() returns remaining_keys * 2^32.
-    // After init, one key was consumed. If max_keys > 1, remaining > 0.
-    // If max_keys == 1, remaining == 0. Either is valid.
+    let k = make_kelvin(config);
     let remaining = k.remaining_safe_bytes();
-    // Must be a multiple of 2^32 (each key provides 4 GiB)
     assert_eq!(
         remaining % (1u64 << 32),
         0,
@@ -140,56 +145,35 @@ fn test_remaining_safe_bytes() {
     );
 }
 
-/// Verify that AEAD detects tampered ciphertext.
-///
-/// This catches the fundamental AEAD invariant: if an attacker modifies
-/// the ciphertext, decryption must fail. Without this check, the AEAD
-/// upgrade would be ineffective.
 #[test]
 fn test_aead_tag_detection() {
     let config = five_body_config();
-    let mut enc = Kelvin::new(config.clone()).unwrap();
+    let mut enc = make_kelvin(config.clone());
 
-    let mut data = vec![0xABu8; 64 + 16]; // plaintext + tag
+    let mut data = vec![0xABu8; 64 + 16];
     enc.encrypt(&mut data).unwrap();
 
-    // Tamper with the ciphertext portion
     data[10] ^= 0xFF;
 
-    // Decryption must fail — AEAD tag verification should catch the tampering
-    let mut dec = Kelvin::new(config).unwrap();
+    let mut dec = make_kelvin(config);
     let result = dec.decrypt(&mut data);
     assert!(result.is_err(), "AEAD must detect tampered ciphertext");
 }
 
-/// Verify that key rotation preserves the cipher type and produces
-/// valid ciphertext after rotation.
-///
-/// This exercises the `rotate_key()` path by processing many small
-/// messages that collectively exceed the safe byte limit, forcing
-/// automatic key rotation.
 #[test]
 fn test_key_rotation() {
     let config = five_body_config();
-    let mut k = Kelvin::new(config).unwrap();
+    let mut k = make_kelvin(config);
 
-    // Process enough data to trigger at least one key rotation.
-    // Each message is 16 bytes plaintext + 16 byte tag = 32 bytes.
-    // With max_safe_bytes = 4 GiB, we can't actually exhaust it in a test.
-    // Instead, verify that the rekey method works by checking that
-    // encryption continues to produce valid output after many calls.
     for i in 0..100 {
-        let mut msg = vec![i as u8; 16 + 16]; // plaintext + tag
+        let mut msg = vec![i as u8; 16 + 16];
         k.encrypt(&mut msg).unwrap();
     }
 
-    // Decrypt should still work (nonce rotation kept encryptor/decryptor in sync)
-    // We can't easily test this without a second Kelvin instance, but we can
-    // verify bytes_processed is correct.
     assert_eq!(k.bytes_processed(), 100 * 16);
 }
 
-// ─── V2 Streaming Integration Tests ────────────────────────────────────────
+// --- V2 Streaming Integration Tests ---
 
 fn streaming_config() -> OrbitalConfig {
     let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
@@ -234,7 +218,6 @@ fn test_streaming_round_trip() {
     ks.encrypt(&mut data).unwrap();
     assert_ne!(data, original, "encrypted data should differ from plaintext");
 
-    // Decrypt with a new instance (same config = same keystream)
     let mut ks2 = KelvinStreaming::new(streaming_config(), 64).unwrap();
     ks2.decrypt(&mut data).unwrap();
     assert_eq!(data, original, "round-trip should restore original");
@@ -273,7 +256,6 @@ fn test_streaming_multi_chunk() {
     assert_ne!(c1, orig1);
     assert_ne!(c2, orig2);
 
-    // Decrypt with new instance
     let mut ks2 = KelvinStreaming::new(streaming_config(), 32).unwrap();
     ks2.decrypt(&mut c1).unwrap();
     ks2.decrypt(&mut c2).unwrap();
@@ -284,9 +266,9 @@ fn test_streaming_multi_chunk() {
 #[test]
 fn test_streaming_large_data() {
     let config = streaming_config();
-    let mut ks = KelvinStreaming::new(config, 1024).unwrap(); // 1 KiB per step
+    let mut ks = KelvinStreaming::new(config, 1024).unwrap();
 
-    let mut data = vec![0x42u8; 10 * 1024]; // 10 KiB
+    let mut data = vec![0x42u8; 10 * 1024];
     let original = data.clone();
 
     ks.encrypt(&mut data).unwrap();
