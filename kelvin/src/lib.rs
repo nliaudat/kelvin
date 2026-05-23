@@ -74,7 +74,9 @@ pub use authenticated::{
     KelvinPhotonAuthenticated, KelvinQuantumAuthenticated, KelvinStreamingAuthenticated,
 };
 pub use photon::KelvinPhoton;
-pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_ORBITAL_STEPS};
+pub use quantum::{
+    KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_ORBITAL_STEPS, DEFAULT_RESEED_INTERVAL,
+};
 
 use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};
 use kelvin_kdf::LyapunovEstimator;
@@ -87,18 +89,13 @@ use zeroize::Zeroize;
 /// - **Euler**: Explicit Euler integration. Numerical instability amplifies
 ///   chaos ~10x faster than Verlet, producing more entropy per step.
 ///   Use `--euler` to opt in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntegrationMethod {
     /// Symplectic Velocity Verlet (default, backward compatible).
+    #[default]
     Verlet,
     /// Explicit Euler (maximum chaos amplification).
     Euler,
-}
-
-impl Default for IntegrationMethod {
-    fn default() -> Self {
-        IntegrationMethod::Verlet
-    }
 }
 
 /// Run the full orbital simulation pipeline and extract a 2048-byte seed.
@@ -111,7 +108,9 @@ impl Default for IntegrationMethod {
 /// 4. SHAKE256 seed extraction
 ///
 /// Returns the 2048-byte seed and the simulated bodies.
-pub fn simulate_and_extract_seed(config: &OrbitalConfig) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
+pub fn simulate_and_extract_seed(
+    config: &OrbitalConfig,
+) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
     simulate_and_extract_seed_with_method(config, IntegrationMethod::Verlet)
 }
 
@@ -120,13 +119,11 @@ pub fn simulate_and_extract_seed_with_method(
     config: &OrbitalConfig,
     method: IntegrationMethod,
 ) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
-
     // Validate config
     config.validate()?;
 
     // Estimate Lyapunov time
-    let lyapunov =
-        LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
+    let lyapunov = LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
     let result = lyapunov.estimate(1000, config.total_steps)?;
 
     if config.total_steps < result.min_chaos_steps {
@@ -213,7 +210,10 @@ struct InitState {
 impl Kelvin {
     /// Run the shared initialization pipeline (validation, Lyapunov estimation,
     /// simulation, seed extraction, key schedule creation).
-    fn init_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<InitState, KelvinError> {
+    fn init_with_method(
+        config: OrbitalConfig,
+        method: IntegrationMethod,
+    ) -> Result<InitState, KelvinError> {
         // Validate config
         config.validate()?;
 
@@ -300,7 +300,10 @@ impl Kelvin {
     /// Use `IntegrationMethod::Euler` for maximum chaos amplification
     /// (numerical instability produces ~10x more entropy per step).
     /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
-    pub fn new_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<Self, KelvinError> {
+    pub fn new_with_method(
+        config: OrbitalConfig,
+        method: IntegrationMethod,
+    ) -> Result<Self, KelvinError> {
         let mut state = Self::init_with_method(config, method)?;
 
         // Get first key
@@ -331,7 +334,10 @@ impl Kelvin {
     ///
     /// Available when the `aes-ni` feature is enabled.
     #[cfg(feature = "aes-ni")]
-    pub fn new_aes_with_method(config: OrbitalConfig, method: IntegrationMethod) -> Result<Self, KelvinError> {
+    pub fn new_aes_with_method(
+        config: OrbitalConfig,
+        method: IntegrationMethod,
+    ) -> Result<Self, KelvinError> {
         let mut state = Self::init_with_method(config, method)?;
 
         // Get first key
@@ -576,7 +582,10 @@ impl KelvinStreaming {
             );
 
             // 3. XOR chunk with keystream
-            for (d, k) in data[offset..offset + chunk_size].iter_mut().zip(self.keystream_buf[..chunk_size].iter()) {
+            for (d, k) in data[offset..offset + chunk_size]
+                .iter_mut()
+                .zip(self.keystream_buf[..chunk_size].iter())
+            {
                 *d ^= k;
             }
 
@@ -587,7 +596,6 @@ impl KelvinStreaming {
 
         Ok(())
     }
-
 
     /// Encrypt data in-place (same as process_chunk).
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {

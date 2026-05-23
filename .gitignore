@@ -44,3 +44,4 @@ tests/entropy_analysis/run_keystream_test.py
 *.pyd
 *.pyc
 production_readiness_review.md
+/scripts/test_results

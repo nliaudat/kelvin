@@ -38,7 +38,6 @@ pub const MAX_VERLET_STEPS: u64 = 1_000_000_000;
 /// more than enough for entropy generation.
 pub const MAX_EULER_STEPS: u64 = 100_000_000;
 
-
 /// Error type for orbital state operations.
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrbitalError {
@@ -56,14 +55,12 @@ impl core::fmt::Display for OrbitalError {
         match self {
             OrbitalError::OrbitalOverflow { step, max_steps } => {
                 write!(f, "orbital simulation overflow at step {} (max {})", step, max_steps)
-            }
+            },
         }
     }
 }
 
 impl std::error::Error for OrbitalError {}
-
-
 
 /// 5-body orbital state with Verlet integration.
 ///
@@ -104,11 +101,11 @@ impl OrbitalState {
         Self {
             masses: [1.0, 0.001, 0.000003, 0.000000037, 0.00000000001],
             positions: [
-                [0.0, 0.0, 0.0],          // Star at origin
-                [5.2, 0.1, 0.05],         // Jupiter-like
-                [1.0, 0.8, 0.3],          // Earth-like, inclined
-                [1.002, 0.801, 0.301],    // Moon-like, offset from Earth
-                [42.0, -13.0, 7.0],       // Chaos dust, highly eccentric
+                [0.0, 0.0, 0.0],       // Star at origin
+                [5.2, 0.1, 0.05],      // Jupiter-like
+                [1.0, 0.8, 0.3],       // Earth-like, inclined
+                [1.002, 0.801, 0.301], // Moon-like, offset from Earth
+                [42.0, -13.0, 7.0],    // Chaos dust, highly eccentric
             ],
             velocities: [
                 [0.0, 0.0, 0.0],
@@ -144,28 +141,23 @@ impl OrbitalState {
 
         // Compute current accelerations
         let mut accel_current = [[0.0; 3]; 5];
-        Self::compute_accelerations(
-            &self.positions, &self.masses, &mut accel_current, G, EPSILON,
-        );
+        Self::compute_accelerations(&self.positions, &self.masses, &mut accel_current, G, EPSILON);
 
         // Update positions (half-step)
-        for i in 0..5 {
-            for j in 0..3 {
-                self.positions[i][j] += self.velocities[i][j] * DT
-                    + 0.5 * accel_current[i][j] * DT * DT;
+        for (i, pos) in self.positions.iter_mut().enumerate() {
+            for (j, p) in pos.iter_mut().enumerate() {
+                *p += self.velocities[i][j] * DT + 0.5 * accel_current[i][j] * DT * DT;
             }
         }
 
         // Compute new accelerations from updated positions
         let mut accel_new = [[0.0; 3]; 5];
-        Self::compute_accelerations(
-            &self.positions, &self.masses, &mut accel_new, G, EPSILON,
-        );
+        Self::compute_accelerations(&self.positions, &self.masses, &mut accel_new, G, EPSILON);
 
         // Update velocities (full-step)
-        for i in 0..5 {
-            for j in 0..3 {
-                self.velocities[i][j] += 0.5 * (accel_current[i][j] + accel_new[i][j]) * DT;
+        for (i, vel) in self.velocities.iter_mut().enumerate() {
+            for (j, v) in vel.iter_mut().enumerate() {
+                *v += 0.5 * (accel_current[i][j] + accel_new[i][j]) * DT;
             }
         }
 
@@ -217,20 +209,18 @@ impl OrbitalState {
 
         // Compute accelerations from current positions
         let mut accel = [[0.0; 3]; 5];
-        Self::compute_accelerations(
-            &self.positions, &self.masses, &mut accel, G, EPSILON,
-        );
+        Self::compute_accelerations(&self.positions, &self.masses, &mut accel, G, EPSILON);
 
         // True explicit Euler integration: position before velocity.
         // This is NOT symplectic — energy drift amplifies chaos ~10x faster
         // than semi-implicit (symplectic) Euler. The numerical instability
         // is a feature for entropy generation.
-        for i in 0..5 {
-            for j in 0..3 {
+        for (i, pos) in self.positions.iter_mut().enumerate() {
+            for (j, p) in pos.iter_mut().enumerate() {
                 // Save current velocity before updating position
                 let v_old = self.velocities[i][j];
                 // Update position using OLD velocity (explicit Euler)
-                self.positions[i][j] += v_old * DT;
+                *p += v_old * DT;
                 // Update velocity using current acceleration
                 self.velocities[i][j] += accel[i][j] * DT;
             }
@@ -254,7 +244,7 @@ impl OrbitalState {
     }
 
     /// Compute gravitational accelerations for all bodies.
-
+    #[allow(clippy::disallowed_methods)]
     fn compute_accelerations(
         positions: &[[f64; 3]; 5],
         masses: &[f64; 5],
@@ -321,15 +311,13 @@ impl OrbitalState {
 
         // Compute instantaneous accelerations for all bodies
         let mut accelerations = [[0.0; 3]; 5];
-        Self::compute_accelerations(
-            &self.positions, &self.masses, &mut accelerations, G, EPSILON,
-        );
+        Self::compute_accelerations(&self.positions, &self.masses, &mut accelerations, G, EPSILON);
 
-        for i in 0..5 {
+        for (i, pos) in self.positions.iter().enumerate() {
             sha3::digest::Update::update(&mut hasher, &self.masses[i].to_le_bytes());
-            sha3::digest::Update::update(&mut hasher, &self.positions[i][0].to_le_bytes());
-            sha3::digest::Update::update(&mut hasher, &self.positions[i][1].to_le_bytes());
-            sha3::digest::Update::update(&mut hasher, &self.positions[i][2].to_le_bytes());
+            sha3::digest::Update::update(&mut hasher, &pos[0].to_le_bytes());
+            sha3::digest::Update::update(&mut hasher, &pos[1].to_le_bytes());
+            sha3::digest::Update::update(&mut hasher, &pos[2].to_le_bytes());
             sha3::digest::Update::update(&mut hasher, &self.velocities[i][0].to_le_bytes());
             sha3::digest::Update::update(&mut hasher, &self.velocities[i][1].to_le_bytes());
             sha3::digest::Update::update(&mut hasher, &self.velocities[i][2].to_le_bytes());
@@ -349,6 +337,7 @@ impl OrbitalState {
     ///
     /// Returns the estimated exponent (positive = chaotic).
     /// Higher values indicate faster divergence.
+    #[allow(clippy::disallowed_methods)]
     pub fn estimate_lyapunov(&mut self, sample_steps: u64) -> f64 {
         if sample_steps == 0 {
             return 0.0;
@@ -373,9 +362,9 @@ impl OrbitalState {
 
             // Compute separation
             let mut separation = 0.0;
-            for i in 0..5 {
-                for j in 0..3 {
-                    let d = self.positions[i][j] - shadow.positions[i][j];
+            for (i, pos) in self.positions.iter().enumerate() {
+                for (j, p) in pos.iter().enumerate() {
+                    let d = p - shadow.positions[i][j];
                     separation += d * d;
                 }
             }
@@ -389,27 +378,20 @@ impl OrbitalState {
                 samples += 1;
 
                 // Renormalize shadow to prevent overflow
-                for i in 0..5 {
-                    for j in 0..3 {
-                        shadow.positions[i][j] = self.positions[i][j]
-                            + (shadow.positions[i][j] - self.positions[i][j]) * (1e-10 / separation);
+                for (i, pos) in self.positions.iter().enumerate() {
+                    for (j, p) in pos.iter().enumerate() {
+                        shadow.positions[i][j] =
+                            p + (shadow.positions[i][j] - p) * (1e-10 / separation);
                     }
                 }
             }
         }
 
-        let lyapunov = if samples > 0 {
-            total_log_ratio / samples as f64
-        } else {
-            0.0
-        };
+        let lyapunov = if samples > 0 { total_log_ratio / samples as f64 } else { 0.0 };
 
         self.lyapunov_estimate = lyapunov;
         lyapunov
     }
-
-
-
 }
 
 impl Zeroize for OrbitalState {
@@ -435,6 +417,7 @@ impl Zeroize for OrbitalState {
 }
 
 #[cfg(test)]
+#[allow(clippy::disallowed_methods)]
 mod tests {
     use super::*;
 
@@ -496,39 +479,27 @@ mod tests {
 
     #[test]
     fn test_non_periodic_long_term() {
-        // Verify the system is not trivially periodic by checking that
-        // the state after many steps is not the same as the initial state.
-        // A non-chaotic system would return to its initial state after
-        // each orbital period.
         let mut state = OrbitalState::chaotic_default();
         let initial_positions = state.positions;
 
-        // Run for 10000 steps (~25 orbits for Earth-like body)
         state.verlet_steps(10000).unwrap();
 
-        // Check that positions have changed significantly
         let mut max_diff = 0.0;
-        for i in 0..5 {
-            for j in 0..3 {
-                let d = (state.positions[i][j] - initial_positions[i][j]).abs();
+        for (i, pos) in state.positions.iter().enumerate() {
+            for (j, p) in pos.iter().enumerate() {
+                let d = (p - initial_positions[i][j]).abs();
                 if d > max_diff {
                     max_diff = d;
                 }
             }
         }
 
-        // The positions should have changed by at least 0.1 (the bodies
-        // should have moved significantly from their starting positions)
         assert!(
             max_diff > 0.1,
             "System appears frozen: max position change = {} after 10000 steps",
             max_diff
         );
     }
-
-
-
-
 
     #[test]
     fn test_overflow_safety() {
@@ -558,7 +529,6 @@ mod tests {
         let state = OrbitalState::chaotic_default();
         let mut buf = [0u8; 128];
         state.extract_entropy(&mut buf);
-        // All bytes should not be zero (basic sanity)
         let has_nonzero = buf.iter().any(|&b| b != 0);
         assert!(has_nonzero, "entropy buffer should not be all zeros");
     }
@@ -576,8 +546,6 @@ mod tests {
     #[test]
     fn test_euler_step_changes_state() {
         let mut state = OrbitalState::chaotic_default();
-        // Body 3 (Moon-like) has non-zero x-velocity (2.01), so its
-        // x-position should change after one explicit Euler step.
         let pos_before = state.positions[3][0];
         state.euler_step().unwrap();
         let pos_after = state.positions[3][0];
@@ -593,28 +561,22 @@ mod tests {
 
     #[test]
     fn test_euler_diverges_from_verlet() {
-        // Euler and Verlet starting from the same initial conditions
-        // should produce completely different trajectories after enough steps.
         let mut euler_state = OrbitalState::chaotic_default();
         let mut verlet_state = OrbitalState::chaotic_default();
 
-        // Run both for 1000 steps
         euler_state.euler_steps(1000).unwrap();
         verlet_state.verlet_steps(1000).unwrap();
 
-        // Positions should be very different
         let mut max_diff = 0.0;
-        for i in 0..5 {
-            for j in 0..3 {
-                let d = (euler_state.positions[i][j] - verlet_state.positions[i][j]).abs();
+        for (i, pos) in euler_state.positions.iter().enumerate() {
+            for (j, p) in pos.iter().enumerate() {
+                let d = (p - verlet_state.positions[i][j]).abs();
                 if d > max_diff {
                     max_diff = d;
                 }
             }
         }
 
-        // The trajectories should have diverged significantly
-        // (Euler's numerical instability amplifies chaos much faster)
         assert!(
             max_diff > 1.0,
             "Euler and Verlet trajectories should diverge: max diff = {}",
@@ -636,15 +598,12 @@ mod tests {
 
     #[test]
     fn test_euler_energy_drift() {
-        // Euler should have more energy drift than Verlet (this is a feature for entropy).
-        // At dt=0.001, Euler is stable for ~1000 steps but drift accumulates over time.
         let mut euler_state = OrbitalState::chaotic_default();
         let mut verlet_state = OrbitalState::chaotic_default();
 
         let euler_e0 = compute_total_energy(&euler_state);
         let verlet_e0 = compute_total_energy(&verlet_state);
 
-        // Run 10000 steps for both
         euler_state.euler_steps(10000).unwrap();
         verlet_state.verlet_steps(10000).unwrap();
 
@@ -654,7 +613,6 @@ mod tests {
         let euler_drift = (euler_e1 - euler_e0).abs() / euler_e0.abs().max(1e-30);
         let verlet_drift = (verlet_e1 - verlet_e0).abs() / verlet_e0.abs().max(1e-30);
 
-        // Euler should have more energy drift than Verlet
         assert!(
             euler_drift > verlet_drift,
             "Euler drift ({}) should exceed Verlet drift ({})",
@@ -663,22 +621,15 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_verlet_energy_conservation() {
-
-        // Energy should be approximately conserved over short timescales
         let mut state = OrbitalState::chaotic_default();
-
-        // Compute initial kinetic + potential energy
         let e0 = compute_total_energy(&state);
 
-        // Run 100 steps
         state.verlet_steps(100).unwrap();
 
         let e1 = compute_total_energy(&state);
 
-        // Energy drift should be small (< 1%)
         let drift = (e1 - e0).abs() / e0.abs().max(1e-30);
         assert!(drift < 0.01, "Energy drift too large: {}", drift);
     }
@@ -687,16 +638,12 @@ mod tests {
         const G: f64 = 1.0;
         const EPSILON: f64 = 1e-6;
 
-        // Kinetic energy
         let mut ke = 0.0;
-        for i in 0..5 {
-            let v2 = state.velocities[i][0] * state.velocities[i][0]
-                + state.velocities[i][1] * state.velocities[i][1]
-                + state.velocities[i][2] * state.velocities[i][2];
+        for (i, vel) in state.velocities.iter().enumerate() {
+            let v2 = vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2];
             ke += 0.5 * state.masses[i] * v2;
         }
 
-        // Potential energy
         let mut pe = 0.0;
         for i in 0..5 {
             for j in (i + 1)..5 {

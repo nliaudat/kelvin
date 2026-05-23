@@ -66,7 +66,7 @@ Kelvin derives multiple Post-Quantum (PQ) and classical asymmetric identities fr
 ./kelvin identify --config my_secret.json --ecc --kem
 
 ### Authenticated Encryption (`--auth`)
-V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte BLAKE3-keyed MAC tag to the ciphertext, defeating malleability.
+V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability.
 
 ```bash
 # Chaos mode with authentication
@@ -171,9 +171,9 @@ let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMe
 ks.encrypt(&mut data)?;
 ```
 
-### Authenticated Encryption (V2/V3/H + BLAKE3 MAC)
+### Authenticated Encryption (V2/V3/H + KMAC128)
 
-For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a 32-byte BLAKE3-keyed MAC tag:
+For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a 32-byte KMAC128 tag (NIST SP 800-185):
 
 ```rust
 use kelvin::{
@@ -181,13 +181,13 @@ use kelvin::{
     KelvinQuantumAuthenticated, OrbitalConfig,
 };
 
-// V2 Chaos + BLAKE3 MAC
+// V2 Chaos + KMAC128
 let config = OrbitalConfig::from_json(&config_json)?;
 let mut ks = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
 let mut data = b"Hello authenticated streaming!".to_vec();
 ks.encrypt(&mut data)?; // ciphertext + 32-byte tag appended
 
-// V3 Photon + BLAKE3 MAC
+// V3 Photon + KMAC128
 let (seed, _bodies) = kelvin::simulate_and_extract_seed_with_method(
     &config, kelvin::IntegrationMethod::Verlet
 )?;
@@ -195,7 +195,7 @@ let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
 let mut data = b"Hello authenticated photon!".to_vec();
 photon.encrypt(&mut data)?;
 
-// H Quantum + BLAKE3 MAC
+// H Quantum + KMAC128
 let mut quantum = KelvinQuantumAuthenticated::with_config(
     seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024
 )?;
@@ -203,7 +203,7 @@ let mut data = b"Hello authenticated quantum!".to_vec();
 quantum.encrypt(&mut data)?;
 ```
 
-> **Important:** The authenticated wrappers append a 32-byte tag to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
+> **Important:** The authenticated wrappers append a 32-byte KMAC128 tag to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
 
 ### Accessing Asymmetric Keys
 ```rust
@@ -246,7 +246,7 @@ Kelvin automatically reseeds the keystream by advancing through the **key schedu
 > [!CAUTION]
 > V2 (Chaos), V3 (Photon), and H (Quantum) modes are **pure XOR stream ciphers** — they do not provide built-in message authentication. Without authentication, an attacker can flip ciphertext bits and cause predictable plaintext changes (malleability).
 >
-> **Use `--auth`** to append a 32-byte BLAKE3-keyed MAC tag to the ciphertext, defeating malleability. The tag is verified in constant time during decryption.
+> **Use `--auth`** to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability. The tag is verified in constant time during decryption.
 >
 > V1 (Secure) mode uses ChaCha20Poly1305 AEAD and has built-in authentication — the `--auth` flag is ignored for this mode.
 
@@ -424,4 +424,3 @@ The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.h
 - The domain separator `b"kelvin-streaming-v2-v1-000000000"` ensures domain separation from V1.
 - **Deterministic**: same config + same step count = same keystream, regardless of how the caller chunks the data (as long as total bytes processed is the same).
 - **Unlimited keystream**: Unlike V1's finite key schedule, V2 can keep simulating indefinitely — there is no `SeedExhausted` error.
-

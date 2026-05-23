@@ -61,7 +61,8 @@ pub fn bench_extract_seed(runner: &mut CtRunner, rng: &mut BenchRng) {
                     Vec3::ZERO,
                 ),
             ];
-            let _seed = extract_seed(&bodies, step, DEFAULT_G, SOFTENING_FACTOR, b"kelvin-ct-bench");
+            let _seed =
+                extract_seed(&bodies, step, DEFAULT_G, SOFTENING_FACTOR, b"kelvin-ct-bench");
         });
     }
 }

@@ -1,6 +1,6 @@
 @echo off
 REM ==============================================================================
-REM Kelvin — Run All Tests (Windows Batch)
+REM Kelvin -- Run All Tests (Windows Batch)
 REM ==============================================================================
 REM Runs the full test suite: build, lint, unit tests, integration tests,
 REM entropy analysis, NIST SP 800-22 statistical tests, and constant-time
@@ -42,14 +42,8 @@ if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE%
 echo %GREEN%PASSED%NC%
 
-call :step "2c/8: Build kelvin-demo binaries"
-cargo build -p kelvin-demo
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE%
-echo %GREEN%PASSED%NC%
-
 REM ---------------------------------------------------------------------------
-REM 2. Lint — clippy + rustfmt
+REM 2. Lint -- clippy + rustfmt
 REM ---------------------------------------------------------------------------
 call :step "3/8: Clippy (deny warnings)"
 cargo clippy --workspace -- -D warnings
@@ -58,7 +52,7 @@ if !EXITCODE! neq 0 exit /b !EXITCODE%
 echo %GREEN%PASSED%NC%
 
 call :step "4/8: Check formatting"
-cargo fmt --check
+cargo fmt --all --check
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE%
 echo %GREEN%PASSED%NC%

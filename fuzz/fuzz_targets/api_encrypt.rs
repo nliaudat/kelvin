@@ -13,8 +13,8 @@
 //! Run with: `cargo test -p kelvin-fuzz --test api_encrypt`
 //! Heavy run: `PROPTEST_CASES=100000 cargo test -p kelvin-fuzz --test api_encrypt`
 
+use kelvin::{KelvinPhoton, KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated};
 use proptest::prelude::*;
-use kelvin::{KelvinPhoton, KelvinQuantum, KelvinPhotonAuthenticated, KelvinQuantumAuthenticated};
 
 /// Build a 2048-byte seed from a vector of bytes (padded/repeated as needed).
 fn make_seed(bytes: Vec<u8>) -> [u8; 2048] {

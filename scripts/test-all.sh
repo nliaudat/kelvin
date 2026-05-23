@@ -46,10 +46,6 @@ step "2b/8: Build V2 Streaming example"
 cargo build --example simple_streaming -p kelvin
 pass
 
-step "2c/8: Build kelvin-demo binaries"
-cargo build -p kelvin-demo
-pass
-
 # ---------------------------------------------------------------------------
 # 2. Lint — clippy + rustfmt
 # ---------------------------------------------------------------------------
@@ -58,7 +54,7 @@ cargo clippy --workspace -- -D warnings
 pass
 
 step "4/8: Check formatting"
-cargo fmt --check
+cargo fmt --all --check
 pass
 
 # ---------------------------------------------------------------------------

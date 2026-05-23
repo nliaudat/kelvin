@@ -50,7 +50,6 @@ pub enum KelvinError {
     /// Serialization error.
     #[error("serialization error: {0}")]
     Serialization(String),
-
 }
 
 impl From<kelvin_kdf::ConfigError> for KelvinError {

@@ -22,6 +22,7 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
 subtle = "2"
+sha3-kmac = "0.3.0"
 
 
 [features]

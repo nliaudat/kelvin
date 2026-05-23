@@ -217,9 +217,7 @@ impl KelvinQuantum {
             let available = self.keystream_cache.len() - self.cache_pos;
             let take = remaining.min(available);
 
-            result.extend_from_slice(
-                &self.keystream_cache[self.cache_pos..self.cache_pos + take],
-            );
+            result.extend_from_slice(&self.keystream_cache[self.cache_pos..self.cache_pos + take]);
 
             self.cache_pos += take;
             self.bytes_since_reseed += take as u64;
@@ -253,7 +251,6 @@ impl KelvinQuantum {
         self.orbital_state
             .euler_steps(self.orbital_steps_per_reseed)
             .map_err(|_| KelvinError::SeedExhausted)?;
-
 
         // Extract fresh entropy via SHAKE256
         let mut fresh_entropy = [0u8; 64];
@@ -290,9 +287,7 @@ impl KelvinQuantum {
         info.extend_from_slice(b"kelvin-quantum-cache-v1");
         info.extend_from_slice(&self.reseed_count.to_le_bytes());
 
-        hk.expand(&info, &mut xof_seed)
-
-            .map_err(|_| KelvinError::SeedExhausted)?;
+        hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
 
         // SHAKE256 XOF: fill the cache
         let mut hasher = Shake256::default();
@@ -540,8 +535,6 @@ mod tests {
         quantum.encrypt(&mut data).unwrap(); // triggers reseed (count=1)
         assert_eq!(quantum.remaining_reseeds(), 9);
     }
-
-
 
     #[test]
     fn test_avalanche() {

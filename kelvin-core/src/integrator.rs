@@ -120,7 +120,6 @@ pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fi
 /// 3. Compute new accelerations a'
 /// 4. Kick:   v ← v + a' * dt/2
 pub fn verlet_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) {
-
     let half_dt = dt / Fixed::from_int(2);
 
     // Step 1: Kick (half step)

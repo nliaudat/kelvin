@@ -291,8 +291,15 @@ pub fn simulate_with_monitoring(
     ejection_energy_threshold: Fixed,
 ) -> Result<(), StabilityError> {
     simulate_with_monitoring_inner(
-        bodies, steps, dt, softening, g, min_separation,
-        monitor_interval, ejection_energy_threshold, verlet_step,
+        bodies,
+        steps,
+        dt,
+        softening,
+        g,
+        min_separation,
+        monitor_interval,
+        ejection_energy_threshold,
+        verlet_step,
     )
 }
 
@@ -316,8 +323,15 @@ pub fn simulate_with_monitoring_euler(
     ejection_energy_threshold: Fixed,
 ) -> Result<(), StabilityError> {
     simulate_with_monitoring_inner(
-        bodies, steps, dt, softening, g, min_separation,
-        monitor_interval, ejection_energy_threshold, euler_step,
+        bodies,
+        steps,
+        dt,
+        softening,
+        g,
+        min_separation,
+        monitor_interval,
+        ejection_energy_threshold,
+        euler_step,
     )
 }
 

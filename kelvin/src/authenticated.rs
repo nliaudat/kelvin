@@ -1,14 +1,14 @@
 //! Authenticated wrappers for V2 Chaos (Streaming), V3 Photon, and H Quantum stream modes.
 //!
 //! All three stream modes are pure XOR stream ciphers with no built-in
-//! authentication. This module provides wrappers that append a **BLAKE3-keyed
-//! MAC tag** (32 bytes) to the ciphertext, and verify it in constant time
-//! before decryption.
+//! authentication. This module provides wrappers that append a **KMAC128
+//! tag** (32 bytes, NIST SP 800-185) to the ciphertext, and verify it in
+//! constant time before decryption.
 //!
 //! ## Wire Format
 //!
 //! ```text
-//! ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)
+//! ciphertext (N bytes) || KMAC128 tag (32 bytes)
 //! ```
 //!
 //! ## MAC Key Derivation
@@ -24,11 +24,12 @@
 //!
 //! ## Security
 //!
+//! - **NIST SP 800-185 standard**: KMAC128 is a NIST-approved MAC based on
+//!   cSHAKE256 (Keccak sponge), providing 128-bit security against classical
+//!   and quantum adversaries.
 //! - **Constant-time verification**: Uses `subtle::ConstantTimeEq` to
 //!   compare MAC tags, defeating timing side-channel attacks.
 //! - **Separate MAC key**: Domain-separated from the encryption keystream.
-//! - **BLAKE3-keyed MAC**: BLAKE3 in keyed mode is a native PRF-MAC,
-//!   providing 128-bit security against quantum adversaries.
 //!
 //! ## Example
 //!
@@ -44,9 +45,9 @@
 //! assert_eq!(&data, b"Secret message");
 //! ```
 
-use blake3::Hash;
 use hkdf::Hkdf;
 use sha3::Sha3_512;
+use sha3_kmac::Kmac128;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
@@ -56,7 +57,7 @@ use crate::quantum::KelvinQuantum;
 use kelvin_core::OrbitalBody;
 use kelvin_kdf::extract_shake256_into;
 
-/// Size of the BLAKE3-keyed MAC tag in bytes.
+/// Size of the KMAC128 tag in bytes.
 const TAG_LEN: usize = 32;
 
 /// Derive a 32-byte MAC key from the 2048-byte seed using HKDF-SHA512.
@@ -75,6 +76,19 @@ fn derive_mac_key(seed: &[u8; 2048]) -> [u8; 32] {
 /// Extracts 64 bytes of entropy from the initial bodies via SHAKE256, then
 /// expands to a 32-byte MAC key via HKDF-SHA512 with domain separator
 /// `b"kelvin-streaming-mac-key-v1"`.
+///
+/// # Note on `dt`
+///
+/// The `dt` parameter is intentionally excluded from the MAC key derivation.
+/// The MAC key is derived solely from the **initial orbital state** (bodies,
+/// softening, G) which fully determines the chaotic trajectory. The `dt`
+/// parameter is a simulation step size that affects the numerical integration
+/// path but is not a secret — it is part of the shared configuration. Two
+/// configs that differ only in `dt` will produce different ciphertexts
+/// (because `dt` drives the simulation) but the same MAC key, which is
+/// acceptable because the MAC key is derived from the initial state that
+/// both configs share. Including `dt` would add no security benefit since
+/// `dt` is public configuration metadata.
 fn derive_mac_key_from_bodies(
     bodies: &[OrbitalBody],
     _dt: kelvin_core::Fixed,
@@ -100,22 +114,28 @@ fn derive_mac_key_from_bodies(
     mac_key
 }
 
-/// Compute a BLAKE3-keyed MAC tag over `data` using `key`.
-fn compute_tag(key: &[u8; 32], data: &[u8]) -> Hash {
-    blake3::keyed_hash(key, data)
+/// Compute a KMAC128 tag over `data` using `key`.
+///
+/// Uses the empty customization string (domain separation is provided by
+/// the key derivation step, which uses HKDF-SHA512 with distinct domain
+/// separators for each context).
+fn compute_tag(key: &[u8; 32], data: &[u8]) -> [u8; 32] {
+    let mut mac = Kmac128::new(key, b"").expect("KMAC128::new with 32-byte key should never fail");
+    mac.update(data);
+    let mut tag = [0u8; 32];
+    mac.finalize_into(&mut tag);
+    tag
 }
 
-/// Verify `tag` against a freshly computed MAC of `data` using `key`.
+/// Verify `tag` against a freshly computed KMAC128 of `data` using `key`.
 ///
 /// Uses `subtle::ConstantTimeEq` to prevent timing side-channels.
 fn verify_tag(key: &[u8; 32], data: &[u8], tag: &[u8; 32]) -> Result<(), KelvinError> {
     let expected = compute_tag(key, data);
-    if expected.as_bytes().ct_eq(tag).into() {
+    if expected.ct_eq(tag).into() {
         Ok(())
     } else {
-        Err(KelvinError::AuthenticationFailed(
-            "BLAKE3-keyed MAC tag mismatch".to_string(),
-        ))
+        Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".to_string()))
     }
 }
 
@@ -125,13 +145,13 @@ fn verify_tag(key: &[u8; 32], data: &[u8], tag: &[u8; 32]) -> Result<(), KelvinE
 
 /// Authenticated wrapper around [`KelvinPhoton`].
 ///
-/// Appends a 32-byte BLAKE3-keyed MAC tag to the ciphertext on encryption,
-/// and verifies it in constant time before decryption.
+/// Appends a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext on
+/// encryption, and verifies it in constant time before decryption.
 ///
 /// ## Wire Format
 ///
 /// ```text
-/// ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)
+/// ciphertext (N bytes) || KMAC128 tag (32 bytes)
 /// ```
 ///
 /// ## Example
@@ -163,35 +183,32 @@ impl KelvinPhotonAuthenticated {
     /// `max_reseeds` limits the total keystream.
     pub fn new(seed: [u8; 2048], max_reseeds: u64) -> Self {
         let mac_key = derive_mac_key(&seed);
-        KelvinPhotonAuthenticated {
-            inner: KelvinPhoton::new(seed, max_reseeds),
-            mac_key,
-        }
+        KelvinPhotonAuthenticated { inner: KelvinPhoton::new(seed, max_reseeds), mac_key }
     }
 
-    /// Encrypt data in-place and append a 32-byte MAC tag.
+    /// Encrypt data in-place and append a 32-byte KMAC128 tag.
     ///
     /// The input `data` Vec is grown by 32 bytes to accommodate the tag.
     pub fn encrypt(&mut self, data: &mut Vec<u8>) -> Result<(), KelvinError> {
         // Encrypt the plaintext in-place (XOR with keystream)
         self.inner.encrypt(data.as_mut_slice())?;
 
-        // Compute MAC over the ciphertext and append
+        // Compute KMAC128 over the ciphertext and append
         let tag = compute_tag(&self.mac_key, data);
-        data.extend_from_slice(tag.as_bytes());
+        data.extend_from_slice(&tag);
 
         Ok(())
     }
 
-    /// Verify the MAC tag and decrypt data in-place.
+    /// Verify the KMAC128 tag and decrypt data in-place.
     ///
-    /// The last 32 bytes of `data` are treated as the MAC tag. If verification
+    /// The last 32 bytes of `data` are treated as the KMAC128 tag. If verification
     /// fails, `AuthenticationFailed` is returned and `data` is **not** modified.
     /// On success, the tag is stripped and the plaintext remains in `data`.
     pub fn decrypt(&mut self, data: &mut Vec<u8>) -> Result<(), KelvinError> {
         if data.len() < TAG_LEN {
             return Err(KelvinError::AuthenticationFailed(
-                "ciphertext too short to contain MAC tag".to_string(),
+                "ciphertext too short to contain KMAC128 tag".to_string(),
             ));
         }
 
@@ -239,13 +256,13 @@ impl Drop for KelvinPhotonAuthenticated {
 
 /// Authenticated wrapper around [`KelvinQuantum`].
 ///
-/// Appends a 32-byte BLAKE3-keyed MAC tag to the ciphertext on encryption,
+/// Appends a 32-byte KMAC128 tag to the ciphertext on encryption,
 /// and verifies it in constant time before decryption.
 ///
 /// ## Wire Format
 ///
 /// ```text
-/// ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)
+/// ciphertext (N bytes) || KMAC128 tag (32 bytes)
 /// ```
 ///
 /// ## Example
@@ -281,10 +298,7 @@ impl KelvinQuantumAuthenticated {
     /// Panics if the initial keystream cache refill fails (e.g., `max_reseeds` is 0).
     pub fn new(seed: [u8; 2048], max_reseeds: u64) -> Self {
         let mac_key = derive_mac_key(&seed);
-        KelvinQuantumAuthenticated {
-            inner: KelvinQuantum::new(seed, max_reseeds),
-            mac_key,
-        }
+        KelvinQuantumAuthenticated { inner: KelvinQuantum::new(seed, max_reseeds), mac_key }
     }
 
     /// Create a new authenticated Quantum instance with custom configuration.
@@ -308,29 +322,29 @@ impl KelvinQuantumAuthenticated {
         Ok(KelvinQuantumAuthenticated { inner, mac_key })
     }
 
-    /// Encrypt data in-place and append a 32-byte MAC tag.
+    /// Encrypt data in-place and append a 32-byte KMAC128 tag.
     ///
     /// The input `data` Vec is grown by 32 bytes to accommodate the tag.
     pub fn encrypt(&mut self, data: &mut Vec<u8>) -> Result<(), KelvinError> {
         // Encrypt the plaintext in-place (XOR with keystream)
         self.inner.encrypt(data.as_mut_slice())?;
 
-        // Compute MAC over the ciphertext and append
+        // Compute KMAC128 over the ciphertext and append
         let tag = compute_tag(&self.mac_key, data);
-        data.extend_from_slice(tag.as_bytes());
+        data.extend_from_slice(&tag);
 
         Ok(())
     }
 
-    /// Verify the MAC tag and decrypt data in-place.
+    /// Verify the KMAC128 tag and decrypt data in-place.
     ///
-    /// The last 32 bytes of `data` are treated as the MAC tag. If verification
+    /// The last 32 bytes of `data` are treated as the KMAC128 tag. If verification
     /// fails, `AuthenticationFailed` is returned and `data` is **not** modified.
     /// On success, the tag is stripped and the plaintext remains in `data`.
     pub fn decrypt(&mut self, data: &mut Vec<u8>) -> Result<(), KelvinError> {
         if data.len() < TAG_LEN {
             return Err(KelvinError::AuthenticationFailed(
-                "ciphertext too short to contain MAC tag".to_string(),
+                "ciphertext too short to contain KMAC128 tag".to_string(),
             ));
         }
 
@@ -383,7 +397,7 @@ impl Drop for KelvinQuantumAuthenticated {
 
 /// Authenticated wrapper around [`KelvinStreaming`].
 ///
-/// Appends a 32-byte BLAKE3-keyed MAC tag to the ciphertext on encryption,
+/// Appends a 32-byte KMAC128 tag to the ciphertext on encryption,
 /// and verifies it in constant time before decryption.
 ///
 /// ## MAC Key Derivation
@@ -396,7 +410,7 @@ impl Drop for KelvinQuantumAuthenticated {
 /// ## Wire Format
 ///
 /// ```text
-/// ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)
+/// ciphertext (N bytes) || KMAC128 tag (32 bytes)
 /// ```
 ///
 /// ## Example
@@ -441,12 +455,8 @@ impl KelvinStreamingAuthenticated {
         method: crate::IntegrationMethod,
     ) -> Result<Self, KelvinError> {
         // Derive MAC key from the initial orbital state (before simulation)
-        let mac_key = derive_mac_key_from_bodies(
-            &config.bodies,
-            config.dt,
-            config.softening,
-            config.g,
-        );
+        let mac_key =
+            derive_mac_key_from_bodies(&config.bodies, config.dt, config.softening, config.g);
 
         // Create the inner streaming engine
         let inner = crate::KelvinStreaming::new_with_method(config, bytes_per_step, method)?;
@@ -454,29 +464,29 @@ impl KelvinStreamingAuthenticated {
         Ok(KelvinStreamingAuthenticated { inner, mac_key })
     }
 
-    /// Encrypt data in-place and append a 32-byte MAC tag.
+    /// Encrypt data in-place and append a 32-byte KMAC128 tag.
     ///
     /// The input `data` Vec is grown by 32 bytes to accommodate the tag.
     pub fn encrypt(&mut self, data: &mut Vec<u8>) -> Result<(), KelvinError> {
         // Encrypt the plaintext in-place (XOR with keystream)
         self.inner.encrypt(data.as_mut_slice())?;
 
-        // Compute MAC over the ciphertext and append
+        // Compute KMAC128 over the ciphertext and append
         let tag = compute_tag(&self.mac_key, data);
-        data.extend_from_slice(tag.as_bytes());
+        data.extend_from_slice(&tag);
 
         Ok(())
     }
 
-    /// Verify the MAC tag and decrypt data in-place.
+    /// Verify the KMAC128 tag and decrypt data in-place.
     ///
-    /// The last 32 bytes of `data` are treated as the MAC tag. If verification
+    /// The last 32 bytes of `data` are treated as the KMAC128 tag. If verification
     /// fails, `AuthenticationFailed` is returned and `data` is **not** modified.
     /// On success, the tag is stripped and the plaintext remains in `data`.
     pub fn decrypt(&mut self, data: &mut Vec<u8>) -> Result<(), KelvinError> {
         if data.len() < TAG_LEN {
             return Err(KelvinError::AuthenticationFailed(
-                "ciphertext too short to contain MAC tag".to_string(),
+                "ciphertext too short to contain KMAC128 tag".to_string(),
             ));
         }
 
@@ -599,12 +609,9 @@ mod tests {
 
         let mut auth2 = KelvinPhotonAuthenticated::new(test_seed(), 1000);
         let result = auth2.decrypt(&mut data);
-        assert!(
-            result.is_err(),
-            "tampered ciphertext should fail authentication"
-        );
+        assert!(result.is_err(), "tampered ciphertext should fail authentication");
         match result {
-            Err(KelvinError::AuthenticationFailed(_)) => {} // expected
+            Err(KelvinError::AuthenticationFailed(_)) => {}, // expected
             _ => panic!("expected AuthenticationFailed error"),
         }
     }
@@ -621,12 +628,9 @@ mod tests {
 
         let mut auth2 = KelvinPhotonAuthenticated::new(test_seed(), 1000);
         let result = auth2.decrypt(&mut data);
-        assert!(
-            result.is_err(),
-            "tampered tag should fail authentication"
-        );
+        assert!(result.is_err(), "tampered tag should fail authentication");
         match result {
-            Err(KelvinError::AuthenticationFailed(_)) => {} // expected
+            Err(KelvinError::AuthenticationFailed(_)) => {}, // expected
             _ => panic!("expected AuthenticationFailed error"),
         }
     }
@@ -706,7 +710,7 @@ mod tests {
         let result = auth2.decrypt(&mut data);
         assert!(result.is_err(), "tampered ciphertext should fail authentication");
         match result {
-            Err(KelvinError::AuthenticationFailed(_)) => {}
+            Err(KelvinError::AuthenticationFailed(_)) => {},
             _ => panic!("expected AuthenticationFailed error"),
         }
     }
@@ -724,7 +728,7 @@ mod tests {
         let result = auth2.decrypt(&mut data);
         assert!(result.is_err(), "tampered tag should fail authentication");
         match result {
-            Err(KelvinError::AuthenticationFailed(_)) => {}
+            Err(KelvinError::AuthenticationFailed(_)) => {},
             _ => panic!("expected AuthenticationFailed error"),
         }
     }
@@ -786,10 +790,7 @@ mod tests {
             .expect("with_config should succeed");
         let mut data = vec![0u8; 1000];
         auth.encrypt(&mut data).unwrap();
-        assert!(
-            auth.reseed_count() > 0,
-            "should have triggered reseeds with small interval"
-        );
+        assert!(auth.reseed_count() > 0, "should have triggered reseeds with small interval");
     }
 
     #[test]
@@ -836,12 +837,9 @@ mod tests {
         let config2 = test_streaming_config();
         let mut auth2 = KelvinStreamingAuthenticated::new(config2, 64).unwrap();
         let result = auth2.decrypt(&mut data);
-        assert!(
-            result.is_err(),
-            "tampered ciphertext should fail authentication"
-        );
+        assert!(result.is_err(), "tampered ciphertext should fail authentication");
         match result {
-            Err(KelvinError::AuthenticationFailed(_)) => {}
+            Err(KelvinError::AuthenticationFailed(_)) => {},
             _ => panic!("expected AuthenticationFailed error"),
         }
     }
@@ -860,12 +858,9 @@ mod tests {
         let config2 = test_streaming_config();
         let mut auth2 = KelvinStreamingAuthenticated::new(config2, 64).unwrap();
         let result = auth2.decrypt(&mut data);
-        assert!(
-            result.is_err(),
-            "tampered tag should fail authentication"
-        );
+        assert!(result.is_err(), "tampered tag should fail authentication");
         match result {
-            Err(KelvinError::AuthenticationFailed(_)) => {}
+            Err(KelvinError::AuthenticationFailed(_)) => {},
             _ => panic!("expected AuthenticationFailed error"),
         }
     }

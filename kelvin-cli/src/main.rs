@@ -15,9 +15,9 @@
 //! | `photon` (V3) | `KelvinPhoton` | `KelvinPhotonAuthenticated` | HKDF→SHAKE256 XOR |
 //! | `quantum` (H) | `KelvinQuantum` | `KelvinQuantumAuthenticated` | Hybrid cache+XOR + orbital reseed |
 //!
-//! Use `--auth` to append a 32-byte BLAKE3-keyed MAC tag to defeat ciphertext
-//! malleability. The `secure` mode has built-in AEAD authentication and ignores
-//! the `--auth` flag.
+//! Use `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to defeat
+//! ciphertext malleability. The `secure` mode has built-in AEAD authentication
+//! and ignores the `--auth` flag.
 //!
 //! Integration defaults to Euler (faster chaos amplification). Use `--verlet`
 //! for symplectic, energy-conserving integration.
@@ -87,7 +87,7 @@ enum Commands {
         /// Use symplectic Verlet integration instead of default Euler (energy-conserving)
         #[arg(long)]
         verlet: bool,
-        /// Append a 32-byte BLAKE3-keyed MAC tag for authentication (chaos, photon, quantum modes)
+        /// Append a 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
     },
@@ -111,7 +111,7 @@ enum Commands {
         /// Use symplectic Verlet integration instead of default Euler (energy-conserving)
         #[arg(long)]
         verlet: bool,
-        /// Append a 32-byte BLAKE3-keyed MAC tag for authentication (chaos, photon, quantum modes)
+        /// Verify and strip the 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
     },
@@ -162,7 +162,16 @@ fn main() -> Result<()> {
         },
         Commands::Decrypt { mode, config, input, output, bytes_per_step, verlet, auth } => {
             let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
-            process_file_mode(&mode, &config, &input, &output, false, bytes_per_step, method, auth)?;
+            process_file_mode(
+                &mode,
+                &config,
+                &input,
+                &output,
+                false,
+                bytes_per_step,
+                method,
+                auth,
+            )?;
         },
         Commands::Identify { config, all, ecc, kem, fast } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
@@ -331,6 +340,7 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
 }
 
 /// Dispatch to the correct processing function based on mode.
+#[allow(clippy::too_many_arguments)]
 fn process_file_mode(
     mode: &CryptoMode,
     config_path: &str,
@@ -342,10 +352,24 @@ fn process_file_mode(
     auth: bool,
 ) -> Result<()> {
     match mode {
-        CryptoMode::Secure => process_file_secure(config_path, input_path, output_path, encrypt, method),
-        CryptoMode::Chaos => process_file_chaos(config_path, input_path, output_path, encrypt, bytes_per_step, method, auth),
-        CryptoMode::Photon => process_file_photon(config_path, input_path, output_path, encrypt, method, auth),
-        CryptoMode::Quantum => process_file_quantum(config_path, input_path, output_path, encrypt, method, auth),
+        CryptoMode::Secure => {
+            process_file_secure(config_path, input_path, output_path, encrypt, method)
+        },
+        CryptoMode::Chaos => process_file_chaos(
+            config_path,
+            input_path,
+            output_path,
+            encrypt,
+            bytes_per_step,
+            method,
+            auth,
+        ),
+        CryptoMode::Photon => {
+            process_file_photon(config_path, input_path, output_path, encrypt, method, auth)
+        },
+        CryptoMode::Quantum => {
+            process_file_quantum(config_path, input_path, output_path, encrypt, method, auth)
+        },
     }
 }
 
@@ -361,7 +385,10 @@ fn process_file_secure(
     let config = OrbitalConfig::from_json(&config_json)?;
 
     let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
-    println!("Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...", method_label);
+    println!(
+        "Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...",
+        method_label
+    );
     let mut k = Kelvin::new_with_method(config, method).context("Failed to initialize Kelvin")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
@@ -397,7 +424,7 @@ fn process_file_secure(
 /// V2 Chaos: Per-step SHAKE256 XOR streaming.
 ///
 /// When `auth` is true, uses [`KelvinStreamingAuthenticated`] to append a
-/// 32-byte BLAKE3-keyed MAC tag to defeat ciphertext malleability.
+/// 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability.
 fn process_file_chaos(
     config_path: &str,
     input_path: &str,
@@ -411,18 +438,27 @@ fn process_file_chaos(
     let config = OrbitalConfig::from_json(&config_json)?;
 
     let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
-    let auth_label = if auth { " + BLAKE3 MAC" } else { "" };
-    println!("Initializing Kelvin Chaos (V2, {} integration, instant setup{})...", method_label, auth_label);
+    let auth_label = if auth { " + KMAC128" } else { "" };
+    println!(
+        "Initializing Kelvin Chaos (V2, {} integration, instant setup{})...",
+        method_label, auth_label
+    );
 
     if auth {
         let mut ks = KelvinStreamingAuthenticated::new_with_method(config, bytes_per_step, method)
             .context("Failed to initialize KelvinStreamingAuthenticated")?;
 
         let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
-        let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
+        let mut output_file =
+            fs::File::create(output_path).context("Failed to create output file")?;
 
-        println!("Processing (SHAKE256 XOR + BLAKE3 MAC)...");
-        let mut buffer = vec![0u8; 64 * 1024];
+        println!("Processing (SHAKE256 XOR + KMAC128)...");
+        let chunk_size = 64 * 1024;
+        // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
+        // During decryption, we need to read ciphertext + tag in one shot.
+        let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
+        let mut buffer = vec![0u8; read_size];
+        let mut chunk = Vec::with_capacity(chunk_size + 32);
         let mut total_processed = 0u64;
         loop {
             let bytes_read = input_file.read(&mut buffer)?;
@@ -430,7 +466,8 @@ fn process_file_chaos(
                 break;
             }
 
-            let mut chunk = buffer[..bytes_read].to_vec();
+            chunk.clear();
+            chunk.extend_from_slice(&buffer[..bytes_read]);
             if encrypt {
                 ks.encrypt(&mut chunk)?;
             } else {
@@ -451,9 +488,7 @@ fn process_file_chaos(
         .context("Failed to initialize KelvinStreaming")?;
 
     let rate = ks.benchmark(100);
-    let file_size = fs::metadata(input_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let file_size = fs::metadata(input_path).map(|m| m.len()).unwrap_or(0);
     let (steps_needed, est_secs) = ks.estimate_time(file_size, rate);
     if file_size > 0 {
         println!("Estimated: {} steps, ~{:.1}s ({:.0} steps/sec)", steps_needed, est_secs, rate);
@@ -492,7 +527,7 @@ fn process_file_chaos(
 /// V3 Photon: Fast HKDF→SHAKE256 XOR OTP from upfront simulation.
 ///
 /// When `auth` is true, uses [`KelvinPhotonAuthenticated`] to append a
-/// 32-byte BLAKE3-keyed MAC tag to defeat ciphertext malleability.
+/// 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability.
 fn process_file_photon(
     config_path: &str,
     input_path: &str,
@@ -505,20 +540,28 @@ fn process_file_photon(
     let config = OrbitalConfig::from_json(&config_json)?;
 
     let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
-    let auth_label = if auth { " + BLAKE3 MAC" } else { "" };
-    println!("Initializing Kelvin Photon (V3, {} integration, running orbital simulation{})...", method_label, auth_label);
+    let auth_label = if auth { " + KMAC128" } else { "" };
+    println!(
+        "Initializing Kelvin Photon (V3, {} integration, running orbital simulation{})...",
+        method_label, auth_label
+    );
     let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
         .context("Failed to run orbital simulation")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
 
-    let cipher_label = if auth { "HKDF→SHAKE256 XOR + BLAKE3 MAC" } else { "HKDF→SHAKE256 XOR" };
+    let cipher_label = if auth { "HKDF→SHAKE256 XOR + KMAC128" } else { "HKDF→SHAKE256 XOR" };
     println!("Processing ({})...", cipher_label);
 
     if auth {
         let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
-        let mut buffer = vec![0u8; 64 * 1024];
+        let chunk_size = 64 * 1024;
+        // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
+        // During decryption, we need to read ciphertext + tag in one shot.
+        let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
+        let mut buffer = vec![0u8; read_size];
+        let mut chunk = Vec::with_capacity(chunk_size + 32);
         let mut total_processed = 0u64;
         loop {
             let bytes_read = input_file.read(&mut buffer)?;
@@ -526,7 +569,8 @@ fn process_file_photon(
                 break;
             }
 
-            let mut chunk = buffer[..bytes_read].to_vec();
+            chunk.clear();
+            chunk.extend_from_slice(&buffer[..bytes_read]);
             if encrypt {
                 photon.encrypt(&mut chunk)?;
             } else {
@@ -573,7 +617,7 @@ fn process_file_photon(
 /// H Quantum: Hybrid V3 bulk speed + V2 orbital entropy reseed.
 ///
 /// When `auth` is true, uses [`KelvinQuantumAuthenticated`] to append a
-/// 32-byte BLAKE3-keyed MAC tag to defeat ciphertext malleability.
+/// 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability.
 fn process_file_quantum(
     config_path: &str,
     input_path: &str,
@@ -586,21 +630,39 @@ fn process_file_quantum(
     let config = OrbitalConfig::from_json(&config_json)?;
 
     let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
-    let auth_label = if auth { " + BLAKE3 MAC" } else { "" };
-    println!("Initializing Kelvin Quantum (H, {} integration, running orbital simulation{})...", method_label, auth_label);
+    let auth_label = if auth { " + KMAC128" } else { "" };
+    println!(
+        "Initializing Kelvin Quantum (H, {} integration, running orbital simulation{})...",
+        method_label, auth_label
+    );
     let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
         .context("Failed to run orbital simulation")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
 
-    let cipher_label = if auth { "Hybrid cache+XOR + orbital reseed + BLAKE3 MAC" } else { "Hybrid cache+XOR + orbital reseed" };
+    let cipher_label = if auth {
+        "Hybrid cache+XOR + orbital reseed + KMAC128"
+    } else {
+        "Hybrid cache+XOR + orbital reseed"
+    };
     println!("Processing ({})...", cipher_label);
 
     if auth {
-        let mut quantum = KelvinQuantumAuthenticated::with_config(seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024)
-            .context("Failed to initialize KelvinQuantumAuthenticated")?;
-        let mut buffer = vec![0u8; 64 * 1024];
+        let mut quantum = KelvinQuantumAuthenticated::with_config(
+            seed,
+            100_000,
+            1024 * 1024,
+            10_000,
+            10 * 1024 * 1024,
+        )
+        .context("Failed to initialize KelvinQuantumAuthenticated")?;
+        let chunk_size = 64 * 1024;
+        // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
+        // During decryption, we need to read ciphertext + tag in one shot.
+        let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
+        let mut buffer = vec![0u8; read_size];
+        let mut chunk = Vec::with_capacity(chunk_size + 32);
         let mut total_processed = 0u64;
         loop {
             let bytes_read = input_file.read(&mut buffer)?;
@@ -608,7 +670,8 @@ fn process_file_quantum(
                 break;
             }
 
-            let mut chunk = buffer[..bytes_read].to_vec();
+            chunk.clear();
+            chunk.extend_from_slice(&buffer[..bytes_read]);
             if encrypt {
                 quantum.encrypt(&mut chunk)?;
             } else {
@@ -625,8 +688,9 @@ fn process_file_quantum(
         return Ok(());
     }
 
-    let mut quantum = KelvinQuantum::with_config(seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024)
-        .context("Failed to initialize KelvinQuantum")?;
+    let mut quantum =
+        KelvinQuantum::with_config(seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024)
+            .context("Failed to initialize KelvinQuantum")?;
 
     let mut buffer = vec![0u8; 64 * 1024];
     let mut total_processed = 0u64;

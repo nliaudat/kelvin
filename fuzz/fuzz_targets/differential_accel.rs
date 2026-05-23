@@ -14,8 +14,8 @@
 //! Run with: `cargo test -p kelvin-fuzz --test differential_accel`
 //! Heavy run: `PROPTEST_CASES=100000 cargo test -p kelvin-fuzz --test differential_accel`
 
-use proptest::prelude::*;
 use kelvin_core::{Fixed, OrbitalBody, Vec3};
+use proptest::prelude::*;
 
 /// Convert a Fixed value to f64 for comparison.
 fn fixed_to_f64(v: Fixed) -> f64 {
@@ -35,7 +35,7 @@ fn f64_to_fixed(v: f64) -> Fixed {
 
 /// f64 reimplementation of compute_accelerations matching the Fixed version.
 fn compute_accelerations_f64(
-    bodies: &[[f64; 3]; 5],  // positions
+    bodies: &[[f64; 3]; 5], // positions
     masses: &[f64; 5],
     softening: f64,
     g: f64,

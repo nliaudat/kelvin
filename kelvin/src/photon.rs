@@ -81,12 +81,7 @@ impl KelvinPhoton {
     /// `max_reseeds` limits the total keystream (each reseed produces ~16KB
     /// of HKDF output, which seeds unlimited SHAKE256 keystream).
     pub fn new(seed: [u8; 2048], max_reseeds: u64) -> Self {
-        KelvinPhoton {
-            seed,
-            reseed_count: 0,
-            max_reseeds,
-            bytes_processed: 0,
-        }
+        KelvinPhoton { seed, reseed_count: 0, max_reseeds, bytes_processed: 0 }
     }
 
     /// Maximum chunk size for keystream generation (1 MB).
@@ -112,8 +107,7 @@ impl KelvinPhoton {
         info.extend_from_slice(b"kelvin-photon-keystream-v1");
         info.extend_from_slice(&self.reseed_count.to_le_bytes());
 
-        hk.expand(&info, &mut xof_seed)
-            .map_err(|_| KelvinError::SeedExhausted)?;
+        hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
 
         // SHAKE256 XOF: produce keystream directly into output buffer.
         //
@@ -183,7 +177,6 @@ impl KelvinPhoton {
         self.bytes_processed += data.len() as u64;
         Ok(())
     }
-
 
     /// Decrypt data in-place (same as encrypt, XOR is its own inverse).
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {

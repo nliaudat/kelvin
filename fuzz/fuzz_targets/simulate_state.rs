@@ -12,8 +12,8 @@
 //! Run with: `cargo test -p kelvin-fuzz --test simulate_state`
 //! Heavy run: `PROPTEST_CASES=100000 cargo test -p kelvin-fuzz --test simulate_state`
 
-use proptest::prelude::*;
 use kelvin_kdf::OrbitalState;
+use proptest::prelude::*;
 
 /// Maximum steps to simulate in a single fuzz iteration.
 /// Kept low to avoid long-running tests while still probing edge cases.

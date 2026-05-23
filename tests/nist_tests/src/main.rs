@@ -12,9 +12,9 @@
 use std::fs::File;
 use std::io::Write;
 
+use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 use nistrs::prelude::*;
 use nistrs::BitsData;
-use kelvin_core::{Fixed, Vec3, OrbitalBody, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 
 fn main() {
     println!("=== NIST SP 800-22 Statistical Test Suite for Kelvin ===\n");
@@ -79,14 +79,7 @@ fn main() {
     // ── Summary ────────────────────────────────────────────────────────────
     println!();
     println!("=== Summary ===");
-    let labels = [
-        "V1 Verlet",
-        "V1 Euler",
-        "V2 Verlet",
-        "V2 Euler",
-        "V3 Photon",
-        "H Quantum",
-    ];
+    let labels = ["V1 Verlet", "V1 Euler", "V2 Verlet", "V2 Euler", "V3 Photon", "H Quantum"];
     for (i, label) in labels.iter().enumerate() {
         let status = if all_passed[i] == all_total[i] { "✅" } else { "⚠️" };
         println!("  {}: {}/{} {}", label, all_passed[i], all_total[i], status);
@@ -113,15 +106,19 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
     total += 1;
     let (ok, p) = frequency_test(data);
     print_result("Frequency (Monobit) Test", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 2. Frequency Test within a Block
     total += 1;
     match block_frequency_test(data, 128) {
         Ok((ok, p)) => {
             print_result("Block Frequency Test (M=128)", ok, p);
-            if ok { passed += 1; }
-        }
+            if ok {
+                passed += 1;
+            }
+        },
         Err(e) => println!("  [FAIL] Block Frequency Test: {}", e),
     }
 
@@ -129,15 +126,19 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
     total += 1;
     let (ok, p) = runs_test(data);
     print_result("Runs Test", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 4. Longest Run of Ones in a Block
     total += 1;
     match longest_run_of_ones_test(data) {
         Ok((ok, p)) => {
             print_result("Longest Run of Ones Test", ok, p);
-            if ok { passed += 1; }
-        }
+            if ok {
+                passed += 1;
+            }
+        },
         Err(e) => println!("  [FAIL] Longest Run of Ones Test: {}", e),
     }
 
@@ -146,8 +147,10 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
     match rank_test(data) {
         Ok((ok, p)) => {
             print_result("Binary Matrix Rank Test", ok, p);
-            if ok { passed += 1; }
-        }
+            if ok {
+                passed += 1;
+            }
+        },
         Err(e) => println!("  [FAIL] Binary Matrix Rank Test: {}", e),
     }
 
@@ -155,7 +158,9 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
     total += 1;
     let (ok, p) = fft_test(data);
     print_result("Discrete Fourier Transform Test", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 7. Non-overlapping Template Matching
     total += 1;
@@ -168,58 +173,78 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
                 if ok { "PASS" } else { "FAIL" },
                 results.len(),
                 pass_rate * 100.0);
-            if ok { passed += 1; }
-        }
+            if ok {
+                passed += 1;
+            }
+        },
         Err(e) => {
             println!("  [FAIL] Non-overlapping Template Matching Test: {}", e);
-        }
+        },
     }
 
     // 8. Overlapping Template Matching
     total += 1;
     let (ok, p) = overlapping_template_test(data, 9);
     print_result("Overlapping Template Matching Test", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 9. Maurer's Universal Statistical Test
     total += 1;
     let (ok, p) = universal_test(data);
     print_result("Maurer's Universal Statistical Test", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 10. Linear Complexity Test
     total += 1;
     let (ok, p) = linear_complexity_test(data, 500);
     print_result("Linear Complexity Test", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 11. Serial Test
     total += 1;
     let results = serial_test(data, 16);
     let ok = results.len() >= 2 && results[0].0 && results[1].0;
-    let del1_p = if results.len() >= 1 { results[0].1 } else { 0.0 };
+    let del1_p = if !results.is_empty() { results[0].1 } else { 0.0 };
     let del2_p = if results.len() >= 2 { results[1].1 } else { 0.0 };
-    println!("  [{}] Serial Test (m=16) — del1_p={:.6}, del2_p={:.6}",
+    println!(
+        "  [{}] Serial Test (m=16) — del1_p={:.6}, del2_p={:.6}",
         if ok { "PASS" } else { "FAIL" },
-        del1_p, del2_p);
-    if ok { passed += 1; }
+        del1_p,
+        del2_p
+    );
+    if ok {
+        passed += 1;
+    }
 
     // 12. Approximate Entropy Test
     total += 1;
     let (ok, p) = approximate_entropy_test(data, 2);
     print_result("Approximate Entropy Test (m=2)", ok, p);
-    if ok { passed += 1; }
+    if ok {
+        passed += 1;
+    }
 
     // 13. Cumulative Sums (Cusum) Test
     total += 1;
     let results = cumulative_sums_test(data);
     let ok = results.len() >= 2 && results[0].0 && results[1].0;
-    let forward_p = if results.len() >= 1 { results[0].1 } else { 0.0 };
+    let forward_p = if !results.is_empty() { results[0].1 } else { 0.0 };
     let reverse_p = if results.len() >= 2 { results[1].1 } else { 0.0 };
-    println!("  [{}] Cumulative Sums Test — forward_p={:.6}, reverse_p={:.6}",
+    println!(
+        "  [{}] Cumulative Sums Test — forward_p={:.6}, reverse_p={:.6}",
         if ok { "PASS" } else { "FAIL" },
-        forward_p, reverse_p);
-    if ok { passed += 1; }
+        forward_p,
+        reverse_p
+    );
+    if ok {
+        passed += 1;
+    }
 
     // 14. Random Excursions Test
     total += 1;
@@ -227,13 +252,18 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
         Ok(results) => {
             let ok = results.iter().all(|(ok, _)| *ok);
             let min_p = results.iter().map(|(_, p)| *p).fold(1.0f64, f64::min);
-            println!("  [{}] Random Excursions Test — min_p={:.6}",
-                if ok { "PASS" } else { "FAIL" }, min_p);
-            if ok { passed += 1; }
-        }
+            println!(
+                "  [{}] Random Excursions Test — min_p={:.6}",
+                if ok { "PASS" } else { "FAIL" },
+                min_p
+            );
+            if ok {
+                passed += 1;
+            }
+        },
         Err(e) => {
             println!("  [FAIL] Random Excursions Test: {}", e);
-        }
+        },
     }
 
     // 15. Random Excursions Variant Test
@@ -242,13 +272,18 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
         Ok(results) => {
             let ok = results.iter().all(|(ok, _)| *ok);
             let min_p = results.iter().map(|(_, p)| *p).fold(1.0f64, f64::min);
-            println!("  [{}] Random Excursions Variant Test — min_p={:.6}",
-                if ok { "PASS" } else { "FAIL" }, min_p);
-            if ok { passed += 1; }
-        }
+            println!(
+                "  [{}] Random Excursions Variant Test — min_p={:.6}",
+                if ok { "PASS" } else { "FAIL" },
+                min_p
+            );
+            if ok {
+                passed += 1;
+            }
+        },
         Err(e) => {
             println!("  [FAIL] Random Excursions Variant Test: {}", e);
-        }
+        },
     }
 
     println!();
@@ -264,8 +299,7 @@ fn run_all_tests(data: &BitsData) -> (u32, u32) {
 
 /// Print a single test result with its p-value.
 fn print_result(name: &str, ok: bool, p: f64) {
-    println!("  [{}] {} — p={:.6}",
-        if ok { "PASS" } else { "FAIL" }, name, p);
+    println!("  [{}] {} — p={:.6}", if ok { "PASS" } else { "FAIL" }, name, p);
 }
 
 // ── Base seed generation ─────────────────────────────────────────────────────
@@ -275,14 +309,8 @@ fn generate_base_seed() -> ([u8; 2048], Vec<OrbitalBody>) {
     use kelvin::OrbitalConfig;
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(
-        bodies,
-        1000,
-        10,
-        DEFAULT_DT,
-        SOFTENING_FACTOR,
-        DEFAULT_G,
-    ).expect("Failed to create config");
+    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .expect("Failed to create config");
 
     kelvin::simulate_and_extract_seed(&config).expect("Failed to extract seed")
 }
@@ -315,17 +343,11 @@ fn default_bodies() -> Vec<OrbitalBody> {
 // ── V1 Secure: ChaCha20Poly1305 AEAD ─────────────────────────────────────────
 
 fn generate_v1_keystream_verlet() -> Vec<u8> {
-    use kelvin::{Kelvin, OrbitalConfig, IntegrationMethod};
+    use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(
-        bodies,
-        1000,
-        10,
-        DEFAULT_DT,
-        SOFTENING_FACTOR,
-        DEFAULT_G,
-    ).expect("Failed to create config");
+    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .expect("Failed to create config");
 
     let mut kelvin = Kelvin::new_with_method(config, IntegrationMethod::Verlet)
         .expect("Failed to initialize Kelvin");
@@ -336,18 +358,12 @@ fn generate_v1_keystream_verlet() -> Vec<u8> {
 }
 
 fn generate_v1_keystream_euler() -> Vec<u8> {
-    use kelvin::{Kelvin, OrbitalConfig, IntegrationMethod};
+    use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
     // Use a more stable Euler configuration: fewer steps, smaller dt
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(
-        bodies,
-        500,
-        5,
-        DEFAULT_DT,
-        SOFTENING_FACTOR,
-        DEFAULT_G,
-    ).expect("Failed to create config");
+    let config = OrbitalConfig::new(bodies, 500, 5, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .expect("Failed to create config");
 
     let mut kelvin = Kelvin::new_with_method(config, IntegrationMethod::Euler)
         .expect("Failed to initialize Kelvin");
@@ -363,17 +379,11 @@ fn generate_v2_keystream_verlet() -> Vec<u8> {
     use kelvin::{KelvinStreaming, OrbitalConfig};
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(
-        bodies,
-        1000,
-        10,
-        DEFAULT_DT,
-        SOFTENING_FACTOR,
-        DEFAULT_G,
-    ).expect("Failed to create config");
+    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .expect("Failed to create config");
 
-    let mut ks = KelvinStreaming::new(config, 1_048_576)
-        .expect("Failed to initialize KelvinStreaming");
+    let mut ks =
+        KelvinStreaming::new(config, 1_048_576).expect("Failed to initialize KelvinStreaming");
 
     let mut data = vec![0u8; 1_048_576];
     ks.encrypt(&mut data).expect("Failed to encrypt");
@@ -381,18 +391,12 @@ fn generate_v2_keystream_verlet() -> Vec<u8> {
 }
 
 fn generate_v2_keystream_euler() -> Vec<u8> {
-    use kelvin::{KelvinStreaming, OrbitalConfig, IntegrationMethod};
+    use kelvin::{IntegrationMethod, KelvinStreaming, OrbitalConfig};
 
     // Use a more stable Euler configuration: fewer steps, smaller dt
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(
-        bodies,
-        500,
-        5,
-        DEFAULT_DT,
-        SOFTENING_FACTOR,
-        DEFAULT_G,
-    ).expect("Failed to create config");
+    let config = OrbitalConfig::new(bodies, 500, 5, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .expect("Failed to create config");
 
     let mut ks = KelvinStreaming::new_with_method(config, 1_048_576, IntegrationMethod::Euler)
         .expect("Failed to initialize KelvinStreaming");

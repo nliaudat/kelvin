@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 //! Entropy Analysis and SP 800-90B Health Tests for Kelvin Cryptosystem
 //!
 //! Two modes:
@@ -42,36 +44,30 @@ fn parse_args() -> Args {
                 if i < args.len() {
                     num_keys = args[i].parse().unwrap_or(100);
                 }
-            }
+            },
             "--level" => {
                 i += 1;
                 if i < args.len() {
                     level = args[i].clone();
                 }
-            }
+            },
             "--dir" => {
                 i += 1;
                 if i < args.len() {
                     dir = args[i].clone();
                 }
-            }
+            },
             "--output" | "-o" => {
                 i += 1;
                 if i < args.len() {
                     output = Some(args[i].clone());
                 }
-            }
-            _ => {}
+            },
+            _ => {},
         }
         i += 1;
     }
-    Args {
-        keystream,
-        num_keys,
-        level,
-        dir,
-        output,
-    }
+    Args { keystream, num_keys, level, dir, output }
 }
 
 // ── Keystream generation ──────────────────────────────────────────────────────
@@ -102,7 +98,7 @@ fn default_bodies() -> Vec<OrbitalBody> {
 }
 
 fn generate_keystream() -> Vec<u8> {
-    use kelvin::{Kelvin, OrbitalConfig, IntegrationMethod};
+    use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
     let bodies = default_bodies();
     let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
@@ -304,10 +300,10 @@ fn analyze_keystream() -> String {
     let mut out = String::new();
 
     out.push_str(&format!("\n{:=^60}\n", ""));
-    out.push_str(&format!(" KEYSTREAM STATISTICAL ANALYSIS\n"));
+    out.push_str(" KEYSTREAM STATISTICAL ANALYSIS\n");
     out.push_str(&format!("{:=^60}\n", ""));
 
-    out.push_str(&format!("\nGenerating 1MB keystream via Kelvin (V1 Verlet)...\n"));
+    out.push_str("\nGenerating 1MB keystream via Kelvin (V1 Verlet)...\n");
     let keystream = generate_keystream();
     out.push_str(&format!("  Keystream size: {} bytes\n", keystream.len()));
 
@@ -342,10 +338,13 @@ fn analyze_keystream() -> String {
     let max_count = *counts.iter().max().unwrap_or(&0);
     let expected = keystream.len() as f64 / 256.0;
     let missing: usize = counts.iter().filter(|&&c| c == 0).count();
-    let chi_square: f64 = counts.iter().map(|&c| {
-        let diff = c as f64 - expected;
-        diff * diff / expected
-    }).sum();
+    let chi_square: f64 = counts
+        .iter()
+        .map(|&c| {
+            let diff = c as f64 - expected;
+            diff * diff / expected
+        })
+        .sum();
     out.push_str(&format!(
         "  Byte value distribution: min={}, max={}, expected={:.0}, χ²={:.1}\n",
         min_count, max_count, expected, chi_square
@@ -355,7 +354,10 @@ fn analyze_keystream() -> String {
     } else if chi_square < 310.0 {
         out.push_str(&format!("  [PASS] Chi-square = {:.1} (critical: 310, df=255)\n", chi_square));
     } else {
-        out.push_str(&format!("  [FAIL] Chi-square = {:.1} exceeds critical value 310\n", chi_square));
+        out.push_str(&format!(
+            "  [FAIL] Chi-square = {:.1} exceeds critical value 310\n",
+            chi_square
+        ));
     }
 
     // ── SP 800-90B Entropy Health Tests ────────────────────────────────────
@@ -403,13 +405,13 @@ fn analyze_keystream() -> String {
     let dist_pass = missing == 0 && chi_square < 310.0;
 
     let results = [
-        ("Shannon Entropy",        shannon_pass,  format!("{:.4} bits/byte", shannon)),
-        ("Correlation",            corr_pass,     format!("{:.6}", corr)),
-        ("Byte Distribution",      dist_pass,     format!("min={}, max={}", min_count, max_count)),
-        ("Repetition Test",        rep_pass,      format!("max {} consecutive", max_cons)),
-        ("Adaptive Proportion",    apt_pass,      format!("worst {}/512", worst_count)),
-        ("Runs Test",              runs_pass,     format!("{} runs", runs)),
-        ("Longest Run Test",       longest_pass,  format!("longest {} bits", longest)),
+        ("Shannon Entropy", shannon_pass, format!("{:.4} bits/byte", shannon)),
+        ("Correlation", corr_pass, format!("{:.6}", corr)),
+        ("Byte Distribution", dist_pass, format!("min={}, max={}", min_count, max_count)),
+        ("Repetition Test", rep_pass, format!("max {} consecutive", max_cons)),
+        ("Adaptive Proportion", apt_pass, format!("worst {}/512", worst_count)),
+        ("Runs Test", runs_pass, format!("{} runs", runs)),
+        ("Longest Run Test", longest_pass, format!("longest {} bits", longest)),
     ];
 
     let passed = results.iter().filter(|(_, ok, _)| *ok).count();
@@ -418,9 +420,20 @@ fn analyze_keystream() -> String {
     out.push_str("\n  ── Summary ──\n");
     for (name, ok, detail) in &results {
         let icon = if *ok { "✓" } else { "✗" };
-        out.push_str(&format!("  {} {}: {} [{}]\n", icon, name, detail, if *ok { "PASS" } else { "FAIL" }));
+        out.push_str(&format!(
+            "  {} {}: {} [{}]\n",
+            icon,
+            name,
+            detail,
+            if *ok { "PASS" } else { "FAIL" }
+        ));
     }
-    out.push_str(&format!("  Result: {}/{} tests passed {}\n", passed, total, if passed == total { "✅" } else { "⚠️" }));
+    out.push_str(&format!(
+        "  Result: {}/{} tests passed {}\n",
+        passed,
+        total,
+        if passed == total { "✅" } else { "⚠️" }
+    ));
 
     out
 }
@@ -465,14 +478,14 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             Err(e) => {
                 eprintln!("  [WARN] Could not read {}: {}", path, e);
                 continue;
-            }
+            },
         };
         let key_data: KeyData = match serde_json::from_str(&content) {
             Ok(k) => k,
             Err(e) => {
                 eprintln!("  [WARN] Could not parse {}: {}", path, e);
                 continue;
-            }
+            },
         };
 
         if key_data.bodies.is_empty() {
@@ -497,7 +510,10 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             0
         } else {
             let mut sorted: Vec<&T> = values.iter().collect();
-            sorted.sort_by(|a, b| a.partial_cmp(b).expect("Incomparable values (e.g. NaN) detected during entropy analysis"));
+            sorted.sort_by(|a, b| {
+                a.partial_cmp(b)
+                    .expect("Incomparable values (e.g. NaN) detected during entropy analysis")
+            });
             let mut count = 1;
             for i in 1..n {
                 if sorted[i] != sorted[i - 1] {
@@ -507,11 +523,7 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
             count
         };
 
-        let empirical_bits = if unique_count > 0 {
-            (unique_count as f64).log2()
-        } else {
-            0.0
-        };
+        let empirical_bits = if unique_count > 0 { (unique_count as f64).log2() } else { 0.0 };
         s.push_str(&format!("\n[ {} ]\n", label));
         s.push_str(&format!("  Samples:    {}\n", n));
         s.push_str(&format!(
@@ -555,11 +567,71 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
     let coll_ok = duplicates == 0;
 
     let key_results = [
-        ("Sun Mass",      sun_ok,    format!("{} samples, {} unique ({}%)", sun_masses.len(), sun_unique, if sun_masses.is_empty() { 0 } else { (sun_unique as f64 / sun_masses.len() as f64 * 100.0) as usize })),
-        ("Planet Masses", planet_ok, format!("{} samples, {} unique ({}%)", planet_masses.len(), planet_unique, if planet_masses.is_empty() { 0 } else { (planet_unique as f64 / planet_masses.len() as f64 * 100.0) as usize })),
-        ("Positions",     pos_ok,    format!("{} samples, {} unique ({}%)", positions.len(), pos_unique, if positions.is_empty() { 0 } else { (pos_unique as f64 / positions.len() as f64 * 100.0) as usize })),
-        ("Velocities",    vel_ok,    format!("{} samples, {} unique ({}%)", velocities.len(), vel_unique, if velocities.is_empty() { 0 } else { (vel_unique as f64 / velocities.len() as f64 * 100.0) as usize })),
-        ("Collisions",    coll_ok,   if coll_ok { "none detected".to_string() } else { format!("{} collisions", duplicates) }),
+        (
+            "Sun Mass",
+            sun_ok,
+            format!(
+                "{} samples, {} unique ({}%)",
+                sun_masses.len(),
+                sun_unique,
+                if sun_masses.is_empty() {
+                    0
+                } else {
+                    (sun_unique as f64 / sun_masses.len() as f64 * 100.0) as usize
+                }
+            ),
+        ),
+        (
+            "Planet Masses",
+            planet_ok,
+            format!(
+                "{} samples, {} unique ({}%)",
+                planet_masses.len(),
+                planet_unique,
+                if planet_masses.is_empty() {
+                    0
+                } else {
+                    (planet_unique as f64 / planet_masses.len() as f64 * 100.0) as usize
+                }
+            ),
+        ),
+        (
+            "Positions",
+            pos_ok,
+            format!(
+                "{} samples, {} unique ({}%)",
+                positions.len(),
+                pos_unique,
+                if positions.is_empty() {
+                    0
+                } else {
+                    (pos_unique as f64 / positions.len() as f64 * 100.0) as usize
+                }
+            ),
+        ),
+        (
+            "Velocities",
+            vel_ok,
+            format!(
+                "{} samples, {} unique ({}%)",
+                velocities.len(),
+                vel_unique,
+                if velocities.is_empty() {
+                    0
+                } else {
+                    (vel_unique as f64 / velocities.len() as f64 * 100.0) as usize
+                }
+            ),
+        ),
+        (
+            "Collisions",
+            coll_ok,
+            if coll_ok {
+                "none detected".to_string()
+            } else {
+                format!("{} collisions", duplicates)
+            },
+        ),
     ];
 
     let key_passed = key_results.iter().filter(|(_, ok, _)| *ok).count();
@@ -569,9 +641,20 @@ fn analyze_key_entropy(dir: &str, num_keys: usize) -> String {
     out.push_str(&format!("  Mode: Key Entropy Analysis ({} keys)\n", num_keys));
     for (name, ok, detail) in &key_results {
         let icon = if *ok { "✓" } else { "✗" };
-        out.push_str(&format!("    {} {}: {} [{}]\n", icon, name, detail, if *ok { "PASS" } else { "FAIL" }));
+        out.push_str(&format!(
+            "    {} {}: {} [{}]\n",
+            icon,
+            name,
+            detail,
+            if *ok { "PASS" } else { "FAIL" }
+        ));
     }
-    out.push_str(&format!("  Result: {}/{} checks passed {}\n", key_passed, key_total, if key_passed == key_total { "✅" } else { "⚠️" }));
+    out.push_str(&format!(
+        "  Result: {}/{} checks passed {}\n",
+        key_passed,
+        key_total,
+        if key_passed == key_total { "✅" } else { "⚠️" }
+    ));
 
     out
 }
@@ -613,10 +696,7 @@ fn main() {
             fs::create_dir_all(dir).expect("Failed to create output directory");
         }
 
-        println!(
-            "Starting generation of {} keys (Level: {})...",
-            args.num_keys, args.level
-        );
+        println!("Starting generation of {} keys (Level: {})...", args.num_keys, args.level);
         for i in 0..args.num_keys {
             if i > 0 && i % 50 == 0 {
                 println!("  ... {}/{} complete", i, args.num_keys);

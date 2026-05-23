@@ -92,7 +92,7 @@ Kelvin provides four cryptographic modes, each optimized for different use cases
 | **Cipher** | ChaCha20Poly1305 AEAD | SHAKE256 XOR per-step | HKDF→SHAKE256 XOR | Hybrid cache+XOR + orbital reseed |
 | **Authentication** | ✅ Built-in AEAD | ❌ XOR only (add `--auth`) | ❌ XOR only (add `--auth`) | ❌ XOR only (add `--auth`) |
 | **Authenticated engine** | N/A (AEAD built-in) | `KelvinStreamingAuthenticated` | `KelvinPhotonAuthenticated` | `KelvinQuantumAuthenticated` |
-| **Auth method** | ChaCha20Poly1305 tag | BLAKE3-keyed MAC (32-byte tag) | BLAKE3-keyed MAC (32-byte tag) | BLAKE3-keyed MAC (32-byte tag) |
+| **Auth method** | ChaCha20Poly1305 tag | KMAC128 tag (32 bytes, NIST SP 800-185) | KMAC128 tag (32 bytes, NIST SP 800-185) | KMAC128 tag (32 bytes, NIST SP 800-185) |
 | **Keystream** | Finite (~28 GiB) | ✅ Unlimited | Finite (key schedule bound) | ✅ Effectively unlimited |
 | **Setup time** | Seconds–minutes | Instant | Seconds–minutes | Seconds–minutes |
 | **First byte** | After setup | Milliseconds | After setup | After setup |
@@ -104,7 +104,7 @@ Kelvin provides four cryptographic modes, each optimized for different use cases
 
 > **Note:** All modes use the same `OrbitalConfig` shared secret. The integration method (Verlet/Euler) must match between encryption and decryption.
 >
-> **Authentication:** Append `--auth` to encrypt/decrypt commands for chaos, photon, or quantum modes to append a 32-byte BLAKE3-keyed MAC tag, defeating ciphertext malleability. The secure mode has built-in AEAD and ignores the flag.
+> **Authentication:** Append `--auth` to encrypt/decrypt commands for chaos, photon, or quantum modes to append a 32-byte KMAC128 tag (NIST SP 800-185), defeating ciphertext malleability. The secure mode has built-in AEAD and ignores the flag.
 
 
 ## Security Levels

@@ -38,10 +38,8 @@ use pyo3::types::PyByteArray;
 
 use kelvin::{
     Kelvin as KelvinRust, KelvinError, KelvinPhoton as KelvinPhotonRust,
-    KelvinPhotonAuthenticated as KelvinPhotonAuthRust,
-    KelvinQuantum as KelvinQuantumRust,
-    KelvinQuantumAuthenticated as KelvinQuantumAuthRust,
-    KelvinStreaming as KelvinStreamingRust,
+    KelvinPhotonAuthenticated as KelvinPhotonAuthRust, KelvinQuantum as KelvinQuantumRust,
+    KelvinQuantumAuthenticated as KelvinQuantumAuthRust, KelvinStreaming as KelvinStreamingRust,
     OrbitalConfig,
 };
 
@@ -104,9 +102,8 @@ fn generate_config() -> String {
 
 /// Parse a JSON config string into an `OrbitalConfig`.
 fn parse_config(config_json: &str) -> PyResult<OrbitalConfig> {
-    serde_json::from_str(config_json).map_err(|e| {
-        PyValueError::new_err(format!("Invalid orbital config: {}", e))
-    })
+    serde_json::from_str(config_json)
+        .map_err(|e| PyValueError::new_err(format!("Invalid orbital config: {}", e)))
 }
 
 // ============================================================================
@@ -119,6 +116,7 @@ fn get_mut_slice<'a>(data: &'a Bound<'a, PyByteArray>) -> &'a mut [u8] {
     unsafe { data.as_bytes_mut() }
 }
 
+#[allow(dead_code)]
 fn get_bytes<'a>(data: &'a Bound<'a, PyByteArray>) -> &'a [u8] {
     // SAFETY: GIL is held.
     unsafe { data.as_bytes() }
@@ -198,9 +196,10 @@ impl KelvinPhoton {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
         if seed.len() != 2048 {
-            return Err(PyValueError::new_err(
-                format!("seed must be exactly 2048 bytes, got {}", seed.len()),
-            ));
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly 2048 bytes, got {}",
+                seed.len()
+            )));
         }
         let mut seed_arr = [0u8; 2048];
         seed_arr.copy_from_slice(seed);
@@ -253,9 +252,10 @@ impl KelvinQuantum {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
         if seed.len() != 2048 {
-            return Err(PyValueError::new_err(
-                format!("seed must be exactly 2048 bytes, got {}", seed.len()),
-            ));
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly 2048 bytes, got {}",
+                seed.len()
+            )));
         }
         let mut seed_arr = [0u8; 2048];
         seed_arr.copy_from_slice(seed);
@@ -274,9 +274,10 @@ impl KelvinQuantum {
         reseed_interval_bytes: Option<u64>,
     ) -> PyResult<Self> {
         if seed.len() != 2048 {
-            return Err(PyValueError::new_err(
-                format!("seed must be exactly 2048 bytes, got {}", seed.len()),
-            ));
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly 2048 bytes, got {}",
+                seed.len()
+            )));
         }
         let mut seed_arr = [0u8; 2048];
         seed_arr.copy_from_slice(seed);
@@ -345,9 +346,10 @@ impl KelvinPhotonAuthenticated {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
         if seed.len() != 2048 {
-            return Err(PyValueError::new_err(
-                format!("seed must be exactly 2048 bytes, got {}", seed.len()),
-            ));
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly 2048 bytes, got {}",
+                seed.len()
+            )));
         }
         let mut seed_arr = [0u8; 2048];
         seed_arr.copy_from_slice(seed);
@@ -409,9 +411,10 @@ impl KelvinQuantumAuthenticated {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
         if seed.len() != 2048 {
-            return Err(PyValueError::new_err(
-                format!("seed must be exactly 2048 bytes, got {}", seed.len()),
-            ));
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly 2048 bytes, got {}",
+                seed.len()
+            )));
         }
         let mut seed_arr = [0u8; 2048];
         seed_arr.copy_from_slice(seed);
@@ -430,9 +433,10 @@ impl KelvinQuantumAuthenticated {
         reseed_interval_bytes: Option<u64>,
     ) -> PyResult<Self> {
         if seed.len() != 2048 {
-            return Err(PyValueError::new_err(
-                format!("seed must be exactly 2048 bytes, got {}", seed.len()),
-            ));
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly 2048 bytes, got {}",
+                seed.len()
+            )));
         }
         let mut seed_arr = [0u8; 2048];
         seed_arr.copy_from_slice(seed);
