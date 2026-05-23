@@ -13,8 +13,7 @@ WHAT'S INCLUDED
   simple_streaming.exe    - V2 streaming encrypt/decrypt demo (SHAKE256 XOR)
   orbital_visualizer.html - 3D orbital simulation with KDF pipeline display
   sample_key.json         - Sample orbital configuration
-  test-all.ps1            - Windows test suite
-  test-all.sh             - Linux test suite
+   (see scripts/test-all.bat for the full test suite)
 
 QUICK START
 -----------
@@ -35,8 +34,8 @@ QUICK START
      - Load a key.json file to visualize custom orbital dynamics
      - Hover over KDF pipeline stages for detailed information
 
-  6. Run all tests:
-     .\test-all.ps1
+  6. Run all tests (from the repo root):
+     ..\scripts\test-all.bat
 
 DEMO BINARIES
 -------------
