@@ -96,7 +96,9 @@ not indicate systemic weaknesses in any cipher variant.
 
 2. **Increase keystream size** from 1 MB to 10 MB or more. Larger samples
    produce more stable p-values and more cycles for the Random Excursions
-   tests, reducing both false positives and inapplicable results.
+   tests, reducing both false positives and inapplicable results. The current
+   1 MB default balances statistical coverage with runtime; if inconclusive
+   results persist, consider increasing to 10 MB.
 
 3. **Skip Random Excursions for XOR-based variants.** The NIST SP 800-22
    specification notes that these tests may be inapplicable for certain

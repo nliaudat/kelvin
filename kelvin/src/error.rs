@@ -75,3 +75,9 @@ impl From<kelvin_core::StabilityError> for KelvinError {
         KelvinError::StabilityError(e.to_string())
     }
 }
+
+impl From<kelvin_kdf::OrbitalError> for KelvinError {
+    fn from(e: kelvin_kdf::OrbitalError) -> Self {
+        KelvinError::StabilityError(e.to_string())
+    }
+}

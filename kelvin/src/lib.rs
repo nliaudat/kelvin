@@ -87,8 +87,7 @@ use zeroize::Zeroize;
 /// - **Euler** (default): Explicit Euler integration. Numerical instability
 ///   amplifies chaos ~10x faster than Verlet, producing more entropy per step.
 /// - **Verlet**: Symplectic Velocity Verlet. Energy-conserving,
-///   time-reversible. Use `--verlet` to switch back to Verlet; Euler is the
-///   CLI default.
+///   time-reversible. Use `--verlet` to opt in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntegrationMethod {
     /// Explicit Euler (default, maximum chaos amplification).
@@ -99,6 +98,12 @@ pub enum IntegrationMethod {
 }
 
 /// Run the full orbital simulation pipeline and extract a 2048-byte seed.
+///
+/// **Since v0.2.0:** Default integration method changed from Verlet to Euler.
+/// Seeds produced by this function will differ from v0.1.x. Callers that
+/// need backward compatibility should use
+/// [`simulate_and_extract_seed_with_method`] with
+/// `IntegrationMethod::Verlet`.
 ///
 /// This is the shared initialization used by V1 (`Kelvin`), V3 (`KelvinPhoton`),
 /// and H (`KelvinQuantum`). It performs:
@@ -292,7 +297,7 @@ impl Kelvin {
     /// This runs the Lyapunov time estimator and initial orbital simulation.
     /// Setup time depends on the security level (seconds to minutes).
     pub fn new(config: OrbitalConfig) -> Result<Self, KelvinError> {
-        Self::new_with_method(config, IntegrationMethod::Verlet)
+        Self::new_with_method(config, IntegrationMethod::default())
     }
 
     /// Create a new Kelvin instance with a configurable integration method.
@@ -327,7 +332,7 @@ impl Kelvin {
     /// Available when the `aes-ni` feature is enabled.
     #[cfg(feature = "aes-ni")]
     pub fn new_aes(config: OrbitalConfig) -> Result<Self, KelvinError> {
-        Self::new_aes_with_method(config, IntegrationMethod::Verlet)
+        Self::new_aes_with_method(config, IntegrationMethod::default())
     }
 
     /// Create a new Kelvin instance using AES-256-GCM with a configurable integration method.
@@ -488,7 +493,7 @@ impl KelvinStreaming {
     /// This does NOT run the full simulation upfront — it only validates the config
     /// and initializes the body state. The simulation advances one step per chunk.
     pub fn new(config: OrbitalConfig, bytes_per_step: u64) -> Result<Self, KelvinError> {
-        Self::new_with_method(config, bytes_per_step, IntegrationMethod::Verlet)
+        Self::new_with_method(config, bytes_per_step, IntegrationMethod::default())
     }
 
     /// Create a new streaming Kelvin instance with a configurable integration method.
@@ -526,7 +531,15 @@ impl KelvinStreaming {
     }
 
     /// Advance the simulation by one step using the configured integration method.
-    fn advance_step(&mut self) {
+    ///
+    /// ## Stability monitoring
+    ///
+    /// Every `MONITOR_INTERVAL` steps (default: 10,000), checks for:
+    /// - Body ejection (unbound orbit energy)
+    /// - Gravitational collapse (bodies too close)
+    ///
+    /// If either condition is detected, returns `KelvinError::StabilityError`.
+    fn advance_step(&mut self) -> Result<(), KelvinError> {
         match self.integration_method {
             IntegrationMethod::Verlet => {
                 kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
@@ -536,6 +549,49 @@ impl KelvinStreaming {
             },
         }
         self.step += 1;
+
+        // Periodic stability check every MONITOR_INTERVAL steps
+        if self.step.is_multiple_of(kelvin_core::MONITOR_INTERVAL) {
+            // Check for gravitational collapse
+
+            if let Some((i, j, dist)) =
+                kelvin_core::detect_collapse(&self.bodies, kelvin_core::MIN_SEPARATION)
+            {
+                return Err(KelvinError::StabilityError(format!(
+                    "bodies {} and {} collided at step {} (distance = {:.6e} AU)",
+                    i,
+                    j,
+                    self.step,
+                    dist.to_f64()
+                )));
+            }
+
+            // Check for body ejection
+            for i in 0..self.bodies.len() {
+                if kelvin_core::is_body_ejected(
+                    i,
+                    &self.bodies,
+                    self.g,
+                    self.softening,
+                    kelvin_core::EJECTION_ENERGY_THRESHOLD,
+                ) {
+                    let energy = (self.bodies[i].kinetic_energy()
+                        + kelvin_core::gravitational_potential(
+                            i,
+                            &self.bodies,
+                            self.g,
+                            self.softening,
+                        ))
+                    .to_f64();
+                    return Err(KelvinError::StabilityError(format!(
+                        "body {} ejected at step {} (energy = {:.6e} AU²/yr²)",
+                        i, self.step, energy
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Process a chunk of data: advance simulation, extract keystream, XOR.
@@ -568,7 +624,7 @@ impl KelvinStreaming {
             let chunk_size = std::cmp::min(remaining, bps);
 
             // 1. Advance simulation by one step (Verlet or Euler)
-            self.advance_step();
+            self.advance_step()?;
 
             // 2. Extract keystream into the reusable buffer via SHAKE256 XOF
             //    This avoids allocating a new Vec<u8> for every chunk iteration.

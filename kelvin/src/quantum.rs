@@ -247,10 +247,19 @@ impl KelvinQuantum {
     /// one-way function property.
     fn reseed_from_orbital_chaos(&mut self) -> Result<(), KelvinError> {
         // Run Euler steps to generate fresh chaos (Euler amplifies chaos ~10x
-        // faster than Verlet due to numerical instability)
-        self.orbital_state
-            .euler_steps(self.orbital_steps_per_reseed)
-            .map_err(|_| KelvinError::SeedExhausted)?;
+        // faster than Verlet due to numerical instability).
+        //
+        // We use euler_step() directly (not euler_steps()) to avoid the
+        // stability check (ejection/collapse detection). The reseed is about
+        // generating fresh entropy — even if a body is ejected, the remaining
+        // bodies still provide chaotic dynamics. The stability check is a
+        // safety net for the main simulation, not for reseeding.
+        for _ in 0..self.orbital_steps_per_reseed {
+            self.orbital_state.euler_step().map_err(|e| match e {
+                kelvin_kdf::OrbitalError::OrbitalOverflow { .. } => KelvinError::SeedExhausted,
+                _ => KelvinError::StabilityError(e.to_string()),
+            })?;
+        }
 
         // Extract fresh entropy via SHAKE256
         let mut fresh_entropy = [0u8; 64];
