@@ -531,7 +531,15 @@ impl KelvinStreaming {
     }
 
     /// Advance the simulation by one step using the configured integration method.
-    fn advance_step(&mut self) {
+    ///
+    /// ## Stability monitoring
+    ///
+    /// Every `MONITOR_INTERVAL` steps (default: 10,000), checks for:
+    /// - Body ejection (unbound orbit energy)
+    /// - Gravitational collapse (bodies too close)
+    ///
+    /// If either condition is detected, returns `KelvinError::StabilityError`.
+    fn advance_step(&mut self) -> Result<(), KelvinError> {
         match self.integration_method {
             IntegrationMethod::Verlet => {
                 kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);
@@ -541,6 +549,49 @@ impl KelvinStreaming {
             },
         }
         self.step += 1;
+
+        // Periodic stability check every MONITOR_INTERVAL steps
+        if self.step.is_multiple_of(kelvin_core::MONITOR_INTERVAL) {
+            // Check for gravitational collapse
+
+            if let Some((i, j, dist)) =
+                kelvin_core::detect_collapse(&self.bodies, kelvin_core::MIN_SEPARATION)
+            {
+                return Err(KelvinError::StabilityError(format!(
+                    "bodies {} and {} collided at step {} (distance = {:.6e} AU)",
+                    i,
+                    j,
+                    self.step,
+                    dist.to_f64()
+                )));
+            }
+
+            // Check for body ejection
+            for i in 0..self.bodies.len() {
+                if kelvin_core::is_body_ejected(
+                    i,
+                    &self.bodies,
+                    self.g,
+                    self.softening,
+                    kelvin_core::EJECTION_ENERGY_THRESHOLD,
+                ) {
+                    let energy = (self.bodies[i].kinetic_energy()
+                        + kelvin_core::gravitational_potential(
+                            i,
+                            &self.bodies,
+                            self.g,
+                            self.softening,
+                        ))
+                    .to_f64();
+                    return Err(KelvinError::StabilityError(format!(
+                        "body {} ejected at step {} (energy = {:.6e} AU²/yr²)",
+                        i, self.step, energy
+                    )));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Process a chunk of data: advance simulation, extract keystream, XOR.
@@ -573,7 +624,7 @@ impl KelvinStreaming {
             let chunk_size = std::cmp::min(remaining, bps);
 
             // 1. Advance simulation by one step (Verlet or Euler)
-            self.advance_step();
+            self.advance_step()?;
 
             // 2. Extract keystream into the reusable buffer via SHAKE256 XOF
             //    This avoids allocating a new Vec<u8> for every chunk iteration.

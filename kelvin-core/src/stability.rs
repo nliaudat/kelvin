@@ -340,7 +340,7 @@ pub fn simulate_with_monitoring_euler(
 ///
 /// Uses the same softened potential as the simulation integrator:
 ///   U_i = -Σ_{j≠i} G * m_i * m_j / sqrt(|r_ij|² + ε²)
-fn gravitational_potential(
+pub fn gravitational_potential(
     body_index: usize,
     bodies: &[OrbitalBody],
     g: Fixed,

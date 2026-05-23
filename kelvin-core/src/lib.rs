@@ -51,8 +51,8 @@ pub use constants::{
 pub use fixed_math::Fixed;
 pub use integrator::{compute_accelerations, euler_step, simulate, verlet_step};
 pub use stability::{
-    detect_collapse, is_body_ejected, simulate_with_monitoring, simulate_with_monitoring_euler,
-    StabilityError,
+    detect_collapse, gravitational_potential, is_body_ejected, simulate_with_monitoring,
+    simulate_with_monitoring_euler, StabilityError,
 };
 
 #[cfg(test)]
