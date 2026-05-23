@@ -1,0 +1,6 @@
+[submodule "tests/sp800_90b_non_iid"]
+	path = tests/sp800_90b_non_iid
+	url = https://github.com/dj-on-github/SP800_90b_tests.git
+[submodule "tests/ea_iid"]
+	path = tests/ea_iid
+	url = https://github.com/usnistgov/SP800-90B_EntropyAssessment.git
