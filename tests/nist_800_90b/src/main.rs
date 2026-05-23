@@ -156,7 +156,7 @@ fn default_config() -> OrbitalConfig {
     );
     OrbitalConfig::new(
         vec![sun, planet1, planet2, planet3, planet4],
-        1000,
+        2000,
         10,
         DEFAULT_DT,
         SOFTENING_FACTOR,
@@ -349,7 +349,9 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
     }
 
     let expected_runs = total_bits as f64 / 2.0;
-    let z = 2.0 * (runs as f64 - expected_runs).abs() / (total_bits as f64).sqrt();
+    // NIST SP 800-22 §2.3: z = |V_obs - 2nπ(1-π)| / (2·√(2n)·π·(1-π))
+    // For π = 0.5: numerator = |V_obs - n/2|, denominator = √(n/2)
+    let z = (runs as f64 - expected_runs).abs() / (total_bits as f64 / 2.0).sqrt();
     let ok = z < 2.576;
 
     (ok, runs, expected_runs as u64)
@@ -405,6 +407,12 @@ fn analyze_keystream_file(path: &str) -> Result<(), String> {
 
     file.read_exact(&mut data).map_err(|e| format!("Failed to read keystream: {}", e))?;
 
+    if file_size > 1024 * 1024 {
+        eprintln!(
+            "  (Note: analyzing first 1 MiB of a {}-byte file — this is a quick health check, not a full NIST analysis)",
+            file_size
+        );
+    }
     eprintln!("Analyzing {} bytes from: {}", analyze_size, path);
 
     // ── Shannon Entropy ────────────────────────────────────────────────────
