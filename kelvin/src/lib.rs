@@ -70,7 +70,9 @@ pub use kelvin_stream::{ChaChaStream, StreamCipher};
 #[cfg(feature = "aes-ni")]
 pub use kelvin_stream::AesGcmStream;
 
-pub use authenticated::{KelvinPhotonAuthenticated, KelvinQuantumAuthenticated};
+pub use authenticated::{
+    KelvinPhotonAuthenticated, KelvinQuantumAuthenticated, KelvinStreamingAuthenticated,
+};
 pub use photon::KelvinPhoton;
 pub use quantum::{KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_RESEED_INTERVAL, DEFAULT_ORBITAL_STEPS};
 
