@@ -65,7 +65,13 @@ Security is the primary requirement for production readiness. We must move beyon
         - `extract_seed` — passes (|t| < 5)
         - `key_schedule` — passes (|t| < 5)
     - **Note on `verlet_step`/`simulate` timing variation**: The Verlet integrator calls `compute_accelerations` twice per step (kick-drift-kick). While individual `compute_accelerations` calls pass the t-test, the accumulated timing variation over multiple calls with different mass values exceeds the threshold. This is a benchmark artifact — the `Fixed` arithmetic is verified constant-time at the operation level, and the `compute_accelerations` function passes independently. The variation likely stems from the `vec![]` allocation inside the timed closure combined with state evolution differences between classes. A control benchmark with identical bodies for both classes passes (|t| = 1.34), confirming the methodology is sound.
-- [/] **Zeroization Verification**: Ensure all secret material is effectively cleared from memory. *(Completed: Zeroize implemented and unit-tested for all critical buffers/states; Pending: assembly audit for compiler optimization removal)*
+- [x] **Zeroization Verification**: All secret material is effectively cleared from memory. *(Completed 2026-05-23)*
+    - `Zeroize` trait implemented for all critical buffers and states (`Kelvin`, `KelvinStreaming`, `KelvinQuantum`, `KelvinPhoton`, `KeySchedule`, `OrbitalBody`, `Vec3`, `Fixed`)
+    - `SecureBuffer` type with platform-specific memory locking:
+        - Windows: `VirtualLock` / `VirtualUnlock`
+        - Unix: `mlock` / `munlock`
+    - Runtime volatile read-back test verifies zeroization actually occurs after `drop()`
+    - Assembly-level audit confirms compiler optimizations do not elide zeroization calls
 
 ### 1.4 Statistical Testing
 - [x] **NIST SP 800-90B Health Tests**: Implement statistical test suite for keystream quality validation. *(Completed 2026-05-22)*
@@ -77,6 +83,11 @@ Security is the primary requirement for production readiness. We must move beyon
     - Chi-square byte distribution test (df=255, critical: 310)
     - Adjacent-byte correlation (Pearson, target: <0.01)
     - Integrated into `tests/entropy_analysis/` with `--keystream` mode
+- [ ] **NIST SP 800-90B Formal Validation**: Run the official NIST entropy assessment tool (`ea_iid`) on raw keystream output.
+    - Generate 1 GB of raw keystream from un-conditioned orbital state
+    - Run `ea_iid` and document min-entropy estimate per the standard
+    - Provide conditioning component (SHAKE256) as per NIST SP 800-90C
+    - Produce a report suitable for FIPS 140-3 submissions
 
 ### 1.5 Fuzzing
 - [x] **Continuous Fuzzing**: Property-based fuzz test (`proptest`) for:
@@ -88,9 +99,27 @@ Security is the primary requirement for production readiness. We must move beyon
     - Python reference: `tests/differential_fuzzing/reference.py` — compares f64 vs mpmath 128-bit (1000 random vectors pass, max rel error 4.35e-13)
     - No sign flips, no NaN/Inf divergence detected
 
-### 1.6 External Audit
+### 1.6 Fault Resilience
+- [ ] **Error Injection Testing**: Use the `fail` crate to inject errors in the simulation and verify graceful degradation.
+    - Inject failures in Verlet/Euler steps — verify `KelvinError` is returned, not silent corruption
+    - Inject failures in SHAKE256 extraction — verify `KelvinError` is returned
+    - Inject failures in key schedule — verify `KelvinError::SeedExhausted` is returned
+- [ ] **Memory Protection Testing**: Verify that seed material is inaccessible after use.
+    - Use `mprotect(PROT_NONE)` on seed buffers after extraction
+    - Verify that any access attempt causes a clean panic (SIGSEGV handler)
+- [ ] **Panic Safety**: Ensure that panics in the simulation do not leave the system in an inconsistent state.
+    - Verify `Drop` impls run correctly during unwinding
+    - Verify no double-free or use-after-free on panic paths
+
+### 1.7 External Audit
 - [ ] **Audit Readiness**: Prepare a "Security Target" document explaining the mathematical foundations and security proofs.
+    - Design document with architecture overview
+    - Complete test vector suite
+    - Threat model document
+    - Self-audit results (Kani proofs, CT audit, fuzzing)
 - [ ] **Third-Party Engagement**: Schedule a professional security audit by a specialized firm (e.g., Trail of Bits, NCC Group, or Kudelski Security).
+    - Two firms, concurrent review recommended
+    - Budget for 8-12 weeks of audit + 4-6 weeks remediation + 2-4 weeks re-audit
 
 ---
 
@@ -115,6 +144,14 @@ Production use cases often require Kelvin to run in non-Rust environments. We wi
 - [ ] **Swift Package**: Create a `Kelvin.swift` wrapper around the FFI for seamless iOS integration.
 - [ ] **Kotlin/JNI**: Create a `kelvin-android` library with JNI bindings.
 
+### 2.4 Post-Quantum Signature Module (Future)
+- [ ] **HAWK-512 Integration**: Add optional feature for post-quantum digital signatures.
+    - Integrate HAWK-512 (or liboqs wrapper) as an optional feature
+    - Provide `encrypt_and_sign()` that returns ciphertext + HAWK signature
+    - Document non-repudiation use cases (legal, financial)
+- [ ] **SNOVA Evaluation**: Monitor NIST PQC standardization for SNOVA and other candidates.
+- [ ] **Hybrid Mode**: Support traditional ECDSA + PQ signature for backward compatibility.
+
 ---
 
 ## 3. Infrastructure & CI/CD
@@ -124,6 +161,9 @@ Automate everything to ensure quality and prevent regressions.
 ### 3.1 Multi-Platform CI
 - [ ] **Architecture Support**: Test in CI on `x86_64`, `aarch64` (ARM64), `riscv64`, and `wasm32`.
 - [ ] **Endianness Verification**: Explicitly test on big-endian architectures (if possible) to ensure LE-conversion logic is robust.
+- [ ] **Kani CI**: Enable the disabled Kani workflow using GitHub's larger runners (`ubuntu-24.04-16core`).
+    - Kani requires ~8 GB RAM per proof harness
+    - Document required CI runner resources in `.github/workflows/kani.yml`
 
 ### 3.2 Supply Chain Security
 - [ ] **Dependency Auditing**: Integrate `cargo-audit` and `cargo-deny` into CI.
@@ -131,6 +171,15 @@ Automate everything to ensure quality and prevent regressions.
 
 ### 3.3 Automated Benchmarking
 - [ ] **Regression Detection**: Run `criterion` benchmarks in CI and fail if performance drops by >5% on core simulation paths.
+
+### 3.4 Comparative Benchmarking
+- [ ] **Throughput Comparison**: Run `criterion` benchmarks comparing Kelvin modes against established libraries.
+    - `KelvinQuantum` (H) vs. AES-256-GCM (`ring`) — MB/s throughput
+    - `KelvinQuantum` (H) vs. ChaCha20-Poly1305 (`ring`) — MB/s throughput
+    - `KelvinStreaming` (V2) vs. AES-256-CTR — MB/s throughput
+    - Key generation time vs. X25519 (`dalek`)
+    - Signature time (optional HAWK) vs. ED25519 (`dalek`)
+- [ ] **Results Publication**: Publish benchmark results in `/docs/benchmarks/` as interactive charts.
 
 ---
 
@@ -150,16 +199,35 @@ Automate everything to ensure quality and prevent regressions.
     - Deployment Best Practices.
     - Threat Modeling for specific industries (IoT, Finance).
 
+### 4.4 Interoperability Test Vectors
+- [ ] **Canonical Test Vectors**: Generate a set of JSON test vectors using the Rust reference implementation.
+    - Orbital configuration (5-body, standard parameters)
+    - Plaintext for each mode (V1, V2, V3, H, authenticated variants)
+    - Expected ciphertext for each mode
+    - Signed with a known key (or use a static seed for reproducibility)
+- [ ] **Cross-Binding Verification**: CI runs Python and JS bindings against these vectors.
+- [ ] **Versioning**: Version the test vectors with each release (e.g., `test_vectors_v1.json`).
+
 ---
 
 ## 5. Execution Timeline
 
 | Phase | Focus | Duration | Status |
 | :--- | :--- | :--- | :--- |
-| **I: Hardening** | Kani, SP 800-90B, Fuzzing, CT-Audit | 4 Weeks | ✅ All complete |
-| **II: Ecosystem** | Python & JS Bindings | 3 Weeks | 🔄 In progress (Python done) |
-| **III: Operations** | CI/CD, Security Policies, Docs | 2 Weeks | ⬜ Not started |
-| **IV: Audit** | Third-party review & fixes | 4-8 Weeks | ⬜ Not started |
+| **I: Hardening** | Kani, SP 800-90B, Fuzzing, CT-Audit, Zeroization, Fault Resilience, Security Assumptions | 5 Weeks | 🔄 In progress (Kani, CT, Fuzzing, Zeroization done) |
+| **II: Ecosystem** | Python, JS/TS, Test Vectors, Comparative Benchmarks | 4 Weeks | 🔄 In progress (Python done) |
+| **III: Infrastructure** | CI/CD, Kani CI, NIST 800-90B ea_iid, Security Policies, Docs | 3 Weeks | ⬜ Not started |
+| **IV: Audit** | Third-party review & fixes | 14-20 Weeks | ⬜ Not started |
+| **V: Advanced** | PQ Signatures, PQ KEM (optional) | Future | ⬜ Not started |
+
+### Phase IV — Audit Breakdown
+
+| Activity | Duration |
+|----------|----------|
+| Pre-audit preparation (documentation, test harness, threat model) | 2 weeks |
+| Third-party audit (two firms, concurrent) | 8-12 weeks |
+| Remediation & re-audit | 4-6 weeks |
+| **Total** | **14-20 weeks** |
 
 ---
 
