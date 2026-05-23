@@ -11,6 +11,7 @@ members = [
     "tests/constant_time_bench",
     "tests/nist_tests",
     "tests/entropy_analysis",
+    "tests/nist_800_90b",
     "fuzz",
     "libs/python/kelvin_pyo3",
 ]

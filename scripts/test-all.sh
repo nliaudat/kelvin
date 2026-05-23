@@ -103,6 +103,12 @@ step "Integration: NIST SP 800-22 statistical tests (all 6 variants)"
 cargo run --release -p nist_tests
 pass
 
+step "Integration: NIST SP 800-90B keystream generation + analysis"
+cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b.bin
+cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b.bin
+rm -f target/keystream_90b.bin
+pass
+
 # ---------------------------------------------------------------------------
 # 6. Constant-time benchmarks
 # ---------------------------------------------------------------------------

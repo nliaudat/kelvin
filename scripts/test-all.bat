@@ -123,6 +123,16 @@ if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
+call :step "Integration: NIST SP 800-90B keystream generation + analysis"
+cargo run --release -p nist_800_90b -- generate --size 1048576 --output target\keystream_90b.bin
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+cargo run --release -p nist_800_90b -- analyze --input target\keystream_90b.bin
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+del target\keystream_90b.bin
+echo %GREEN%PASSED%NC%
+
 REM ---------------------------------------------------------------------------
 REM 6. Constant-time benchmarks
 REM ---------------------------------------------------------------------------

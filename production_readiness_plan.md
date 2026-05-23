@@ -83,11 +83,21 @@ Security is the primary requirement for production readiness. We must move beyon
     - Chi-square byte distribution test (df=255, critical: 310)
     - Adjacent-byte correlation (Pearson, target: <0.01)
     - Integrated into `tests/entropy_analysis/` with `--keystream` mode
-- [ ] **NIST SP 800-90B Formal Validation**: Run the official NIST entropy assessment tool (`ea_iid`) on raw keystream output.
-    - Generate 1 GB of raw keystream from un-conditioned orbital state
-    - Run `ea_iid` and document min-entropy estimate per the standard
-    - Provide conditioning component (SHAKE256) as per NIST SP 800-90C
-    - Produce a report suitable for FIPS 140-3 submissions
+- [x] **NIST SP 800-90B Formal Validation Tooling**: Created `tests/nist_800_90b/` — a dedicated keystream generation and analysis crate. *(Completed 2026-05-23)*
+    - `generate` mode: dumps raw SHAKE256 XOR keystream (V2 streaming, no cipher wrapping) to binary file
+    - `analyze` mode: runs 7 built-in SP 800-90B health tests (Shannon entropy, correlation, chi-square, repetition, adaptive proportion, runs, longest run)
+    - Supports custom orbital configs via `--config` and Verlet integration via `--verlet`
+    - Default 5-body deterministic config for reproducible NIST submissions
+    - Progress indicator for large files (1 GB+)
+    - Integrated into `scripts/test-all.bat` and `scripts/test-all.sh`
+- [ ] **NIST SP 800-90B Formal Validation (ea_iid)**: Run the official NIST entropy assessment tool on raw keystream output.
+    - Install `ea_iid` from https://github.com/usnistgov/SP800-90B_EntropyAssessment
+    - Generate 1 GB keystream: `cargo run --release -p nist_800_90b -- generate --size 1073741824 --output keystream_1gb.bin`
+    - Run `ea_iid`: `python ea_iid.py -i keystream_1gb.bin -o results.txt`
+    - Document min-entropy estimate per the standard
+    - Conditioning component (SHAKE256) documented per NIST SP 800-90C
+    - Report template available at `documentation/nist_800_90b_report.md`
+    - Full instructions in `tests/nist_800_90b/README.md`
 
 ### 1.5 Fuzzing
 - [x] **Continuous Fuzzing**: Property-based fuzz test (`proptest`) for:
