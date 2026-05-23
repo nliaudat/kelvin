@@ -147,7 +147,7 @@ impl Fixed {
             let borrow = (remainder_if_sub > remainder) as u128;
             let mask = borrow.wrapping_sub(1); // 0 -> !0, 1 -> 0
             remainder = (remainder & !mask) | (remainder_if_sub & mask);
-            let bit = (mask >> 127) as u128;
+            let bit = mask >> 127;
 
             result = (result << 1) | bit;
         }
@@ -163,7 +163,7 @@ impl Fixed {
             let borrow = (remainder_if_sub > remainder) as u128;
             let mask = borrow.wrapping_sub(1);
             remainder = (remainder & !mask) | (remainder_if_sub & mask);
-            let bit = (mask >> 127) as u128;
+            let bit = mask >> 127;
 
             result = (result << 1) | bit;
         }
@@ -506,7 +506,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_abs() {
         assert_eq!(Fixed::from_int(5).abs(), Fixed::from_int(5));
@@ -655,8 +654,7 @@ mod kani_proofs {
 
         // The result should be within [-200, 200] AU
         let raw = result.to_raw();
-        kani::assert(raw >= -2 * MAX_AU && raw <= 2 * MAX_AU,
-            "add: result within [-200, 200] AU");
+        kani::assert(raw >= -2 * MAX_AU && raw <= 2 * MAX_AU, "add: result within [-200, 200] AU");
     }
 
     // ── Harness 2: Subtraction ─────────────────────────────────────────
@@ -677,8 +675,7 @@ mod kani_proofs {
         let result = a - b;
 
         let raw = result.to_raw();
-        kani::assert(raw >= -2 * MAX_AU && raw <= 2 * MAX_AU,
-            "sub: result within [-200, 200] AU");
+        kani::assert(raw >= -2 * MAX_AU && raw <= 2 * MAX_AU, "sub: result within [-200, 200] AU");
     }
 
     // ── Harness 3: Multiplication ──────────────────────────────────────
@@ -714,8 +711,10 @@ mod kani_proofs {
         let raw = result.to_raw();
         // Maximum product magnitude: 100 * 100 = 10,000 AU²
         // In Q32.64 raw: 10,000 << 64 ≈ 1.84e23, well within i128::MAX
-        kani::assert(raw >= -10000 * (1 << 64) && raw <= 10000 * (1 << 64),
-            "mul: result within [-10000, 10000] AU²");
+        kani::assert(
+            raw >= -10000 * (1 << 64) && raw <= 10000 * (1 << 64),
+            "mul: result within [-10000, 10000] AU²",
+        );
     }
 
     // ── Harness 4: Division ────────────────────────────────────────────
@@ -775,8 +774,7 @@ mod kani_proofs {
         let raw = result.to_raw();
         // G / dist³ for dist ≥ 2⁻²⁰ AU gives at most ~2.6×10⁶ AU⁻²
         // In Q32.64: 2.6×10⁶ × 2⁶⁴ ≈ 4.8×10²⁵, well within i128::MAX
-        kani::assert(raw != i128::MIN && raw != i128::MAX,
-            "div: result is not at extreme bounds");
+        kani::assert(raw != i128::MIN && raw != i128::MAX, "div: result is not at extreme bounds");
     }
 
     // ── Harness 5: Square Root ─────────────────────────────────────────
@@ -798,8 +796,7 @@ mod kani_proofs {
         let result = val.sqrt();
 
         // sqrt should return a non-negative result
-        kani::assert(result.to_raw() >= 0,
-            "sqrt: result is non-negative");
+        kani::assert(result.to_raw() >= 0, "sqrt: result is non-negative");
         // Kani already proves sqrt completes without panic or overflow
         // for all inputs in [0, (200 AU)²]. Numerical accuracy is
         // verified by the unit test test_sqrt.

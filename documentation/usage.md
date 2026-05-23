@@ -34,22 +34,22 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 Kelvin uses the orbital simulation to generate a chaotic **Orbital Keystream** for encryption.
 
 ```bash
-# Default: Verlet integration (symplectic, energy-conserving)
+# Default: Euler integration (faster chaos amplification, more entropy per step)
 ./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
 
-# Euler integration: faster chaos amplification, more entropy per step
-./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --euler
+# Verlet integration: symplectic, energy-conserving
+./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --verlet
 ```
 
 ### Decrypt a File
 Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config and integration method must be used.
 
 ```bash
-# Default: Verlet integration
+# Default: Euler integration
 ./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar
 
-# Euler integration (must match encryption)
-./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --euler
+# Verlet integration (must match encryption)
+./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --verlet
 ```
 
 ### Identity (Asymmetric Keys)
@@ -66,7 +66,7 @@ Kelvin derives multiple Post-Quantum (PQ) and classical asymmetric identities fr
 ./kelvin identify --config my_secret.json --ecc --kem
 
 ### Authenticated Encryption (`--auth`)
-V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte BLAKE3-keyed MAC tag to the ciphertext, defeating malleability.
+V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability.
 
 ```bash
 # Chaos mode with authentication
@@ -102,14 +102,14 @@ Add `kelvin` to your `Cargo.toml`:
 kelvin = { git = "https://github.com/nliaudat/kelvin", features = ["serde"] }
 ```
 
-### Integration Method: Verlet vs Euler
+### Integration Method: Euler vs Verlet
 
 Kelvin supports two integration methods for the orbital simulation:
 
 | Method | CLI Flag | Property | Best For |
 |--------|----------|----------|----------|
-| **Verlet** (default) | *(none)* | Symplectic, energy-conserving, physically realistic | Standard encryption, backward compatibility |
-| **Euler** | `--euler` | 1st-order, numerically unstable, faster chaos amplification | Maximum entropy per step, shorter Lyapunov time |
+| **Euler** (default) | *(none)* | 1st-order, numerically unstable, faster chaos amplification | Maximum entropy per step, shorter Lyapunov time |
+| **Verlet** | `--verlet` | Symplectic, energy-conserving, physically realistic | Standard encryption, backward compatibility |
 
 Euler's numerical instability amplifies chaos ~10x faster than Verlet, producing more entropy per CPU cycle. See [`Euler_vs_Verlet.md`](Euler_vs_Verlet.md) for the full theoretical analysis.
 
@@ -142,17 +142,17 @@ fn main() -> anyhow::Result<()> {
 }
 ```
 
-### Using Euler Integration
+### Using Verlet Integration
 
-To use Euler integration instead of the default Verlet, pass `IntegrationMethod::Euler` to the constructor:
+To use Verlet integration instead of the default Euler, pass `IntegrationMethod::Verlet` to the constructor:
 
 ```rust
 use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
 let config = OrbitalConfig::from_json(&config_json)?;
 
-// Euler integration: faster chaos amplification
-let mut k = Kelvin::new_with_method(config, IntegrationMethod::Euler)?;
+// Verlet integration: symplectic, energy-conserving
+let mut k = Kelvin::new_with_method(config, IntegrationMethod::Verlet)?;
 
 // Encrypt/decrypt works identically
 let mut data = b"Hello Kelvin Chaos!".to_vec();
@@ -166,14 +166,14 @@ use kelvin::{IntegrationMethod, KelvinStreaming, OrbitalConfig};
 
 let config = OrbitalConfig::from_json(&config_json)?;
 
-// V2 streaming with Euler integration
-let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMethod::Euler)?;
+// V2 streaming with Verlet integration
+let mut ks = KelvinStreaming::new_with_method(config, 1024 * 1024, IntegrationMethod::Verlet)?;
 ks.encrypt(&mut data)?;
 ```
 
-### Authenticated Encryption (V2/V3/H + BLAKE3 MAC)
+### Authenticated Encryption (V2/V3/H + KMAC128)
 
-For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a 32-byte BLAKE3-keyed MAC tag:
+For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a 32-byte KMAC128 tag (NIST SP 800-185):
 
 ```rust
 use kelvin::{
@@ -181,13 +181,13 @@ use kelvin::{
     KelvinQuantumAuthenticated, OrbitalConfig,
 };
 
-// V2 Chaos + BLAKE3 MAC
+// V2 Chaos + KMAC128
 let config = OrbitalConfig::from_json(&config_json)?;
 let mut ks = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
 let mut data = b"Hello authenticated streaming!".to_vec();
 ks.encrypt(&mut data)?; // ciphertext + 32-byte tag appended
 
-// V3 Photon + BLAKE3 MAC
+// V3 Photon + KMAC128
 let (seed, _bodies) = kelvin::simulate_and_extract_seed_with_method(
     &config, kelvin::IntegrationMethod::Verlet
 )?;
@@ -195,7 +195,7 @@ let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
 let mut data = b"Hello authenticated photon!".to_vec();
 photon.encrypt(&mut data)?;
 
-// H Quantum + BLAKE3 MAC
+// H Quantum + KMAC128
 let mut quantum = KelvinQuantumAuthenticated::with_config(
     seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024
 )?;
@@ -203,7 +203,7 @@ let mut data = b"Hello authenticated quantum!".to_vec();
 quantum.encrypt(&mut data)?;
 ```
 
-> **Important:** The authenticated wrappers append a 32-byte tag to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
+> **Important:** The authenticated wrappers append a 32-byte KMAC128 tag to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
 
 ### Accessing Asymmetric Keys
 ```rust
@@ -246,7 +246,7 @@ Kelvin automatically reseeds the keystream by advancing through the **key schedu
 > [!CAUTION]
 > V2 (Chaos), V3 (Photon), and H (Quantum) modes are **pure XOR stream ciphers** — they do not provide built-in message authentication. Without authentication, an attacker can flip ciphertext bits and cause predictable plaintext changes (malleability).
 >
-> **Use `--auth`** to append a 32-byte BLAKE3-keyed MAC tag to the ciphertext, defeating malleability. The tag is verified in constant time during decryption.
+> **Use `--auth`** to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability. The tag is verified in constant time during decryption.
 >
 > V1 (Secure) mode uses ChaCha20Poly1305 AEAD and has built-in authentication — the `--auth` flag is ignored for this mode.
 
@@ -424,4 +424,3 @@ The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.h
 - The domain separator `b"kelvin-streaming-v2-v1-000000000"` ensures domain separation from V1.
 - **Deterministic**: same config + same step count = same keystream, regardless of how the caller chunks the data (as long as total bytes processed is the same).
 - **Unlimited keystream**: Unlike V1's finite key schedule, V2 can keep simulating indefinitely — there is no `SeedExhausted` error.
-

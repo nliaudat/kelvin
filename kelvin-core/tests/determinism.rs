@@ -50,8 +50,8 @@
 //!   — Theoretical foundation for symplectic integrators.
 
 use kelvin_core::{
-    compute_accelerations, euler_step, simulate, verlet_step, Fixed, OrbitalBody, Vec3,
-    DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR,
+    compute_accelerations, euler_step, simulate, verlet_step, Fixed, OrbitalBody, Vec3, DEFAULT_DT,
+    DEFAULT_G, SOFTENING_FACTOR,
 };
 use sha3::{Digest, Sha3_256};
 
@@ -150,7 +150,8 @@ const GOLDEN_EULER_1000: &str = "53dacba804bb7e0dd6d91908cc488095924868578c085f0
 ///
 /// Captured on: x86_64-pc-windows-msvc, SSE2 baseline
 /// Date: 2026-05-22
-const GOLDEN_ACCEL_INITIAL: &str = "38424c5fa124031fe071c07285ba7e40b4701b56bbfac36a807c71af26831895";
+const GOLDEN_ACCEL_INITIAL: &str =
+    "38424c5fa124031fe071c07285ba7e40b4701b56bbfac36a807c71af26831895";
 
 // ============================================================================
 // Tests
@@ -333,10 +334,7 @@ fn test_serialization_canonical() {
     let serialized_a = serialize_state(&bodies);
     let serialized_b = serialize_state(&bodies);
 
-    assert_eq!(
-        serialized_a, serialized_b,
-        "Serialization must be canonical"
-    );
+    assert_eq!(serialized_a, serialized_b, "Serialization must be canonical");
     assert_eq!(
         serialized_a.len(),
         5 * 7 * 16,
@@ -429,10 +427,7 @@ fn test_two_body_determinism() {
     simulate(&mut bodies_a, steps, dt, softening, DEFAULT_G);
     simulate(&mut bodies_b, steps, dt, softening, DEFAULT_G);
 
-    assert_eq!(
-        bodies_a, bodies_b,
-        "Two-body Verlet simulation must be deterministic"
-    );
+    assert_eq!(bodies_a, bodies_b, "Two-body Verlet simulation must be deterministic");
 }
 
 /// Test determinism with zero softening.
@@ -451,10 +446,7 @@ fn test_zero_softening_determinism() {
     simulate(&mut bodies_a, steps, dt, Fixed::ZERO, DEFAULT_G);
     simulate(&mut bodies_b, steps, dt, Fixed::ZERO, DEFAULT_G);
 
-    assert_eq!(
-        bodies_a, bodies_b,
-        "Verlet with zero softening must be deterministic"
-    );
+    assert_eq!(bodies_a, bodies_b, "Verlet with zero softening must be deterministic");
 }
 
 /// Test determinism with maximum dt.
@@ -473,10 +465,7 @@ fn test_max_dt_determinism() {
     simulate(&mut bodies_a, steps, dt, softening, DEFAULT_G);
     simulate(&mut bodies_b, steps, dt, softening, DEFAULT_G);
 
-    assert_eq!(
-        bodies_a, bodies_b,
-        "Verlet with MAX_DT must be deterministic"
-    );
+    assert_eq!(bodies_a, bodies_b, "Verlet with MAX_DT must be deterministic");
 }
 
 /// Test determinism with minimum dt.
@@ -494,10 +483,7 @@ fn test_min_dt_determinism() {
     simulate(&mut bodies_a, steps, dt, softening, DEFAULT_G);
     simulate(&mut bodies_b, steps, dt, softening, DEFAULT_G);
 
-    assert_eq!(
-        bodies_a, bodies_b,
-        "Verlet with MIN_DT must be deterministic"
-    );
+    assert_eq!(bodies_a, bodies_b, "Verlet with MIN_DT must be deterministic");
 }
 
 /// Test determinism with a single body.
@@ -521,10 +507,7 @@ fn test_single_body_determinism() {
     simulate(&mut bodies_a, steps, dt, softening, DEFAULT_G);
     simulate(&mut bodies_b, steps, dt, softening, DEFAULT_G);
 
-    assert_eq!(
-        bodies_a, bodies_b,
-        "Single-body Verlet simulation must be deterministic"
-    );
+    assert_eq!(bodies_a, bodies_b, "Single-body Verlet simulation must be deterministic");
 }
 
 /// Test determinism with 7 bodies (maximum typical configuration).
@@ -560,10 +543,7 @@ fn test_seven_body_determinism() {
     simulate(&mut bodies_a, steps, dt, softening, DEFAULT_G);
     simulate(&mut bodies_b, steps, dt, softening, DEFAULT_G);
 
-    assert_eq!(
-        bodies_a, bodies_b,
-        "Seven-body Verlet simulation must be deterministic"
-    );
+    assert_eq!(bodies_a, bodies_b, "Seven-body Verlet simulation must be deterministic");
 }
 
 /// Test that the `compute_accelerations` function is deterministic

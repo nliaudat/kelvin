@@ -2,7 +2,10 @@
 # ==============================================================================
 # Kelvin — Run All Tests (Linux / macOS)
 # ==============================================================================
-# Runs the full test suite: build, lint, unit tests, integration tests.
+# Runs the full test suite: build, lint, unit tests, integration tests,
+# entropy analysis, NIST SP 800-22 statistical tests, and constant-time
+# benchmarks.
+#
 # Exit code is 0 only if ALL steps pass.
 #
 # Usage:
@@ -43,10 +46,6 @@ step "2b/8: Build V2 Streaming example"
 cargo build --example simple_streaming -p kelvin
 pass
 
-step "2c/8: Build kelvin-demo binaries"
-cargo build -p kelvin-demo
-pass
-
 # ---------------------------------------------------------------------------
 # 2. Lint — clippy + rustfmt
 # ---------------------------------------------------------------------------
@@ -55,7 +54,7 @@ cargo clippy --workspace -- -D warnings
 pass
 
 step "4/8: Check formatting"
-cargo fmt --check
+cargo fmt --all --check
 pass
 
 # ---------------------------------------------------------------------------
@@ -91,6 +90,24 @@ pass
 
 step "Integration: Client/Server self-test (V1 + V2 Streaming)"
 cargo run -p kelvin-test-client
+pass
+
+# ---------------------------------------------------------------------------
+# 5. Entropy analysis & statistical tests
+# ---------------------------------------------------------------------------
+step "Integration: Entropy analysis (SP 800-90B health tests)"
+cargo run --release -p entropy_analysis -- --keystream
+pass
+
+step "Integration: NIST SP 800-22 statistical tests (all 6 variants)"
+cargo run --release -p nist_tests
+pass
+
+# ---------------------------------------------------------------------------
+# 6. Constant-time benchmarks
+# ---------------------------------------------------------------------------
+step "Integration: Constant-time benchmarks (DudeCT)"
+cargo run --release -p constant_time_bench
 pass
 
 # ---------------------------------------------------------------------------

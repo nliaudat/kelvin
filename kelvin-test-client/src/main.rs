@@ -296,7 +296,9 @@ fn run_self_test() -> Result<(), String> {
     println!("Running built-in determinism self-test...");
     println!();
 
-    // Create a simple 5-body configuration
+    // Create a canonical 5-body configuration (same as kelvin's unit tests).
+    // This is a proven stable configuration that the Lyapunov estimator
+    // accepts with a reasonable horizon (~95 safe steps).
     let bodies = vec![
         OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
         OrbitalBody::new(
@@ -305,33 +307,31 @@ fn run_self_test() -> Result<(), String> {
             Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
         ),
         OrbitalBody::new(
-            Fixed::from_raw(1 << 54),
-            Vec3::new(Fixed::from_raw(3 << 63), Fixed::ZERO, Fixed::ZERO),
-            Vec3::new(Fixed::ZERO, Fixed::from_raw(4896710557980672i128), Fixed::from_raw(1 << 62)),
+            Fixed::from_raw(1 << 53),
+            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
         ),
         OrbitalBody::new(
-            Fixed::from_raw(1 << 53),
+            Fixed::from_raw(1 << 52),
             Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
             Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
         ),
         OrbitalBody::new(
-            Fixed::from_raw(1 << 52),
+            Fixed::from_raw(1 << 51),
             Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
             Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
         ),
     ];
 
-    // Use a step count that the Lyapunov estimator will accept.
-    // The estimator typically allows ~95 safe steps for this config.
-    // Using 80 to ensure the test passes consistently across different platforms
-    // where the estimator may return slightly different values.
-    let safe_steps: u64 = 80;
+    // Use enough steps to exceed the Lyapunov horizon (~95 steps for this config).
+    // 200 ensures we're well into the chaotic regime.
+    let safe_steps: u64 = 200;
 
     let config = kelvin::OrbitalConfig::new(
         bodies,
         safe_steps,
         safe_steps / 10,
-        Fixed::from_raw(1 << 44),
+        kelvin_core::DEFAULT_DT,
         Fixed::from_raw(1 << 44),
         kelvin_core::DEFAULT_G,
     )

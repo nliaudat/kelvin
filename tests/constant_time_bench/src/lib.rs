@@ -30,14 +30,14 @@
 //!   RSA, DSS, and other systems." *CRYPTO '96*.
 //!   — Foundational paper on timing side-channel attacks.
 
-pub mod fixed_mul;
+pub mod acceleration;
+pub mod euler_step;
+pub mod extract_seed;
 pub mod fixed_div;
+pub mod fixed_mul;
 pub mod fixed_sqrt;
 pub mod fixed_sqrt_clamp;
 pub mod fixed_sqrt_edge;
-pub mod acceleration;
-pub mod verlet_step;
-pub mod euler_step;
-pub mod simulate;
-pub mod extract_seed;
 pub mod key_schedule;
+pub mod simulate;
+pub mod verlet_step;
