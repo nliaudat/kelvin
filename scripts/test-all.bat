@@ -21,6 +21,11 @@ set NC=[0m
 
 set EXITCODE=0
 
+REM Initialize git submodules (NIST SP 800-90B tools)
+if not exist .gitmodules goto :skip_submodules
+git submodule update --init --recursive
+:skip_submodules
+
 call :step "1/8: Build workspace (default features)"
 cargo build --workspace
 if errorlevel 1 set EXITCODE=1
@@ -130,6 +135,15 @@ if !EXITCODE! neq 0 exit /b !EXITCODE!
 cargo run --release -p nist_800_90b -- analyze --input target\keystream_90b.bin
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
+
+call :step "Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)"
+python tests\sp800_90b_non_iid\sp800_90b_tests.py -t mcv target\keystream_90b.bin -s 10000
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+python tests\sp800_90b_non_iid\sp800_90b_tests.py -t ttuple target\keystream_90b.bin -s 10000
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+
 del target\keystream_90b.bin
 echo %GREEN%PASSED%NC%
 

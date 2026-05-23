@@ -43,6 +43,7 @@ tests/entropy_analysis/run_keystream_test.py
 /libs/python/kelvin_pyo3/.venv
 *.pyd
 *.pyc
+__pycache__/
 production_readiness_review.md
 /scripts/test_results
 OrbitalConfig

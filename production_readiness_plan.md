@@ -90,10 +90,18 @@ Security is the primary requirement for production readiness. We must move beyon
     - Default 5-body deterministic config for reproducible NIST submissions
     - Progress indicator for large files (1 GB+)
     - Integrated into `scripts/test-all.bat` and `scripts/test-all.sh`
-- [ ] **NIST SP 800-90B Formal Validation (ea_iid)**: Run the official NIST entropy assessment tool on raw keystream output.
-    - Install `ea_iid` from https://github.com/usnistgov/SP800-90B_EntropyAssessment
+- [x] **NIST SP 800-90B Non-IID Entropy Estimation**: Integrated `dj-on-github/SP800_90b_tests` as a git submodule at `tests/sp800_90b_non_iid/` — a Python implementation of all 10 non-IID entropy estimators from SP 800-90B Section 6.3. *(Completed 2026-05-23)*
+    - MCV (Most Common Value) and t-Tuple tests run in CI via `test-all.bat`/`test-all.sh`
+    - All 10 estimators available: MCV, Collision, Markov, Compression, t-Tuple, LRS, Multi MCW, Lag Prediction, Multi MMC Prediction, LZ78Y
+    - CSV output mode (`-c`) for automated parsing
+    - Provides min-entropy estimates (bits/bit) complementary to our built-in pass/fail health tests
+- [x] **NIST SP 800-90B ea_iid Submodule**: Added `usnistgov/SP800-90B_EntropyAssessment` as a git submodule at `tests/ea_iid/`. *(Completed 2026-05-23)*
+    - Clone with `git clone --recurse-submodules` or `git submodule update --init --recursive`
+    - **Build via Docker**: `tests\build-ea-iid.bat` (Windows) or `./tests/build-ea-iid.sh` (Unix)
+    - Dockerfile at `tests/ea_iid/Dockerfile` — Ubuntu 24.04 with all dependencies (`libdivsufsort-dev`, `libjsoncpp-dev`, `libssl-dev`, etc.)
+    - Produces 5 binaries: `ea_iid`, `ea_non_iid`, `ea_restart`, `ea_conditioning`, `ea_transpose`
     - Generate 1 GB keystream: `cargo run --release -p nist_800_90b -- generate --size 1073741824 --output keystream_1gb.bin`
-    - Run `ea_iid`: `python ea_iid.py -i keystream_1gb.bin -o results.txt`
+    - Run `ea_iid`: `python tests/ea_iid/ea_iid.py -i keystream_1gb.bin -o results.txt`
     - Document min-entropy estimate per the standard
     - Conditioning component (SHAKE256) documented per NIST SP 800-90C
     - Report template available at `documentation/nist_800_90b_report.md`

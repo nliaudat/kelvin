@@ -14,6 +14,11 @@
 
 set -euo pipefail
 
+# Initialize git submodules (NIST SP 800-90B tools)
+if [ -f .gitmodules ]; then
+    git submodule update --init --recursive
+fi
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
@@ -106,6 +111,11 @@ pass
 step "Integration: NIST SP 800-90B keystream generation + analysis"
 cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b.bin
 cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b.bin
+
+step "Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)"
+python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t mcv target/keystream_90b.bin -s 10000
+python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t ttuple target/keystream_90b.bin -s 10000
+
 rm -f target/keystream_90b.bin
 pass
 
