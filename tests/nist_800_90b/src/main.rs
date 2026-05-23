@@ -54,7 +54,7 @@ struct Args {
 }
 
 enum Command {
-    Generate { size: u64, output: String, config: Option<String>, verlet: bool },
+    Generate { size: u64, output: String, config: Option<String>, euler: bool },
     Analyze { input: String },
 }
 
@@ -63,7 +63,7 @@ fn parse_args() -> Args {
     if args.len() < 2 {
         eprintln!("Usage:");
         eprintln!(
-            "  nist_800_90b generate --size <BYTES> --output <FILE> [--config <JSON>] [--verlet]"
+            "  nist_800_90b generate --size <BYTES> --output <FILE> [--config <JSON>] [--euler]"
         );
         eprintln!("  nist_800_90b analyze --input <FILE>");
         std::process::exit(1);
@@ -74,7 +74,7 @@ fn parse_args() -> Args {
             let mut size: u64 = 1024 * 1024; // default 1 MB
             let mut output = String::from("keystream.bin");
             let mut config: Option<String> = None;
-            let mut verlet = false;
+            let mut euler = false;
             let mut nist = false;
 
             let mut i = 2;
@@ -98,7 +98,7 @@ fn parse_args() -> Args {
                             config = Some(args[i].clone());
                         }
                     },
-                    "--verlet" => verlet = true,
+                    "--euler" => euler = true,
                     "--nist" => nist = true,
                     _ => {},
                 }
@@ -111,7 +111,7 @@ fn parse_args() -> Args {
                 size = 1_000_000;
             }
 
-            Args { command: Command::Generate { size, output, config, verlet } }
+            Args { command: Command::Generate { size, output, config, euler } }
         },
         "analyze" => {
             let mut input = String::from("keystream.bin");
@@ -550,8 +550,8 @@ fn main() {
     let args = parse_args();
 
     match args.command {
-        Command::Generate { size, output, config, verlet } => {
-            let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
+        Command::Generate { size, output, config, euler } => {
+            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
 
             let orbital_config = if let Some(config_path) = &config {
                 let json = fs::read_to_string(config_path).unwrap_or_else(|e| {
@@ -566,7 +566,7 @@ fn main() {
                 default_config()
             };
 
-            let method_label = if verlet { "Verlet" } else { "Euler" };
+            let method_label = if euler { "Euler" } else { "Verlet" };
             eprintln!("NIST SP 800-90B Keystream Generator");
             eprintln!("  Size: {} bytes ({:.2} GB)", size, size as f64 / 1_073_741_824.0);
             eprintln!("  Output: {}", output);

@@ -19,8 +19,8 @@
 //! ciphertext malleability. The `secure` mode has built-in AEAD authentication
 //! and ignores the `--auth` flag.
 //!
-//! Integration defaults to Euler (faster chaos amplification). Use `--verlet`
-//! for symplectic, energy-conserving integration.
+//! Integration defaults to Verlet (energy-conserving). Use `--euler`
+//! for numerically unstable integration (faster chaos amplification).
 
 #![deny(unsafe_code)]
 
@@ -84,9 +84,9 @@ enum Commands {
         /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
         #[arg(long, default_value = "1048576")]
         bytes_per_step: u64,
-        /// Use symplectic Verlet integration instead of default Euler (energy-conserving)
+        /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
-        verlet: bool,
+        euler: bool,
         /// Append a 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
@@ -108,9 +108,9 @@ enum Commands {
         /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
         #[arg(long, default_value = "1048576")]
         bytes_per_step: u64,
-        /// Use symplectic Verlet integration instead of default Euler (energy-conserving)
+        /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
-        verlet: bool,
+        euler: bool,
         /// Verify and strip the 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
@@ -156,12 +156,12 @@ fn main() -> Result<()> {
                 println!("{}", json);
             }
         },
-        Commands::Encrypt { mode, config, input, output, bytes_per_step, verlet, auth } => {
-            let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
+        Commands::Encrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
+            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             process_file_mode(&mode, &config, &input, &output, true, bytes_per_step, method, auth)?;
         },
-        Commands::Decrypt { mode, config, input, output, bytes_per_step, verlet, auth } => {
-            let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
+        Commands::Decrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
+            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             process_file_mode(
                 &mode,
                 &config,

@@ -84,26 +84,25 @@ use zeroize::Zeroize;
 
 /// Integration method for the n-body gravitational simulation.
 ///
-/// - **Euler** (default): Explicit Euler integration. Numerical instability
-///   amplifies chaos ~10x faster than Verlet, producing more entropy per step.
-/// - **Verlet**: Symplectic Velocity Verlet. Energy-conserving,
-///   time-reversible. Use `--verlet` to opt in.
+/// - **Verlet** (default): Symplectic Velocity Verlet. Energy-conserving,
+///   time-reversible. Provides stable, deterministic chaos.
+/// - **Euler**: Explicit Euler integration. Numerical instability amplifies
+///   chaos ~10x faster than Verlet, but may cause body ejection in some
+///   configurations. Use `--euler` to opt in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntegrationMethod {
-    /// Explicit Euler (default, maximum chaos amplification).
+    /// Symplectic Velocity Verlet (default, energy-conserving).
     #[default]
-    Euler,
-    /// Symplectic Velocity Verlet (energy-conserving).
     Verlet,
+    /// Explicit Euler (numerically unstable, may cause ejection).
+    Euler,
 }
 
 /// Run the full orbital simulation pipeline and extract a 2048-byte seed.
 ///
-/// **Since v0.2.0:** Default integration method changed from Verlet to Euler.
-/// Seeds produced by this function will differ from v0.1.x. Callers that
-/// need backward compatibility should use
-/// [`simulate_and_extract_seed_with_method`] with
-/// `IntegrationMethod::Verlet`.
+/// Uses Verlet integration (default). Callers that need Euler integration
+/// should use [`simulate_and_extract_seed_with_method`] with
+/// `IntegrationMethod::Euler`.
 ///
 /// This is the shared initialization used by V1 (`Kelvin`), V3 (`KelvinPhoton`),
 /// and H (`KelvinQuantum`). It performs:
@@ -128,8 +127,11 @@ pub fn simulate_and_extract_seed_with_method(
     config.validate()?;
 
     // Estimate Lyapunov time
+    // Use 10,000 shadow steps to detect divergence in wide orbits (e.g., 100 AU).
+    // The standard 1000 steps was insufficient for bodies with ~1000-year orbital periods.
+    // 10,000 steps provides Medium confidence and catches most chaotic systems.
     let lyapunov = LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
-    let result = lyapunov.estimate(1000, config.total_steps)?;
+    let result = lyapunov.estimate(10_000, config.total_steps)?;
 
     if config.total_steps < result.min_chaos_steps {
         return Err(KelvinError::InsufficientChaos {
@@ -223,9 +225,12 @@ impl Kelvin {
         config.validate()?;
 
         // Estimate Lyapunov time
+        // Use 10,000 shadow steps to detect divergence in wide orbits (e.g., 100 AU).
+        // The standard 1000 steps was insufficient for bodies with ~1000-year orbital periods.
+        // 10,000 steps provides Medium confidence and catches most chaotic systems.
         let lyapunov =
             LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
-        let result = lyapunov.estimate(1000, config.total_steps)?;
+        let result = lyapunov.estimate(10_000, config.total_steps)?;
 
         if config.total_steps < result.min_chaos_steps {
             return Err(KelvinError::InsufficientChaos {
@@ -302,9 +307,10 @@ impl Kelvin {
 
     /// Create a new Kelvin instance with a configurable integration method.
     ///
-    /// Use `IntegrationMethod::Euler` for maximum chaos amplification
-    /// (numerical instability produces ~10x more entropy per step).
-    /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
+    /// Use `IntegrationMethod::Verlet` (default) for stable, energy-conserving
+    /// integration. Use `IntegrationMethod::Euler` for maximum chaos amplification
+    /// (numerical instability produces ~10x more entropy per step, but may cause
+    /// body ejection in some configurations).
     pub fn new_with_method(
         config: OrbitalConfig,
         method: IntegrationMethod,
@@ -498,9 +504,10 @@ impl KelvinStreaming {
 
     /// Create a new streaming Kelvin instance with a configurable integration method.
     ///
-    /// Use `IntegrationMethod::Euler` for maximum chaos amplification
-    /// (numerical instability produces ~10x more entropy per step).
-    /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
+    /// Use `IntegrationMethod::Verlet` (default) for stable, energy-conserving
+    /// integration. Use `IntegrationMethod::Euler` for maximum chaos amplification
+    /// (numerical instability produces ~10x more entropy per step, but may cause
+    /// body ejection in some configurations).
     pub fn new_with_method(
         config: OrbitalConfig,
         bytes_per_step: u64,
