@@ -11,6 +11,8 @@
 //! - **MAC key sizes**: 32 bytes for KMAC128 (NIST SP 800-185).
 //! - **Chunk sizes**: 1 MiB (1,048,576 bytes) for keystream generation buffers.
 
+use kelvin_core::IntegrationMethod;
+
 // ============================================================================
 // Seed & Key Sizes
 // ============================================================================
@@ -458,11 +460,21 @@ pub const QUANTUM_DEFAULT_MAX_RESEEDS: u64 = 100_000;
 /// Default cache size for H Quantum keystream (1 MiB).
 pub const QUANTUM_DEFAULT_CACHE_SIZE: usize = 1024 * 1024;
 
+/// Default integration method for H Quantum orbital reseeding.
+///
+/// Used in `KelvinQuantum::reseed_from_orbital_chaos` to advance the orbital
+/// simulation when refreshing the base seed with fresh chaotic entropy.
+///
+/// **Why Verlet?** Verlet is energy-conserving and provides stable long-term
+/// integration. Use Euler for faster chaos amplification (numerically unstable).
+///
+/// **Changing this** affects the chaotic trajectory of the reseed entropy.
+pub const QUANTUM_DEFAULT_INTEGRATION_METHOD: IntegrationMethod = IntegrationMethod::Verlet;
+
 /// Default orbital steps per reseed for H Quantum (10,000).
 ///
-/// **Why 10,000?** 10,000 Euler steps (~0.5ms) provides enough trajectory
-/// divergence to inject fresh entropy into the base seed. Euler's numerical
-/// instability amplifies chaos ~10x faster than Verlet.
+/// **Why 10,000?** 10,000 Verlet steps (~0.5ms) provides enough trajectory
+/// divergence to inject fresh entropy into the base seed.
 pub const QUANTUM_DEFAULT_ORBITAL_STEPS: u64 = 10_000;
 
 /// Default reseed interval for H Quantum in bytes (10 MiB).

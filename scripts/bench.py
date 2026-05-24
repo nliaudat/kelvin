@@ -161,10 +161,13 @@ def main():
         # Encrypt
         print("\033[93m  Encrypting...\033[0m")
         t0 = time.time()
-        result = run([str(kelvin_exe), "encrypt", "--mode", mode,
-                      "--config", str(key_file), "--input", str(input_file),
-                      "--output", str(enc_file),
-                      "--bytes-per-step", str(args.bytes_per_step)])
+        cmd = [str(kelvin_exe), "encrypt", "--mode", mode,
+               "--config", str(key_file), "--input", str(input_file),
+               "--output", str(enc_file)]
+        # Only pass --bytes-per-step for chaos mode; photon/quantum use internal defaults
+        if mode == "chaos":
+            cmd.extend(["--bytes-per-step", str(args.bytes_per_step)])
+        result = run(cmd)
         t1 = time.time()
         if result.returncode != 0:
             print(f"\033[91m  Encryption failed (rc={result.returncode})\033[0m")
@@ -183,9 +186,13 @@ def main():
         # Decrypt
         print("\033[93m  Decrypting...\033[0m")
         t0 = time.time()
-        result = run([str(kelvin_exe), "decrypt", "--mode", mode,
-                      "--config", str(key_file), "--input", str(enc_file),
-                      "--output", str(dec_file)])
+        cmd = [str(kelvin_exe), "decrypt", "--mode", mode,
+               "--config", str(key_file), "--input", str(enc_file),
+               "--output", str(dec_file)]
+        # Only pass --bytes-per-step for chaos mode; photon/quantum use internal defaults
+        if mode == "chaos":
+            cmd.extend(["--bytes-per-step", str(args.bytes_per_step)])
+        result = run(cmd)
         t1 = time.time()
         if result.returncode != 0:
             print(f"\033[91m  Decryption failed (rc={result.returncode})\033[0m")

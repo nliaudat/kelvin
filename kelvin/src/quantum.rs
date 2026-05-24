@@ -43,9 +43,10 @@ use crate::error::KelvinError;
 use crate::parameters::{
     DOMSEP_QUANTUM_CACHE_V1, DOMSEP_QUANTUM_KEYSTREAM, DOMSEP_QUANTUM_PERTURB_V1, EXTRACT_BUF_SIZE,
     KEYSTREAM_CHUNK_SIZE, QUANTUM_BASE_SEED_SIZE, QUANTUM_DEFAULT_CACHE_SIZE,
-    QUANTUM_DEFAULT_ORBITAL_STEPS, QUANTUM_DEFAULT_RESEED_INTERVAL, QUANTUM_PERTURB_SCALE,
-    XOF_SEED_SIZE,
+    QUANTUM_DEFAULT_INTEGRATION_METHOD, QUANTUM_DEFAULT_ORBITAL_STEPS,
+    QUANTUM_DEFAULT_RESEED_INTERVAL, QUANTUM_PERTURB_SCALE, XOF_SEED_SIZE,
 };
+use kelvin_core::IntegrationMethod;
 use kelvin_kdf::OrbitalState;
 
 /// H Kelvin-Quantum: hybrid orbital chaos + quantum-resistant stream cipher.
@@ -75,7 +76,9 @@ pub struct KelvinQuantum {
     cache_pos: usize,
     /// Orbital state for fresh entropy generation.
     orbital_state: OrbitalState,
-    /// Orbital steps to run per reseed (Euler integration).
+    /// Integration method for orbital reseeding (Verlet or Euler).
+    integration_method: IntegrationMethod,
+    /// Orbital steps to run per reseed.
     orbital_steps_per_reseed: u64,
     /// Bytes since last reseed.
     bytes_since_reseed: u64,
@@ -154,6 +157,7 @@ impl KelvinQuantum {
             keystream_cache: vec![0u8; cache_size],
             cache_pos: cache_size, // Force immediate refill
             orbital_state,
+            integration_method: QUANTUM_DEFAULT_INTEGRATION_METHOD,
             orbital_steps_per_reseed,
             bytes_since_reseed: 0,
             reseed_interval_bytes,
@@ -202,16 +206,20 @@ impl KelvinQuantum {
 
     /// Reseed the base seed with fresh orbital entropy.
     ///
-    /// Advances the orbital simulation by `orbital_steps_per_reseed` steps,
+    /// Advances the orbital simulation by `orbital_steps_per_reseed` steps
+    /// using the configured integration method (Verlet or Euler),
     /// then extracts fresh entropy via SHAKE256 and XORs it into the base seed.
     /// This provides forward secrecy beyond BLAKE3's deterministic reseeding.
     fn reseed_from_orbital_chaos(&mut self) {
-        // Advance orbital simulation
+        // Advance orbital simulation using the configured integration method
         for _ in 0..self.orbital_steps_per_reseed {
-            // Ignore errors from verlet_step (stability checks may fail for
+            // Ignore errors from integration steps (stability checks may fail for
             // perturbed systems, but we still get useful entropy from the
             // simulation state before the error would occur).
-            let _ = self.orbital_state.verlet_step();
+            let _ = match self.integration_method {
+                IntegrationMethod::Verlet => self.orbital_state.verlet_step(),
+                IntegrationMethod::Euler => self.orbital_state.euler_step(),
+            };
         }
 
         // Extract fresh entropy from orbital state using the built-in extractor
@@ -226,26 +234,41 @@ impl KelvinQuantum {
         fresh_entropy.zeroize();
     }
 
-    /// Get a byte from the keystream, refilling the cache if needed.
+    /// Fill `output` with keystream bytes from the cache, refilling as needed.
+    ///
+    /// This is the bulk (batch) variant of `next_keystream_byte`. It copies
+    /// directly from the cache in slices, avoiding the byte-by-byte overhead
+    /// of calling `next_keystream_byte` in a loop.
     ///
     /// Also triggers orbital reseeding at the configured interval.
-    fn next_keystream_byte(&mut self) -> Result<u8, KelvinError> {
-        if self.cache_pos >= self.keystream_cache.len() {
-            self.refill_keystream_cache()?;
+    fn keystream_bytes(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
+        let mut remaining = output.len();
+        let mut out_pos = 0;
+        while remaining > 0 {
+            // Refill cache if exhausted
+            if self.cache_pos >= self.keystream_cache.len() {
+                self.refill_keystream_cache()?;
+            }
+
+            // Copy as much as possible from current cache position
+            let avail = self.keystream_cache.len() - self.cache_pos;
+            let take = std::cmp::min(remaining, avail);
+            output[out_pos..out_pos + take]
+                .copy_from_slice(&self.keystream_cache[self.cache_pos..self.cache_pos + take]);
+
+            self.cache_pos += take;
+            self.total_bytes_generated += take as u64;
+            self.bytes_since_reseed += take as u64;
+            out_pos += take;
+            remaining -= take;
+
+            // Check if we need to reseed from orbital chaos
+            if self.bytes_since_reseed >= self.reseed_interval_bytes {
+                self.reseed_from_orbital_chaos();
+                self.bytes_since_reseed = 0;
+            }
         }
-
-        let byte = self.keystream_cache[self.cache_pos];
-        self.cache_pos += 1;
-        self.total_bytes_generated += 1;
-        self.bytes_since_reseed += 1;
-
-        // Check if we need to reseed from orbital chaos
-        if self.bytes_since_reseed >= self.reseed_interval_bytes {
-            self.reseed_from_orbital_chaos();
-            self.bytes_since_reseed = 0;
-        }
-
-        Ok(byte)
+        Ok(())
     }
 
     /// Encrypt data in-place using XOR with the keystream.
@@ -273,10 +296,8 @@ impl KelvinQuantum {
             let chunk_size = std::cmp::min(remaining, KEYSTREAM_CHUNK_SIZE);
             let chunk = &mut data[offset..offset + chunk_size];
 
-            // Fill keystream buffer byte-by-byte from the cache
-            for k in keystream[..chunk_size].iter_mut() {
-                *k = self.next_keystream_byte()?;
-            }
+            // Fill keystream buffer in bulk from the cache (batch extraction)
+            self.keystream_bytes(&mut keystream[..chunk_size])?;
 
             // XOR into data
             for (d, k) in chunk.iter_mut().zip(keystream[..chunk_size].iter()) {
