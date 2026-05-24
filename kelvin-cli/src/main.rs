@@ -172,16 +172,7 @@ fn main() -> Result<()> {
         Commands::Decrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
-            process_file_mode(
-                &mode,
-                &config,
-                &input,
-                &output,
-                false,
-                bps,
-                method,
-                auth,
-            )?;
+            process_file_mode(&mode, &config, &input, &output, false, bps, method, auth)?;
         },
         Commands::Identify { config, all, ecc, kem, fast } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
@@ -394,12 +385,24 @@ fn process_file_mode(
             method,
             auth,
         ),
-        CryptoMode::Photon => {
-            process_file_photon(config_path, input_path, output_path, encrypt, method, auth, bytes_per_step)
-        },
-        CryptoMode::Quantum => {
-            process_file_quantum(config_path, input_path, output_path, encrypt, method, auth, bytes_per_step)
-        },
+        CryptoMode::Photon => process_file_photon(
+            config_path,
+            input_path,
+            output_path,
+            encrypt,
+            method,
+            auth,
+            bytes_per_step,
+        ),
+        CryptoMode::Quantum => process_file_quantum(
+            config_path,
+            input_path,
+            output_path,
+            encrypt,
+            method,
+            auth,
+            bytes_per_step,
+        ),
     }
 }
 

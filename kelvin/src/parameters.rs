@@ -128,7 +128,6 @@ pub const EXTRACT_BUF_SIZE: usize = 64;
 /// - Lower values → faster but may miss chaos in wide orbits
 pub const LYAPUNOV_SHADOW_STEPS: u64 = 100_000;
 
-
 // ============================================================================
 // Keystream Generation
 // ============================================================================
