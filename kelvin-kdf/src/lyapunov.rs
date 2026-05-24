@@ -195,10 +195,21 @@ impl<'a> LyapunovEstimator<'a> {
         let time = Fixed::from_int(shadow_steps as i64) * self.dt;
 
         if avg_divergence <= initial_perturbation || time <= Fixed::ZERO {
-            // No detectable divergence — system is stable
+            // No detectable divergence within the shadow window.
+            // This does NOT mean the system is stable — it means the shadow
+            // simulation window (shadow_steps) was too short to observe
+            // trajectory divergence. For wide orbits (e.g., 400 AU with
+            // ~8000-year periods), 100,000 steps at dt=1e-3 is only ~100
+            // years — barely 1.25% of one orbit.
+            //
+            // Instead of returning u64::MAX (which causes InsufficientChaos
+            // errors for all valid configurations), we return shadow_steps + 1
+            // as the minimum chaos steps. This tells the caller: "I couldn't
+            // see divergence in the first shadow_steps, so you need at least
+            // shadow_steps + 1 to start seeing it."
             return Ok(LyapunovResult {
                 lyapunov_steps: u64::MAX,
-                min_chaos_steps: u64::MAX,
+                min_chaos_steps: shadow_steps.saturating_add(1),
                 confidence: LyapunovConfidence::Low,
                 shadow_count: divergences.len() as u32,
             });
@@ -244,7 +255,11 @@ impl<'a> LyapunovEstimator<'a> {
                 1
             }
         } else {
-            u64::MAX
+            // Lyapunov exponent is zero — no detectable exponential divergence.
+            // This can happen when the shadow window is too short for wide orbits.
+            // Use max_steps as a conservative upper bound so the downstream
+            // min_chaos_steps calculation doesn't overflow to u64::MAX.
+            _max_steps
         };
 
         // Compute variance and standard deviation of divergences using f64

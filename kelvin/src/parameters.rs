@@ -15,10 +15,11 @@
 // Seed & Key Sizes
 // ============================================================================
 
-/// Size of the main entropy pool / seed in bytes.
+/// Size of the orbital simulation seed in bytes.
 ///
-/// Used by V1 (`Kelvin`), V3 (`KelvinPhoton`), and H (`KelvinQuantum`) as the
+/// Used by V1 (`Kelvin`) and `simulate_and_extract_seed_with_method` as the
 /// primary seed material extracted from the orbital simulation via SHAKE256 XOF.
+/// This seed is then passed to `KeySchedule` for key derivation.
 ///
 /// **Why 2048?** SHAKE256 can produce arbitrary-length output. 2048 bytes
 /// (16,384 bits) provides a large entropy pool for HKDF-SHA512 expansion,
@@ -27,7 +28,46 @@
 /// **Changing this** affects the maximum number of keys derivable from a single
 /// orbital simulation. Larger values increase memory usage but allow more
 /// key material before reseeding.
-pub const SEED_SIZE: usize = 2048;
+pub const ORBITAL_SEED_SIZE: usize = 2048;
+
+/// Size of the V3 Photon base seed in bytes.
+///
+/// Used by `KelvinPhoton` and `KelvinPhotonAuthenticated` as the initial
+/// entropy pool for HKDF-SHA512 expansion → SHAKE256 keystream generation.
+/// Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+///
+/// **Why 2048?** Same rationale as `ORBITAL_SEED_SIZE`. The Photon mode
+/// reuses the same seed size for consistency, but the seed is consumed
+/// differently (HKDF expand → SHAKE256 XOF vs. KeySchedule key derivation).
+///
+/// **Changing this** would break compatibility with existing V3 ciphertexts.
+pub const PHOTON_BASE_SEED_SIZE: usize = 2048;
+
+/// Size of the H Quantum base seed in bytes.
+///
+/// Used by `KelvinQuantum` and `KelvinQuantumAuthenticated` as the base
+/// entropy pool that is periodically refreshed with fresh orbital entropy
+/// via `reseed_from_orbital_chaos`.
+///
+/// **Why 2048?** Same rationale as `ORBITAL_SEED_SIZE`. The Quantum mode
+/// reuses the same seed size but the seed lifecycle is different — it is
+/// XORed with fresh orbital entropy on each reseed rather than being
+/// replaced via BLAKE3.
+///
+/// **Changing this** would break compatibility with existing H ciphertexts.
+pub const QUANTUM_BASE_SEED_SIZE: usize = 2048;
+
+/// Size of the KeySchedule seed in bytes.
+///
+/// Used by `KeySchedule` in `kelvin-kdf` for HKDF-SHA512-based key derivation
+/// and BLAKE3-based reseeding. This is the V1 key schedule seed.
+///
+/// **Why 2048?** Same rationale as `ORBITAL_SEED_SIZE`. The KeySchedule
+/// receives the orbital seed and uses it for HKDF key derivation with
+/// forward secrecy via BLAKE3 reseeding.
+///
+/// **Changing this** would break compatibility with existing V1 key schedules.
+pub const KEY_SCHEDULE_SEED_SIZE: usize = 2048;
 
 /// Size of the XOF seed in bytes (HKDF-SHA512 output → SHAKE256 input).
 ///
@@ -76,14 +116,17 @@ pub const EXTRACT_BUF_SIZE: usize = 64;
 /// Used by `simulate_and_extract_seed_with_method` and `Kelvin::init_with_method`
 /// to estimate the Lyapunov exponent via the shadow orbit method.
 ///
-/// **Why 10,000?** The standard 1,000 steps was insufficient for bodies with
-/// ~1000-year orbital periods (wide orbits up to 100 AU). 10,000 steps provides
-/// Medium confidence and reliably detects chaos in most N-body configurations.
+/// **Why 100,000?** The previous value of 10,000 steps was insufficient for
+/// bodies with ~1000-year orbital periods (wide orbits up to 500 AU at maximum
+/// security level). 10,000 steps × 1e-3 yr/step = only 10 years of simulation,
+/// which is barely a blink for a 500 AU orbit (~11,180 year period). 100,000
+/// steps provides 100 years of simulation, enough to detect divergence even
+/// in the widest orbits.
 ///
 /// **Changing this** affects the accuracy of Lyapunov estimation:
 /// - Higher values → more accurate but slower initialization
 /// - Lower values → faster but may miss chaos in wide orbits
-pub const LYAPUNOV_SHADOW_STEPS: u64 = 10_000;
+pub const LYAPUNOV_SHADOW_STEPS: u64 = 100_000;
 
 // ============================================================================
 // Keystream Generation
@@ -353,8 +396,51 @@ pub const ORBITAL_VELOCITY_CONSTANT: f64 = std::f64::consts::TAU;
 // CLI Defaults
 // ============================================================================
 
-/// Default bytes per step for V2 streaming mode (1 MiB).
-pub const DEFAULT_BYTES_PER_STEP: u64 = 1024 * 1024;
+/// Default bytes per step for V2 Chaos streaming mode (1 MiB).
+///
+/// Controls how many bytes of keystream each simulation step produces.
+/// Larger values mean fewer steps for a given file size, reducing the
+/// number of Verlet/Euler integrations needed.
+///
+/// **Why 1 MiB?** Balances simulation cost (~0.3ms per Verlet step for
+/// 10 bodies) with I/O efficiency. 1 MiB per step means ~1000 steps per GB.
+///
+/// **Changing this** affects the chaos mode throughput:
+/// - Larger → fewer steps, faster processing, less frequent entropy refresh
+/// - Smaller → more steps, slower processing, more frequent entropy refresh
+pub const CHAOS_DEFAULT_BYTES_PER_STEP: u64 = 1024 * 1024;
+
+/// Default bytes per step/chunk for V3 Photon mode (64 MiB).
+///
+/// Controls the I/O chunk size for photon mode. Photon generates keystream
+/// from HKDF→SHAKE256 (no per-step simulation), so larger chunks reduce
+/// loop overhead without any simulation cost.
+///
+/// **Why 64 MiB?** Photon is already I/O bound at ~30 GB/s. A 64 MiB chunk
+/// reduces Python/CLI loop overhead while keeping memory usage reasonable.
+///
+/// **Changing this** affects photon mode throughput:
+/// - Larger → fewer iterations, less overhead, more memory
+/// - Smaller → more iterations, more overhead, less memory
+pub const PHOTON_DEFAULT_BYTES_PER_STEP: u64 = 64 * 1024 * 1024;
+
+/// Default bytes per step/chunk for H Quantum mode (64 MiB).
+///
+/// Controls the I/O chunk size for quantum mode. Like photon, quantum
+/// generates keystream from a cache (SHAKE256 XOF) with periodic orbital
+/// reseeding. Larger chunks reduce loop overhead.
+///
+/// **Why 64 MiB?** Same rationale as photon. Quantum's orbital reseeding
+/// happens every 10 MiB regardless of chunk size, so chunk size only
+/// affects I/O loop overhead.
+///
+/// **Changing this** affects quantum mode throughput:
+/// - Larger → fewer iterations, less overhead, more memory
+/// - Smaller → more iterations, more overhead, less memory
+pub const QUANTUM_DEFAULT_BYTES_PER_STEP: u64 = 64 * 1024 * 1024;
+
+/// Legacy alias for DEFAULT_BYTES_PER_STEP (kept for backward compatibility).
+pub const DEFAULT_BYTES_PER_STEP: u64 = CHAOS_DEFAULT_BYTES_PER_STEP;
 
 /// Default max reseeds for V3 Photon mode.
 ///

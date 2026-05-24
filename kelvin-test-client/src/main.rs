@@ -323,9 +323,9 @@ fn run_self_test() -> Result<(), String> {
         ),
     ];
 
-    // Use enough steps to exceed the Lyapunov horizon (~95 steps for this config).
-    // 200 ensures we're well into the chaotic regime.
-    let safe_steps: u64 = 200;
+    // Use enough steps to exceed the Lyapunov horizon (~271 steps for this config
+    // with LYAPUNOV_SHADOW_STEPS=100000). 500 ensures we're well into the chaotic regime.
+    let safe_steps: u64 = 500;
 
     let config = kelvin::OrbitalConfig::new(
         bodies,

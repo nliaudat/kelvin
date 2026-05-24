@@ -36,7 +36,8 @@ use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::KelvinError;
 use crate::parameters::{
-    DOMSEP_PHOTON_KEYSTREAM_V1, DOMSEP_PHOTON_RESEED_V1, KEYSTREAM_CHUNK_SIZE, XOF_SEED_SIZE,
+    DOMSEP_PHOTON_KEYSTREAM_V1, DOMSEP_PHOTON_RESEED_V1, KEYSTREAM_CHUNK_SIZE,
+    PHOTON_BASE_SEED_SIZE, XOF_SEED_SIZE,
 };
 
 /// V3 Kelvin-Photon: fast bulk OTP via HKDF→SHAKE256 XOR.
@@ -58,7 +59,7 @@ use crate::parameters::{
 /// ```rust,ignore
 /// use kelvin::KelvinPhoton;
 ///
-/// let seed = [0u8; 2048]; // From orbital simulation
+/// let seed = [0u8; PHOTON_BASE_SEED_SIZE]; // From orbital simulation
 /// let mut photon = KelvinPhoton::new(seed, 1000)?;
 /// let mut data = b"Secret message".to_vec();
 /// photon.encrypt(&mut data)?;
@@ -67,8 +68,8 @@ use crate::parameters::{
 /// ```
 #[derive(Debug)]
 pub struct KelvinPhoton {
-    /// Current seed material (2048 bytes).
-    seed: [u8; 2048],
+    /// Current seed material (PHOTON_BASE_SEED_SIZE bytes).
+    seed: [u8; PHOTON_BASE_SEED_SIZE],
     /// Current reseed counter.
     reseed_count: u64,
     /// Maximum reseeds before exhaustion.
@@ -83,7 +84,7 @@ impl KelvinPhoton {
     /// `seed` is the initial 2048-byte entropy pool (from orbital simulation).
     /// `max_reseeds` limits the total keystream (each reseed produces ~16KB
     /// of HKDF output, which seeds unlimited SHAKE256 keystream).
-    pub fn new(seed: [u8; 2048], max_reseeds: u64) -> Self {
+    pub fn new(seed: [u8; PHOTON_BASE_SEED_SIZE], max_reseeds: u64) -> Self {
         KelvinPhoton { seed, reseed_count: 0, max_reseeds, bytes_processed: 0 }
     }
 
@@ -128,12 +129,12 @@ impl KelvinPhoton {
         let mut reader = hasher.finalize_xof();
         XofReader::read(&mut reader, output);
 
-        // Reseed: derive new 2048-byte seed via BLAKE3
+        // Reseed: derive new seed via BLAKE3
         let mut reseed_hasher = Hasher::new();
         reseed_hasher.update(DOMSEP_PHOTON_RESEED_V1);
         reseed_hasher.update(&self.seed[..]);
         reseed_hasher.update(&self.reseed_count.to_le_bytes());
-        let mut reseed_buf = [0u8; 2048];
+        let mut reseed_buf = [0u8; PHOTON_BASE_SEED_SIZE];
         reseed_hasher.finalize_xof().fill(&mut reseed_buf);
         self.seed = reseed_buf;
 
@@ -214,8 +215,8 @@ impl Drop for KelvinPhoton {
 mod tests {
     use super::*;
 
-    fn test_seed() -> [u8; 2048] {
-        let mut seed = [0u8; 2048];
+    fn test_seed() -> [u8; PHOTON_BASE_SEED_SIZE] {
+        let mut seed = [0u8; PHOTON_BASE_SEED_SIZE];
         for (i, byte) in seed.iter_mut().enumerate() {
             *byte = (i % 256) as u8;
         }

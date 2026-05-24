@@ -75,17 +75,19 @@ pub use authenticated::{
     KelvinPhotonAuthenticated, KelvinQuantumAuthenticated, KelvinStreamingAuthenticated,
 };
 pub use parameters::{
-    DEFAULT_BYTES_PER_STEP, DOMSEP_MAC_KEY_V1, DOMSEP_ORBITAL_STATE_V1, DOMSEP_PHOTON_KEYSTREAM_V1,
-    DOMSEP_PHOTON_RESEED_V1, DOMSEP_QUANTUM_CACHE_V1, DOMSEP_QUANTUM_KEYSTREAM,
-    DOMSEP_QUANTUM_PERTURB_V1, DOMSEP_QUANTUM_RESEED_V1, DOMSEP_STREAMING_MAC_KEY_V1,
-    EXTRACT_BUF_SIZE, KEYSTREAM_CHUNK_SIZE, LYAPUNOV_SHADOW_STEPS, MAC_KEY_SIZE, MAXIMUM_BODIES,
-    MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS,
-    PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW, PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER,
-    QUANTUM_DEFAULT_CACHE_SIZE, QUANTUM_DEFAULT_MAX_RESEEDS, QUANTUM_DEFAULT_ORBITAL_STEPS,
-    QUANTUM_DEFAULT_RESEED_INTERVAL, QUANTUM_PERTURB_SCALE, SEED_SIZE, STANDARD_BODIES,
-    STANDARD_STEPS, STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW,
-    SUN_MASS_RANGE, SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
-    XOF_SEED_SIZE,
+    CHAOS_DEFAULT_BYTES_PER_STEP, DEFAULT_BYTES_PER_STEP, DOMSEP_MAC_KEY_V1,
+    DOMSEP_ORBITAL_STATE_V1, DOMSEP_PHOTON_KEYSTREAM_V1, DOMSEP_PHOTON_RESEED_V1,
+    DOMSEP_QUANTUM_CACHE_V1, DOMSEP_QUANTUM_KEYSTREAM, DOMSEP_QUANTUM_PERTURB_V1,
+    DOMSEP_QUANTUM_RESEED_V1, DOMSEP_STREAMING_MAC_KEY_V1, EXTRACT_BUF_SIZE, KEYSTREAM_CHUNK_SIZE,
+    KEY_SCHEDULE_SEED_SIZE, LYAPUNOV_SHADOW_STEPS, MAC_KEY_SIZE, MAXIMUM_BODIES, MAXIMUM_STEPS,
+    ORBITAL_SEED_SIZE, ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS,
+    PHOTON_BASE_SEED_SIZE, PHOTON_DEFAULT_BYTES_PER_STEP, PHOTON_DEFAULT_MAX_RESEEDS,
+    PLANET_MASS_MAX_RAW, PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, QUANTUM_BASE_SEED_SIZE,
+    QUANTUM_DEFAULT_BYTES_PER_STEP, QUANTUM_DEFAULT_CACHE_SIZE, QUANTUM_DEFAULT_MAX_RESEEDS,
+    QUANTUM_DEFAULT_ORBITAL_STEPS, QUANTUM_DEFAULT_RESEED_INTERVAL, QUANTUM_PERTURB_SCALE,
+    STANDARD_BODIES, STANDARD_STEPS, STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW,
+    SUN_MASS_MIN_RAW, SUN_MASS_RANGE, SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW,
+    SUN_VEL_MIN_RAW, XOF_SEED_SIZE,
 };
 pub use photon::KelvinPhoton;
 pub use quantum::KelvinQuantum;
@@ -95,7 +97,7 @@ use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};
 use kelvin_kdf::LyapunovEstimator;
 use zeroize::Zeroize;
 
-/// Run the full orbital simulation pipeline and extract a 2048-byte seed.
+/// Run the full orbital simulation pipeline and extract an orbital seed.
 ///
 /// Uses Verlet integration (default). Callers that need Euler integration
 /// should use [`simulate_and_extract_seed_with_method`] with
@@ -108,10 +110,10 @@ use zeroize::Zeroize;
 /// 3. Full orbital simulation with stability monitoring
 /// 4. SHAKE256 seed extraction
 ///
-/// Returns the 2048-byte seed and the simulated bodies.
+/// Returns the orbital seed and the simulated bodies.
 pub fn simulate_and_extract_seed(
     config: &OrbitalConfig,
-) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
+) -> Result<([u8; ORBITAL_SEED_SIZE], Vec<OrbitalBody>), KelvinError> {
     simulate_and_extract_seed_with_method(config, IntegrationMethod::default())
 }
 
@@ -119,7 +121,7 @@ pub fn simulate_and_extract_seed(
 pub fn simulate_and_extract_seed_with_method(
     config: &OrbitalConfig,
     method: IntegrationMethod,
-) -> Result<([u8; 2048], Vec<OrbitalBody>), KelvinError> {
+) -> Result<([u8; ORBITAL_SEED_SIZE], Vec<OrbitalBody>), KelvinError> {
     // Validate config
     config.validate()?;
 
@@ -166,9 +168,9 @@ pub fn simulate_and_extract_seed_with_method(
         },
     }
 
-    // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
+    // Extract initial orbital seed (using SHAKE256 XOF) directly into
     // a fixed-size array — avoids an unnecessary Vec allocation.
-    let mut seed = [0u8; SEED_SIZE];
+    let mut seed = [0u8; ORBITAL_SEED_SIZE];
     extract_shake256_into(
         &bodies,
         config.total_steps,
@@ -262,9 +264,9 @@ impl Kelvin {
             },
         }
 
-        // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
+        // Extract initial orbital seed (using SHAKE256 XOF) directly into
         // a fixed-size array — avoids an unnecessary Vec allocation.
-        let mut seed = [0u8; SEED_SIZE];
+        let mut seed = [0u8; ORBITAL_SEED_SIZE];
         extract_shake256_into(
             &bodies,
             config.total_steps,
@@ -751,7 +753,7 @@ mod tests {
         );
         OrbitalConfig::new(
             vec![sun, planet1, planet2, planet3, planet4],
-            200, // Use enough steps to exceed Lyapunov horizon
+            500, // Use enough steps to exceed Lyapunov horizon
             10,
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44), // ~1e-6
