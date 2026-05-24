@@ -285,9 +285,9 @@ impl KelvinQuantum {
         let inner = KelvinQuantumRust::with_config(
             seed_arr,
             max_reseeds,
-            cache_size.unwrap_or(kelvin::DEFAULT_CACHE_SIZE),
-            orbital_steps_per_reseed.unwrap_or(kelvin::DEFAULT_ORBITAL_STEPS),
-            reseed_interval_bytes.unwrap_or(kelvin::DEFAULT_RESEED_INTERVAL),
+            cache_size.unwrap_or(kelvin::QUANTUM_DEFAULT_CACHE_SIZE),
+            orbital_steps_per_reseed.unwrap_or(kelvin::QUANTUM_DEFAULT_ORBITAL_STEPS),
+            reseed_interval_bytes.unwrap_or(kelvin::QUANTUM_DEFAULT_RESEED_INTERVAL),
         )
         .map_err(map_error)?;
 
@@ -444,9 +444,9 @@ impl KelvinQuantumAuthenticated {
         let inner = KelvinQuantumAuthRust::with_config(
             seed_arr,
             max_reseeds,
-            cache_size.unwrap_or(kelvin::DEFAULT_CACHE_SIZE),
-            orbital_steps_per_reseed.unwrap_or(kelvin::DEFAULT_ORBITAL_STEPS),
-            reseed_interval_bytes.unwrap_or(kelvin::DEFAULT_RESEED_INTERVAL),
+            cache_size.unwrap_or(kelvin::QUANTUM_DEFAULT_CACHE_SIZE),
+            orbital_steps_per_reseed.unwrap_or(kelvin::QUANTUM_DEFAULT_ORBITAL_STEPS),
+            reseed_interval_bytes.unwrap_or(kelvin::QUANTUM_DEFAULT_RESEED_INTERVAL),
         )
         .map_err(map_error)?;
 

@@ -31,6 +31,14 @@ use kelvin::{
     KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated, KelvinStreaming,
     KelvinStreamingAuthenticated, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3,
 };
+use kelvin::{
+    DEFAULT_BYTES_PER_STEP, MAXIMUM_BODIES, MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT,
+    PARANOID_BODIES, PARANOID_STEPS, PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW,
+    PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, QUANTUM_DEFAULT_CACHE_SIZE,
+    QUANTUM_DEFAULT_MAX_RESEEDS, QUANTUM_DEFAULT_RESEED_INTERVAL, STANDARD_BODIES, STANDARD_STEPS,
+    STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW, SUN_MASS_RANGE,
+    SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
+};
 use ml_kem::KeyExport;
 use rand::Rng;
 use std::fs;
@@ -259,12 +267,15 @@ fn main() -> Result<()> {
 fn generate_config(level: &str) -> Result<OrbitalConfig> {
     let mut rng = rand::thread_rng();
     let (n_bodies, steps) = match level {
-        "standard" => (5, 1_000_000),
-        "paranoid" => (5, 10_000_000),
+        "standard" => (STANDARD_BODIES, STANDARD_STEPS),
+        "paranoid" => (PARANOID_BODIES, PARANOID_STEPS),
         "maximum" => {
-            eprintln!("Warning: 'maximum' level uses 10 bodies and 100,000,000 simulation steps.");
+            eprintln!(
+                "Warning: 'maximum' level uses {} bodies and {} simulation steps.",
+                MAXIMUM_BODIES, MAXIMUM_STEPS
+            );
             eprintln!("This will take significantly longer than 'standard' or 'paranoid'.");
-            (10, 100_000_000)
+            (MAXIMUM_BODIES, MAXIMUM_STEPS)
         },
         _ => {
             anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level)
@@ -274,29 +285,29 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
     let mut bodies = Vec::with_capacity(n_bodies);
 
     let sun_mass = loop {
-        let raw: i128 = (1 << 64) + rng.gen_range(-(1i128 << 62)..(1i128 << 62) + 1);
+        let raw: i128 = SUN_MASS_CENTER + rng.gen_range(-SUN_MASS_RANGE..SUN_MASS_RANGE + 1);
         let m = Fixed::from_raw(raw);
-        if m >= Fixed::from_raw(3 << 62) && m <= Fixed::from_raw(5 << 62) {
+        if m >= Fixed::from_raw(SUN_MASS_MIN_RAW) && m <= Fixed::from_raw(SUN_MASS_MAX_RAW) {
             break m;
         }
     };
     bodies.push(OrbitalBody::new(
         sun_mass,
         Vec3::new(
-            Fixed::from_raw(rng.gen_range(1 << 20..1 << 30)),
-            Fixed::from_raw(rng.gen_range(1 << 20..1 << 30)),
-            Fixed::from_raw(rng.gen_range(1 << 20..1 << 30)),
+            Fixed::from_raw(rng.gen_range(SUN_POS_MIN_RAW..SUN_POS_MAX_RAW)),
+            Fixed::from_raw(rng.gen_range(SUN_POS_MIN_RAW..SUN_POS_MAX_RAW)),
+            Fixed::from_raw(rng.gen_range(SUN_POS_MIN_RAW..SUN_POS_MAX_RAW)),
         ),
         Vec3::new(
-            Fixed::from_raw(rng.gen_range(1 << 10..1 << 20)),
-            Fixed::from_raw(rng.gen_range(1 << 10..1 << 20)),
-            Fixed::from_raw(rng.gen_range(1 << 10..1 << 20)),
+            Fixed::from_raw(rng.gen_range(SUN_VEL_MIN_RAW..SUN_VEL_MAX_RAW)),
+            Fixed::from_raw(rng.gen_range(SUN_VEL_MIN_RAW..SUN_VEL_MAX_RAW)),
+            Fixed::from_raw(rng.gen_range(SUN_VEL_MIN_RAW..SUN_VEL_MAX_RAW)),
         ),
     ));
 
     for i in 1..n_bodies {
-        let radius = (i as i64 + 1) * 50;
-        let mass = Fixed::from_raw(rng.gen_range(1 << 30..1 << 35));
+        let radius = (i as i64 + 1) * PLANET_RADIUS_MULTIPLIER;
+        let mass = Fixed::from_raw(rng.gen_range(PLANET_MASS_MIN_RAW..PLANET_MASS_MAX_RAW));
 
         let theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
         let phi = (rng.gen_range(-1.0..1.0f64)).acos();
@@ -307,7 +318,7 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
 
         let v_theta = rng.gen_range(0.0..std::f64::consts::PI * 2.0);
         let v_phi = (rng.gen_range(-1.0..1.0f64)).acos();
-        let v_mag = 1.0 / (radius as f64).sqrt() * 6.3;
+        let v_mag = 1.0 / (radius as f64).sqrt() * ORBITAL_VELOCITY_CONSTANT;
 
         let vx = v_mag * v_phi.sin() * v_theta.cos();
         let vy = v_mag * v_phi.sin() * v_theta.sin();
@@ -332,8 +343,8 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
         bodies,
         steps,
         steps / 10,
-        Fixed::from_raw(1 << 54),
-        Fixed::from_raw(1 << 48),
+        kelvin::DEFAULT_DT,
+        kelvin::SOFTENING_FACTOR,
         kelvin::DEFAULT_G,
     )
     .map_err(|e| anyhow::anyhow!(e))
@@ -395,10 +406,10 @@ fn process_file_secure(
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
 
     println!("Processing (ChaCha20Poly1305 AEAD)...");
-    let mut buffer = vec![0u8; 64 * 1024 + 16];
+    let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE + 16];
     let mut total_processed = 0u64;
     loop {
-        let bytes_read = input_file.read(&mut buffer[..64 * 1024])?;
+        let bytes_read = input_file.read(&mut buffer[..STREAMING_CHUNK_SIZE])?;
         if bytes_read == 0 {
             break;
         }
@@ -453,7 +464,7 @@ fn process_file_chaos(
             fs::File::create(output_path).context("Failed to create output file")?;
 
         println!("Processing (SHAKE256 XOR + KMAC128)...");
-        let chunk_size = 64 * 1024;
+        let chunk_size = STREAMING_CHUNK_SIZE;
         // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
         // During decryption, we need to read ciphertext + tag in one shot.
         let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
@@ -498,7 +509,7 @@ fn process_file_chaos(
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
 
     println!("Processing (SHAKE256 XOR)...");
-    let mut buffer = vec![0u8; 64 * 1024];
+    let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
     let mut total_processed = 0u64;
     loop {
         let bytes_read = input_file.read(&mut buffer)?;
@@ -555,8 +566,8 @@ fn process_file_photon(
     println!("Processing ({})...", cipher_label);
 
     if auth {
-        let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
-        let chunk_size = 64 * 1024;
+        let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
+        let chunk_size = STREAMING_CHUNK_SIZE;
         // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
         // During decryption, we need to read ciphertext + tag in one shot.
         let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
@@ -587,8 +598,8 @@ fn process_file_photon(
         return Ok(());
     }
 
-    let mut photon = KelvinPhoton::new(seed, 100_000);
-    let mut buffer = vec![0u8; 64 * 1024];
+    let mut photon = KelvinPhoton::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
+    let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
     let mut total_processed = 0u64;
     loop {
         let bytes_read = input_file.read(&mut buffer)?;
@@ -651,13 +662,13 @@ fn process_file_quantum(
     if auth {
         let mut quantum = KelvinQuantumAuthenticated::with_config(
             seed,
-            100_000,
-            1024 * 1024,
-            10_000,
-            10 * 1024 * 1024,
+            PHOTON_DEFAULT_MAX_RESEEDS,
+            QUANTUM_DEFAULT_CACHE_SIZE,
+            QUANTUM_DEFAULT_RESEED_INTERVAL,
+            QUANTUM_DEFAULT_MAX_RESEEDS,
         )
         .context("Failed to initialize KelvinQuantumAuthenticated")?;
-        let chunk_size = 64 * 1024;
+        let chunk_size = STREAMING_CHUNK_SIZE;
         // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
         // During decryption, we need to read ciphertext + tag in one shot.
         let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
@@ -688,11 +699,16 @@ fn process_file_quantum(
         return Ok(());
     }
 
-    let mut quantum =
-        KelvinQuantum::with_config(seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024)
-            .context("Failed to initialize KelvinQuantum")?;
+    let mut quantum = KelvinQuantum::with_config(
+        seed,
+        PHOTON_DEFAULT_MAX_RESEEDS,
+        QUANTUM_DEFAULT_CACHE_SIZE,
+        QUANTUM_DEFAULT_RESEED_INTERVAL,
+        QUANTUM_DEFAULT_MAX_RESEEDS,
+    )
+    .context("Failed to initialize KelvinQuantum")?;
 
-    let mut buffer = vec![0u8; 64 * 1024];
+    let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
     let mut total_processed = 0u64;
     loop {
         let bytes_read = input_file.read(&mut buffer)?;
@@ -730,7 +746,7 @@ fn run_benchmark() -> Result<()> {
         let duration = start.elapsed();
         println!("  Setup Time: {:?}", duration);
 
-        let mut data = vec![0u8; 1024 * 1024];
+        let mut data = vec![0u8; DEFAULT_BYTES_PER_STEP as usize];
         let mut k = Kelvin::new(generate_config(level)?)?;
         let start = std::time::Instant::now();
         k.encrypt(&mut data)?;

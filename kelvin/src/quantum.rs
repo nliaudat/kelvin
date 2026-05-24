@@ -49,16 +49,12 @@ use sha3::{Sha3_512, Shake256};
 use zeroize::Zeroize;
 
 use crate::error::KelvinError;
+use crate::parameters::{
+    DOMSEP_QUANTUM_CACHE_V1, DOMSEP_QUANTUM_KEYSTREAM, DOMSEP_QUANTUM_PERTURB_V1,
+    DOMSEP_QUANTUM_RESEED_V1, EXTRACT_BUF_SIZE, QUANTUM_DEFAULT_CACHE_SIZE,
+    QUANTUM_DEFAULT_ORBITAL_STEPS, QUANTUM_DEFAULT_RESEED_INTERVAL, SEED_SIZE, XOF_SEED_SIZE,
+};
 use kelvin_kdf::OrbitalState;
-
-/// Default cache size for keystream (1 MB).
-pub const DEFAULT_CACHE_SIZE: usize = 1024 * 1024;
-
-/// Default orbital steps per reseed (10,000).
-pub const DEFAULT_ORBITAL_STEPS: u64 = 10_000;
-
-/// Default reseed interval in bytes (10 MB).
-pub const DEFAULT_RESEED_INTERVAL: u64 = 10 * 1024 * 1024;
 
 /// H Kelvin-Quantum: Hybrid OTP combining V3 bulk speed with V2 entropy freshness.
 ///
@@ -112,9 +108,9 @@ impl KelvinQuantum {
         Self::with_config(
             seed,
             max_reseeds,
-            DEFAULT_CACHE_SIZE,
-            DEFAULT_ORBITAL_STEPS,
-            DEFAULT_RESEED_INTERVAL,
+            QUANTUM_DEFAULT_CACHE_SIZE,
+            QUANTUM_DEFAULT_ORBITAL_STEPS,
+            QUANTUM_DEFAULT_RESEED_INTERVAL,
         )
         .expect("KelvinQuantum::new: initial cache refill failed (max_reseeds may be 0)")
     }
@@ -136,9 +132,9 @@ impl KelvinQuantum {
         // synchronization across users.
         let orbital_state = {
             let mut state = OrbitalState::chaotic_default();
-            let mut p = [0u8; 64];
+            let mut p = [0u8; XOF_SEED_SIZE];
             Hasher::new()
-                .update(b"kelvin-quantum-seed-perturb-v1")
+                .update(DOMSEP_QUANTUM_PERTURB_V1)
                 .update(&seed[..])
                 .finalize_xof()
                 .fill(&mut p);
@@ -262,16 +258,16 @@ impl KelvinQuantum {
         }
 
         // Extract fresh entropy via SHAKE256
-        let mut fresh_entropy = [0u8; 64];
+        let mut fresh_entropy = [0u8; EXTRACT_BUF_SIZE];
         self.orbital_state.extract_entropy(&mut fresh_entropy);
 
         // XOR fresh entropy into base seed (domain separated)
         let mut reseed_hasher = Hasher::new();
-        reseed_hasher.update(b"kelvin-quantum-reseed-v1");
+        reseed_hasher.update(DOMSEP_QUANTUM_RESEED_V1);
         reseed_hasher.update(&self.base_seed[..]);
         reseed_hasher.update(&fresh_entropy[..]);
         reseed_hasher.update(&self.reseed_count.to_le_bytes());
-        let mut reseed_buf = [0u8; 2048];
+        let mut reseed_buf = [0u8; SEED_SIZE];
         reseed_hasher.finalize_xof().fill(&mut reseed_buf);
         self.base_seed = reseed_buf;
 
@@ -289,11 +285,11 @@ impl KelvinQuantum {
             return Err(KelvinError::SeedExhausted);
         }
 
-        // HKDF-SHA512 expand: derive 64-byte XOF seed from base seed
+        // HKDF-SHA512 expand: derive XOF seed from base seed
         let hk = Hkdf::<Sha3_512>::new(None, &self.base_seed);
-        let mut xof_seed = [0u8; 64];
+        let mut xof_seed = [0u8; XOF_SEED_SIZE];
         let mut info = Vec::with_capacity(32);
-        info.extend_from_slice(b"kelvin-quantum-cache-v1");
+        info.extend_from_slice(DOMSEP_QUANTUM_CACHE_V1);
         info.extend_from_slice(&self.reseed_count.to_le_bytes());
 
         hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
@@ -301,7 +297,7 @@ impl KelvinQuantum {
         // SHAKE256 XOF: fill the cache
         let mut hasher = Shake256::default();
         sha3::digest::Update::update(&mut hasher, &xof_seed);
-        sha3::digest::Update::update(&mut hasher, b"kelvin-quantum-keystream");
+        sha3::digest::Update::update(&mut hasher, DOMSEP_QUANTUM_KEYSTREAM);
         sha3::digest::Update::update(&mut hasher, &self.total_bytes_generated.to_le_bytes());
 
         let mut reader = hasher.finalize_xof();
