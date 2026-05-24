@@ -14,7 +14,7 @@
 //!
 //! ## Reseeding
 //!
-//! Uses **BLAKE3** for fast XOF-based reseeding of the 2048-byte entropy pool.
+//! Uses **BLAKE3** for fast XOF-based reseeding of the entropy pool.
 //! BLAKE3 is ~10x faster than SHAKE256 for large outputs, and the reseeding
 //! path is performance-critical (called every `reseed_interval` steps).
 //!
@@ -30,6 +30,16 @@ use hkdf::Hkdf;
 use sha3::Sha3_512;
 use zeroize::Zeroize;
 
+/// Size of the KeySchedule seed in bytes.
+///
+/// The seed is 2048 bytes, providing a large entropy pool for long-term
+/// forward secrecy. Each reseed derives a fresh pool via BLAKE3.
+///
+/// **Why 2048?** SHAKE256 can produce arbitrary-length output. 2048 bytes
+/// (16,384 bits) provides a large entropy pool for HKDF-SHA512 expansion,
+/// allowing millions of key derivations without reseeding.
+const KEY_SCHEDULE_SEED_SIZE: usize = 2048;
+
 /// State of the key schedule.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ScheduleState {
@@ -44,12 +54,12 @@ pub enum ScheduleState {
 /// Manages key derivation from orbital simulation state.
 /// Each key is 32 bytes (cipher key) + 12 bytes (nonce/IV).
 ///
-/// The seed is 2048 bytes, providing a large entropy pool for long-term
-/// forward secrecy. Each reseed derives a fresh 2048-byte pool via BLAKE3.
+/// The seed is KEY_SCHEDULE_SEED_SIZE bytes, providing a large entropy pool
+/// for long-term forward secrecy. Each reseed derives a fresh pool via BLAKE3.
 #[derive(Clone, Debug)]
 pub struct KeySchedule {
-    /// Current seed material (2048 bytes).
-    seed: [u8; 2048],
+    /// Current seed material (KEY_SCHEDULE_SEED_SIZE bytes).
+    seed: [u8; KEY_SCHEDULE_SEED_SIZE],
     /// Current step counter.
     step: u64,
     /// Total steps in the simulation.
@@ -71,9 +81,14 @@ pub struct KeySchedule {
 impl KeySchedule {
     /// Create a new key schedule.
     ///
-    /// `seed` is the initial 2048-byte seed from SHAKE256 extraction.
+    /// `seed` is the initial seed from SHAKE256 extraction.
     /// `max_bytes_per_key` is the safe byte limit per key (default: 4 GiB).
-    pub fn new(seed: [u8; 2048], total_steps: u64, reseed_interval: u64, safe_steps: u64) -> Self {
+    pub fn new(
+        seed: [u8; KEY_SCHEDULE_SEED_SIZE],
+        total_steps: u64,
+        reseed_interval: u64,
+        safe_steps: u64,
+    ) -> Self {
         Self::with_max_bytes_per_key(seed, total_steps, reseed_interval, safe_steps, 1 << 32)
     }
 
@@ -83,7 +98,7 @@ impl KeySchedule {
     /// Larger values reduce key rotation frequency at the cost of
     /// increased exposure if a key is compromised.
     pub fn with_max_bytes_per_key(
-        seed: [u8; 2048],
+        seed: [u8; KEY_SCHEDULE_SEED_SIZE],
         total_steps: u64,
         reseed_interval: u64,
         safe_steps: u64,
@@ -147,12 +162,12 @@ impl KeySchedule {
         self.step += self.reseed_interval;
         self.keys_generated += 1;
 
-        // Reseed: derive new 2048-byte seed from current seed using BLAKE3
+        // Reseed: derive new seed from current seed using BLAKE3
         let mut reseed_hasher = Hasher::new();
         reseed_hasher.update(b"kelvin-reseed-v1");
         reseed_hasher.update(&self.seed[..]);
         reseed_hasher.update(&self.step.to_le_bytes());
-        let mut reseed_buf = [0u8; 2048];
+        let mut reseed_buf = [0u8; KEY_SCHEDULE_SEED_SIZE];
         reseed_hasher.finalize_xof().fill(&mut reseed_buf);
         self.seed = reseed_buf;
 
@@ -190,7 +205,7 @@ impl KeySchedule {
     }
 
     /// Reset the schedule with a new seed.
-    pub fn reset(&mut self, seed: [u8; 2048]) {
+    pub fn reset(&mut self, seed: [u8; KEY_SCHEDULE_SEED_SIZE]) {
         self.seed = seed;
         self.step = 0;
         self.keys_generated = 0;
@@ -215,8 +230,8 @@ impl Drop for KeySchedule {
 mod tests {
     use super::*;
 
-    fn test_seed() -> [u8; 2048] {
-        let mut seed = [0u8; 2048];
+    fn test_seed() -> [u8; KEY_SCHEDULE_SEED_SIZE] {
+        let mut seed = [0u8; KEY_SCHEDULE_SEED_SIZE];
         for (i, byte) in seed.iter_mut().enumerate() {
             *byte = (i % 256) as u8;
         }

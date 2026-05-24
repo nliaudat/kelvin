@@ -34,8 +34,7 @@ use kelvin::{
 use kelvin::{
     DEFAULT_BYTES_PER_STEP, MAXIMUM_BODIES, MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT,
     PARANOID_BODIES, PARANOID_STEPS, PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW,
-    PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, QUANTUM_DEFAULT_CACHE_SIZE,
-    QUANTUM_DEFAULT_MAX_RESEEDS, QUANTUM_DEFAULT_RESEED_INTERVAL, STANDARD_BODIES, STANDARD_STEPS,
+    PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, STANDARD_BODIES, STANDARD_STEPS,
     STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW, SUN_MASS_RANGE,
     SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
 };
@@ -400,7 +399,7 @@ fn process_file_secure(
         "Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...",
         method_label
     );
-    let mut k = Kelvin::new_with_method(config, method).context("Failed to initialize Kelvin")?;
+    let mut k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
 
     let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
@@ -456,7 +455,7 @@ fn process_file_chaos(
     );
 
     if auth {
-        let mut ks = KelvinStreamingAuthenticated::new_with_method(config, bytes_per_step, method)
+        let mut ks = KelvinStreamingAuthenticated::new(config, bytes_per_step)
             .context("Failed to initialize KelvinStreamingAuthenticated")?;
 
         let mut input_file = fs::File::open(input_path).context("Failed to open input file")?;
@@ -495,7 +494,7 @@ fn process_file_chaos(
         return Ok(());
     }
 
-    let mut ks = KelvinStreaming::new_with_method(config, bytes_per_step, method)
+    let mut ks = KelvinStreaming::new(config, bytes_per_step)
         .context("Failed to initialize KelvinStreaming")?;
 
     let rate = ks.benchmark(100);
@@ -660,14 +659,7 @@ fn process_file_quantum(
     println!("Processing ({})...", cipher_label);
 
     if auth {
-        let mut quantum = KelvinQuantumAuthenticated::with_config(
-            seed,
-            PHOTON_DEFAULT_MAX_RESEEDS,
-            QUANTUM_DEFAULT_CACHE_SIZE,
-            QUANTUM_DEFAULT_RESEED_INTERVAL,
-            QUANTUM_DEFAULT_MAX_RESEEDS,
-        )
-        .context("Failed to initialize KelvinQuantumAuthenticated")?;
+        let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
         let chunk_size = STREAMING_CHUNK_SIZE;
         // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
         // During decryption, we need to read ciphertext + tag in one shot.
@@ -699,14 +691,7 @@ fn process_file_quantum(
         return Ok(());
     }
 
-    let mut quantum = KelvinQuantum::with_config(
-        seed,
-        PHOTON_DEFAULT_MAX_RESEEDS,
-        QUANTUM_DEFAULT_CACHE_SIZE,
-        QUANTUM_DEFAULT_RESEED_INTERVAL,
-        QUANTUM_DEFAULT_MAX_RESEEDS,
-    )
-    .context("Failed to initialize KelvinQuantum")?;
+    let mut quantum = KelvinQuantum::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
 
     let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
     let mut total_processed = 0u64;

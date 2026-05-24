@@ -15,10 +15,11 @@
 // Seed & Key Sizes
 // ============================================================================
 
-/// Size of the main entropy pool / seed in bytes.
+/// Size of the orbital simulation seed in bytes.
 ///
-/// Used by V1 (`Kelvin`), V3 (`KelvinPhoton`), and H (`KelvinQuantum`) as the
+/// Used by V1 (`Kelvin`) and `simulate_and_extract_seed_with_method` as the
 /// primary seed material extracted from the orbital simulation via SHAKE256 XOF.
+/// This seed is then passed to `KeySchedule` for key derivation.
 ///
 /// **Why 2048?** SHAKE256 can produce arbitrary-length output. 2048 bytes
 /// (16,384 bits) provides a large entropy pool for HKDF-SHA512 expansion,
@@ -27,7 +28,46 @@
 /// **Changing this** affects the maximum number of keys derivable from a single
 /// orbital simulation. Larger values increase memory usage but allow more
 /// key material before reseeding.
-pub const SEED_SIZE: usize = 2048;
+pub const ORBITAL_SEED_SIZE: usize = 2048;
+
+/// Size of the V3 Photon base seed in bytes.
+///
+/// Used by `KelvinPhoton` and `KelvinPhotonAuthenticated` as the initial
+/// entropy pool for HKDF-SHA512 expansion → SHAKE256 keystream generation.
+/// Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+///
+/// **Why 2048?** Same rationale as `ORBITAL_SEED_SIZE`. The Photon mode
+/// reuses the same seed size for consistency, but the seed is consumed
+/// differently (HKDF expand → SHAKE256 XOF vs. KeySchedule key derivation).
+///
+/// **Changing this** would break compatibility with existing V3 ciphertexts.
+pub const PHOTON_BASE_SEED_SIZE: usize = 2048;
+
+/// Size of the H Quantum base seed in bytes.
+///
+/// Used by `KelvinQuantum` and `KelvinQuantumAuthenticated` as the base
+/// entropy pool that is periodically refreshed with fresh orbital entropy
+/// via `reseed_from_orbital_chaos`.
+///
+/// **Why 2048?** Same rationale as `ORBITAL_SEED_SIZE`. The Quantum mode
+/// reuses the same seed size but the seed lifecycle is different — it is
+/// XORed with fresh orbital entropy on each reseed rather than being
+/// replaced via BLAKE3.
+///
+/// **Changing this** would break compatibility with existing H ciphertexts.
+pub const QUANTUM_BASE_SEED_SIZE: usize = 2048;
+
+/// Size of the KeySchedule seed in bytes.
+///
+/// Used by `KeySchedule` in `kelvin-kdf` for HKDF-SHA512-based key derivation
+/// and BLAKE3-based reseeding. This is the V1 key schedule seed.
+///
+/// **Why 2048?** Same rationale as `ORBITAL_SEED_SIZE`. The KeySchedule
+/// receives the orbital seed and uses it for HKDF key derivation with
+/// forward secrecy via BLAKE3 reseeding.
+///
+/// **Changing this** would break compatibility with existing V1 key schedules.
+pub const KEY_SCHEDULE_SEED_SIZE: usize = 2048;
 
 /// Size of the XOF seed in bytes (HKDF-SHA512 output → SHAKE256 input).
 ///

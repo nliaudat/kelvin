@@ -40,7 +40,7 @@ use kelvin::{
     Kelvin as KelvinRust, KelvinError, KelvinPhoton as KelvinPhotonRust,
     KelvinPhotonAuthenticated as KelvinPhotonAuthRust, KelvinQuantum as KelvinQuantumRust,
     KelvinQuantumAuthenticated as KelvinQuantumAuthRust, KelvinStreaming as KelvinStreamingRust,
-    OrbitalConfig,
+    OrbitalConfig, PHOTON_BASE_SEED_SIZE, QUANTUM_BASE_SEED_SIZE,
 };
 
 // ============================================================================
@@ -195,13 +195,14 @@ struct KelvinPhoton {
 impl KelvinPhoton {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
-        if seed.len() != 2048 {
+        if seed.len() != PHOTON_BASE_SEED_SIZE {
             return Err(PyValueError::new_err(format!(
-                "seed must be exactly 2048 bytes, got {}",
+                "seed must be exactly {} bytes, got {}",
+                PHOTON_BASE_SEED_SIZE,
                 seed.len()
             )));
         }
-        let mut seed_arr = [0u8; 2048];
+        let mut seed_arr = [0u8; PHOTON_BASE_SEED_SIZE];
         seed_arr.copy_from_slice(seed);
         let inner = KelvinPhotonRust::new(seed_arr, max_reseeds);
         Ok(KelvinPhoton { inner })
@@ -251,46 +252,16 @@ struct KelvinQuantum {
 impl KelvinQuantum {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
-        if seed.len() != 2048 {
+        if seed.len() != QUANTUM_BASE_SEED_SIZE {
             return Err(PyValueError::new_err(format!(
-                "seed must be exactly 2048 bytes, got {}",
+                "seed must be exactly {} bytes, got {}",
+                QUANTUM_BASE_SEED_SIZE,
                 seed.len()
             )));
         }
-        let mut seed_arr = [0u8; 2048];
+        let mut seed_arr = [0u8; QUANTUM_BASE_SEED_SIZE];
         seed_arr.copy_from_slice(seed);
         let inner = KelvinQuantumRust::new(seed_arr, max_reseeds);
-        Ok(KelvinQuantum { inner })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    #[staticmethod]
-    #[pyo3(signature = (seed, max_reseeds, cache_size=None, orbital_steps_per_reseed=None, reseed_interval_bytes=None))]
-    fn with_config(
-        seed: &[u8],
-        max_reseeds: u64,
-        cache_size: Option<usize>,
-        orbital_steps_per_reseed: Option<u64>,
-        reseed_interval_bytes: Option<u64>,
-    ) -> PyResult<Self> {
-        if seed.len() != 2048 {
-            return Err(PyValueError::new_err(format!(
-                "seed must be exactly 2048 bytes, got {}",
-                seed.len()
-            )));
-        }
-        let mut seed_arr = [0u8; 2048];
-        seed_arr.copy_from_slice(seed);
-
-        let inner = KelvinQuantumRust::with_config(
-            seed_arr,
-            max_reseeds,
-            cache_size.unwrap_or(kelvin::QUANTUM_DEFAULT_CACHE_SIZE),
-            orbital_steps_per_reseed.unwrap_or(kelvin::QUANTUM_DEFAULT_ORBITAL_STEPS),
-            reseed_interval_bytes.unwrap_or(kelvin::QUANTUM_DEFAULT_RESEED_INTERVAL),
-        )
-        .map_err(map_error)?;
-
         Ok(KelvinQuantum { inner })
     }
 
@@ -304,8 +275,8 @@ impl KelvinQuantum {
         self.inner.decrypt(slice).map_err(map_error)
     }
 
-    fn bytes_generated(&self) -> u64 {
-        self.inner.bytes_generated()
+    fn bytes_processed(&self) -> u64 {
+        self.inner.bytes_processed()
     }
 
     fn reseed_count(&self) -> u64 {
@@ -314,10 +285,6 @@ impl KelvinQuantum {
 
     fn remaining_reseeds(&self) -> u64 {
         self.inner.remaining_reseeds()
-    }
-
-    fn orbital_step(&self) -> u64 {
-        self.inner.orbital_step()
     }
 }
 
@@ -345,13 +312,14 @@ struct KelvinPhotonAuthenticated {
 impl KelvinPhotonAuthenticated {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
-        if seed.len() != 2048 {
+        if seed.len() != PHOTON_BASE_SEED_SIZE {
             return Err(PyValueError::new_err(format!(
-                "seed must be exactly 2048 bytes, got {}",
+                "seed must be exactly {} bytes, got {}",
+                PHOTON_BASE_SEED_SIZE,
                 seed.len()
             )));
         }
-        let mut seed_arr = [0u8; 2048];
+        let mut seed_arr = [0u8; PHOTON_BASE_SEED_SIZE];
         seed_arr.copy_from_slice(seed);
         let inner = KelvinPhotonAuthRust::new(seed_arr, max_reseeds);
         Ok(KelvinPhotonAuthenticated { inner })
@@ -410,46 +378,16 @@ struct KelvinQuantumAuthenticated {
 impl KelvinQuantumAuthenticated {
     #[new]
     fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
-        if seed.len() != 2048 {
+        if seed.len() != QUANTUM_BASE_SEED_SIZE {
             return Err(PyValueError::new_err(format!(
-                "seed must be exactly 2048 bytes, got {}",
+                "seed must be exactly {} bytes, got {}",
+                QUANTUM_BASE_SEED_SIZE,
                 seed.len()
             )));
         }
-        let mut seed_arr = [0u8; 2048];
+        let mut seed_arr = [0u8; QUANTUM_BASE_SEED_SIZE];
         seed_arr.copy_from_slice(seed);
         let inner = KelvinQuantumAuthRust::new(seed_arr, max_reseeds);
-        Ok(KelvinQuantumAuthenticated { inner })
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    #[staticmethod]
-    #[pyo3(signature = (seed, max_reseeds, cache_size=None, orbital_steps_per_reseed=None, reseed_interval_bytes=None))]
-    fn with_config(
-        seed: &[u8],
-        max_reseeds: u64,
-        cache_size: Option<usize>,
-        orbital_steps_per_reseed: Option<u64>,
-        reseed_interval_bytes: Option<u64>,
-    ) -> PyResult<Self> {
-        if seed.len() != 2048 {
-            return Err(PyValueError::new_err(format!(
-                "seed must be exactly 2048 bytes, got {}",
-                seed.len()
-            )));
-        }
-        let mut seed_arr = [0u8; 2048];
-        seed_arr.copy_from_slice(seed);
-
-        let inner = KelvinQuantumAuthRust::with_config(
-            seed_arr,
-            max_reseeds,
-            cache_size.unwrap_or(kelvin::QUANTUM_DEFAULT_CACHE_SIZE),
-            orbital_steps_per_reseed.unwrap_or(kelvin::QUANTUM_DEFAULT_ORBITAL_STEPS),
-            reseed_interval_bytes.unwrap_or(kelvin::QUANTUM_DEFAULT_RESEED_INTERVAL),
-        )
-        .map_err(map_error)?;
-
         Ok(KelvinQuantumAuthenticated { inner })
     }
 
@@ -469,8 +407,8 @@ impl KelvinQuantumAuthenticated {
         Ok(())
     }
 
-    fn bytes_generated(&self) -> u64 {
-        self.inner.bytes_generated()
+    fn bytes_processed(&self) -> u64 {
+        self.inner.bytes_processed()
     }
 
     fn reseed_count(&self) -> u64 {
@@ -479,10 +417,6 @@ impl KelvinQuantumAuthenticated {
 
     fn remaining_reseeds(&self) -> u64 {
         self.inner.remaining_reseeds()
-    }
-
-    fn orbital_step(&self) -> u64 {
-        self.inner.orbital_step()
     }
 }
 
