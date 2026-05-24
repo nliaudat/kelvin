@@ -32,12 +32,12 @@ use kelvin::{
     KelvinStreamingAuthenticated, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3,
 };
 use kelvin::{
-    CHAOS_DEFAULT_BYTES_PER_STEP, DEFAULT_BYTES_PER_STEP, MAXIMUM_BODIES, MAXIMUM_STEPS,
-    ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS, PHOTON_DEFAULT_BYTES_PER_STEP,
-    PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW, PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER,
-    QUANTUM_DEFAULT_BYTES_PER_STEP, STANDARD_BODIES, STANDARD_STEPS, STREAMING_CHUNK_SIZE,
-    SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW, SUN_MASS_RANGE, SUN_POS_MAX_RAW,
-    SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
+    CHAOS_DEFAULT_BYTES_PER_STEP, DEFAULT_BYTES_PER_STEP, FAST_RESEED_INTERVAL, FAST_STEPS,
+    MAXIMUM_BODIES, MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS,
+    PHOTON_DEFAULT_BYTES_PER_STEP, PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW,
+    PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, QUANTUM_DEFAULT_BYTES_PER_STEP, STANDARD_BODIES,
+    STANDARD_STEPS, STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW,
+    SUN_MASS_RANGE, SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
 };
 use ml_kem::KeyExport;
 use rand::Rng;
@@ -74,6 +74,12 @@ enum Commands {
         /// Output file (default: stdout)
         #[arg(long)]
         output: Option<String>,
+        /// Fast mode: use 110,000 simulation steps instead of the full step count
+        /// (standard=1M, paranoid=10M, maximum=100M). Produces a valid config
+        /// that passes the Lyapunov chaos check (~100k min_chaos_steps) while
+        /// keeping simulation time under ~4s. Useful for benchmarking and testing.
+        #[arg(long)]
+        fast: bool,
     },
     /// Encrypt a file
     Encrypt {
@@ -154,12 +160,16 @@ enum Commands {
 fn main() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Keygen { level, output } => {
-            let config = generate_config(&level)?;
+        Commands::Keygen { level, output, fast } => {
+            let config = generate_config(&level, fast)?;
             let json = config.to_json()?;
             if let Some(path) = output {
                 fs::write(path, json).context("Failed to write config file")?;
-                println!("Generated {} config.", level);
+                if fast {
+                    println!("Generated {} config (fast mode, 110,000 steps).", level);
+                } else {
+                    println!("Generated {} config.", level);
+                }
             } else {
                 println!("{}", json);
             }
@@ -257,7 +267,7 @@ fn main() -> Result<()> {
 }
 
 #[allow(clippy::disallowed_methods)]
-fn generate_config(level: &str) -> Result<OrbitalConfig> {
+fn generate_config(level: &str, fast: bool) -> Result<OrbitalConfig> {
     let mut rng = rand::thread_rng();
     let (n_bodies, steps) = match level {
         "standard" => (STANDARD_BODIES, STANDARD_STEPS),
@@ -274,6 +284,14 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
             anyhow::bail!("Unknown security level: {}. Use standard, paranoid, or maximum.", level)
         },
     };
+
+    // When fast mode is enabled, override the step count to 110,000
+    // (just above the Lyapunov horizon) and scale reseed_interval
+    // proportionally. The body state (positions/velocities/masses) is
+    // unchanged — it's still generated with the full body count for the
+    // requested security level.
+    let (use_steps, use_reseed) =
+        if fast { (FAST_STEPS, FAST_RESEED_INTERVAL) } else { (steps, steps / 10) };
 
     let mut bodies = Vec::with_capacity(n_bodies);
 
@@ -334,8 +352,8 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
 
     OrbitalConfig::new(
         bodies,
-        steps,
-        steps / 10,
+        use_steps,
+        use_reseed,
         kelvin::DEFAULT_DT,
         kelvin::SOFTENING_FACTOR,
         kelvin::DEFAULT_G,
@@ -790,14 +808,15 @@ fn run_benchmark() -> Result<()> {
 
     for level in levels {
         println!("\nLevel: {}", level);
-        let config = generate_config(level)?;
+        // Use fast mode for benchmarking to avoid long simulation times
+        let config = generate_config(level, true)?;
         let start = std::time::Instant::now();
         let _ = Kelvin::new(config)?;
         let duration = start.elapsed();
         println!("  Setup Time: {:?}", duration);
 
         let mut data = vec![0u8; DEFAULT_BYTES_PER_STEP as usize];
-        let mut k = Kelvin::new(generate_config(level)?)?;
+        let mut k = Kelvin::new(generate_config(level, true)?)?;
         let start = std::time::Instant::now();
         k.encrypt(&mut data)?;
         let duration = start.elapsed();

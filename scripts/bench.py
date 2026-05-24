@@ -83,14 +83,12 @@ def main():
     print("\033[92m  Done\033[0m")
 
     print(f"\033[96m[3/7] Generating fast orbital config ({level} level, 110,000 steps)...\033[0m")
-    # Generate a custom config with 110,000 steps instead of using keygen.
-    # The Lyapunov check requires total_steps >= min_chaos_steps (typically
-    # ~100,000 for 8-body paranoid configs). 110,000 steps is just above the
-    # horizon, keeping simulation time under ~4s (vs 336s for paranoid's 10M).
-    #
-    # We use the keygen command to generate the initial config, then modify it
-    # to use fewer steps. This ensures the body positions/velocities are valid.
-    result = run([str(kelvin_exe), "keygen", "--level", level, "--output", str(key_file)],
+    # Use the --fast flag to generate a config with 110,000 steps instead of
+    # the full step count. The Lyapunov check requires total_steps >=
+    # min_chaos_steps (typically ~100,000 for 8-body paranoid configs).
+    # 110,000 steps is just above the horizon, keeping simulation time under
+    # ~4s (vs 336s for paranoid's 10M).
+    result = run([str(kelvin_exe), "keygen", "--level", level, "--fast", "--output", str(key_file)],
                  capture_output=True, text=True)
     if result.returncode != 0:
         print("\033[91mKeygen failed\033[0m")
@@ -102,21 +100,11 @@ def main():
     if not keygen_info:
         keygen_info = result.stderr.strip() if result.stderr else ""
 
-    # Override total_steps and reseed_interval to use 110,000 steps
-    # (just above the Lyapunov horizon, keeps simulation under ~4s)
-    import json
-    with open(key_file, 'r') as f:
-        config = json.load(f)
-    config['total_steps'] = 110000
-    config['reseed_interval'] = 11000
-    with open(key_file, 'w') as f:
-        json.dump(config, f)
-
     print("\033[92m  Done\033[0m")
     if keygen_info:
         for line in keygen_info.splitlines():
             print(f"    {line}")
-    print(f"  (overridden to 110,000 steps for fast benchmarking)")
+    print(f"  (fast mode, 110,000 steps)")
     print()
 
     print(f"\033[96m[4/7] Generating {size_gb} GB pattern file...\033[0m")

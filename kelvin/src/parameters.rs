@@ -130,6 +130,28 @@ pub const EXTRACT_BUF_SIZE: usize = 64;
 /// - Lower values → faster but may miss chaos in wide orbits
 pub const LYAPUNOV_SHADOW_STEPS: u64 = 100_000;
 
+/// Fast mode simulation steps for benchmarking/testing.
+///
+/// Set to `LYAPUNOV_SHADOW_STEPS + 10,000` (110,000), which is just above
+/// the Lyapunov horizon. The `min_chaos_steps` from Lyapunov estimation is
+/// at most `LYAPUNOV_SHADOW_STEPS + 1` (100,001) in the no-divergence case,
+/// so 110,000 steps comfortably satisfies the chaos check while keeping
+/// simulation time under ~4s (vs 336s for paranoid's 10M steps).
+///
+/// Used by `keygen --fast` and the internal `run_benchmark()`.
+///
+/// **Changing this** affects the minimum steps for fast mode:
+/// - Must be >= `LYAPUNOV_SHADOW_STEPS + 1` to pass the chaos check
+/// - Higher values → slower but more entropy
+/// - Lower values → faster but may fail the chaos check
+pub const FAST_STEPS: u64 = LYAPUNOV_SHADOW_STEPS + 10_000;
+
+/// Fast mode reseed interval, proportionally scaled from `FAST_STEPS`.
+///
+/// Set to `FAST_STEPS / 10` (11,000), maintaining the same ratio as the
+/// default `reseed_interval = total_steps / 10`.
+pub const FAST_RESEED_INTERVAL: u64 = FAST_STEPS / 10;
+
 // ============================================================================
 // Keystream Generation
 // ============================================================================
