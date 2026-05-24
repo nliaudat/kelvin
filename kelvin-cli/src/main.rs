@@ -32,11 +32,12 @@ use kelvin::{
     KelvinStreamingAuthenticated, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3,
 };
 use kelvin::{
-    DEFAULT_BYTES_PER_STEP, MAXIMUM_BODIES, MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT,
-    PARANOID_BODIES, PARANOID_STEPS, PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW,
-    PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, STANDARD_BODIES, STANDARD_STEPS,
-    STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW, SUN_MASS_RANGE,
-    SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
+    CHAOS_DEFAULT_BYTES_PER_STEP, DEFAULT_BYTES_PER_STEP, MAXIMUM_BODIES, MAXIMUM_STEPS,
+    ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS, PHOTON_DEFAULT_BYTES_PER_STEP,
+    PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW, PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER,
+    QUANTUM_DEFAULT_BYTES_PER_STEP, STANDARD_BODIES, STANDARD_STEPS, STREAMING_CHUNK_SIZE,
+    SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW, SUN_MASS_RANGE, SUN_POS_MAX_RAW,
+    SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
 };
 use ml_kem::KeyExport;
 use rand::Rng;
@@ -88,9 +89,9 @@ enum Commands {
         /// Output file path
         #[arg(long)]
         output: String,
-        /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
-        #[arg(long, default_value = "1048576")]
-        bytes_per_step: u64,
+        /// Bytes of keystream per step/chunk (chaos/photon/quantum, mode-specific default)
+        #[arg(long)]
+        bytes_per_step: Option<u64>,
         /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
         euler: bool,
@@ -112,9 +113,9 @@ enum Commands {
         /// Output file path
         #[arg(long)]
         output: String,
-        /// Bytes of keystream per simulation step (chaos mode only, default 1MB)
-        #[arg(long, default_value = "1048576")]
-        bytes_per_step: u64,
+        /// Bytes of keystream per step/chunk (chaos/photon/quantum, mode-specific default)
+        #[arg(long)]
+        bytes_per_step: Option<u64>,
         /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
         euler: bool,
@@ -165,17 +166,19 @@ fn main() -> Result<()> {
         },
         Commands::Encrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
-            process_file_mode(&mode, &config, &input, &output, true, bytes_per_step, method, auth)?;
+            let bps = resolve_bytes_per_step(&mode, bytes_per_step);
+            process_file_mode(&mode, &config, &input, &output, true, bps, method, auth)?;
         },
         Commands::Decrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
+            let bps = resolve_bytes_per_step(&mode, bytes_per_step);
             process_file_mode(
                 &mode,
                 &config,
                 &input,
                 &output,
                 false,
-                bytes_per_step,
+                bps,
                 method,
                 auth,
             )?;
@@ -349,6 +352,23 @@ fn generate_config(level: &str) -> Result<OrbitalConfig> {
     .map_err(|e| anyhow::anyhow!(e))
 }
 
+/// Resolve the mode-specific default for `--bytes-per-step`.
+///
+/// If the user explicitly provided a value, use it. Otherwise, use the
+/// mode-specific default from `parameters.rs`:
+/// - Chaos:  `CHAOS_DEFAULT_BYTES_PER_STEP`   (1 MiB)
+/// - Photon: `PHOTON_DEFAULT_BYTES_PER_STEP`  (64 MiB)
+/// - Quantum:`QUANTUM_DEFAULT_BYTES_PER_STEP` (64 MiB)
+/// - Secure: unused (ignored)
+fn resolve_bytes_per_step(mode: &CryptoMode, user_value: Option<u64>) -> u64 {
+    user_value.unwrap_or(match mode {
+        CryptoMode::Chaos => CHAOS_DEFAULT_BYTES_PER_STEP,
+        CryptoMode::Photon => PHOTON_DEFAULT_BYTES_PER_STEP,
+        CryptoMode::Quantum => QUANTUM_DEFAULT_BYTES_PER_STEP,
+        CryptoMode::Secure => CHAOS_DEFAULT_BYTES_PER_STEP, // unused, but keep consistent
+    })
+}
+
 /// Dispatch to the correct processing function based on mode.
 #[allow(clippy::too_many_arguments)]
 fn process_file_mode(
@@ -375,10 +395,10 @@ fn process_file_mode(
             auth,
         ),
         CryptoMode::Photon => {
-            process_file_photon(config_path, input_path, output_path, encrypt, method, auth)
+            process_file_photon(config_path, input_path, output_path, encrypt, method, auth, bytes_per_step)
         },
         CryptoMode::Quantum => {
-            process_file_quantum(config_path, input_path, output_path, encrypt, method, auth)
+            process_file_quantum(config_path, input_path, output_path, encrypt, method, auth, bytes_per_step)
         },
     }
 }
@@ -545,6 +565,7 @@ fn process_file_photon(
     encrypt: bool,
     method: IntegrationMethod,
     auth: bool,
+    bytes_per_step: u64,
 ) -> Result<()> {
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -565,8 +586,8 @@ fn process_file_photon(
     println!("Processing ({})...", cipher_label);
 
     if auth {
+        let chunk_size = bytes_per_step as usize;
         let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
-        let chunk_size = STREAMING_CHUNK_SIZE;
         // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
         // During decryption, we need to read ciphertext + tag in one shot.
         let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
@@ -597,8 +618,9 @@ fn process_file_photon(
         return Ok(());
     }
 
+    let chunk_size = bytes_per_step as usize;
     let mut photon = KelvinPhoton::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
-    let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
+    let mut buffer = vec![0u8; chunk_size];
     let mut total_processed = 0u64;
     loop {
         let bytes_read = input_file.read(&mut buffer)?;
@@ -635,6 +657,7 @@ fn process_file_quantum(
     encrypt: bool,
     method: IntegrationMethod,
     auth: bool,
+    bytes_per_step: u64,
 ) -> Result<()> {
     let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -659,8 +682,8 @@ fn process_file_quantum(
     println!("Processing ({})...", cipher_label);
 
     if auth {
+        let chunk_size = bytes_per_step as usize;
         let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
-        let chunk_size = STREAMING_CHUNK_SIZE;
         // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
         // During decryption, we need to read ciphertext + tag in one shot.
         let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
@@ -691,9 +714,10 @@ fn process_file_quantum(
         return Ok(());
     }
 
+    let chunk_size = bytes_per_step as usize;
     let mut quantum = KelvinQuantum::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
 
-    let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
+    let mut buffer = vec![0u8; chunk_size];
     let mut total_processed = 0u64;
     loop {
         let bytes_read = input_file.read(&mut buffer)?;

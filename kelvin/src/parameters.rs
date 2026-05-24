@@ -116,14 +116,18 @@ pub const EXTRACT_BUF_SIZE: usize = 64;
 /// Used by `simulate_and_extract_seed_with_method` and `Kelvin::init_with_method`
 /// to estimate the Lyapunov exponent via the shadow orbit method.
 ///
-/// **Why 10,000?** The standard 1,000 steps was insufficient for bodies with
-/// ~1000-year orbital periods (wide orbits up to 100 AU). 10,000 steps provides
-/// Medium confidence and reliably detects chaos in most N-body configurations.
+/// **Why 100,000?** The previous value of 10,000 steps was insufficient for
+/// bodies with ~1000-year orbital periods (wide orbits up to 500 AU at maximum
+/// security level). 10,000 steps × 1e-3 yr/step = only 10 years of simulation,
+/// which is barely a blink for a 500 AU orbit (~11,180 year period). 100,000
+/// steps provides 100 years of simulation, enough to detect divergence even
+/// in the widest orbits.
 ///
 /// **Changing this** affects the accuracy of Lyapunov estimation:
 /// - Higher values → more accurate but slower initialization
 /// - Lower values → faster but may miss chaos in wide orbits
-pub const LYAPUNOV_SHADOW_STEPS: u64 = 10_000;
+pub const LYAPUNOV_SHADOW_STEPS: u64 = 100_000;
+
 
 // ============================================================================
 // Keystream Generation
@@ -393,8 +397,51 @@ pub const ORBITAL_VELOCITY_CONSTANT: f64 = std::f64::consts::TAU;
 // CLI Defaults
 // ============================================================================
 
-/// Default bytes per step for V2 streaming mode (1 MiB).
-pub const DEFAULT_BYTES_PER_STEP: u64 = 1024 * 1024;
+/// Default bytes per step for V2 Chaos streaming mode (1 MiB).
+///
+/// Controls how many bytes of keystream each simulation step produces.
+/// Larger values mean fewer steps for a given file size, reducing the
+/// number of Verlet/Euler integrations needed.
+///
+/// **Why 1 MiB?** Balances simulation cost (~0.3ms per Verlet step for
+/// 10 bodies) with I/O efficiency. 1 MiB per step means ~1000 steps per GB.
+///
+/// **Changing this** affects the chaos mode throughput:
+/// - Larger → fewer steps, faster processing, less frequent entropy refresh
+/// - Smaller → more steps, slower processing, more frequent entropy refresh
+pub const CHAOS_DEFAULT_BYTES_PER_STEP: u64 = 1024 * 1024;
+
+/// Default bytes per step/chunk for V3 Photon mode (64 MiB).
+///
+/// Controls the I/O chunk size for photon mode. Photon generates keystream
+/// from HKDF→SHAKE256 (no per-step simulation), so larger chunks reduce
+/// loop overhead without any simulation cost.
+///
+/// **Why 64 MiB?** Photon is already I/O bound at ~30 GB/s. A 64 MiB chunk
+/// reduces Python/CLI loop overhead while keeping memory usage reasonable.
+///
+/// **Changing this** affects photon mode throughput:
+/// - Larger → fewer iterations, less overhead, more memory
+/// - Smaller → more iterations, more overhead, less memory
+pub const PHOTON_DEFAULT_BYTES_PER_STEP: u64 = 64 * 1024 * 1024;
+
+/// Default bytes per step/chunk for H Quantum mode (64 MiB).
+///
+/// Controls the I/O chunk size for quantum mode. Like photon, quantum
+/// generates keystream from a cache (SHAKE256 XOF) with periodic orbital
+/// reseeding. Larger chunks reduce loop overhead.
+///
+/// **Why 64 MiB?** Same rationale as photon. Quantum's orbital reseeding
+/// happens every 10 MiB regardless of chunk size, so chunk size only
+/// affects I/O loop overhead.
+///
+/// **Changing this** affects quantum mode throughput:
+/// - Larger → fewer iterations, less overhead, more memory
+/// - Smaller → more iterations, more overhead, less memory
+pub const QUANTUM_DEFAULT_BYTES_PER_STEP: u64 = 64 * 1024 * 1024;
+
+/// Legacy alias for DEFAULT_BYTES_PER_STEP (kept for backward compatibility).
+pub const DEFAULT_BYTES_PER_STEP: u64 = CHAOS_DEFAULT_BYTES_PER_STEP;
 
 /// Default max reseeds for V3 Photon mode.
 ///
