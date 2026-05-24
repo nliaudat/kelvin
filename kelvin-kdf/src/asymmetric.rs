@@ -135,7 +135,7 @@ impl OrbitalKeyPair {
             config.dt,
             config.softening,
             config.g,
-            kelvin_core::IntegrationMethod::Verlet,
+            kelvin_core::IntegrationMethod::default(),
         );
 
         let result = estimator

@@ -47,7 +47,7 @@ fn five_body_config() -> OrbitalConfig {
 /// 10000 steps. Euler's numerical instability causes body 3 ejection at
 /// ~1500 steps, which would break these AEAD round-trip tests.
 fn make_kelvin(config: OrbitalConfig) -> Kelvin {
-    Kelvin::new_with_method(config, IntegrationMethod::Verlet).unwrap()
+    Kelvin::new_with_method(config, IntegrationMethod::default()).unwrap()
 }
 
 #[test]

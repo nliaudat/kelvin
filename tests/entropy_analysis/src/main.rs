@@ -105,7 +105,7 @@ fn generate_keystream() -> Vec<u8> {
         .expect("Failed to create config");
 
     let mut kelvin =
-        Kelvin::new_with_method(config, IntegrationMethod::Verlet).expect("Failed to init Kelvin");
+        Kelvin::new_with_method(config, IntegrationMethod::default()).expect("Failed to init Kelvin");
 
     let mut plaintext = vec![0u8; 1_048_576 + 16]; // 1 MB + AEAD tag
     kelvin.encrypt(&mut plaintext).expect("Failed to encrypt");

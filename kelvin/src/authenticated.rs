@@ -444,7 +444,7 @@ impl KelvinStreamingAuthenticated {
     /// The MAC key is derived from the initial orbital state (before any
     /// simulation steps), ensuring it is deterministic from the config.
     pub fn new(config: crate::OrbitalConfig, bytes_per_step: u64) -> Result<Self, KelvinError> {
-        Self::new_with_method(config, bytes_per_step, crate::IntegrationMethod::Verlet)
+        Self::new_with_method(config, bytes_per_step, crate::IntegrationMethod::default())
     }
 
     /// Create a new authenticated streaming instance with a configurable
