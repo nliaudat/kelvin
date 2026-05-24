@@ -407,6 +407,21 @@ fn process_file_mode(
 }
 
 /// V1 Secure: ChaCha20Poly1305 AEAD (original Kelvin).
+///
+/// ## AEAD Tag Handling
+///
+/// ChaCha20Poly1305 appends a 16-byte authentication tag to the ciphertext.
+/// The buffer must have 16 extra bytes after the plaintext for the tag.
+///
+/// **Encryption flow:**
+/// 1. Read `STREAMING_CHUNK_SIZE` bytes of plaintext into buffer[..chunk]
+/// 2. `k.encrypt()` encrypts in-place, writing the 16-byte tag at buffer[chunk..chunk+16]
+/// 3. Write buffer[..chunk + 16] to output (plaintext + tag)
+///
+/// **Decryption flow:**
+/// 1. Read `STREAMING_CHUNK_SIZE + 16` bytes of ciphertext+tag into buffer
+/// 2. `k.decrypt()` decrypts in-place, verifying the tag
+/// 3. Write buffer[..chunk] to output (plaintext only, strip the tag)
 fn process_file_secure(
     config_path: &str,
     input_path: &str,
@@ -428,22 +443,45 @@ fn process_file_secure(
     let mut output_file = fs::File::create(output_path).context("Failed to create output file")?;
 
     println!("Processing (ChaCha20Poly1305 AEAD)...");
+    // Buffer layout: [plaintext/ciphertext | 16-byte AEAD tag]
+    // encrypt_in_place() expects data.len() = plaintext_len + 16.
+    // The tag is written at position plaintext_len..plaintext_len+16.
     let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE + 16];
     let mut total_processed = 0u64;
     loop {
-        let bytes_read = input_file.read(&mut buffer[..STREAMING_CHUNK_SIZE])?;
-        if bytes_read == 0 {
-            break;
-        }
-
         if encrypt {
-            k.encrypt(&mut buffer[..bytes_read])?;
+            // Encryption:
+            // 1. Read STREAMING_CHUNK_SIZE bytes of plaintext into buffer[..chunk]
+            // 2. Call encrypt(&mut buffer[..chunk + 16]) — the extra 16 bytes are
+            //    zeroed and receive the AEAD tag at position chunk..chunk+16
+            // 3. Write buffer[..chunk + 16] to output (ciphertext + tag)
+            let bytes_read = input_file.read(&mut buffer[..STREAMING_CHUNK_SIZE])?;
+            if bytes_read == 0 {
+                break;
+            }
+            // Zero the tag area to ensure clean state
+            buffer[bytes_read..bytes_read + 16].fill(0);
+            k.encrypt(&mut buffer[..bytes_read + 16])?;
+            output_file.write_all(&buffer[..bytes_read + 16])?;
+            total_processed += bytes_read as u64;
         } else {
+            // Decryption:
+            // 1. Read STREAMING_CHUNK_SIZE + 16 bytes of ciphertext+tag into buffer
+            // 2. Call decrypt(&mut buffer[..bytes_read]) — verifies the tag
+            // 3. Write buffer[..bytes_read - 16] to output (plaintext only)
+            let bytes_read = input_file.read(&mut buffer[..STREAMING_CHUNK_SIZE + 16])?;
+            if bytes_read == 0 {
+                break;
+            }
+            let plaintext_len = bytes_read.saturating_sub(16);
+            if plaintext_len == 0 {
+                break;
+            }
             k.decrypt(&mut buffer[..bytes_read])?;
+            output_file.write_all(&buffer[..plaintext_len])?;
+            total_processed += plaintext_len as u64;
         }
 
-        output_file.write_all(&buffer[..bytes_read])?;
-        total_processed += bytes_read as u64;
         if total_processed.is_multiple_of(1024 * 1024) {
             print!(".");
             let _ = std::io::stdout().flush();
