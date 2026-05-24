@@ -24,7 +24,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use kelvin_core::{verlet_step, euler_step, Fixed, IntegrationMethod, OrbitalBody, Vec3};
+use kelvin_core::{euler_step, verlet_step, Fixed, IntegrationMethod, OrbitalBody, Vec3};
 
 /// Confidence level for Lyapunov time estimation.
 #[derive(Copy, Clone, Debug, PartialEq)]

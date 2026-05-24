@@ -49,18 +49,13 @@ mod stability;
 /// - **Euler**: Explicit Euler integration. Numerical instability amplifies
 ///   chaos ~10x faster than Verlet, but may cause body ejection in some
 ///   configurations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IntegrationMethod {
     /// Symplectic Velocity Verlet (default, energy-conserving).
+    #[default]
     Verlet,
     /// Explicit Euler (numerically unstable, may cause ejection).
     Euler,
-}
-
-impl Default for IntegrationMethod {
-    fn default() -> Self {
-        IntegrationMethod::Verlet
-    }
 }
 
 pub use body::{OrbitalBody, Vec3};

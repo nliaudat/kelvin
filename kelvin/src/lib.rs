@@ -115,7 +115,8 @@ pub fn simulate_and_extract_seed_with_method(
     // Use 10,000 shadow steps to detect divergence in wide orbits (e.g., 100 AU).
     // The standard 1000 steps was insufficient for bodies with ~1000-year orbital periods.
     // 10,000 steps provides Medium confidence and catches most chaotic systems.
-    let lyapunov = LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
+    let lyapunov =
+        LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
     let result = lyapunov.estimate(10_000, config.total_steps)?;
 
     if config.total_steps < result.min_chaos_steps {

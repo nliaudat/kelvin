@@ -309,7 +309,7 @@ fn generate_base_seed() -> ([u8; 2048], Vec<OrbitalBody>) {
     use kelvin::OrbitalConfig;
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(bodies, 500, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("Failed to create config");
 
     kelvin::simulate_and_extract_seed(&config).expect("Failed to extract seed")
@@ -346,7 +346,7 @@ fn generate_v1_keystream_verlet() -> Vec<u8> {
     use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+    let config = OrbitalConfig::new(bodies, 2000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("Failed to create config");
 
     let mut kelvin = Kelvin::new_with_method(config, IntegrationMethod::Verlet)
@@ -379,7 +379,7 @@ fn generate_v2_keystream_verlet() -> Vec<u8> {
     use kelvin::{KelvinStreaming, OrbitalConfig};
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+    let config = OrbitalConfig::new(bodies, 2000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("Failed to create config");
 
     let mut ks =
