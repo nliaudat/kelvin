@@ -101,11 +101,11 @@ fn generate_keystream() -> Vec<u8> {
     use kelvin::{IntegrationMethod, Kelvin, OrbitalConfig};
 
     let bodies = default_bodies();
-    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+    let config = OrbitalConfig::new(bodies, 2000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("Failed to create config");
 
-    let mut kelvin =
-        Kelvin::new_with_method(config, IntegrationMethod::Verlet).expect("Failed to init Kelvin");
+    let mut kelvin = Kelvin::new_with_method(config, IntegrationMethod::default())
+        .expect("Failed to init Kelvin");
 
     let mut plaintext = vec![0u8; 1_048_576 + 16]; // 1 MB + AEAD tag
     kelvin.encrypt(&mut plaintext).expect("Failed to encrypt");
@@ -230,9 +230,8 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
     let mut runs: u64 = 1;
     let mut prev_bit = (data[0] >> 7) & 1;
 
-    for (i, &byte) in data.iter().enumerate() {
-        let start_bit = if i == 0 { 6 } else { 7 };
-        for bit_pos in (0..=start_bit).rev() {
+    for &byte in data.iter() {
+        for bit_pos in (0..=7).rev() {
             let current_bit = (byte >> bit_pos) & 1;
             if current_bit != prev_bit {
                 runs += 1;
@@ -253,14 +252,113 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
     (ok, runs, expected_runs as u64)
 }
 
-// ── SP 800-22 §2.4 Longest Run Test (simplified) ──────────────────────────────
+// ── SP 800-22 §2.4 Longest Run Test (block-based) ─────────────────────────────
+//
+// For large datasets (≥ 1,000,000 bits), NIST SP 800-22 §2.4 uses a
+// chi-square test across blocks of size M = 10000. The critical values
+// for the longest run within each block are:
+//   ≤ 10, 11, 12, 13, 14, 15, 16, ≥ 17
+// with expected frequencies v = [0.0882, 0.2092, 0.2483, 0.1933,
+//                                0.1208, 0.0675, 0.0727] × N_blocks.
+//
+// For smaller datasets, we use the simplified global threshold approach.
 
-fn longest_run_bit_test(data: &[u8]) -> (bool, u64, u64) {
+/// Result of the longest run test.
+struct LongestRunResult {
+    pass: bool,
+    /// The observed longest run (in bits) across the entire dataset.
+    longest_run: u64,
+    /// Human-readable description of the threshold/criterion used.
+    detail: String,
+}
+
+fn longest_run_bit_test(data: &[u8]) -> LongestRunResult {
     if data.is_empty() {
-        return (true, 0, 0);
+        return LongestRunResult { pass: true, longest_run: 0, detail: "no data".to_string() };
     }
     let total_bits = (data.len() * 8) as u64;
 
+    // For datasets ≥ 1,000,000 bits, use NIST SP 800-22 §2.4 block-based test
+    if total_bits >= 1_000_000 {
+        const M: u64 = 10000; // block size
+        let n_blocks = (total_bits / M) as usize;
+
+        // NIST SP 800-22 §2.4 Table 2.7 (M = 10000, 7 categories):
+        //   v[0]=10 (≤10), v[1]=11, v[2]=12, v[3]=13, v[4]=14, v[5]=15, v[6]=16 (≥16)
+        //   pi = [0.0882, 0.2092, 0.2483, 0.1933, 0.1208, 0.0675, 0.0727]
+        let expected_probs = [0.0882, 0.2092, 0.2483, 0.1933, 0.1208, 0.0675, 0.0727];
+        let expected: Vec<f64> = expected_probs.iter().map(|p| p * n_blocks as f64).collect();
+
+        // Count longest run in each block (7 categories matching NIST SP 800-22)
+        let mut counts = [0u64; 7]; // indices: 0=≤10, 1=11, 2=12, 3=13, 4=14, 5=15, 6=≥16
+        let mut global_longest: u64 = 1;
+
+        for block in 0..n_blocks {
+            let start_bit = block as u64 * M;
+
+            // NIST SP 800-22 §2.4: count longest run of ONES only
+            let mut longest: u64 = 0;
+            let mut current: u64 = 0;
+
+            for bit_idx in 0..M {
+                let abs_bit = start_bit + bit_idx;
+                let byte_idx = (abs_bit / 8) as usize;
+                let bit_pos = 7 - (abs_bit % 8) as u8;
+                let current_bit = (data[byte_idx] >> bit_pos) & 1;
+
+                if current_bit == 1 {
+                    current += 1;
+                    if current > longest {
+                        longest = current;
+                    }
+                } else {
+                    current = 0;
+                }
+            }
+
+            if longest > global_longest {
+                global_longest = longest;
+            }
+
+            // NIST SP 800-22 §2.4: 7 categories matching Table 2.7
+            // v[0]=10 (≤10), v[1]=11, v[2]=12, v[3]=13, v[4]=14, v[5]=15, v[6]=16 (≥16)
+            let idx = match longest {
+                0..=10 => 0,
+                11 => 1,
+                12 => 2,
+                13 => 3,
+                14 => 4,
+                15 => 5,
+                _ => 6, // ≥16
+            };
+            counts[idx] += 1;
+        }
+
+        // Chi-square statistic
+        let chi_sq: f64 = counts
+            .iter()
+            .zip(expected.iter())
+            .map(|(&obs, &exp)| {
+                if exp > 0.0 {
+                    let diff = obs as f64 - exp;
+                    diff * diff / exp
+                } else {
+                    0.0
+                }
+            })
+            .sum();
+
+        // Critical value for df=7 at α=0.01 is 18.475
+        let pass = chi_sq < 18.475;
+        let detail = format!(
+            "χ²={:.2} (critical: 18.475, df=6), longest block run: {} bits, dist: [{}, {}, {}, {}, {}, {}, {}]",
+            chi_sq, global_longest,
+            counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6]
+        );
+        return LongestRunResult { pass, longest_run: global_longest, detail };
+    }
+
+    // For smaller datasets, use simplified global threshold
     let max_allowed = if total_bits < 100 {
         12
     } else if total_bits < 1000 {
@@ -275,9 +373,8 @@ fn longest_run_bit_test(data: &[u8]) -> (bool, u64, u64) {
     let mut current: u64 = 1;
     let mut prev_bit = (data[0] >> 7) & 1;
 
-    for (i, &byte) in data.iter().enumerate() {
-        let start_bit = if i == 0 { 6 } else { 7 };
-        for bit_pos in (0..=start_bit).rev() {
+    for &byte in data.iter() {
+        for bit_pos in (0..=7).rev() {
             let current_bit = (byte >> bit_pos) & 1;
             if current_bit == prev_bit {
                 current += 1;
@@ -291,7 +388,9 @@ fn longest_run_bit_test(data: &[u8]) -> (bool, u64, u64) {
         }
     }
 
-    (longest <= max_allowed, longest, max_allowed)
+    let pass = longest <= max_allowed;
+    let detail = format!("longest: {} bits, max allowed: {}", longest, max_allowed);
+    LongestRunResult { pass, longest_run: longest, detail }
 }
 
 // ── Keystream analysis (returns report string) ────────────────────────────────
@@ -390,12 +489,11 @@ fn analyze_keystream() -> String {
     ));
 
     // Longest Run Test (§2.4 simplified)
-    let (longest_pass, longest, max_allowed) = longest_run_bit_test(&keystream);
+    let longest_result = longest_run_bit_test(&keystream);
     out.push_str(&format!(
-        "  [{}] Longest Run Test (longest: {} bits, max allowed: {})\n",
-        if longest_pass { "PASS" } else { "FAIL" },
-        longest,
-        max_allowed
+        "  [{}] Longest Run Test ({})\n",
+        if longest_result.pass { "PASS" } else { "FAIL" },
+        longest_result.detail
     ));
 
     // ── Summary ────────────────────────────────────────────────────────────
@@ -411,7 +509,11 @@ fn analyze_keystream() -> String {
         ("Repetition Test", rep_pass, format!("max {} consecutive", max_cons)),
         ("Adaptive Proportion", apt_pass, format!("worst {}/512", worst_count)),
         ("Runs Test", runs_pass, format!("{} runs", runs)),
-        ("Longest Run Test", longest_pass, format!("longest {} bits", longest)),
+        (
+            "Longest Run Test",
+            longest_result.pass,
+            format!("longest {} bits", longest_result.longest_run),
+        ),
     ];
 
     let passed = results.iter().filter(|(_, ok, _)| *ok).count();

@@ -24,7 +24,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use kelvin_core::{verlet_step, Fixed, OrbitalBody, Vec3};
+use kelvin_core::{euler_step, verlet_step, Fixed, IntegrationMethod, OrbitalBody, Vec3};
 
 /// Confidence level for Lyapunov time estimation.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -97,12 +97,24 @@ pub struct LyapunovEstimator<'a> {
     softening: Fixed,
     /// Gravitational constant.
     g: Fixed,
+    /// Integration method (Verlet or Euler).
+    method: IntegrationMethod,
 }
 
 impl<'a> LyapunovEstimator<'a> {
     /// Create a new Lyapunov estimator.
-    pub fn new(reference: &'a [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) -> Self {
-        LyapunovEstimator { reference, dt, softening, g }
+    ///
+    /// `method` selects the integration method for the shadow orbits.
+    /// Use `IntegrationMethod::Verlet` for energy-conserving estimation,
+    /// or `IntegrationMethod::Euler` for chaos-amplified estimation.
+    pub fn new(
+        reference: &'a [OrbitalBody],
+        dt: Fixed,
+        softening: Fixed,
+        g: Fixed,
+        method: IntegrationMethod,
+    ) -> Self {
+        LyapunovEstimator { reference, dt, softening, g, method }
     }
 
     /// Estimate the Lyapunov time.
@@ -123,10 +135,17 @@ impl<'a> LyapunovEstimator<'a> {
             return Err(LyapunovError::ZeroSteps);
         }
 
-        // Run reference simulation
+        // Run reference simulation using the configured integration method
         let mut ref_bodies = self.reference.to_vec();
         for _ in 0..shadow_steps {
-            verlet_step(&mut ref_bodies, self.dt, self.softening, self.g);
+            match self.method {
+                IntegrationMethod::Verlet => {
+                    verlet_step(&mut ref_bodies, self.dt, self.softening, self.g);
+                },
+                IntegrationMethod::Euler => {
+                    euler_step(&mut ref_bodies, self.dt, self.softening, self.g);
+                },
+            }
         }
 
         // Create shadow orbits with small perturbations
@@ -145,9 +164,16 @@ impl<'a> LyapunovEstimator<'a> {
             };
             shadow[0].position += delta;
 
-            // Run shadow simulation
+            // Run shadow simulation using the configured integration method
             for _ in 0..shadow_steps {
-                verlet_step(&mut shadow, self.dt, self.softening, self.g);
+                match self.method {
+                    IntegrationMethod::Verlet => {
+                        verlet_step(&mut shadow, self.dt, self.softening, self.g);
+                    },
+                    IntegrationMethod::Euler => {
+                        euler_step(&mut shadow, self.dt, self.softening, self.g);
+                    },
+                }
             }
 
             // Measure divergence
@@ -329,6 +355,7 @@ mod tests {
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
+            IntegrationMethod::Verlet,
         );
         let result = estimator.estimate(100, 10000).unwrap();
         assert!(result.lyapunov_steps > 0);
@@ -346,6 +373,7 @@ mod tests {
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
+            IntegrationMethod::Verlet,
         );
         let result = estimator.estimate(100, 10000);
         assert!(matches!(result, Err(LyapunovError::TooFewBodies)));
@@ -359,6 +387,7 @@ mod tests {
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
+            IntegrationMethod::Verlet,
         );
         let result = estimator.estimate(0, 10000);
         assert!(matches!(result, Err(LyapunovError::ZeroSteps)));
@@ -372,6 +401,7 @@ mod tests {
             kelvin_core::DEFAULT_DT,
             Fixed::from_raw(1 << 44),
             kelvin_core::DEFAULT_G,
+            IntegrationMethod::Verlet,
         );
         // Short run → Low confidence
         let result = estimator.estimate(10, 1000).unwrap();

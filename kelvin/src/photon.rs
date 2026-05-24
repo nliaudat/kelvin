@@ -35,6 +35,9 @@ use sha3::{Sha3_512, Shake256};
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::KelvinError;
+use crate::parameters::{
+    DOMSEP_PHOTON_KEYSTREAM_V1, DOMSEP_PHOTON_RESEED_V1, KEYSTREAM_CHUNK_SIZE, XOF_SEED_SIZE,
+};
 
 /// V3 Kelvin-Photon: fast bulk OTP via HKDF→SHAKE256 XOR.
 ///
@@ -88,7 +91,7 @@ impl KelvinPhoton {
     ///
     /// Processing data in chunks prevents OOM crashes when encrypting
     /// large (multi-GB) inputs by avoiding a full-size keystream allocation.
-    const CHUNK_SIZE: usize = 1024 * 1024;
+    const CHUNK_SIZE: usize = KEYSTREAM_CHUNK_SIZE;
 
     /// Generate keystream and write it directly into `output`.
     ///
@@ -100,11 +103,11 @@ impl KelvinPhoton {
             return Err(KelvinError::SeedExhausted);
         }
 
-        // HKDF-SHA512 expand: derive 64-byte XOF seed from 2048-byte pool
+        // HKDF-SHA512 expand: derive XOF seed from 2048-byte pool
         let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
-        let mut xof_seed = [0u8; 64];
+        let mut xof_seed = [0u8; XOF_SEED_SIZE];
         let mut info = Vec::with_capacity(32);
-        info.extend_from_slice(b"kelvin-photon-keystream-v1");
+        info.extend_from_slice(DOMSEP_PHOTON_KEYSTREAM_V1);
         info.extend_from_slice(&self.reseed_count.to_le_bytes());
 
         hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
@@ -127,7 +130,7 @@ impl KelvinPhoton {
 
         // Reseed: derive new 2048-byte seed via BLAKE3
         let mut reseed_hasher = Hasher::new();
-        reseed_hasher.update(b"kelvin-photon-reseed-v1");
+        reseed_hasher.update(DOMSEP_PHOTON_RESEED_V1);
         reseed_hasher.update(&self.seed[..]);
         reseed_hasher.update(&self.reseed_count.to_le_bytes());
         let mut reseed_buf = [0u8; 2048];

@@ -1,0 +1,406 @@
+//! Named parameters for the Kelvin cryptosystem.
+//!
+//! All hardcoded values used across the `kelvin` crate are defined here
+//! with documentation explaining what they control and the implications
+//! of changing them.
+//!
+//! ## Conventions
+//!
+//! - **Seed sizes**: 2048 bytes for the main entropy pool (SHAKE256 XOF output).
+//! - **XOF seed sizes**: 64 bytes for HKDF-SHA512 output seeding SHAKE256.
+//! - **MAC key sizes**: 32 bytes for KMAC128 (NIST SP 800-185).
+//! - **Chunk sizes**: 1 MiB (1,048,576 bytes) for keystream generation buffers.
+
+// ============================================================================
+// Seed & Key Sizes
+// ============================================================================
+
+/// Size of the main entropy pool / seed in bytes.
+///
+/// Used by V1 (`Kelvin`), V3 (`KelvinPhoton`), and H (`KelvinQuantum`) as the
+/// primary seed material extracted from the orbital simulation via SHAKE256 XOF.
+///
+/// **Why 2048?** SHAKE256 can produce arbitrary-length output. 2048 bytes
+/// (16,384 bits) provides a large entropy pool for HKDF-SHA512 expansion,
+/// allowing millions of key derivations without reseeding.
+///
+/// **Changing this** affects the maximum number of keys derivable from a single
+/// orbital simulation. Larger values increase memory usage but allow more
+/// key material before reseeding.
+pub const SEED_SIZE: usize = 2048;
+
+/// Size of the XOF seed in bytes (HKDF-SHA512 output → SHAKE256 input).
+///
+/// Used by V3 (`KelvinPhoton`) and H (`KelvinQuantum`) to seed SHAKE256 XOF
+/// for arbitrary-length keystream generation.
+///
+/// **Why 64?** HKDF-SHA512 can output up to 16,320 bytes per expand call.
+/// 64 bytes is sufficient to seed SHAKE256's 256-bit security level while
+/// keeping the HKDF call efficient.
+///
+/// **Changing this** affects the entropy available to seed SHAKE256. Must be
+/// at least 32 bytes for 256-bit security.
+pub const XOF_SEED_SIZE: usize = 64;
+
+/// Size of the KMAC128 MAC key in bytes.
+///
+/// Used by authenticated wrappers (`KelvinPhotonAuthenticated`,
+/// `KelvinQuantumAuthenticated`, `KelvinStreamingAuthenticated`) for
+/// NIST SP 800-185 KMAC128 authentication.
+///
+/// **Why 32?** KMAC128 provides 128-bit security against classical and quantum
+/// adversaries. A 32-byte (256-bit) key is standard for HMAC/KMAC.
+///
+/// **Changing this** affects the security level of the MAC. Must be at least
+/// 16 bytes for 128-bit security.
+pub const MAC_KEY_SIZE: usize = 32;
+
+/// Size of the entropy extraction buffer in bytes.
+///
+/// Used when extracting fresh entropy from the orbital state via SHAKE256
+/// for reseeding (e.g., `KelvinQuantum::reseed_from_orbital_chaos`).
+///
+/// **Why 64?** Provides 512 bits of entropy per extraction, which is then
+/// XORed into the 2048-byte base seed. 64 bytes is a standard XOF output
+/// size for SHAKE256.
+///
+/// **Changing this** affects how much fresh entropy is mixed in per reseed.
+pub const EXTRACT_BUF_SIZE: usize = 64;
+
+// ============================================================================
+// Lyapunov Estimation
+// ============================================================================
+
+/// Number of shadow steps used for Lyapunov time estimation.
+///
+/// Used by `simulate_and_extract_seed_with_method` and `Kelvin::init_with_method`
+/// to estimate the Lyapunov exponent via the shadow orbit method.
+///
+/// **Why 10,000?** The standard 1,000 steps was insufficient for bodies with
+/// ~1000-year orbital periods (wide orbits up to 100 AU). 10,000 steps provides
+/// Medium confidence and reliably detects chaos in most N-body configurations.
+///
+/// **Changing this** affects the accuracy of Lyapunov estimation:
+/// - Higher values → more accurate but slower initialization
+/// - Lower values → faster but may miss chaos in wide orbits
+pub const LYAPUNOV_SHADOW_STEPS: u64 = 10_000;
+
+// ============================================================================
+// Keystream Generation
+// ============================================================================
+
+/// Maximum chunk size for keystream generation in bytes (1 MiB).
+///
+/// Used by V3 (`KelvinPhoton`) and H (`KelvinQuantum`) to process data in
+/// fixed-size chunks, preventing OOM crashes when encrypting large (multi-GB)
+/// inputs by avoiding a full-size keystream allocation.
+///
+/// **Why 1 MiB?** Balances memory usage (~1 MB per buffer) with throughput.
+/// Larger chunks reduce loop overhead but increase peak memory. 1 MiB is a
+/// common page cache-friendly size.
+///
+/// **Changing this** affects peak memory usage and throughput:
+/// - Larger → fewer iterations, more memory
+/// - Smaller → less memory, more iterations
+pub const KEYSTREAM_CHUNK_SIZE: usize = 1024 * 1024;
+
+// ============================================================================
+// Domain Separators
+// ============================================================================
+
+/// Domain separator for V1 orbital state seed extraction.
+///
+/// Used in `simulate_and_extract_seed_with_method` and `Kelvin::init_with_method`
+/// to domain-separate the SHAKE256 extraction of the initial 2048-byte seed
+/// from the orbital simulation state.
+///
+/// **Why this value?** Ensures the V1 seed extraction is cryptographically
+/// isolated from other extraction contexts (V2, V3, H, MAC keys).
+///
+/// **Changing this** would break compatibility with all existing keystreams.
+pub const DOMSEP_ORBITAL_STATE_V1: &[u8] = b"kelvin-orbital-state-v1";
+
+// Domain separator for V2 streaming keystream extraction.
+// (Commented out: not currently used within the `kelvin` crate.
+//  The V2 streaming mode uses a hardcoded domain separator in KelvinStreaming.)
+// pub const DOMSEP_STREAMING_V2: &[u8] = b"kelvin-streaming-v2-v1-000000000";
+
+/// Domain separator for V3 Photon keystream HKDF expansion.
+///
+/// Used in `KelvinPhoton::generate_keystream_into` to domain-separate the
+/// HKDF-SHA512 expand step that derives the XOF seed.
+///
+/// **Changing this** would break compatibility with existing V3 ciphertexts.
+pub const DOMSEP_PHOTON_KEYSTREAM_V1: &[u8] = b"kelvin-photon-keystream-v1";
+
+/// Domain separator for V3 Photon reseed (BLAKE3).
+///
+/// Used in `KelvinPhoton::generate_keystream_into` to domain-separate the
+/// BLAKE3 reseed that derives the next 2048-byte seed pool.
+///
+/// **Changing this** would break forward secrecy chain compatibility.
+pub const DOMSEP_PHOTON_RESEED_V1: &[u8] = b"kelvin-photon-reseed-v1";
+
+/// Domain separator for H Quantum seed perturbation.
+///
+/// Used in `KelvinQuantum::with_config` to domain-separate the BLAKE3 XOF
+/// that generates perturbation material for the orbital state.
+///
+/// **Changing this** would change the chaotic trajectory for all instances.
+pub const DOMSEP_QUANTUM_PERTURB_V1: &[u8] = b"kelvin-quantum-seed-perturb-v1";
+
+/// Domain separator for H Quantum reseed (BLAKE3).
+///
+/// Used in `KelvinQuantum::reseed_from_orbital_chaos` to domain-separate the
+/// BLAKE3 reseed that XORs fresh orbital entropy into the base seed.
+///
+/// **Changing this** would break forward secrecy chain compatibility.
+pub const DOMSEP_QUANTUM_RESEED_V1: &[u8] = b"kelvin-quantum-reseed-v1";
+
+/// Domain separator for H Quantum keystream cache (SHAKE256).
+///
+/// Used in `KelvinQuantum::refill_keystream_cache` to domain-separate the
+/// SHAKE256 XOF that fills the keystream cache.
+///
+/// **Changing this** would break compatibility with existing H ciphertexts.
+pub const DOMSEP_QUANTUM_CACHE_V1: &[u8] = b"kelvin-quantum-cache-v1";
+
+/// Domain separator for H Quantum keystream (SHAKE256).
+///
+/// Used in `KelvinQuantum::refill_keystream_cache` as additional domain
+/// separation within the SHAKE256 XOF input.
+///
+/// **Changing this** would break compatibility with existing H ciphertexts.
+pub const DOMSEP_QUANTUM_KEYSTREAM: &[u8] = b"kelvin-quantum-keystream";
+
+/// Domain separator for MAC key derivation (V3/H).
+///
+/// Used in `derive_mac_key` to domain-separate the HKDF-SHA512 expansion
+/// that derives the 32-byte KMAC128 key from the 2048-byte seed.
+///
+/// **Changing this** would break authentication for all existing ciphertexts.
+pub const DOMSEP_MAC_KEY_V1: &[u8] = b"kelvin-mac-key-v1";
+
+/// Domain separator for V2 streaming MAC key derivation.
+///
+/// Used in `derive_mac_key_from_bodies` to domain-separate the SHAKE256
+/// extraction and HKDF expansion that derives the KMAC128 key from the
+/// initial orbital state.
+///
+/// **Changing this** would break authentication for existing V2 ciphertexts.
+pub const DOMSEP_STREAMING_MAC_KEY_V1: &[u8] = b"kelvin-streaming-mac-key-v1";
+
+// ============================================================================
+// Quantum Mode Defaults
+// ============================================================================
+
+/// Default perturbation scale for orbital state initialization.
+///
+/// Used in `KelvinQuantum::with_config` to scale the seed-derived perturbation
+/// applied to body positions/velocities. The perturbation magnitude (~1e-12)
+/// is small enough to stay within the chaotic regime but large enough to cause
+/// rapid trajectory divergence between instances.
+///
+/// **Why 1e-12?** Small enough to not destabilize the simulation, large enough
+/// to ensure unique trajectories. The Lyapunov exponent amplifies this to
+/// macroscopic divergence within a few thousand steps.
+///
+/// **Changing this** affects how quickly instances diverge:
+/// - Larger → faster divergence, risk of numerical instability
+/// - Smaller → slower divergence, risk of synchronized instances
+pub const QUANTUM_PERTURB_SCALE: f64 = 1e-12;
+
+// ============================================================================
+// Lyapunov Estimator Constants (kelvin-kdf)
+// ============================================================================
+
+// Number of shadow orbits for Lyapunov estimation (one per spatial axis).
+// (Commented out: defined in `kelvin-kdf` crate directly, not imported here.)
+// pub const SHADOW_ORBIT_COUNT: u32 = 3;
+
+// Perturbation magnitude for shadow orbits (~6e-8 AU ≈ 9 km).
+// (Commented out: defined in `kelvin-kdf` crate directly, not imported here.)
+// pub const SHADOW_PERTURBATION_RAW: i128 = 1 << 40;
+
+// Base margin factor for Lyapunov safety margin calculation.
+// (Commented out: defined in `kelvin-kdf` crate directly, not imported here.)
+// pub const LYAPUNOV_BASE_MARGIN: f64 = 10.0;
+
+// Standard deviation scaling factor for dynamic margin adjustment.
+// (Commented out: defined in `kelvin-kdf` crate directly, not imported here.)
+// pub const LYAPUNOV_STD_DEV_SCALING: f64 = 50.0;
+
+// Threshold for High confidence Lyapunov estimation (steps).
+// (Commented out: defined in `kelvin-kdf` crate directly, not imported here.)
+// pub const LYAPUNOV_HIGH_CONFIDENCE_THRESHOLD: u64 = 10_000;
+
+// Threshold for Medium confidence Lyapunov estimation (steps).
+// (Commented out: defined in `kelvin-kdf` crate directly, not imported here.)
+// pub const LYAPUNOV_MEDIUM_CONFIDENCE_THRESHOLD: u64 = 1_000;
+
+// ============================================================================
+// CLI Keygen Defaults
+// ============================================================================
+
+/// Number of bodies for "standard" security level.
+///
+/// **Why 8?** 8-body N-body systems are inherently chaotic with strong
+/// sensitivity to initial conditions. The Lyapunov estimator reliably detects
+/// chaos with 8 bodies, preventing `InsufficientChaos` errors.
+///
+/// **Changing this** affects the security/performance trade-off:
+/// - More bodies → more chaotic, slower simulation
+/// - Fewer bodies → faster simulation, may not reach chaotic regime
+pub const STANDARD_BODIES: usize = 8;
+
+/// Number of bodies for "paranoid" security level.
+///
+/// Same as standard (8 bodies) but with 10x more simulation steps.
+pub const PARANOID_BODIES: usize = 8;
+
+/// Number of bodies for "maximum" security level.
+///
+/// **Why 10?** 10 bodies with 100M steps provides maximum chaos amplification
+/// at significant computational cost.
+pub const MAXIMUM_BODIES: usize = 10;
+
+/// Simulation steps for "standard" security level.
+///
+/// **Why 1,000,000?** Provides ~100x the Lyapunov horizon for typical 8-body
+/// systems, ensuring deep chaotic mixing.
+pub const STANDARD_STEPS: u64 = 1_000_000;
+
+/// Simulation steps for "paranoid" security level.
+///
+/// **Why 10,000,000?** 10x more steps than standard for paranoid users.
+pub const PARANOID_STEPS: u64 = 10_000_000;
+
+/// Simulation steps for "maximum" security level.
+///
+/// **Why 100,000,000?** 100x more steps than standard. Takes significantly
+/// longer but provides maximum entropy amplification.
+pub const MAXIMUM_STEPS: u64 = 100_000_000;
+
+// ============================================================================
+// Keygen Sun Body Parameters
+// ============================================================================
+
+/// Center value for sun mass randomization (1 << 64 in Q32.64).
+///
+/// The sun's mass is randomized around this center value with ±(1 << 62) range.
+/// The final mass is constrained to [3<<62, 5<<62] to ensure stability.
+///
+/// **Why 1<<64?** In Q32.64 fixed-point, this represents 1.0 solar mass.
+/// The ±(1<<62) range provides ~25% variation while keeping the mass
+/// physically reasonable.
+pub const SUN_MASS_CENTER: i128 = 1 << 64;
+
+/// Half-range for sun mass randomization (± this value).
+pub const SUN_MASS_RANGE: i128 = 1 << 62;
+
+/// Minimum acceptable sun mass (3/4 of center).
+pub const SUN_MASS_MIN_RAW: i128 = 3 << 62;
+
+/// Maximum acceptable sun mass (5/4 of center).
+pub const SUN_MASS_MAX_RAW: i128 = 5 << 62;
+
+/// Minimum random value for sun position components.
+pub const SUN_POS_MIN_RAW: i128 = 1 << 20;
+
+/// Maximum random value for sun position components.
+pub const SUN_POS_MAX_RAW: i128 = 1 << 30;
+
+/// Minimum random value for sun velocity components.
+pub const SUN_VEL_MIN_RAW: i128 = 1 << 10;
+
+/// Maximum random value for sun velocity components.
+pub const SUN_VEL_MAX_RAW: i128 = 1 << 20;
+
+// ============================================================================
+// Keygen Planet Body Parameters
+// ============================================================================
+
+/// Radius multiplier for planet orbital distances.
+///
+/// Planet i is placed at radius = (i + 1) * PLANET_RADIUS_MULTIPLIER AU.
+///
+/// **Why 50?** Provides well-separated orbits from ~100 AU to ~500 AU for
+/// 8 planets, avoiding gravitational collapse while keeping the system bound.
+///
+/// **Changing this** affects orbital spacing:
+/// - Larger → wider orbits, longer periods, more steps needed for chaos
+/// - Smaller → tighter orbits, risk of collapse
+pub const PLANET_RADIUS_MULTIPLIER: i64 = 50;
+
+/// Minimum random value for planet masses.
+pub const PLANET_MASS_MIN_RAW: i128 = 1 << 30;
+
+/// Maximum random value for planet masses.
+pub const PLANET_MASS_MAX_RAW: i128 = 1 << 35;
+
+/// Orbital velocity constant (2π, not 6.3).
+///
+/// Used to compute circular orbital velocity: v = 2π / sqrt(r).
+/// The approximate value 6.3 was used historically; this constant
+/// provides the exact 2π value.
+///
+/// **Why 2π?** For a Keplerian orbit, v = sqrt(GM/r). In AU-solar mass-year
+/// units with G = 4π², this simplifies to v = 2π/√r for a circular orbit
+/// around a solar-mass star.
+pub const ORBITAL_VELOCITY_CONSTANT: f64 = std::f64::consts::TAU;
+
+// ============================================================================
+// CLI Defaults
+// ============================================================================
+
+/// Default bytes per step for V2 streaming mode (1 MiB).
+pub const DEFAULT_BYTES_PER_STEP: u64 = 1024 * 1024;
+
+/// Default max reseeds for V3 Photon mode.
+///
+/// **Why 100,000?** Each reseed produces ~16 KB of HKDF output seeding
+/// unlimited SHAKE256 keystream. 100,000 reseeds allows ~1.6 GB of key
+/// material before exhaustion.
+pub const PHOTON_DEFAULT_MAX_RESEEDS: u64 = 100_000;
+
+/// Default max reseeds for H Quantum mode.
+///
+/// **Why 100,000?** Same rationale as Photon. Each reseed refreshes the
+/// 2048-byte base seed with fresh orbital entropy.
+pub const QUANTUM_DEFAULT_MAX_RESEEDS: u64 = 100_000;
+
+/// Default cache size for H Quantum keystream (1 MiB).
+pub const QUANTUM_DEFAULT_CACHE_SIZE: usize = 1024 * 1024;
+
+/// Default orbital steps per reseed for H Quantum (10,000).
+///
+/// **Why 10,000?** 10,000 Euler steps (~0.5ms) provides enough trajectory
+/// divergence to inject fresh entropy into the base seed. Euler's numerical
+/// instability amplifies chaos ~10x faster than Verlet.
+pub const QUANTUM_DEFAULT_ORBITAL_STEPS: u64 = 10_000;
+
+/// Default reseed interval for H Quantum in bytes (10 MiB).
+///
+/// **Why 10 MiB?** Balances orbital computation cost (~0.5ms per reseed)
+/// with keystream freshness. 10 MiB means ~100 reseeds per GB of data.
+pub const QUANTUM_DEFAULT_RESEED_INTERVAL: u64 = 10 * 1024 * 1024;
+
+// Default dt raw value for keygen (1 << 54 in Q32.64 ≈ 1e-3 years).
+// (Commented out: not currently used within the `kelvin` crate.
+//  The CLI uses kelvin_core::DEFAULT_DT directly.)
+// pub const DEFAULT_DT_RAW: i128 = 1 << 54;
+
+// Default softening raw value for keygen (1 << 48 in Q32.64 ≈ 1e-5 AU).
+// (Commented out: not currently used within the `kelvin` crate.
+//  The CLI uses kelvin_core::SOFTENING_FACTOR directly.)
+// pub const DEFAULT_SOFTENING_RAW: i128 = 1 << 48;
+
+/// Buffer size for keystream cache in V2 streaming mode (64 KB).
+///
+/// **Why 64 KB?** Standard filesystem block size for efficient I/O.
+pub const STREAMING_CHUNK_SIZE: usize = 64 * 1024;
+
+// Extra bytes for AEAD authentication tag (ChaCha20Poly1305).
+// (Commented out: not currently used within the `kelvin` crate.
+//  The AEAD tag size is handled internally by ChaChaStream.)
+// pub const AEAD_TAG_SIZE: usize = 16;

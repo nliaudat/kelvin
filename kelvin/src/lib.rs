@@ -56,11 +56,12 @@ mod authenticated;
 mod decrypt;
 mod encrypt;
 mod error;
+mod parameters;
 mod photon;
 mod quantum;
 
 pub use error::KelvinError;
-pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_G};
+pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 pub use kelvin_kdf::{
     extract_seed, extract_shake256, extract_shake256_into, AsymmetricError, KeySchedule,
     OrbitalConfig, OrbitalKeyPair, OrbitalState, ScheduleState,
@@ -73,37 +74,32 @@ pub use kelvin_stream::AesGcmStream;
 pub use authenticated::{
     KelvinPhotonAuthenticated, KelvinQuantumAuthenticated, KelvinStreamingAuthenticated,
 };
-pub use photon::KelvinPhoton;
-pub use quantum::{
-    KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_ORBITAL_STEPS, DEFAULT_RESEED_INTERVAL,
+pub use parameters::{
+    DEFAULT_BYTES_PER_STEP, DOMSEP_MAC_KEY_V1, DOMSEP_ORBITAL_STATE_V1, DOMSEP_PHOTON_KEYSTREAM_V1,
+    DOMSEP_PHOTON_RESEED_V1, DOMSEP_QUANTUM_CACHE_V1, DOMSEP_QUANTUM_KEYSTREAM,
+    DOMSEP_QUANTUM_PERTURB_V1, DOMSEP_QUANTUM_RESEED_V1, DOMSEP_STREAMING_MAC_KEY_V1,
+    EXTRACT_BUF_SIZE, KEYSTREAM_CHUNK_SIZE, LYAPUNOV_SHADOW_STEPS, MAC_KEY_SIZE, MAXIMUM_BODIES,
+    MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS,
+    PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW, PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER,
+    QUANTUM_DEFAULT_CACHE_SIZE, QUANTUM_DEFAULT_MAX_RESEEDS, QUANTUM_DEFAULT_ORBITAL_STEPS,
+    QUANTUM_DEFAULT_RESEED_INTERVAL, QUANTUM_PERTURB_SCALE, SEED_SIZE, STANDARD_BODIES,
+    STANDARD_STEPS, STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW,
+    SUN_MASS_RANGE, SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
+    XOF_SEED_SIZE,
 };
+pub use photon::KelvinPhoton;
+pub use quantum::KelvinQuantum;
 
+pub use kelvin_core::IntegrationMethod;
 use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};
 use kelvin_kdf::LyapunovEstimator;
 use zeroize::Zeroize;
 
-/// Integration method for the n-body gravitational simulation.
-///
-/// - **Euler** (default): Explicit Euler integration. Numerical instability
-///   amplifies chaos ~10x faster than Verlet, producing more entropy per step.
-/// - **Verlet**: Symplectic Velocity Verlet. Energy-conserving,
-///   time-reversible. Use `--verlet` to opt in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum IntegrationMethod {
-    /// Explicit Euler (default, maximum chaos amplification).
-    #[default]
-    Euler,
-    /// Symplectic Velocity Verlet (energy-conserving).
-    Verlet,
-}
-
 /// Run the full orbital simulation pipeline and extract a 2048-byte seed.
 ///
-/// **Since v0.2.0:** Default integration method changed from Verlet to Euler.
-/// Seeds produced by this function will differ from v0.1.x. Callers that
-/// need backward compatibility should use
-/// [`simulate_and_extract_seed_with_method`] with
-/// `IntegrationMethod::Verlet`.
+/// Uses Verlet integration (default). Callers that need Euler integration
+/// should use [`simulate_and_extract_seed_with_method`] with
+/// `IntegrationMethod::Euler`.
 ///
 /// This is the shared initialization used by V1 (`Kelvin`), V3 (`KelvinPhoton`),
 /// and H (`KelvinQuantum`). It performs:
@@ -128,8 +124,9 @@ pub fn simulate_and_extract_seed_with_method(
     config.validate()?;
 
     // Estimate Lyapunov time
-    let lyapunov = LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
-    let result = lyapunov.estimate(1000, config.total_steps)?;
+    let lyapunov =
+        LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
+    let result = lyapunov.estimate(LYAPUNOV_SHADOW_STEPS, config.total_steps)?;
 
     if config.total_steps < result.min_chaos_steps {
         return Err(KelvinError::InsufficientChaos {
@@ -171,13 +168,13 @@ pub fn simulate_and_extract_seed_with_method(
 
     // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
     // a fixed-size array — avoids an unnecessary Vec allocation.
-    let mut seed = [0u8; 2048];
+    let mut seed = [0u8; SEED_SIZE];
     extract_shake256_into(
         &bodies,
         config.total_steps,
         config.g,
         config.softening,
-        b"kelvin-orbital-state-v1",
+        DOMSEP_ORBITAL_STATE_V1,
         &mut seed,
     );
 
@@ -224,8 +221,8 @@ impl Kelvin {
 
         // Estimate Lyapunov time
         let lyapunov =
-            LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
-        let result = lyapunov.estimate(1000, config.total_steps)?;
+            LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
+        let result = lyapunov.estimate(LYAPUNOV_SHADOW_STEPS, config.total_steps)?;
 
         if config.total_steps < result.min_chaos_steps {
             return Err(KelvinError::InsufficientChaos {
@@ -267,13 +264,13 @@ impl Kelvin {
 
         // Extract initial 2048-byte seed (using SHAKE256 XOF) directly into
         // a fixed-size array — avoids an unnecessary Vec allocation.
-        let mut seed = [0u8; 2048];
+        let mut seed = [0u8; SEED_SIZE];
         extract_shake256_into(
             &bodies,
             config.total_steps,
             config.g,
             config.softening,
-            b"kelvin-orbital-state-v1",
+            DOMSEP_ORBITAL_STATE_V1,
             &mut seed,
         );
 
@@ -302,9 +299,10 @@ impl Kelvin {
 
     /// Create a new Kelvin instance with a configurable integration method.
     ///
-    /// Use `IntegrationMethod::Euler` for maximum chaos amplification
-    /// (numerical instability produces ~10x more entropy per step).
-    /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
+    /// Use `IntegrationMethod::Verlet` (default) for stable, energy-conserving
+    /// integration. Use `IntegrationMethod::Euler` for maximum chaos amplification
+    /// (numerical instability produces ~10x more entropy per step, but may cause
+    /// body ejection in some configurations).
     pub fn new_with_method(
         config: OrbitalConfig,
         method: IntegrationMethod,
@@ -498,9 +496,10 @@ impl KelvinStreaming {
 
     /// Create a new streaming Kelvin instance with a configurable integration method.
     ///
-    /// Use `IntegrationMethod::Euler` for maximum chaos amplification
-    /// (numerical instability produces ~10x more entropy per step).
-    /// Use `IntegrationMethod::Verlet` (default) for backward compatibility.
+    /// Use `IntegrationMethod::Verlet` (default) for stable, energy-conserving
+    /// integration. Use `IntegrationMethod::Euler` for maximum chaos amplification
+    /// (numerical instability produces ~10x more entropy per step, but may cause
+    /// body ejection in some configurations).
     pub fn new_with_method(
         config: OrbitalConfig,
         bytes_per_step: u64,

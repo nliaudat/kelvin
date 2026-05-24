@@ -1,3 +1,0 @@
-
-*** Error: data (len = 1048576) does not contain 1000000 samples ***
-

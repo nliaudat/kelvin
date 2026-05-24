@@ -19,8 +19,8 @@
 Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines:
 
 - **Q32.64 fixed-point arithmetic** — deterministic across all platforms
-- **Euler integrator** — numerically unstable, faster chaos amplification (default)
-- **Symplectic Verlet integrator** — energy-conserving n-body simulation (`--verlet` flag)
+- **Symplectic Verlet integrator** — energy-conserving n-body simulation (default)
+- **Euler integrator** — numerically unstable, faster chaos amplification (`--euler` flag)
 - **Lyapunov time estimation** — shadow orbit method for chaos quantification
 - **SHAKE256 XOF entropy extraction** — 2048-byte domain-separated hashing of orbital state
 - **ChaCha20 stream cipher** — XOR-based encryption/decryption
@@ -57,7 +57,7 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 
 2. **Lyapunov time estimation** — Before running the full simulation, Kelvin estimates the Lyapunov time of the system using the shadow orbit method. This quantifies the chaotic divergence rate and ensures the simulation runs within the predictable regime. If the requested step count exceeds the safe Lyapunov horizon, the system rejects the configuration.
 
-3. **Orbital simulation** — The n-body system is evolved using an explicit Euler integrator (default) or a symplectic Verlet integrator (`--verlet` flag). Euler's numerical instability amplifies chaos ~10x faster for maximum entropy per step; Verlet conserves energy and momentum for physically realistic trajectories. Both use deterministic fixed-point arithmetic for bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
+3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator (default, energy-conserving) or an explicit Euler integrator (`--euler` flag, numerically unstable). Verlet conserves energy and momentum for physically realistic trajectories; Euler's numerical instability amplifies chaos ~10x faster for maximum entropy per step. Both use deterministic fixed-point arithmetic for bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
 
 4. **Seed extraction** — After simulation, the final orbital state is hashed with **SHAKE256 (XOF)** using domain separation. This process incorporates the full physical state: positions, velocities, masses, the gravitational constant ($G$), the softening factor, and the **instantaneous gravitational force vectors** acting on every body. This produces a **2048-byte** cryptographically strong seed that is physically bound to the simulation's reality.
 
@@ -82,7 +82,7 @@ kelvin-test-server/ — Test vector generation server
 
 ## Cryptographic Modes
 
-Kelvin provides four cryptographic modes, each optimized for different use cases. All modes support both Euler (default) and Verlet (`--verlet`) integration.
+Kelvin provides four cryptographic modes, each optimized for different use cases. All modes support both Verlet (default) and Euler (`--euler`) integration.
 
 | Parameter | V1 `Secure` | V2 `Chaos` | V3 `Photon` | H `Quantum` |
 | :--- | :--- | :--- | :--- | :--- |
@@ -100,7 +100,7 @@ Kelvin provides four cryptographic modes, each optimized for different use cases
 | **Ideal use case** | Storage / authenticated channels | Lightweight real-time streams | 1 MB–1 GB batch encryption | Large bulk data requiring fresh entropy |
 | **CLI mode flag** | `--mode secure` (default) | `--mode chaos` | `--mode photon` | `--mode quantum` |
 | **Auth flag** | *(ignored)* | `--auth` | `--auth` | `--auth` |
-| **Integration method** | `--verlet` available | `--verlet` available | `--verlet` available | `--verlet` available |
+| **Integration method** | `--euler` available | `--euler` available | `--euler` available | `--euler` available |
 
 > **Note:** All modes use the same `OrbitalConfig` shared secret. The integration method (Verlet/Euler) must match between encryption and decryption.
 >

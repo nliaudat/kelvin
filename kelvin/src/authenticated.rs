@@ -52,6 +52,9 @@ use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::error::KelvinError;
+use crate::parameters::{
+    DOMSEP_MAC_KEY_V1, DOMSEP_STREAMING_MAC_KEY_V1, EXTRACT_BUF_SIZE, MAC_KEY_SIZE,
+};
 use crate::photon::KelvinPhoton;
 use crate::quantum::KelvinQuantum;
 use kelvin_core::OrbitalBody;
@@ -60,22 +63,22 @@ use kelvin_kdf::extract_shake256_into;
 /// Size of the KMAC128 tag in bytes.
 const TAG_LEN: usize = 32;
 
-/// Derive a 32-byte MAC key from the 2048-byte seed using HKDF-SHA512.
+/// Derive a MAC key from the 2048-byte seed using HKDF-SHA512.
 ///
-/// Domain separator: `b"kelvin-mac-key-v1"`.
-fn derive_mac_key(seed: &[u8; 2048]) -> [u8; 32] {
+/// Domain separator: `DOMSEP_MAC_KEY_V1`.
+fn derive_mac_key(seed: &[u8; 2048]) -> [u8; MAC_KEY_SIZE] {
     let hk = Hkdf::<Sha3_512>::new(None, seed);
-    let mut mac_key = [0u8; 32];
-    hk.expand(b"kelvin-mac-key-v1", &mut mac_key)
+    let mut mac_key = [0u8; MAC_KEY_SIZE];
+    hk.expand(DOMSEP_MAC_KEY_V1, &mut mac_key)
         .expect("HKDF expand with 32-byte output should never fail");
     mac_key
 }
 
-/// Derive a 32-byte MAC key from the initial orbital state (for V2 Streaming).
+/// Derive a MAC key from the initial orbital state (for V2 Streaming).
 ///
-/// Extracts 64 bytes of entropy from the initial bodies via SHAKE256, then
-/// expands to a 32-byte MAC key via HKDF-SHA512 with domain separator
-/// `b"kelvin-streaming-mac-key-v1"`.
+/// Extracts entropy from the initial bodies via SHAKE256, then
+/// expands to a MAC key via HKDF-SHA512 with domain separator
+/// `DOMSEP_STREAMING_MAC_KEY_V1`.
 ///
 /// # Note on `dt`
 ///
@@ -94,22 +97,22 @@ fn derive_mac_key_from_bodies(
     _dt: kelvin_core::Fixed,
     softening: kelvin_core::Fixed,
     g: kelvin_core::Fixed,
-) -> [u8; 32] {
-    // Extract 64 bytes of entropy from the initial orbital state
-    let mut seed = [0u8; 64];
+) -> [u8; MAC_KEY_SIZE] {
+    // Extract entropy from the initial orbital state
+    let mut seed = [0u8; EXTRACT_BUF_SIZE];
     extract_shake256_into(
         bodies,
         0, // step 0 (initial state, no simulation yet)
         g,
         softening,
-        b"kelvin-streaming-mac-key-v1",
+        DOMSEP_STREAMING_MAC_KEY_V1,
         &mut seed,
     );
 
-    // Expand to 32-byte MAC key via HKDF
+    // Expand to MAC key via HKDF
     let hk = Hkdf::<Sha3_512>::new(None, &seed);
-    let mut mac_key = [0u8; 32];
-    hk.expand(b"kelvin-streaming-mac-key-v1", &mut mac_key)
+    let mut mac_key = [0u8; MAC_KEY_SIZE];
+    hk.expand(DOMSEP_STREAMING_MAC_KEY_V1, &mut mac_key)
         .expect("HKDF expand with 32-byte output should never fail");
     mac_key
 }
@@ -444,7 +447,7 @@ impl KelvinStreamingAuthenticated {
     /// The MAC key is derived from the initial orbital state (before any
     /// simulation steps), ensuring it is deterministic from the config.
     pub fn new(config: crate::OrbitalConfig, bytes_per_step: u64) -> Result<Self, KelvinError> {
-        Self::new_with_method(config, bytes_per_step, crate::IntegrationMethod::Verlet)
+        Self::new_with_method(config, bytes_per_step, crate::IntegrationMethod::default())
     }
 
     /// Create a new authenticated streaming instance with a configurable

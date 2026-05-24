@@ -54,7 +54,7 @@ struct Args {
 }
 
 enum Command {
-    Generate { size: u64, output: String, config: Option<String>, verlet: bool },
+    Generate { size: u64, output: String, config: Option<String>, euler: bool },
     Analyze { input: String },
 }
 
@@ -63,7 +63,7 @@ fn parse_args() -> Args {
     if args.len() < 2 {
         eprintln!("Usage:");
         eprintln!(
-            "  nist_800_90b generate --size <BYTES> --output <FILE> [--config <JSON>] [--verlet]"
+            "  nist_800_90b generate --size <BYTES> --output <FILE> [--config <JSON>] [--euler]"
         );
         eprintln!("  nist_800_90b analyze --input <FILE>");
         std::process::exit(1);
@@ -74,7 +74,8 @@ fn parse_args() -> Args {
             let mut size: u64 = 1024 * 1024; // default 1 MB
             let mut output = String::from("keystream.bin");
             let mut config: Option<String> = None;
-            let mut verlet = false;
+            let mut euler = false;
+            let mut nist = false;
 
             let mut i = 2;
             while i < args.len() {
@@ -97,13 +98,20 @@ fn parse_args() -> Args {
                             config = Some(args[i].clone());
                         }
                     },
-                    "--verlet" => verlet = true,
+                    "--euler" => euler = true,
+                    "--nist" => nist = true,
                     _ => {},
                 }
                 i += 1;
             }
 
-            Args { command: Command::Generate { size, output, config, verlet } }
+            // --nist flag overrides size to exactly 1,000,000 bytes
+            // (NIST ea_restart tool requires exactly 1,000,000 samples)
+            if nist {
+                size = 1_000_000;
+            }
+
+            Args { command: Command::Generate { size, output, config, euler } }
         },
         "analyze" => {
             let mut input = String::from("keystream.bin");
@@ -348,10 +356,13 @@ fn runs_test_bit_level(data: &[u8]) -> (bool, u64, u64) {
         }
     }
 
-    let expected_runs = total_bits as f64 / 2.0;
     // NIST SP 800-22 §2.3: z = |V_obs - 2nπ(1-π)| / (2·√(2n)·π·(1-π))
-    // For π = 0.5: numerator = |V_obs - n/2|, denominator = √(n/2)
-    let z = (runs as f64 - expected_runs).abs() / (total_bits as f64 / 2.0).sqrt();
+    // Compute actual proportion of ones (π) from the data for accuracy
+    let ones: u64 = data.iter().map(|&b| b.count_ones() as u64).sum();
+    let pi = ones as f64 / total_bits as f64;
+    let expected_runs = 2.0 * total_bits as f64 * pi * (1.0 - pi);
+    let z = (runs as f64 - expected_runs).abs()
+        / (2.0 * (2.0 * total_bits as f64).sqrt() * pi * (1.0 - pi));
     let ok = z < 2.576;
 
     (ok, runs, expected_runs as u64)
@@ -539,8 +550,8 @@ fn main() {
     let args = parse_args();
 
     match args.command {
-        Command::Generate { size, output, config, verlet } => {
-            let method = if verlet { IntegrationMethod::Verlet } else { IntegrationMethod::Euler };
+        Command::Generate { size, output, config, euler } => {
+            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
 
             let orbital_config = if let Some(config_path) = &config {
                 let json = fs::read_to_string(config_path).unwrap_or_else(|e| {
@@ -555,7 +566,7 @@ fn main() {
                 default_config()
             };
 
-            let method_label = if verlet { "Verlet" } else { "Euler" };
+            let method_label = if euler { "Euler" } else { "Verlet" };
             eprintln!("NIST SP 800-90B Keystream Generator");
             eprintln!("  Size: {} bytes ({:.2} GB)", size, size as f64 / 1_073_741_824.0);
             eprintln!("  Output: {}", output);
