@@ -1,6 +1,6 @@
 # Kelvin 100 GB Encryption Benchmark 
  
-**Date:** 23.05.2026 18:30:22,83 
+**Date:** 24.05.2026  9:56:47,35 
 **Platform:** Windows 
 **Test file:** 100 GB alternating 0x00/0x01 pattern 
 **Integration:** Euler (default) 
@@ -8,14 +8,12 @@
  
 | Mode | Operation | Time (s) | Throughput (GB/s) | Verify | 
 |---|-----------|----------|-------------------|--------| 
-| secure | encrypt | ERROR | 0 | FAIL | 
-| secure | decrypt | ERROR | 0 | FAIL | 
-| chaos | encrypt | ERROR | 0 | FAIL | 
-| chaos | decrypt | 242978 | 0 | FAIL | 
+| chaos | encrypt | 111793 |  | FAIL | 
+| chaos | decrypt | 111793 |  | FAIL | 
 | photon | encrypt | ERROR | 0 | FAIL | 
-| photon | decrypt | ERROR | 0 | FAIL | 
-| quantum | encrypt | ERROR | 0 | FAIL | 
-| quantum | decrypt | ERROR | 0 | FAIL | 
+| photon | decrypt | 111793 |  | FAIL | 
+| quantum | encrypt | 111793 | 0 | FAIL | 
+| quantum | decrypt | 111793 |  | FAIL | 
 |---|-----------|----------|-------------------|--------| 
  
-*Benchmark completed at 23.05.2026 18:36:09,67* 
+*Benchmark completed at 24.05.2026 10:05:31,12* 

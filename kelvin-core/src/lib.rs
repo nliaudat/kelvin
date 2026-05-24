@@ -42,6 +42,27 @@ mod fixed_math;
 mod integrator;
 mod stability;
 
+/// Integration method for the n-body gravitational simulation.
+///
+/// - **Verlet** (default): Symplectic Velocity Verlet. Energy-conserving,
+///   time-reversible. Provides stable, deterministic chaos.
+/// - **Euler**: Explicit Euler integration. Numerical instability amplifies
+///   chaos ~10x faster than Verlet, but may cause body ejection in some
+///   configurations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IntegrationMethod {
+    /// Symplectic Velocity Verlet (default, energy-conserving).
+    Verlet,
+    /// Explicit Euler (numerically unstable, may cause ejection).
+    Euler,
+}
+
+impl Default for IntegrationMethod {
+    fn default() -> Self {
+        IntegrationMethod::Verlet
+    }
+}
+
 pub use body::{OrbitalBody, Vec3};
 pub use constants::{
     DEFAULT_DT, DEFAULT_G, DEFAULT_RESEED_INTERVAL, DEFAULT_STEPS, EJECTION_ENERGY_THRESHOLD,

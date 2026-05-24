@@ -78,25 +78,10 @@ pub use quantum::{
     KelvinQuantum, DEFAULT_CACHE_SIZE, DEFAULT_ORBITAL_STEPS, DEFAULT_RESEED_INTERVAL,
 };
 
+pub use kelvin_core::IntegrationMethod;
 use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};
 use kelvin_kdf::LyapunovEstimator;
 use zeroize::Zeroize;
-
-/// Integration method for the n-body gravitational simulation.
-///
-/// - **Verlet** (default): Symplectic Velocity Verlet. Energy-conserving,
-///   time-reversible. Provides stable, deterministic chaos.
-/// - **Euler**: Explicit Euler integration. Numerical instability amplifies
-///   chaos ~10x faster than Verlet, but may cause body ejection in some
-///   configurations. Use `--euler` to opt in.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum IntegrationMethod {
-    /// Symplectic Velocity Verlet (default, energy-conserving).
-    #[default]
-    Verlet,
-    /// Explicit Euler (numerically unstable, may cause ejection).
-    Euler,
-}
 
 /// Run the full orbital simulation pipeline and extract a 2048-byte seed.
 ///
@@ -130,7 +115,7 @@ pub fn simulate_and_extract_seed_with_method(
     // Use 10,000 shadow steps to detect divergence in wide orbits (e.g., 100 AU).
     // The standard 1000 steps was insufficient for bodies with ~1000-year orbital periods.
     // 10,000 steps provides Medium confidence and catches most chaotic systems.
-    let lyapunov = LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
+    let lyapunov = LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
     let result = lyapunov.estimate(10_000, config.total_steps)?;
 
     if config.total_steps < result.min_chaos_steps {
@@ -229,7 +214,7 @@ impl Kelvin {
         // The standard 1000 steps was insufficient for bodies with ~1000-year orbital periods.
         // 10,000 steps provides Medium confidence and catches most chaotic systems.
         let lyapunov =
-            LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g);
+            LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
         let result = lyapunov.estimate(10_000, config.total_steps)?;
 
         if config.total_steps < result.min_chaos_steps {
