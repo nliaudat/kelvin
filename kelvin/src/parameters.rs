@@ -471,17 +471,32 @@ pub const QUANTUM_DEFAULT_CACHE_SIZE: usize = 1024 * 1024;
 /// **Changing this** affects the chaotic trajectory of the reseed entropy.
 pub const QUANTUM_DEFAULT_INTEGRATION_METHOD: IntegrationMethod = IntegrationMethod::Verlet;
 
-/// Default orbital steps per reseed for H Quantum (10,000).
+/// Default orbital steps per reseed for H Quantum (1,000).
 ///
-/// **Why 10,000?** 10,000 Verlet steps (~0.5ms) provides enough trajectory
-/// divergence to inject fresh entropy into the base seed.
-pub const QUANTUM_DEFAULT_ORBITAL_STEPS: u64 = 10_000;
+/// **Why 1,000?** 1,000 Verlet steps (~0.05ms) provides sufficient trajectory
+/// divergence to inject fresh entropy into the base seed. The previous value
+/// of 10,000 was excessive — the Lyapunov exponent amplifies microscopic
+/// perturbations to macroscopic divergence within a few hundred steps.
+/// Reducing to 1,000 cuts orbital reseed cost by 10× while maintaining
+/// security.
+///
+/// **Changing this** affects the orbital reseed cost:
+/// - Larger → more entropy mixing, slower reseeding
+/// - Smaller → faster reseeding, less entropy per reseed
+pub const QUANTUM_DEFAULT_ORBITAL_STEPS: u64 = 1_000;
 
-/// Default reseed interval for H Quantum in bytes (10 MiB).
+/// Default reseed interval for H Quantum in bytes (64 MiB).
 ///
-/// **Why 10 MiB?** Balances orbital computation cost (~0.5ms per reseed)
-/// with keystream freshness. 10 MiB means ~100 reseeds per GB of data.
-pub const QUANTUM_DEFAULT_RESEED_INTERVAL: u64 = 10 * 1024 * 1024;
+/// **Why 64 MiB?** Matches Photon's reseed interval for consistency. At
+/// 1,000 orbital steps per reseed, 64 MiB means ~16 reseeds per GB of data
+/// (~16,000 orbital steps per GB). The previous value of 10 MiB caused
+/// ~100 reseeds per GB (~1M orbital steps per GB), which was the dominant
+/// performance bottleneck.
+///
+/// **Changing this** affects the orbital reseed frequency:
+/// - Larger → fewer reseeds, faster processing, less frequent entropy refresh
+/// - Smaller → more reseeds, slower processing, more frequent entropy refresh
+pub const QUANTUM_DEFAULT_RESEED_INTERVAL: u64 = 64 * 1024 * 1024;
 
 // Default dt raw value for keygen (1 << 54 in Q32.64 ≈ 1e-3 years).
 // (Commented out: not currently used within the `kelvin` crate.

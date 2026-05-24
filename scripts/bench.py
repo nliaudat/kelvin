@@ -2,8 +2,9 @@
 """
 Kelvin -- Encryption Benchmark (Cross-Platform)
 
-Benchmarks all modes (chaos, photon, quantum) on a file of configurable size
-with alternating 0x00/0x01 pattern. Outputs results to documentation/bench_*.md
+Benchmarks all modes (secure, chaos, photon, quantum) on a file of configurable
+size with alternating 0x00/0x01 pattern. Outputs results to
+documentation/bench_*.md
 
 Usage:
     python scripts/bench.py              (default: 1 GB, paranoid level)
@@ -151,7 +152,7 @@ def main():
         f.write("|---|-----------|----------|-------------------|--------------------|--------|\n")
 
 
-    modes = ["chaos", "photon", "quantum"]
+    modes = ["secure", "chaos", "photon", "quantum"]
     results = {}  # mode -> {encrypt: status, decrypt: status, verify: status}
 
     for mode in modes:
