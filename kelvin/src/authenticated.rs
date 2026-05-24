@@ -405,9 +405,21 @@ pub struct KelvinStreamingAuthenticated {
 ///
 /// Uses SHAKE256 to extract entropy from the bodies, then HKDF-SHA512 to
 /// derive the 32-byte KMAC128 key.
-fn derive_mac_key_from_bodies(bodies: &[OrbitalBody], step: u64, g: Fixed, softening: Fixed) -> [u8; MAC_KEY_SIZE] {
+fn derive_mac_key_from_bodies(
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: Fixed,
+    softening: Fixed,
+) -> [u8; MAC_KEY_SIZE] {
     let mut extract_buf = [0u8; EXTRACT_BUF_SIZE];
-    extract_shake256_into(bodies, step, g, softening, DOMSEP_STREAMING_MAC_KEY_V1, &mut extract_buf);
+    extract_shake256_into(
+        bodies,
+        step,
+        g,
+        softening,
+        DOMSEP_STREAMING_MAC_KEY_V1,
+        &mut extract_buf,
+    );
 
     let hk = Hkdf::<Sha3_512>::new(None, &extract_buf);
     let mut mac_key = [0u8; MAC_KEY_SIZE];
@@ -429,13 +441,14 @@ impl KelvinStreamingAuthenticated {
         let inner = crate::KelvinStreaming::new(config, bytes_per_step)?;
 
         // Derive MAC key from initial bodies (step 0)
-        let mac_key = derive_mac_key_from_bodies(&bodies, 0, kelvin_core::DEFAULT_G, kelvin_core::SOFTENING_FACTOR);
+        let mac_key = derive_mac_key_from_bodies(
+            &bodies,
+            0,
+            kelvin_core::DEFAULT_G,
+            kelvin_core::SOFTENING_FACTOR,
+        );
 
-        Ok(KelvinStreamingAuthenticated {
-            inner,
-            mac_key,
-            tag_buf: [0u8; TAG_LEN],
-        })
+        Ok(KelvinStreamingAuthenticated { inner, mac_key, tag_buf: [0u8; TAG_LEN] })
     }
 
     /// Encrypt data in-place with authentication.
@@ -480,7 +493,8 @@ impl KelvinStreamingAuthenticated {
         let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
 
         // Verify the tag before decrypting
-        let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinStreamingAuthenticated-v1");
+        let expected_tag =
+            compute_tag(&self.mac_key, ciphertext, b"KelvinStreamingAuthenticated-v1");
         if tag_in != &expected_tag[..] {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
