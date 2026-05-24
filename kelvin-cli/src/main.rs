@@ -81,7 +81,7 @@ enum Commands {
         #[arg(long)]
         fast: bool,
     },
-    /// Encrypt a file
+    /// Encrypt a file (or in-memory data with --in-memory)
     Encrypt {
         /// Cryptographic mode: secure, chaos, photon, or quantum
         #[arg(long, default_value = "secure")]
@@ -89,12 +89,12 @@ enum Commands {
         /// Path to orbital config JSON
         #[arg(long)]
         config: String,
-        /// Input file path
+        /// Input file path (ignored if --in-memory is set)
         #[arg(long)]
-        input: String,
-        /// Output file path
+        input: Option<String>,
+        /// Output file path (ignored if --in-memory is set)
         #[arg(long)]
-        output: String,
+        output: Option<String>,
         /// Bytes of keystream per step/chunk (chaos/photon/quantum, mode-specific default)
         #[arg(long)]
         bytes_per_step: Option<u64>,
@@ -104,8 +104,14 @@ enum Commands {
         /// Append a 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
+        /// In-memory benchmark mode: process `size` bytes without file I/O
+        #[arg(long)]
+        in_memory: bool,
+        /// Size in bytes for --in-memory mode (default: 1 GiB = 1073741824)
+        #[arg(long, default_value = "1073741824")]
+        size: u64,
     },
-    /// Decrypt a file
+    /// Decrypt a file (or in-memory data with --in-memory)
     Decrypt {
         /// Cryptographic mode: secure, chaos, photon, or quantum
         #[arg(long, default_value = "secure")]
@@ -113,12 +119,12 @@ enum Commands {
         /// Path to orbital config JSON
         #[arg(long)]
         config: String,
-        /// Input file path
+        /// Input file path (ignored if --in-memory is set)
         #[arg(long)]
-        input: String,
-        /// Output file path
+        input: Option<String>,
+        /// Output file path (ignored if --in-memory is set)
         #[arg(long)]
-        output: String,
+        output: Option<String>,
         /// Bytes of keystream per step/chunk (chaos/photon/quantum, mode-specific default)
         #[arg(long)]
         bytes_per_step: Option<u64>,
@@ -128,6 +134,12 @@ enum Commands {
         /// Verify and strip the 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
+        /// In-memory benchmark mode: process `size` bytes without file I/O
+        #[arg(long)]
+        in_memory: bool,
+        /// Size in bytes for --in-memory mode (default: 1 GiB = 1073741824)
+        #[arg(long, default_value = "1073741824")]
+        size: u64,
     },
     /// Identify the Public Key associated with a configuration
     Identify {
@@ -174,15 +186,69 @@ fn main() -> Result<()> {
                 println!("{}", json);
             }
         },
-        Commands::Encrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
+        Commands::Encrypt {
+            mode,
+            config,
+            input,
+            output,
+            bytes_per_step,
+            euler,
+            auth,
+            in_memory,
+            size,
+        } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
-            process_file_mode(&mode, &config, &input, &output, true, bps, method, auth)?;
+            if in_memory {
+                process_in_memory(&mode, &config, true, bps, method, auth, size)?;
+            } else {
+                let input_path =
+                    input.as_deref().context("--input is required (or use --in-memory)")?;
+                let output_path =
+                    output.as_deref().context("--output is required (or use --in-memory)")?;
+                process_file_mode(
+                    &mode,
+                    &config,
+                    input_path,
+                    output_path,
+                    true,
+                    bps,
+                    method,
+                    auth,
+                )?;
+            }
         },
-        Commands::Decrypt { mode, config, input, output, bytes_per_step, euler, auth } => {
+        Commands::Decrypt {
+            mode,
+            config,
+            input,
+            output,
+            bytes_per_step,
+            euler,
+            auth,
+            in_memory,
+            size,
+        } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
-            process_file_mode(&mode, &config, &input, &output, false, bps, method, auth)?;
+            if in_memory {
+                process_in_memory(&mode, &config, false, bps, method, auth, size)?;
+            } else {
+                let input_path =
+                    input.as_deref().context("--input is required (or use --in-memory)")?;
+                let output_path =
+                    output.as_deref().context("--output is required (or use --in-memory)")?;
+                process_file_mode(
+                    &mode,
+                    &config,
+                    input_path,
+                    output_path,
+                    false,
+                    bps,
+                    method,
+                    auth,
+                )?;
+            }
         },
         Commands::Identify { config, all, ecc, kem, fast } => {
             let config_json = fs::read_to_string(config).context("Failed to read config file")?;
@@ -800,6 +866,198 @@ fn process_file_quantum(
 
     println!("\n{} complete.", if encrypt { "Encryption" } else { "Decryption" });
     Ok(())
+}
+
+/// In-memory benchmark mode: process `size` bytes without file I/O.
+///
+/// Generates a buffer of `size` bytes in memory, encrypts/decrypts it using
+/// the specified mode, and reports throughput. This isolates the crypto
+/// throughput from disk I/O, giving a true measure of the cipher speed.
+#[allow(clippy::too_many_arguments)]
+fn process_in_memory(
+    mode: &CryptoMode,
+    config_path: &str,
+    encrypt: bool,
+    bytes_per_step: u64,
+    method: IntegrationMethod,
+    auth: bool,
+    size: u64,
+) -> Result<()> {
+    let config_json = fs::read_to_string(config_path).context("Failed to read config file")?;
+    let config = OrbitalConfig::from_json(&config_json)?;
+
+    let mode_label = format!("{:?}", mode);
+    let method_label = if method == IntegrationMethod::Verlet { "Verlet" } else { "Euler" };
+    let auth_label = if auth { " + KMAC128" } else { "" };
+    let op_label = if encrypt { "Encrypt" } else { "Decrypt" };
+
+    println!(
+        "In-memory {} ({} mode, {} integration{})...",
+        op_label, mode_label, method_label, auth_label
+    );
+
+    // Allocate the full data buffer in memory
+    let mut data = vec![0xABu8; size as usize];
+
+    // Initialize the crypto engine (includes orbital simulation for photon/quantum)
+    match mode {
+        CryptoMode::Secure => {
+            let mut k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
+            println!("  Setup complete. Processing {} bytes...", size);
+            let start = std::time::Instant::now();
+            let chunk_size = STREAMING_CHUNK_SIZE;
+            // Secure mode uses ChaCha20Poly1305 which needs 16 extra bytes for the AEAD tag.
+            // We use a separate buffer with the extra space to avoid panicking at the end of data.
+            let mut buf = vec![0u8; chunk_size + 16];
+            let mut offset = 0;
+            while offset < data.len() {
+                let remaining = data.len() - offset;
+                let chunk = std::cmp::min(remaining, chunk_size);
+                // Copy plaintext into buffer
+                buf[..chunk].copy_from_slice(&data[offset..offset + chunk]);
+                // Zero the tag area
+                buf[chunk..chunk + 16].fill(0);
+                if encrypt {
+                    k.encrypt(&mut buf[..chunk + 16])?;
+                } else {
+                    k.decrypt(&mut buf[..chunk + 16])?;
+                }
+                // Copy result back (ciphertext without tag)
+                data[offset..offset + chunk].copy_from_slice(&buf[..chunk]);
+                offset += chunk;
+            }
+            let elapsed = start.elapsed().as_secs_f64();
+            report_throughput(op_label, size, elapsed);
+        },
+        CryptoMode::Chaos => {
+            if auth {
+                let mut ks = KelvinStreamingAuthenticated::new(config, bytes_per_step)
+                    .context("Failed to initialize KelvinStreamingAuthenticated")?;
+                println!("  Setup complete. Processing {} bytes...", size);
+                let start = std::time::Instant::now();
+                let chunk_size = STREAMING_CHUNK_SIZE;
+                let mut offset = 0;
+                while offset < data.len() {
+                    let remaining = data.len() - offset;
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    let mut buf = data[offset..offset + chunk].to_vec();
+                    if encrypt {
+                        ks.encrypt(&mut buf)?;
+                    } else {
+                        ks.decrypt(&mut buf)?;
+                    }
+                    data[offset..offset + buf.len()].copy_from_slice(&buf);
+                    offset += chunk;
+                }
+                let elapsed = start.elapsed().as_secs_f64();
+                report_throughput(op_label, size, elapsed);
+            } else {
+                let mut ks = KelvinStreaming::new(config, bytes_per_step)
+                    .context("Failed to initialize KelvinStreaming")?;
+                println!("  Setup complete. Processing {} bytes...", size);
+                let start = std::time::Instant::now();
+                let chunk_size = STREAMING_CHUNK_SIZE;
+                let mut offset = 0;
+                while offset < data.len() {
+                    let remaining = data.len() - offset;
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    ks.encrypt(&mut data[offset..offset + chunk])?;
+                    offset += chunk;
+                }
+                let elapsed = start.elapsed().as_secs_f64();
+                report_throughput(op_label, size, elapsed);
+            }
+        },
+        CryptoMode::Photon => {
+            let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
+                .context("Failed to run orbital simulation")?;
+            println!("  Orbital simulation complete. Processing {} bytes...", size);
+            if auth {
+                let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
+                let start = std::time::Instant::now();
+                let chunk_size = bytes_per_step as usize;
+                let mut offset = 0;
+                while offset < data.len() {
+                    let remaining = data.len() - offset;
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    let mut buf = data[offset..offset + chunk].to_vec();
+                    if encrypt {
+                        photon.encrypt(&mut buf)?;
+                    } else {
+                        photon.decrypt(&mut buf)?;
+                    }
+                    data[offset..offset + buf.len()].copy_from_slice(&buf);
+                    offset += chunk;
+                }
+                let elapsed = start.elapsed().as_secs_f64();
+                report_throughput(op_label, size, elapsed);
+            } else {
+                let mut photon = KelvinPhoton::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
+                let start = std::time::Instant::now();
+                let chunk_size = bytes_per_step as usize;
+                let mut offset = 0;
+                while offset < data.len() {
+                    let remaining = data.len() - offset;
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    photon.encrypt(&mut data[offset..offset + chunk])?;
+                    offset += chunk;
+                }
+                let elapsed = start.elapsed().as_secs_f64();
+                report_throughput(op_label, size, elapsed);
+            }
+        },
+        CryptoMode::Quantum => {
+            let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
+                .context("Failed to run orbital simulation")?;
+            println!("  Orbital simulation complete. Processing {} bytes...", size);
+            if auth {
+                let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
+                let start = std::time::Instant::now();
+                let chunk_size = bytes_per_step as usize;
+                let mut offset = 0;
+                while offset < data.len() {
+                    let remaining = data.len() - offset;
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    let mut buf = data[offset..offset + chunk].to_vec();
+                    if encrypt {
+                        quantum.encrypt(&mut buf)?;
+                    } else {
+                        quantum.decrypt(&mut buf)?;
+                    }
+                    data[offset..offset + buf.len()].copy_from_slice(&buf);
+                    offset += chunk;
+                }
+                let elapsed = start.elapsed().as_secs_f64();
+                report_throughput(op_label, size, elapsed);
+            } else {
+                let mut quantum = KelvinQuantum::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
+                let start = std::time::Instant::now();
+                let chunk_size = bytes_per_step as usize;
+                let mut offset = 0;
+                while offset < data.len() {
+                    let remaining = data.len() - offset;
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    quantum.encrypt(&mut data[offset..offset + chunk])?;
+                    offset += chunk;
+                }
+                let elapsed = start.elapsed().as_secs_f64();
+                report_throughput(op_label, size, elapsed);
+            }
+        },
+    }
+
+    Ok(())
+}
+
+/// Report throughput for in-memory benchmark.
+fn report_throughput(op_label: &str, size: u64, elapsed_secs: f64) {
+    let size_gb = size as f64 / (1024.0 * 1024.0 * 1024.0);
+    let throughput_gbs = size_gb / elapsed_secs;
+    let throughput_mbs = throughput_gbs * 1024.0;
+    println!(
+        "  {} complete: {:.3}s, {:.2} GB/s ({:.0} MB/s)",
+        op_label, elapsed_secs, throughput_gbs, throughput_mbs
+    );
 }
 
 fn run_benchmark() -> Result<()> {
