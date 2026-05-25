@@ -1,15 +1,14 @@
 @echo off
 REM ==============================================================================
-REM Kelvin -- Run All Tests (Windows Batch)
+REM Kelvin -- Security & Correctness Tests (Windows Batch)
 REM ==============================================================================
-REM Runs the full test suite: build, lint, unit tests, integration tests,
-REM entropy analysis, NIST SP 800-22 statistical tests, and constant-time
-REM benchmarks.
+REM Runs unit tests, integration tests, entropy analysis, NIST SP 800-22
+REM statistical tests, and constant-time benchmarks.
 REM
 REM Exit code is 0 only if ALL steps pass.
 REM
 REM Usage:
-REM   scripts\test-all.bat
+REM   scripts\test_secure.bat
 REM ==============================================================================
 
 setlocal enabledelayedexpansion
@@ -24,103 +23,64 @@ set EXITCODE=0
 REM Change to workspace root (parent of scripts/)
 cd /d "%~dp0.."
 
-REM Initialize git submodules (NIST SP 800-90B tools)
-if not exist .gitmodules goto :skip_submodules
-git submodule update --init --recursive
-:skip_submodules
-
-call :step "1/8: Build workspace (default features)"
-cargo build --workspace
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-echo %GREEN%PASSED%NC%
-
-call :step "2/8: Build with AES-NI feature"
-cargo build -p kelvin-stream --features aes-ni
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-cargo build -p kelvin --features aes-ni
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-echo %GREEN%PASSED%NC%
-
-call :step "2b/8: Build V2 Streaming example"
-cargo build --example simple_streaming -p kelvin
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-echo %GREEN%PASSED%NC%
-
-call :step "2c/8: Build kelvin-ffi (C FFI bindings)"
-cargo build -p kelvin-ffi
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-echo %GREEN%PASSED%NC%
-
 REM ---------------------------------------------------------------------------
-REM 2. Lint -- clippy + rustfmt
+REM 1. Formatting check
 REM ---------------------------------------------------------------------------
-
-call :step "3/8: Clippy (deny warnings)"
-cargo clippy --workspace -- -D warnings
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-echo %GREEN%PASSED%NC%
-
-call :step "4/8: Check formatting"
+call :step "1/9: Check formatting"
 cargo fmt --check
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
-REM 3. Unit tests (all workspace members)
+REM 2. Unit tests (all workspace members)
 REM ---------------------------------------------------------------------------
-call :step "5/8: Unit tests (all workspace members)"
+call :step "2/9: Unit tests (all workspace members)"
 cargo test --lib --workspace
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
-call :step "6/8: Unit tests - kelvin-stream (AES-NI feature)"
+call :step "3/9: Unit tests - kelvin-stream (AES-NI feature)"
 cargo test --lib -p kelvin-stream --features aes-ni
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
-REM 4. Integration tests
+REM 3. Integration tests
 REM ---------------------------------------------------------------------------
-call :step "Integration: V1 round-trip"
+call :step "4/9: Integration: V1 round-trip"
 cargo test -p kelvin --test v1_round_trip
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Photon cipher"
+call :step "5/9: Integration: Photon cipher"
 cargo test -p kelvin --test photon
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Quantum cipher"
+call :step "6/9: Integration: Quantum cipher"
 cargo test -p kelvin --test quantum
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Authenticated encryption"
+call :step "7/9: Integration: Authenticated encryption"
 cargo test -p kelvin --test authenticated
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Full pipeline"
+call :step "8/9: Integration: Full pipeline"
 cargo test -p kelvin --test full_pipeline
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+call :step "9/9: Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
 cargo test -p kelvin --test streaming_api
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
@@ -139,7 +99,7 @@ if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
-REM 5. Entropy analysis & statistical tests
+REM 4. Entropy analysis & statistical tests
 REM ---------------------------------------------------------------------------
 call :step "Integration: Entropy analysis (SP 800-90B health tests)"
 cargo run --release -p entropy_analysis -- --keystream
@@ -173,7 +133,7 @@ del keystream_90b_test.bin
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
-REM 6. Constant-time benchmarks
+REM 5. Constant-time benchmarks
 REM ---------------------------------------------------------------------------
 call :step "Integration: Constant-time benchmarks (DudeCT)"
 cargo run --release -p constant_time_bench
@@ -186,7 +146,7 @@ REM All passed
 REM ---------------------------------------------------------------------------
 echo.
 echo %GREEN%========================================%NC%
-echo %GREEN%  ALL TESTS PASSED%NC%
+echo %GREEN%  ALL SECURITY TESTS PASSED%NC%
 echo %GREEN%========================================%NC%
 exit /b 0
 
