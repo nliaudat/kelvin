@@ -11,6 +11,8 @@
 //! - **MAC key sizes**: 32 bytes for KMAC128 (NIST SP 800-185).
 //! - **Chunk sizes**: 1 MiB (1,048,576 bytes) for keystream generation buffers.
 
+use kelvin_core::IntegrationMethod;
+
 // ============================================================================
 // Seed & Key Sizes
 // ============================================================================
@@ -127,6 +129,28 @@ pub const EXTRACT_BUF_SIZE: usize = 64;
 /// - Higher values → more accurate but slower initialization
 /// - Lower values → faster but may miss chaos in wide orbits
 pub const LYAPUNOV_SHADOW_STEPS: u64 = 100_000;
+
+/// Fast mode simulation steps for benchmarking/testing.
+///
+/// Set to `LYAPUNOV_SHADOW_STEPS + 10,000` (110,000), which is just above
+/// the Lyapunov horizon. The `min_chaos_steps` from Lyapunov estimation is
+/// at most `LYAPUNOV_SHADOW_STEPS + 1` (100,001) in the no-divergence case,
+/// so 110,000 steps comfortably satisfies the chaos check while keeping
+/// simulation time under ~4s (vs 336s for paranoid's 10M steps).
+///
+/// Used by `keygen --fast` and the internal `run_benchmark()`.
+///
+/// **Changing this** affects the minimum steps for fast mode:
+/// - Must be >= `LYAPUNOV_SHADOW_STEPS + 1` to pass the chaos check
+/// - Higher values → slower but more entropy
+/// - Lower values → faster but may fail the chaos check
+pub const FAST_STEPS: u64 = LYAPUNOV_SHADOW_STEPS + 10_000;
+
+/// Fast mode reseed interval, proportionally scaled from `FAST_STEPS`.
+///
+/// Set to `FAST_STEPS / 10` (11,000), maintaining the same ratio as the
+/// default `reseed_interval = total_steps / 10`.
+pub const FAST_RESEED_INTERVAL: u64 = FAST_STEPS / 10;
 
 // ============================================================================
 // Keystream Generation
@@ -458,18 +482,43 @@ pub const QUANTUM_DEFAULT_MAX_RESEEDS: u64 = 100_000;
 /// Default cache size for H Quantum keystream (1 MiB).
 pub const QUANTUM_DEFAULT_CACHE_SIZE: usize = 1024 * 1024;
 
-/// Default orbital steps per reseed for H Quantum (10,000).
+/// Default integration method for H Quantum orbital reseeding.
 ///
-/// **Why 10,000?** 10,000 Euler steps (~0.5ms) provides enough trajectory
-/// divergence to inject fresh entropy into the base seed. Euler's numerical
-/// instability amplifies chaos ~10x faster than Verlet.
-pub const QUANTUM_DEFAULT_ORBITAL_STEPS: u64 = 10_000;
+/// Used in `KelvinQuantum::reseed_from_orbital_chaos` to advance the orbital
+/// simulation when refreshing the base seed with fresh chaotic entropy.
+///
+/// **Why Verlet?** Verlet is energy-conserving and provides stable long-term
+/// integration. Use Euler for faster chaos amplification (numerically unstable).
+///
+/// **Changing this** affects the chaotic trajectory of the reseed entropy.
+pub const QUANTUM_DEFAULT_INTEGRATION_METHOD: IntegrationMethod = IntegrationMethod::Verlet;
 
-/// Default reseed interval for H Quantum in bytes (10 MiB).
+/// Default orbital steps per reseed for H Quantum (1,000).
 ///
-/// **Why 10 MiB?** Balances orbital computation cost (~0.5ms per reseed)
-/// with keystream freshness. 10 MiB means ~100 reseeds per GB of data.
-pub const QUANTUM_DEFAULT_RESEED_INTERVAL: u64 = 10 * 1024 * 1024;
+/// **Why 1,000?** 1,000 Verlet steps (~0.05ms) provides sufficient trajectory
+/// divergence to inject fresh entropy into the base seed. The previous value
+/// of 10,000 was excessive — the Lyapunov exponent amplifies microscopic
+/// perturbations to macroscopic divergence within a few hundred steps.
+/// Reducing to 1,000 cuts orbital reseed cost by 10× while maintaining
+/// security.
+///
+/// **Changing this** affects the orbital reseed cost:
+/// - Larger → more entropy mixing, slower reseeding
+/// - Smaller → faster reseeding, less entropy per reseed
+pub const QUANTUM_DEFAULT_ORBITAL_STEPS: u64 = 1_000;
+
+/// Default reseed interval for H Quantum in bytes (64 MiB).
+///
+/// **Why 64 MiB?** Matches Photon's reseed interval for consistency. At
+/// 1,000 orbital steps per reseed, 64 MiB means ~16 reseeds per GB of data
+/// (~16,000 orbital steps per GB). The previous value of 10 MiB caused
+/// ~100 reseeds per GB (~1M orbital steps per GB), which was the dominant
+/// performance bottleneck.
+///
+/// **Changing this** affects the orbital reseed frequency:
+/// - Larger → fewer reseeds, faster processing, less frequent entropy refresh
+/// - Smaller → more reseeds, slower processing, more frequent entropy refresh
+pub const QUANTUM_DEFAULT_RESEED_INTERVAL: u64 = 64 * 1024 * 1024;
 
 // Default dt raw value for keygen (1 << 54 in Q32.64 ≈ 1e-3 years).
 // (Commented out: not currently used within the `kelvin` crate.

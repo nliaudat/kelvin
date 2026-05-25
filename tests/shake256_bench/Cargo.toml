@@ -1,0 +1,11 @@
+[package]
+name = "shake256-bench"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "shake256-bench"
+path = "src/main.rs"
+
+[dependencies]
+sha3 = { version = "0.10", features = ["asm"] }

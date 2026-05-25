@@ -29,7 +29,8 @@
 //! print(data[:13])  # b"Hello, world!"
 //! ```
 
-// PyO3 0.23 requires unsafe for as_bytes_mut() on Bound<'_, PyByteArray>
+// PyO3 requires unsafe for as_bytes_mut() and as_bytes() on Bound<'_, PyByteArray>
+// (these were only made safe in PyO3 0.25+)
 #![allow(unsafe_code)]
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -111,8 +112,8 @@ fn parse_config(config_json: &str) -> PyResult<OrbitalConfig> {
 // ============================================================================
 
 fn get_mut_slice<'a>(data: &'a Bound<'a, PyByteArray>) -> &'a mut [u8] {
-    // SAFETY: PyByteArray::as_bytes_mut is unsafe because the GIL must be held,
-    // which it is since we're in a pyfunction/pymethod.
+    // SAFETY: GIL is held (we're in a pyfunction/pymethod), and we don't
+    // allow concurrent access to the PyByteArray from other threads.
     unsafe { data.as_bytes_mut() }
 }
 

@@ -31,7 +31,7 @@
 use blake3::Hasher;
 use hkdf::Hkdf;
 use sha3::digest::{ExtendableOutput, XofReader};
-use sha3::{Sha3_512, Shake256};
+use sha3::{Sha3_512, Shake256, Shake256Reader};
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::error::KelvinError;
@@ -40,10 +40,30 @@ use crate::parameters::{
     PHOTON_BASE_SEED_SIZE, XOF_SEED_SIZE,
 };
 
+/// Bytes of keystream generated before triggering a reseed (64 MiB).
+///
+/// Within one reseed period, the SHAKE256 XOF reader is kept alive and
+/// produces keystream continuously. Only after this many bytes do we
+/// run HKDF + BLAKE3 to derive a fresh XOF seed and reader.
+///
+/// **Why 64 MiB?** SHAKE256 can produce arbitrary-length output from a
+/// single seed. 64 MiB balances reseed overhead (~microseconds) against
+/// memory/throughput. Larger values reduce reseed frequency but increase
+/// the amount of keystream generated from one seed (acceptable for XOF).
+const PHOTON_RESEED_INTERVAL_BYTES: u64 = 64 * 1024 * 1024;
+
 /// V3 Kelvin-Photon: fast bulk OTP via HKDF→SHAKE256 XOR.
 ///
 /// Produces arbitrary-length keystream from a 2048-byte seed.
 /// Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+///
+/// ## Performance
+///
+/// Unlike V1 (which runs HKDF per 44-byte key), V3 keeps a persistent SHAKE256
+/// XOF reader alive across chunks. The reader is only re-created every 64 MiB
+/// (when `PHOTON_RESEED_INTERVAL_BYTES` is reached), at which point HKDF +
+/// BLAKE3 derive a fresh XOF seed. This eliminates the per-chunk HKDF overhead
+/// that was the original bottleneck.
 ///
 /// ## Chunk independence
 ///
@@ -66,7 +86,6 @@ use crate::parameters::{
 /// photon.decrypt(&mut data)?;
 /// assert_eq!(&data, b"Secret message");
 /// ```
-#[derive(Debug)]
 pub struct KelvinPhoton {
     /// Current seed material (PHOTON_BASE_SEED_SIZE bytes).
     seed: [u8; PHOTON_BASE_SEED_SIZE],
@@ -76,6 +95,24 @@ pub struct KelvinPhoton {
     max_reseeds: u64,
     /// Total bytes processed (for tracking only, NOT used in keystream derivation).
     bytes_processed: u64,
+    /// Persistent SHAKE256 XOF reader, kept alive across chunks.
+    /// Re-created every `PHOTON_RESEED_INTERVAL_BYTES` via HKDF + BLAKE3 reseed.
+    reader: Option<Shake256Reader>,
+    /// Bytes generated since the last reseed (triggers HKDF + BLAKE3 refresh).
+    bytes_since_reseed: u64,
+}
+
+impl std::fmt::Debug for KelvinPhoton {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KelvinPhoton")
+            .field("seed", &"[redacted]")
+            .field("reseed_count", &self.reseed_count)
+            .field("max_reseeds", &self.max_reseeds)
+            .field("bytes_processed", &self.bytes_processed)
+            .field("reader", &self.reader.as_ref().map(|_| "Shake256Reader(active)"))
+            .field("bytes_since_reseed", &self.bytes_since_reseed)
+            .finish()
+    }
 }
 
 impl KelvinPhoton {
@@ -85,7 +122,14 @@ impl KelvinPhoton {
     /// `max_reseeds` limits the total keystream (each reseed produces ~16KB
     /// of HKDF output, which seeds unlimited SHAKE256 keystream).
     pub fn new(seed: [u8; PHOTON_BASE_SEED_SIZE], max_reseeds: u64) -> Self {
-        KelvinPhoton { seed, reseed_count: 0, max_reseeds, bytes_processed: 0 }
+        KelvinPhoton {
+            seed,
+            reseed_count: 0,
+            max_reseeds,
+            bytes_processed: 0,
+            reader: None,
+            bytes_since_reseed: 0,
+        }
     }
 
     /// Maximum chunk size for keystream generation (1 MB).
@@ -94,14 +138,23 @@ impl KelvinPhoton {
     /// large (multi-GB) inputs by avoiding a full-size keystream allocation.
     const CHUNK_SIZE: usize = KEYSTREAM_CHUNK_SIZE;
 
-    /// Generate keystream and write it directly into `output`.
+    /// Ensure the SHAKE256 reader is initialized (first call) or re-created
+    /// after `PHOTON_RESEED_INTERVAL_BYTES` of keystream have been produced.
     ///
-    /// This is the chunk-friendly variant of `generate_keystream`. It produces
-    /// exactly `output.len()` bytes of keystream and writes them into the
-    /// provided buffer, avoiding an extra allocation.
-    fn generate_keystream_into(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
+    /// This is the only place where HKDF + BLAKE3 are called, so the expensive
+    /// operations happen at most once per 64 MiB of data.
+    fn ensure_reader(&mut self) -> Result<(), KelvinError> {
         if self.reseed_count >= self.max_reseeds {
             return Err(KelvinError::SeedExhausted);
+        }
+
+        // Diagnostic: count reseeds to verify the persistent reader is working
+        if self.reseed_count == 0 || self.reseed_count.is_power_of_two() {
+            eprintln!(
+                "[KELVIN_DIAG] Photon reseed #{} at byte offset {}",
+                self.reseed_count + 1,
+                self.bytes_processed
+            );
         }
 
         // HKDF-SHA512 expand: derive XOF seed from 2048-byte pool
@@ -113,23 +166,14 @@ impl KelvinPhoton {
 
         hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
 
-        // SHAKE256 XOF: produce keystream directly into output buffer.
-        //
-        // NOTE: bytes_processed is deliberately NOT included in the XOF input.
-        // The keystream within one reseed period is a pure function of
-        // (seed, reseed_count). SHAKE256's XOF property provides position-
-        // independent output — any prefix of the keystream matches the same
-        // prefix from any other call with the same (seed, reseed_count).
-        // This ensures chunk-independence: splitting data into different
-        // chunk sizes produces identical ciphertext.
+        // SHAKE256 XOF: create a persistent reader
         let mut hasher = Shake256::default();
         sha3::digest::Update::update(&mut hasher, &xof_seed);
         sha3::digest::Update::update(&mut hasher, b"kelvin-photon-xof-v1");
 
-        let mut reader = hasher.finalize_xof();
-        XofReader::read(&mut reader, output);
+        self.reader = Some(hasher.finalize_xof());
 
-        // Reseed: derive new seed via BLAKE3
+        // Reseed: derive new seed via BLAKE3 for forward secrecy
         let mut reseed_hasher = Hasher::new();
         reseed_hasher.update(DOMSEP_PHOTON_RESEED_V1);
         reseed_hasher.update(&self.seed[..]);
@@ -139,8 +183,32 @@ impl KelvinPhoton {
         self.seed = reseed_buf;
 
         self.reseed_count += 1;
+        self.bytes_since_reseed = 0;
         xof_seed.zeroize();
 
+        Ok(())
+    }
+
+    /// Generate keystream and write it directly into `output`.
+    ///
+    /// Uses the persistent SHAKE256 reader. If the reader is not yet initialized
+    /// or has exhausted its reseed interval, `ensure_reader()` is called first.
+    fn generate_keystream_into(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
+        if output.is_empty() {
+            return Ok(());
+        }
+
+        // Check if we need to (re)initialize the reader
+        if self.reader.is_none() || self.bytes_since_reseed >= PHOTON_RESEED_INTERVAL_BYTES {
+            self.ensure_reader()?;
+        }
+
+        // Read keystream from the persistent XOF reader
+        if let Some(ref mut reader) = self.reader {
+            XofReader::read(reader, output);
+        }
+
+        self.bytes_since_reseed += output.len() as u64;
         Ok(())
     }
 
@@ -208,6 +276,9 @@ impl Drop for KelvinPhoton {
         self.seed.zeroize();
         self.reseed_count.zeroize();
         self.bytes_processed.zeroize();
+        self.bytes_since_reseed.zeroize();
+        // XofReader is taken by value in read(), so we drop it naturally.
+        // No explicit zeroize needed since SHAKE256 state is ephemeral.
     }
 }
 
@@ -292,24 +363,32 @@ mod tests {
         let mut photon = KelvinPhoton::new(test_seed(), 1000);
         assert_eq!(photon.reseed_count(), 0);
 
+        // First call initializes the reader (reseed_count becomes 1)
         let mut data = vec![0u8; 1];
         photon.encrypt(&mut data).unwrap();
         assert_eq!(photon.reseed_count(), 1);
 
+        // Second call uses the persistent reader (no reseed)
         photon.encrypt(&mut data).unwrap();
-        assert_eq!(photon.reseed_count(), 2);
+        assert_eq!(photon.reseed_count(), 1);
     }
 
     #[test]
     fn test_exhaustion() {
         let mut photon = KelvinPhoton::new(test_seed(), 3);
-        let mut data = vec![0u8; 1];
+        // Encrypt enough to trigger 3 reseeds (each reseed lasts 64 MiB)
+        // 3 reseeds = 192 MiB of keystream
+        let mut data = vec![0u8; 64 * 1024 * 1024 + 1]; // 64 MiB + 1 byte
 
-        // First 3 calls should succeed
-        for _ in 0..3 {
-            assert!(photon.encrypt(&mut data).is_ok());
-        }
-        // 4th call should exhaust
+        // First 64 MiB + 1 byte: triggers reseed at 64 MiB boundary
+        assert!(photon.encrypt(&mut data).is_ok());
+        assert_eq!(photon.reseed_count(), 2); // initial + 1 reseed
+
+        // Second 64 MiB + 1 byte: triggers another reseed
+        assert!(photon.encrypt(&mut data).is_ok());
+        assert_eq!(photon.reseed_count(), 3); // exhausted
+
+        // Third call should fail (max_reseeds = 3, so reseed_count 3 = exhausted)
         assert!(photon.encrypt(&mut data).is_err());
     }
 
@@ -318,7 +397,12 @@ mod tests {
         let mut photon = KelvinPhoton::new(test_seed(), 10);
         assert_eq!(photon.remaining_reseeds(), 10);
 
+        // First call initializes the reader (consumes 1 reseed)
         let mut data = vec![0u8; 1];
+        photon.encrypt(&mut data).unwrap();
+        assert_eq!(photon.remaining_reseeds(), 9);
+
+        // Second call uses persistent reader (no reseed consumed)
         photon.encrypt(&mut data).unwrap();
         assert_eq!(photon.remaining_reseeds(), 9);
     }

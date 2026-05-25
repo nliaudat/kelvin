@@ -33,8 +33,9 @@
 //!   Derivation Function (HKDF)." RFC 5869.
 
 use hkdf::Hkdf;
-use sha3::digest::{ExtendableOutput, Update, XofReader};
-use sha3::{Sha3_512, Shake256};
+use sha3::Sha3_512;
+use sha3_kmac::Kmac128;
+use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
 use crate::error::KelvinError;
@@ -63,65 +64,18 @@ fn derive_mac_key(seed: &[u8; PHOTON_BASE_SEED_SIZE]) -> [u8; MAC_KEY_SIZE] {
 
 /// Compute a KMAC128 tag over the ciphertext.
 ///
-/// Uses SHAKE256 with the KMAC construction from NIST SP 800-185.
+/// Uses the `sha3-kmac` crate (NIST SP 800-185 compliant KMAC128).
 /// The tag is 32 bytes (256 bits), providing 128-bit security against forgery.
 fn compute_tag(key: &[u8; MAC_KEY_SIZE], ciphertext: &[u8], custom: &[u8]) -> [u8; TAG_LEN] {
-    // KMAC128(K, X, L, S):
-    //   newX = bytepad(encode_string(K), 168) || X || right_encode(L)
-    //   return cSHAKE128(newX, L, "KMAC", S)
-    //
-    // We use SHAKE256 instead of SHAKE128 for 256-bit security.
-    // The KMAC construction is:
-    //   SHAKE256(bytepad(encode_string(K), 136) || X || right_encode(L) || "KMAC")
+    use sha3_kmac::generic_array::typenum::U32;
+    use sha3_kmac::Mac;
 
-    let mut hasher = Shake256::default();
-
-    // bytepad(encode_string(K), 136) — 136 is SHAKE256's rate in bytes
-    // encode_string(K) = left_encode(len(K)) || K
-    // left_encode(x) encodes x as a byte string with the length prefix
-    let key_len_encoded = encode_string_length(key.len());
-    hasher.update(&key_len_encoded);
-    hasher.update(key);
-
-    // Pad to 136 bytes (SHAKE256 rate)
-    let padded_len = key_len_encoded.len() + key.len();
-    let padding = 136 - (padded_len % 136);
-    if padding < 136 {
-        hasher.update(&vec![0u8; padding]);
-    }
-
-    // X = ciphertext
-    hasher.update(ciphertext);
-
-    // right_encode(0) — output length 0 means we want the full output
-    hasher.update(&[0u8, 0x01]); // right_encode(0) = 0x00 || 0x01
-
-    // "KMAC" customization
-    hasher.update(b"KMAC");
-
-    // Customization string S
-    hasher.update(custom);
-
-    let mut reader = hasher.finalize_xof();
-    let mut tag = [0u8; TAG_LEN];
-    XofReader::read(&mut reader, &mut tag);
-    tag
-}
-
-/// Encode the length as a byte string for KMAC's encode_string.
-///
-/// left_encode(x) encodes x as a byte string with the number of bytes
-/// needed to represent x prepended.
-fn encode_string_length(len: usize) -> Vec<u8> {
-    if len == 0 {
-        return vec![0x01, 0x00];
-    }
-    let bytes = len.to_be_bytes();
-    // Find the first non-zero byte
-    let start = bytes.iter().position(|&b| b != 0).unwrap_or(bytes.len() - 1);
-    let mut result = vec![(bytes.len() - start) as u8];
-    result.extend_from_slice(&bytes[start..]);
-    result
+    let mut mac = Kmac128::new(key, custom).expect("KMAC128 key size is valid");
+    mac.update(ciphertext);
+    let tag: Mac<U32> = mac.finalize();
+    let mut out = [0u8; TAG_LEN];
+    out.copy_from_slice(&tag);
+    out
 }
 
 // ============================================================================
@@ -213,9 +167,9 @@ impl KelvinPhotonAuthenticated {
         let ciphertext_len = data.len() - TAG_LEN;
         let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
 
-        // Verify the tag before decrypting
+        // Verify the tag before decrypting (constant-time comparison)
         let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinPhotonAuthenticated-v1");
-        if tag_in != &expected_tag[..] {
+        if !bool::from(expected_tag.ct_eq(tag_in)) {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
 
@@ -334,9 +288,9 @@ impl KelvinQuantumAuthenticated {
         let ciphertext_len = data.len() - TAG_LEN;
         let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
 
-        // Verify the tag before decrypting
+        // Verify the tag before decrypting (constant-time comparison)
         let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinQuantumAuthenticated-v1");
-        if tag_in != &expected_tag[..] {
+        if !bool::from(expected_tag.ct_eq(tag_in)) {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
 
@@ -492,10 +446,10 @@ impl KelvinStreamingAuthenticated {
         let ciphertext_len = data.len() - TAG_LEN;
         let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
 
-        // Verify the tag before decrypting
+        // Verify the tag before decrypting (constant-time comparison)
         let expected_tag =
             compute_tag(&self.mac_key, ciphertext, b"KelvinStreamingAuthenticated-v1");
-        if tag_in != &expected_tag[..] {
+        if !bool::from(expected_tag.ct_eq(tag_in)) {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
 

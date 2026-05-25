@@ -2,8 +2,9 @@
 """
 Kelvin -- Encryption Benchmark (Cross-Platform)
 
-Benchmarks all modes (chaos, photon, quantum) on a file of configurable size
-with alternating 0x00/0x01 pattern. Outputs results to documentation/bench_*.md
+Benchmarks all modes (secure, chaos, photon, quantum) on a file of configurable
+size with alternating 0x00/0x01 pattern. Outputs results to
+documentation/bench_*.md
 
 Usage:
     python scripts/bench.py              (default: 1 GB, paranoid level)
@@ -34,6 +35,10 @@ def parse_args():
                         help="Keygen security level (default: paranoid)")
     parser.add_argument("--bytes-per-step", type=int, default=1048576,
                         help="Bytes per step/chunk for chaos/photon/quantum (default: 1048576 = 1 MiB)")
+    parser.add_argument("--continue-on-error", action="store_true",
+                        help="Continue to next mode if a mode fails (instead of aborting)")
+    parser.add_argument("--in-memory", action="store_true",
+                        help="Run in-memory benchmark (no file I/O) to measure true crypto throughput")
     return parser.parse_args()
 
 
@@ -79,38 +84,30 @@ def main():
         sys.exit(1)
     print("\033[92m  Done\033[0m")
 
-    print(f"\033[96m[3/7] Generating orbital config ({level} level)...\033[0m")
-    result = run([str(kelvin_exe), "keygen", "--level", level, "--output", str(key_file)])
+    print(f"\033[96m[3/7] Generating fast orbital config ({level} level, 110,000 steps)...\033[0m")
+    # Use the --fast flag to generate a config with 110,000 steps instead of
+    # the full step count. The Lyapunov check requires total_steps >=
+    # min_chaos_steps (typically ~100,000 for 8-body paranoid configs).
+    # 110,000 steps is just above the horizon, keeping simulation time under
+    # ~4s (vs 336s for paranoid's 10M).
+    result = run([str(kelvin_exe), "keygen", "--level", level, "--fast", "--output", str(key_file)],
+                 capture_output=True, text=True)
     if result.returncode != 0:
         print("\033[91mKeygen failed\033[0m")
+        print(result.stdout)
+        print(result.stderr)
         sys.exit(1)
-    print("\033[92m  Done\033[0m")
+    # Capture keygen summary info
+    keygen_info = result.stdout.strip() if result.stdout else ""
+    if not keygen_info:
+        keygen_info = result.stderr.strip() if result.stderr else ""
 
-    print(f"\033[96m[4/7] Generating {size_gb} GB pattern file...\033[0m")
-    print(f"\033[93m  Writing pattern: {PATTERN!r}\033[0m")
-    chunk_size = 16 * 1024**2  # 16 MB chunks
-    chunk = PATTERN * (chunk_size // len(PATTERN))
-    with open(input_file, 'wb', buffering=1024*1024) as f:
-        remaining = size_bytes
-        while remaining > 0:
-            n = min(chunk_size, remaining)
-            f.write(chunk[:n])
-            remaining -= n
-            sys.stderr.write('.')
-            sys.stderr.flush()
-    sys.stderr.write('\n')
     print("\033[92m  Done\033[0m")
-
-    print("\033[96m[5/7] Computing input file hash...\033[0m")
-    sha256 = hashlib.sha256()
-    with open(input_file, 'rb') as f:
-        while True:
-            data = f.read(64 * 1024**2)
-            if not data:
-                break
-            sha256.update(data)
-    input_hash = sha256.hexdigest()
-    print(f"\033[92m  SHA256: {input_hash}\033[0m")
+    if keygen_info:
+        for line in keygen_info.splitlines():
+            print(f"    {line}")
+    print(f"  (fast mode, 110,000 steps)")
+    print()
 
     # -----------------------------------------------------------------------
     # 2. Benchmark
@@ -121,7 +118,7 @@ def main():
     print(f"\033[96m{'=' * 40}\033[0m")
     print()
 
-    print("\033[96m[6/7] Running encrypt/decrypt/verify for each mode...\033[0m")
+    modes = ["secure", "chaos", "photon", "quantum"]
 
     # Initialize report
     with open(report, 'w') as f:
@@ -130,99 +127,200 @@ def main():
         f.write("**Platform:** Cross-Platform (Python)\n")
         f.write(f"**Test file:** {size_gb} GB pattern {PATTERN!r}\n")
         f.write("**Integration:** Verlet (default)\n")
-        f.write(f"**Key level:** {level}\n\n")
-        f.write("| Mode | Operation | Time (s) | Throughput (GB/s) | Throughput (MB/s) | Verify |\n")
-        f.write("|---|-----------|----------|-------------------|--------------------|--------|\n")
+        f.write(f"**Key level:** {level}\n")
+        f.write("**Simulation steps:** 110,000 (reduced for fast benchmarking)\n")
+        if keygen_info:
+            f.write(f"**Keygen output:**\n```\n{keygen_info}\n```\n")
 
-    modes = ["chaos", "photon", "quantum"]
-
-    for mode in modes:
-        print()
-        print(f"\033[96m--- Mode: {mode} ---\033[0m")
-
-        # Encrypt
-        print("\033[93m  Encrypting...\033[0m")
-        t0 = time.time()
-        result = run([str(kelvin_exe), "encrypt", "--mode", mode,
-                      "--config", str(key_file), "--input", str(input_file),
-                      "--output", str(enc_file),
-                      "--bytes-per-step", str(args.bytes_per_step)])
-        t1 = time.time()
-        if result.returncode != 0:
-            print("\033[91m  Encryption failed\033[0m")
-            enc_time = "ERROR"
-            enc_gbps = 0
-            enc_mbps = 0
-        else:
-            enc_time = f"{t1 - t0:.3f}"
-            enc_gbps = f"{size_gb / (t1 - t0):.3f}"
-            enc_mbps = f"{(size_gb * 1024) / (t1 - t0):.1f}"
-            print(f"\033[92m  Encrypt time: {enc_time} s\033[0m")
-
-        # Decrypt
-        print("\033[93m  Decrypting...\033[0m")
-        t0 = time.time()
-        result = run([str(kelvin_exe), "decrypt", "--mode", mode,
-                      "--config", str(key_file), "--input", str(enc_file),
-                      "--output", str(dec_file)])
-        t1 = time.time()
-        if result.returncode != 0:
-            print("\033[91m  Decryption failed\033[0m")
-            dec_time = "ERROR"
-            dec_gbps = 0
-            dec_mbps = 0
-        else:
-            dec_time = f"{t1 - t0:.3f}"
-            dec_gbps = f"{size_gb / (t1 - t0):.3f}"
-            dec_mbps = f"{(size_gb * 1024) / (t1 - t0):.1f}"
-            print(f"\033[92m  Decrypt time: {dec_time} s\033[0m")
-
-        # Verify (skip if encryption or decryption failed)
-        verify = "FAIL"
-        if enc_time != "ERROR" and dec_time != "ERROR" and dec_file.exists():
-            sha256_dec = hashlib.sha256()
-            with open(dec_file, 'rb') as f:
-                while True:
-                    data = f.read(64 * 1024**2)
-                    if not data:
-                        break
-                    sha256_dec.update(data)
-            dec_hash = sha256_dec.hexdigest()
-            verify = "PASS" if dec_hash == input_hash else "FAIL"
-            if verify == "PASS":
-                print(f"\033[92m  SHA256 match: PASS\033[0m")
-            else:
-                print(f"\033[91m  SHA256 MISMATCH!\033[0m")
-
-        # Verify encrypted file does NOT contain the plaintext pattern
-        print("\033[93m  Checking for pattern leak in ciphertext...\033[0m")
-        pattern_check = "N/A"
-        if enc_time != "ERROR" and enc_file.exists():
-            # Sample the encrypted file to check for the pattern
-            with open(enc_file, 'rb') as f:
-                sample = f.read(8192)  # Read first 8 KB
-            if PATTERN in sample:
-                pattern_check = "FAIL"
-                print(f"\033[91m  WARNING: Plaintext pattern found in encrypted file!\033[0m")
-            else:
-                pattern_check = "PASS"
-                print(f"\033[92m  Pattern not found in ciphertext: PASS\033[0m")
-
-        # Append to report
+    if args.in_memory:
+        # ── In-Memory Benchmark Only ──
+        print("\033[96m[4/7] Running in-memory crypto throughput benchmark (no file I/O)...\033[0m")
         with open(report, 'a') as f:
-            f.write(f"| {mode} | encrypt | {enc_time} | {enc_gbps} | {enc_mbps} | {verify} |\n")
-            f.write(f"| {mode} | decrypt | {dec_time} | {dec_gbps} | {dec_mbps} | {verify} |\n")
+            f.write("\n## In-Memory Crypto Throughput\n\n")
+            f.write("| Mode | Throughput (GB/s) | Throughput (MB/s) |\n")
+            f.write("|------|-------------------|--------------------|\n")
 
-        # Clean up intermediate files
-        if enc_file.exists():
-            enc_file.unlink()
-        if dec_file.exists():
-            dec_file.unlink()
+        for mode in modes:
+            print(f"\033[96m  --- Mode: {mode} ---\033[0m")
+            cmd = [str(kelvin_exe), "encrypt", "--mode", mode,
+                   "--config", str(key_file), "--in-memory", "--size", str(size_bytes)]
+            if mode == "chaos":
+                cmd.extend(["--bytes-per-step", str(args.bytes_per_step)])
+            result = run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"\033[91m  In-memory benchmark failed for {mode}\033[0m")
+                print(result.stdout)
+                print(result.stderr)
+                gbps = "ERROR"
+                mbps = "ERROR"
+            else:
+                # Parse the throughput from output: "Encrypt complete: 1.967s, 0.51 GB/s (521 MB/s)"
+                for line in result.stdout.splitlines():
+                    if "complete:" in line and "GB/s" in line:
+                        # Extract GB/s value (second whitespace-delimited token after comma)
+                        # e.g. "  Encrypt complete: 1.967s, 0.51 GB/s (521 MB/s)"
+                        after_comma = line.split(",")[1] if "," in line else ""
+                        tokens = after_comma.strip().split()
+                        gbps = tokens[0] if len(tokens) >= 1 else "?"
+                        # Extract MB/s from parenthesized value
+                        mbps = tokens[2].strip("()") if len(tokens) >= 3 else "?"
+                        print(f"    {line.strip()}")
+                        break
+                else:
+                    gbps = "?"
+                    mbps = "?"
+                    print(f"    {result.stdout.strip()}")
 
-    # Close report
-    with open(report, 'a') as f:
-        f.write("|---|-----------|----------|-------------------|--------------------|--------|\n")
-        f.write(f"\n*Benchmark completed at {time.strftime('%d.%m.%Y %H:%M:%S')}*\n")
+            with open(report, 'a') as f:
+                f.write(f"| {mode} | {gbps} | {mbps} |\n")
+
+        with open(report, 'a') as f:
+            f.write("|---|-------------------|--------------------|\n")
+    else:
+        # ── File-Based Benchmark ──
+        print(f"\033[96m[4/7] Generating {size_gb} GB pattern file...\033[0m")
+        print(f"\033[93m  Writing pattern: {PATTERN!r}\033[0m")
+        chunk_size = 16 * 1024**2  # 16 MB chunks
+        chunk = PATTERN * (chunk_size // len(PATTERN))
+        with open(input_file, 'wb', buffering=1024*1024) as f:
+            remaining = size_bytes
+            while remaining > 0:
+                n = min(chunk_size, remaining)
+                f.write(chunk[:n])
+                remaining -= n
+                sys.stderr.write('.')
+                sys.stderr.flush()
+        sys.stderr.write('\n')
+        print("\033[92m  Done\033[0m")
+
+        print("\033[96m[5/7] Computing input file hash...\033[0m")
+        sha256 = hashlib.sha256()
+        with open(input_file, 'rb') as f:
+            while True:
+                data = f.read(64 * 1024**2)
+                if not data:
+                    break
+                sha256.update(data)
+        input_hash = sha256.hexdigest()
+        print(f"\033[92m  SHA256: {input_hash}\033[0m")
+
+        print("\033[96m[6/7] Running encrypt/decrypt/verify for each mode...\033[0m")
+
+        with open(report, 'a') as f:
+            f.write("\n| Mode | Operation | Time (s) | Throughput (GB/s) | Throughput (MB/s) | Verify |\n")
+            f.write("|---|-----------|----------|-------------------|--------------------|--------|\n")
+
+        results = {}  # mode -> {encrypt: status, decrypt: status, verify: status}
+
+        for mode in modes:
+            print()
+            print(f"\033[96m--- Mode: {mode} ---\033[0m")
+
+            # Encrypt
+            print("\033[93m  Encrypting...\033[0m")
+            t0 = time.time()
+            cmd = [str(kelvin_exe), "encrypt", "--mode", mode,
+                   "--config", str(key_file), "--input", str(input_file),
+                   "--output", str(enc_file)]
+            if mode == "chaos":
+                cmd.extend(["--bytes-per-step", str(args.bytes_per_step)])
+            result = run(cmd)
+            t1 = time.time()
+            if result.returncode != 0:
+                print(f"\033[91m  Encryption failed (rc={result.returncode})\033[0m")
+                enc_time = "ERROR"
+                enc_gbps = 0
+                enc_mbps = 0
+                if not args.continue_on_error:
+                    print("\033[91m  Aborting (use --continue-on-error to skip failed modes)\033[0m")
+                    sys.exit(1)
+            else:
+                enc_time = f"{t1 - t0:.3f}"
+                enc_gbps = f"{size_gb / (t1 - t0):.3f}"
+                enc_mbps = f"{(size_gb * 1024) / (t1 - t0):.1f}"
+                print(f"\033[92m  Encrypt time: {enc_time} s\033[0m")
+
+            # Decrypt
+            print("\033[93m  Decrypting...\033[0m")
+            t0 = time.time()
+            cmd = [str(kelvin_exe), "decrypt", "--mode", mode,
+                   "--config", str(key_file), "--input", str(enc_file),
+                   "--output", str(dec_file)]
+            if mode == "chaos":
+                cmd.extend(["--bytes-per-step", str(args.bytes_per_step)])
+            result = run(cmd)
+            t1 = time.time()
+            if result.returncode != 0:
+                print(f"\033[91m  Decryption failed (rc={result.returncode})\033[0m")
+                dec_time = "ERROR"
+                dec_gbps = 0
+                dec_mbps = 0
+                if not args.continue_on_error:
+                    print("\033[91m  Aborting (use --continue-on-error to skip failed modes)\033[0m")
+                    sys.exit(1)
+            else:
+                dec_time = f"{t1 - t0:.3f}"
+                dec_gbps = f"{size_gb / (t1 - t0):.3f}"
+                dec_mbps = f"{(size_gb * 1024) / (t1 - t0):.1f}"
+                print(f"\033[92m  Decrypt time: {dec_time} s\033[0m")
+
+            # Verify (skip if encryption or decryption failed)
+            verify = "FAIL"
+            if enc_time != "ERROR" and dec_time != "ERROR" and dec_file.exists():
+                sha256_dec = hashlib.sha256()
+                with open(dec_file, 'rb') as f:
+                    while True:
+                        data = f.read(64 * 1024**2)
+                        if not data:
+                            break
+                        sha256_dec.update(data)
+                dec_hash = sha256_dec.hexdigest()
+                verify = "PASS" if dec_hash == input_hash else "FAIL"
+                if verify == "PASS":
+                    print(f"\033[92m  SHA256 match: PASS\033[0m")
+                else:
+                    print(f"\033[91m  SHA256 MISMATCH!\033[0m")
+
+            # Verify encrypted file does NOT contain the plaintext pattern
+            print("\033[93m  Checking for pattern leak in ciphertext...\033[0m")
+            pattern_check = "N/A"
+            if enc_time != "ERROR" and enc_file.exists():
+                with open(enc_file, 'rb') as f:
+                    sample = f.read(65536)
+                pattern_quad = PATTERN * 4
+                if pattern_quad in sample:
+                    pattern_check = "FAIL"
+                    print(f"\033[91m  WARNING: Plaintext pattern found in encrypted file!\033[0m")
+                else:
+                    pattern_check = "PASS"
+                    print(f"\033[92m  Pattern not found in ciphertext: PASS\033[0m")
+
+            # Append to report
+            with open(report, 'a') as f:
+                f.write(f"| {mode} | encrypt | {enc_time} | {enc_gbps} | {enc_mbps} | {verify} |\n")
+                f.write(f"| {mode} | decrypt | {dec_time} | {dec_gbps} | {dec_mbps} | {verify} |\n")
+
+            results[mode] = {
+                "encrypt": "PASS" if enc_time != "ERROR" else "FAIL",
+                "decrypt": "PASS" if dec_time != "ERROR" else "FAIL",
+                "verify": verify,
+            }
+
+            if enc_file.exists():
+                enc_file.unlink()
+            if dec_file.exists():
+                dec_file.unlink()
+
+        # Close report
+        with open(report, 'a') as f:
+            f.write("|---|-----------|----------|-------------------|--------------------|--------|\n")
+            f.write(f"\n*Benchmark completed at {time.strftime('%d.%m.%Y %H:%M:%S')}*\n")
+            f.write("\n## Summary\n\n")
+            f.write("| Mode | Encrypt | Decrypt | Verify |\n")
+            f.write("|------|---------|---------|--------|\n")
+            for mode in modes:
+                r = results.get(mode, {"encrypt": "SKIP", "decrypt": "SKIP", "verify": "SKIP"})
+                f.write(f"| {mode} | {r['encrypt']} | {r['decrypt']} | {r['verify']} |\n")
 
     # -----------------------------------------------------------------------
     # 3. Cleanup
