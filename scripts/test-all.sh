@@ -89,6 +89,10 @@ step "Integration: Full pipeline"
 cargo test -p kelvin --test full_pipeline
 pass
 
+step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+cargo test -p kelvin --test streaming_api
+pass
+
 step "Integration: Chaos test (Lyapunov estimation)"
 cargo test -p kelvin-kdf --test chaos_test
 pass

@@ -674,137 +674,19 @@ pub fn decrypt_file_streaming(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use kelvin_core::{Fixed, OrbitalBody, Vec3};
 
-    fn test_seed() -> [u8; PHOTON_BASE_SEED_SIZE] {
-        let mut seed = [0u8; PHOTON_BASE_SEED_SIZE];
-        for (i, byte) in seed.iter_mut().enumerate() {
-            *byte = (i % 256) as u8;
-        }
-        seed
-    }
-
-    fn test_quantum_seed() -> [u8; QUANTUM_BASE_SEED_SIZE] {
-        let mut seed = [0u8; QUANTUM_BASE_SEED_SIZE];
-        for (i, byte) in seed.iter_mut().enumerate() {
-            *byte = (i % 256) as u8;
-        }
-        seed
-    }
-
-    fn streaming_config() -> OrbitalConfig {
-        let sun = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
-        let planet1 = OrbitalBody::new(
-            Fixed::from_raw(1 << 54),
-            Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
-            Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-        );
-        let planet2 = OrbitalBody::new(
-            Fixed::from_raw(1 << 53),
-            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
-            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
-        );
-        let planet3 = OrbitalBody::new(
-            Fixed::from_raw(1 << 52),
-            Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
-            Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
-        );
-        let planet4 = OrbitalBody::new(
-            Fixed::from_raw(1 << 51),
-            Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
-            Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
-        );
-        OrbitalConfig::new(
-            vec![sun, planet1, planet2, planet3, planet4],
-            1000,
-            100,
-            kelvin_core::DEFAULT_DT,
-            Fixed::from_raw(1 << 44),
-            kelvin_core::DEFAULT_G,
-        )
-        .unwrap()
-    }
-
-    // ─── Photon Streaming Tests ────────────────────────────────────────────
-
+    /// Verify that the streaming API is accessible and basic trait dispatch works.
     #[test]
-    fn test_photon_streaming_round_trip() {
-        let seed = test_seed();
+    fn test_streaming_trait_smoke() {
+        let seed = [0u8; PHOTON_BASE_SEED_SIZE];
         let mut encryptor = PhotonEncryptor::new(seed, 1000);
         let mut decryptor = PhotonDecryptor::new(seed, 1000);
 
-        let plaintext = b"Hello, Kelvin V3 Photon streaming!";
+        let plaintext = b"Smoke test";
         let mut ciphertext = Vec::new();
         encryptor.update(plaintext, &mut ciphertext).unwrap();
-        let tag = encryptor.finalize().unwrap();
-        assert!(tag.is_empty(), "Photon should not produce a tag");
-
-        let mut decrypted = Vec::new();
-        decryptor.update(&ciphertext, &mut decrypted).unwrap();
-        decryptor.finalize(&[]).unwrap();
-        assert_eq!(&decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_photon_streaming_multi_chunk() {
-        let seed = test_seed();
-        let mut encryptor = PhotonEncryptor::new(seed, 1000);
-        let mut decryptor = PhotonDecryptor::new(seed, 1000);
-
-        let chunks = vec![b"First chunk".to_vec(), b"Second chunk".to_vec(), b"Third".to_vec()];
-        let mut all_ciphertext = Vec::new();
-        for chunk in &chunks {
-            encryptor.update(chunk, &mut all_ciphertext).unwrap();
-        }
-        encryptor.finalize().unwrap();
-
-        let mut all_plaintext = Vec::new();
-        // Decrypt in different chunk sizes to test chunk independence
-        decryptor.update(&all_ciphertext, &mut all_plaintext).unwrap();
-        decryptor.finalize(&[]).unwrap();
-
-        let expected: Vec<u8> = chunks.iter().flat_map(|c| c.iter().copied()).collect();
-        assert_eq!(all_plaintext, expected);
-    }
-
-    #[test]
-    fn test_photon_streaming_empty() {
-        let seed = test_seed();
-        let mut encryptor = PhotonEncryptor::new(seed, 1000);
-        let mut output = Vec::new();
-        encryptor.update(&[], &mut output).unwrap();
-        assert!(output.is_empty());
         let tag = encryptor.finalize().unwrap();
         assert!(tag.is_empty());
-    }
-
-    #[test]
-    fn test_photon_streaming_determinism() {
-        let seed = test_seed();
-        let mut e1 = PhotonEncryptor::new(seed, 1000);
-        let mut e2 = PhotonEncryptor::new(seed, 1000);
-
-        let data = b"Determinism test data";
-        let mut c1 = Vec::new();
-        let mut c2 = Vec::new();
-        e1.update(data, &mut c1).unwrap();
-        e2.update(data, &mut c2).unwrap();
-        assert_eq!(c1, c2);
-    }
-
-    // ─── Quantum Streaming Tests ───────────────────────────────────────────
-
-    #[test]
-    fn test_quantum_streaming_round_trip() {
-        let seed = test_quantum_seed();
-        let mut encryptor = QuantumEncryptor::new(seed, 1000);
-        let mut decryptor = QuantumDecryptor::new(seed, 1000);
-
-        let plaintext = b"Hello, Kelvin H Quantum streaming!";
-        let mut ciphertext = Vec::new();
-        encryptor.update(plaintext, &mut ciphertext).unwrap();
-        let tag = encryptor.finalize().unwrap();
-        assert!(tag.is_empty(), "Quantum should not produce a tag");
 
         let mut decrypted = Vec::new();
         decryptor.update(&ciphertext, &mut decrypted).unwrap();
@@ -812,279 +694,44 @@ mod tests {
         assert_eq!(&decrypted, plaintext);
     }
 
+    /// Verify that encrypt_file_streaming and decrypt_file_streaming work.
     #[test]
-    fn test_quantum_streaming_determinism() {
-        let seed = test_quantum_seed();
-        let mut e1 = QuantumEncryptor::new(seed, 1000);
-        let mut e2 = QuantumEncryptor::new(seed, 1000);
+    fn test_encrypt_file_streaming_smoke() {
+        use std::io::{Read, Write};
 
-        let data = b"Determinism test data";
-        let mut c1 = Vec::new();
-        let mut c2 = Vec::new();
-        e1.update(data, &mut c1).unwrap();
-        e2.update(data, &mut c2).unwrap();
-        assert_eq!(c1, c2);
-    }
+        let seed = [0u8; PHOTON_BASE_SEED_SIZE];
+        let plaintext = b"File smoke test";
 
-    // ─── Chaos Streaming Tests ─────────────────────────────────────────────
+        let in_path = {
+            let mut p = std::env::temp_dir();
+            p.push(format!("kelvin_unit_test_in_{}", std::process::id()));
+            let mut f = std::fs::File::create(&p).unwrap();
+            f.write_all(plaintext).unwrap();
+            p
+        };
+        let out_path = {
+            let mut p = std::env::temp_dir();
+            p.push(format!("kelvin_unit_test_out_{}", std::process::id()));
+            p
+        };
+        let dec_path = {
+            let mut p = std::env::temp_dir();
+            p.push(format!("kelvin_unit_test_dec_{}", std::process::id()));
+            p
+        };
 
-    #[test]
-    fn test_chaos_streaming_round_trip() {
-        let config = streaming_config();
-        let mut encryptor = ChaosEncryptor::new(config.clone(), 64).unwrap();
-        let mut decryptor = ChaosDecryptor::new(config, 64).unwrap();
+        let encryptor = PhotonEncryptor::new(seed, 1000);
+        encrypt_file_streaming(encryptor, &in_path, &out_path, 64).unwrap();
 
-        let plaintext = b"Hello, Kelvin V2 Chaos streaming!";
-        let mut ciphertext = Vec::new();
-        encryptor.update(plaintext, &mut ciphertext).unwrap();
-        let tag = encryptor.finalize().unwrap();
-        assert!(tag.is_empty(), "Chaos should not produce a tag");
+        let decryptor = PhotonDecryptor::new(seed, 1000);
+        decrypt_file_streaming(decryptor, &out_path, &dec_path, 64, 0).unwrap();
 
         let mut decrypted = Vec::new();
-        decryptor.update(&ciphertext, &mut decrypted).unwrap();
-        decryptor.finalize(&[]).unwrap();
+        std::fs::File::open(&dec_path).unwrap().read_to_end(&mut decrypted).unwrap();
         assert_eq!(&decrypted, plaintext);
-    }
 
-    #[test]
-    fn test_chaos_streaming_multi_chunk() {
-        let config = streaming_config();
-        let mut encryptor = ChaosEncryptor::new(config.clone(), 32).unwrap();
-        let mut decryptor = ChaosDecryptor::new(config, 32).unwrap();
-
-        let chunks = vec![b"First chunk".to_vec(), b"Second chunk".to_vec(), b"Third".to_vec()];
-        let mut all_ciphertext = Vec::new();
-        // Encrypt all data as one chunk to ensure consistent keystream
-        let all_plaintext: Vec<u8> = chunks.iter().flat_map(|c| c.iter().copied()).collect();
-        encryptor.update(&all_plaintext, &mut all_ciphertext).unwrap();
-        encryptor.finalize().unwrap();
-
-        let mut decrypted = Vec::new();
-        // Decrypt in the same chunk sizes as encryption
-        decryptor.update(&all_ciphertext, &mut decrypted).unwrap();
-        decryptor.finalize(&[]).unwrap();
-
-        assert_eq!(decrypted, all_plaintext);
-    }
-
-    #[test]
-    fn test_chaos_streaming_determinism() {
-        let config = streaming_config();
-        let mut e1 = ChaosEncryptor::new(config.clone(), 64).unwrap();
-        let mut e2 = ChaosEncryptor::new(config, 64).unwrap();
-
-        let data = b"Determinism test data";
-        let mut c1 = Vec::new();
-        let mut c2 = Vec::new();
-        e1.update(data, &mut c1).unwrap();
-        e2.update(data, &mut c2).unwrap();
-        assert_eq!(c1, c2);
-    }
-
-    // ─── Secure Streaming Tests ────────────────────────────────────────────
-
-    #[test]
-    fn test_secure_streaming_round_trip() {
-        let key = [0xABu8; 32];
-        let nonce = [0xCDu8; 12];
-        let mut encryptor = SecureEncryptor::new(key, nonce);
-        let mut decryptor = SecureDecryptor::new(key, nonce);
-
-        let plaintext = b"Hello, Kelvin V1 Secure streaming!";
-        let mut ciphertext = Vec::new();
-        encryptor.update(plaintext, &mut ciphertext).unwrap();
-        let tag = encryptor.finalize().unwrap();
-        assert!(!tag.is_empty(), "Secure should produce a tag");
-
-        let mut decrypted = Vec::new();
-        decryptor.update(&ciphertext, &mut decrypted).unwrap();
-        decryptor.finalize(&tag).unwrap();
-        assert_eq!(&decrypted, plaintext);
-    }
-
-    #[test]
-    fn test_secure_streaming_multi_chunk() {
-        let key = [0xABu8; 32];
-        let nonce = [0xCDu8; 12];
-        let mut encryptor = SecureEncryptor::new(key, nonce);
-        let mut decryptor = SecureDecryptor::new(key, nonce);
-
-        let chunks = vec![b"First chunk".to_vec(), b"Second chunk".to_vec(), b"Third".to_vec()];
-        let mut all_ciphertext = Vec::new();
-        for chunk in &chunks {
-            encryptor.update(chunk, &mut all_ciphertext).unwrap();
-        }
-        let tag = encryptor.finalize().unwrap();
-
-        let mut all_plaintext = Vec::new();
-        decryptor.update(&all_ciphertext, &mut all_plaintext).unwrap();
-        decryptor.finalize(&tag).unwrap();
-
-        let expected: Vec<u8> = chunks.iter().flat_map(|c| c.iter().copied()).collect();
-        assert_eq!(all_plaintext, expected);
-    }
-
-    #[test]
-    fn test_secure_streaming_tamper_detection() {
-        let key = [0xABu8; 32];
-        let nonce = [0xCDu8; 12];
-        let mut encryptor = SecureEncryptor::new(key, nonce);
-
-        let plaintext = b"Tamper test data";
-        let mut ciphertext = Vec::new();
-        encryptor.update(plaintext, &mut ciphertext).unwrap();
-        let tag = encryptor.finalize().unwrap();
-
-        // Tamper with the ciphertext
-        if !ciphertext.is_empty() {
-            ciphertext[0] ^= 0x01;
-        }
-
-        let mut decryptor = SecureDecryptor::new(key, nonce);
-        let mut decrypted = Vec::new();
-        decryptor.update(&ciphertext, &mut decrypted).unwrap();
-        // Should fail on finalize due to tampered data
-        assert!(decryptor.finalize(&tag).is_err());
-    }
-
-    #[test]
-    fn test_secure_streaming_empty() {
-        let key = [0xABu8; 32];
-        let nonce = [0xCDu8; 12];
-        let mut encryptor = SecureEncryptor::new(key, nonce);
-        let mut output = Vec::new();
-        encryptor.update(&[], &mut output).unwrap();
-        assert!(output.is_empty());
-        let tag = encryptor.finalize().unwrap();
-        assert!(!tag.is_empty(), "Secure should produce a tag even for empty input");
-    }
-
-    #[test]
-    fn test_secure_streaming_wrong_tag() {
-        let key = [0xABu8; 32];
-        let nonce = [0xCDu8; 12];
-        let mut encryptor = SecureEncryptor::new(key, nonce);
-
-        let plaintext = b"Wrong tag test";
-        let mut ciphertext = Vec::new();
-        encryptor.update(plaintext, &mut ciphertext).unwrap();
-        let _tag = encryptor.finalize().unwrap();
-
-        // Try to decrypt with a wrong tag
-        let mut decryptor = SecureDecryptor::new(key, nonce);
-        let mut decrypted = Vec::new();
-        decryptor.update(&ciphertext, &mut decrypted).unwrap();
-        let wrong_tag = [0xFFu8; 16];
-        assert!(decryptor.finalize(&wrong_tag).is_err());
-    }
-
-    // ─── Cross-mode consistency tests ──────────────────────────────────────
-
-    #[test]
-    fn test_photon_streaming_vs_batch_consistency() {
-        let seed = test_seed();
-        let data = vec![0xAAu8; 1000];
-
-        // Batch mode
-        let mut batch = KelvinPhoton::new(seed, 1000);
-        let mut batch_result = data.clone();
-        batch.encrypt(&mut batch_result).unwrap();
-
-        // Streaming mode
-        let mut stream = PhotonEncryptor::new(seed, 1000);
-        let mut stream_result = Vec::new();
-        stream.update(&data, &mut stream_result).unwrap();
-        stream.finalize().unwrap();
-
-        assert_eq!(
-            batch_result, stream_result,
-            "Photon streaming and batch should produce identical ciphertext"
-        );
-    }
-
-    #[test]
-    fn test_quantum_streaming_vs_batch_consistency() {
-        let seed = test_quantum_seed();
-        let data = vec![0xAAu8; 1000];
-
-        // Batch mode
-        let mut batch = KelvinQuantum::new(seed, 1000);
-        let mut batch_result = data.clone();
-        batch.encrypt(&mut batch_result).unwrap();
-
-        // Streaming mode
-        let mut stream = QuantumEncryptor::new(seed, 1000);
-        let mut stream_result = Vec::new();
-        stream.update(&data, &mut stream_result).unwrap();
-        stream.finalize().unwrap();
-
-        assert_eq!(
-            batch_result, stream_result,
-            "Quantum streaming and batch should produce identical ciphertext"
-        );
-    }
-
-    #[test]
-    fn test_chaos_streaming_vs_batch_consistency() {
-        let config = streaming_config();
-        let data = vec![0xAAu8; 200]; // Multiple of 64 to align with bytes_per_step
-
-        // Batch mode
-        let mut batch = KelvinStreaming::new(config.clone(), 64).unwrap();
-        let mut batch_result = data.clone();
-        batch.encrypt(&mut batch_result).unwrap();
-
-        // Streaming mode
-        let mut stream = ChaosEncryptor::new(config, 64).unwrap();
-        let mut stream_result = Vec::new();
-        stream.update(&data, &mut stream_result).unwrap();
-        stream.finalize().unwrap();
-
-        assert_eq!(
-            batch_result, stream_result,
-            "Chaos streaming and batch should produce identical ciphertext"
-        );
-    }
-
-    #[test]
-    fn test_photon_streaming_chunk_independence() {
-        let seed = test_seed();
-        let data = vec![0xBBu8; 100];
-
-        // Encrypt as one chunk
-        let mut e1 = PhotonEncryptor::new(seed, 1000);
-        let mut c1 = Vec::new();
-        e1.update(&data, &mut c1).unwrap();
-        e1.finalize().unwrap();
-
-        // Encrypt as two chunks
-        let mut e2 = PhotonEncryptor::new(seed, 1000);
-        let mut c2 = Vec::new();
-        e2.update(&data[..50], &mut c2).unwrap();
-        e2.update(&data[50..], &mut c2).unwrap();
-        e2.finalize().unwrap();
-
-        assert_eq!(c1, c2, "Photon should produce same ciphertext regardless of chunking");
-    }
-
-    #[test]
-    fn test_chaos_streaming_chunk_independence() {
-        let config = streaming_config();
-        let data = vec![0xBBu8; 128]; // Multiple of 64
-
-        // Encrypt as one chunk
-        let mut e1 = ChaosEncryptor::new(config.clone(), 64).unwrap();
-        let mut c1 = Vec::new();
-        e1.update(&data, &mut c1).unwrap();
-        e1.finalize().unwrap();
-
-        // Encrypt as two chunks
-        let mut e2 = ChaosEncryptor::new(config, 64).unwrap();
-        let mut c2 = Vec::new();
-        e2.update(&data[..64], &mut c2).unwrap();
-        e2.update(&data[64..], &mut c2).unwrap();
-        e2.finalize().unwrap();
-
-        assert_eq!(c1, c2, "Chaos should produce same ciphertext regardless of chunking");
+        let _ = std::fs::remove_file(&in_path);
+        let _ = std::fs::remove_file(&out_path);
+        let _ = std::fs::remove_file(&dec_path);
     }
 }

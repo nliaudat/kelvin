@@ -104,6 +104,12 @@ if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
+call :step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+cargo test -p kelvin --test streaming_api
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
 call :step "Integration: Chaos test (Lyapunov estimation)"
 cargo test -p kelvin-kdf --test chaos_test
 if errorlevel 1 set EXITCODE=1

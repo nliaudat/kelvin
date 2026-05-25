@@ -59,7 +59,7 @@ mod error;
 mod parameters;
 mod photon;
 mod quantum;
-mod streaming;
+pub mod streaming;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
