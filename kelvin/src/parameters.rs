@@ -535,6 +535,42 @@ pub const QUANTUM_DEFAULT_RESEED_INTERVAL: u64 = 64 * 1024 * 1024;
 /// **Why 64 KB?** Standard filesystem block size for efficient I/O.
 pub const STREAMING_CHUNK_SIZE: usize = 64 * 1024;
 
+/// Size of the KMAC128 authentication tag in bytes.
+///
+/// Used by authenticated wrappers (`KelvinPhotonAuthenticated`,
+/// `KelvinQuantumAuthenticated`, `KelvinStreamingAuthenticated`) for
+/// NIST SP 800-185 KMAC128 authentication.
+///
+/// **Why 32?** KMAC128 provides 128-bit security against forgery.
+/// A 32-byte (256-bit) tag is standard for KMAC128.
+///
+/// **Changing this** would break compatibility with existing authenticated
+/// ciphertexts.
+pub const AUTH_TAG_LEN: usize = 32;
+
+/// Wire format version for authenticated ciphertexts.
+///
+/// The version byte is prepended to the KMAC128 tag in the wire format:
+///
+/// ```text
+/// ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)
+/// ```
+///
+/// **Why 0x01?** This is the initial version. Future versions can be
+/// detected and handled gracefully during decryption.
+///
+/// **Changing this** would break compatibility with existing authenticated
+/// ciphertexts.
+pub const AUTH_FORMAT_VERSION: u8 = 0x01;
+
+/// Total overhead for authenticated ciphertexts in bytes.
+///
+/// This is the version byte (1) + the KMAC128 tag (32) = 33 bytes.
+///
+/// **Changing this** would break compatibility with existing authenticated
+/// ciphertexts.
+pub const AUTH_OVERHEAD: usize = 1 + AUTH_TAG_LEN;
+
 // Extra bytes for AEAD authentication tag (ChaCha20Poly1305).
 // (Commented out: not currently used within the `kelvin` crate.
 //  The AEAD tag size is handled internally by ChaChaStream.)

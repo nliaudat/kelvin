@@ -148,15 +148,6 @@ impl KelvinPhoton {
             return Err(KelvinError::SeedExhausted);
         }
 
-        // Diagnostic: count reseeds to verify the persistent reader is working
-        if self.reseed_count == 0 || self.reseed_count.is_power_of_two() {
-            eprintln!(
-                "[KELVIN_DIAG] Photon reseed #{} at byte offset {}",
-                self.reseed_count + 1,
-                self.bytes_processed
-            );
-        }
-
         // HKDF-SHA512 expand: derive XOF seed from 2048-byte pool
         let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
         let mut xof_seed = [0u8; XOF_SEED_SIZE];

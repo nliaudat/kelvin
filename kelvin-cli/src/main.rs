@@ -15,9 +15,9 @@
 //! | `photon` (V3) | `KelvinPhoton` | `KelvinPhotonAuthenticated` | HKDF→SHAKE256 XOR |
 //! | `quantum` (H) | `KelvinQuantum` | `KelvinQuantumAuthenticated` | Hybrid cache+XOR + orbital reseed |
 //!
-//! Use `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to defeat
-//! ciphertext malleability. The `secure` mode has built-in AEAD authentication
-//! and ignores the `--auth` flag.
+//! Use `--auth` to append a version byte + 32-byte KMAC128 tag (NIST SP 800-185)
+//! to defeat ciphertext malleability. The `secure` mode has built-in AEAD
+//! authentication and ignores the `--auth` flag.
 //!
 //! Integration defaults to Verlet (energy-conserving). Use `--euler`
 //! for numerically unstable integration (faster chaos amplification).
@@ -32,9 +32,9 @@ use kelvin::{
     KelvinStreamingAuthenticated, OrbitalBody, OrbitalConfig, OrbitalKeyPair, Vec3,
 };
 use kelvin::{
-    CHAOS_DEFAULT_BYTES_PER_STEP, DEFAULT_BYTES_PER_STEP, FAST_RESEED_INTERVAL, FAST_STEPS,
-    MAXIMUM_BODIES, MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES, PARANOID_STEPS,
-    PHOTON_DEFAULT_BYTES_PER_STEP, PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW,
+    AUTH_OVERHEAD, CHAOS_DEFAULT_BYTES_PER_STEP, DEFAULT_BYTES_PER_STEP, FAST_RESEED_INTERVAL,
+    FAST_STEPS, MAXIMUM_BODIES, MAXIMUM_STEPS, ORBITAL_VELOCITY_CONSTANT, PARANOID_BODIES,
+    PARANOID_STEPS, PHOTON_DEFAULT_BYTES_PER_STEP, PHOTON_DEFAULT_MAX_RESEEDS, PLANET_MASS_MAX_RAW,
     PLANET_MASS_MIN_RAW, PLANET_RADIUS_MULTIPLIER, QUANTUM_DEFAULT_BYTES_PER_STEP, STANDARD_BODIES,
     STANDARD_STEPS, STREAMING_CHUNK_SIZE, SUN_MASS_CENTER, SUN_MASS_MAX_RAW, SUN_MASS_MIN_RAW,
     SUN_MASS_RANGE, SUN_POS_MAX_RAW, SUN_POS_MIN_RAW, SUN_VEL_MAX_RAW, SUN_VEL_MIN_RAW,
@@ -101,7 +101,7 @@ enum Commands {
         /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
         euler: bool,
-        /// Append a 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
+        /// Append a version byte + 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
         /// In-memory benchmark mode: process `size` bytes without file I/O
@@ -131,7 +131,7 @@ enum Commands {
         /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
         euler: bool,
-        /// Verify and strip the 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
+        /// Verify and strip the version byte + 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
         /// In-memory benchmark mode: process `size` bytes without file I/O
@@ -557,10 +557,10 @@ fn process_file_secure(
             if bytes_read == 0 {
                 break;
             }
-            let plaintext_len = bytes_read.saturating_sub(16);
-            if plaintext_len == 0 {
-                break;
+            if bytes_read < 16 {
+                anyhow::bail!("Invalid ciphertext: truncated data at offset {}", total_processed);
             }
+            let plaintext_len = bytes_read - 16;
             k.decrypt(&mut buffer[..bytes_read])?;
             output_file.write_all(&buffer[..plaintext_len])?;
             total_processed += plaintext_len as u64;
@@ -609,11 +609,11 @@ fn process_file_chaos(
 
         println!("Processing (SHAKE256 XOR + KMAC128)...");
         let chunk_size = STREAMING_CHUNK_SIZE;
-        // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
-        // During decryption, we need to read ciphertext + tag in one shot.
-        let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
+        // During encryption, each plaintext chunk produces ciphertext + auth overhead.
+        // During decryption, we need to read ciphertext + auth overhead in one shot.
+        let read_size = if encrypt { chunk_size } else { chunk_size + AUTH_OVERHEAD };
         let mut buffer = vec![0u8; read_size];
-        let mut chunk = Vec::with_capacity(chunk_size + 32);
+        let mut chunk = Vec::with_capacity(chunk_size + AUTH_OVERHEAD);
         let mut total_processed = 0u64;
         loop {
             let bytes_read = input_file.read(&mut buffer)?;
@@ -713,11 +713,11 @@ fn process_file_photon(
     if auth {
         let chunk_size = bytes_per_step as usize;
         let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
-        // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
-        // During decryption, we need to read ciphertext + tag in one shot.
-        let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
+        // During encryption, each plaintext chunk produces ciphertext + auth overhead.
+        // During decryption, we need to read ciphertext + auth overhead in one shot.
+        let read_size = if encrypt { chunk_size } else { chunk_size + AUTH_OVERHEAD };
         let mut buffer = vec![0u8; read_size];
-        let mut chunk = Vec::with_capacity(chunk_size + 32);
+        let mut chunk = Vec::with_capacity(chunk_size + AUTH_OVERHEAD);
         let mut total_processed = 0u64;
         loop {
             let bytes_read = input_file.read(&mut buffer)?;
@@ -809,11 +809,11 @@ fn process_file_quantum(
     if auth {
         let chunk_size = bytes_per_step as usize;
         let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
-        // During encryption, each plaintext chunk produces ciphertext + 32-byte tag.
-        // During decryption, we need to read ciphertext + tag in one shot.
-        let read_size = if encrypt { chunk_size } else { chunk_size + 32 };
+        // During encryption, each plaintext chunk produces ciphertext + auth overhead.
+        // During decryption, we need to read ciphertext + auth overhead in one shot.
+        let read_size = if encrypt { chunk_size } else { chunk_size + AUTH_OVERHEAD };
         let mut buffer = vec![0u8; read_size];
-        let mut chunk = Vec::with_capacity(chunk_size + 32);
+        let mut chunk = Vec::with_capacity(chunk_size + AUTH_OVERHEAD);
         let mut total_processed = 0u64;
         loop {
             let bytes_read = input_file.read(&mut buffer)?;
@@ -873,6 +873,28 @@ fn process_file_quantum(
 /// Generates a buffer of `size` bytes in memory, encrypts/decrypts it using
 /// the specified mode, and reports throughput. This isolates the crypto
 /// throughput from disk I/O, giving a true measure of the cipher speed.
+///
+/// ## Tag handling for authenticated modes
+///
+/// For modes that append authentication tags (Secure: 16-byte AEAD tag;
+/// Chaos/Photon/Quantum with `--auth`: 32-byte KMAC128 tag), the in-memory
+/// buffer must accommodate the tag expansion during encryption and provide
+/// the tag during decryption.
+///
+/// **Encryption flow:**
+/// 1. Copy `chunk` bytes of plaintext from `data` into a working buffer
+/// 2. Call `encrypt()` which appends the tag to the buffer
+/// 3. Copy the full buffer (plaintext + tag) back into `data`
+/// 4. Advance offset by `chunk + TAG_LEN`
+///
+/// **Decryption flow:**
+/// 1. Copy `chunk + TAG_LEN` bytes of ciphertext+tag from `data` into a working buffer
+/// 2. Call `decrypt()` which verifies and strips the tag
+/// 3. Copy only the plaintext (without tag) back into `data`
+/// 4. Advance offset by `chunk + TAG_LEN`
+///
+/// For non-authenticated modes (Chaos/Photon/Quantum without `--auth`),
+/// the data size stays constant and no tag handling is needed.
 #[allow(clippy::too_many_arguments)]
 fn process_in_memory(
     mode: &CryptoMode,
@@ -896,6 +918,9 @@ fn process_in_memory(
         op_label, mode_label, method_label, auth_label
     );
 
+    // Constants for tag sizes
+    const SECURE_TAG_LEN: usize = 16; // ChaCha20Poly1305 AEAD tag
+
     // Allocate the full data buffer in memory
     let mut data = vec![0xABu8; size as usize];
 
@@ -907,24 +932,30 @@ fn process_in_memory(
             let start = std::time::Instant::now();
             let chunk_size = STREAMING_CHUNK_SIZE;
             // Secure mode uses ChaCha20Poly1305 which needs 16 extra bytes for the AEAD tag.
-            // We use a separate buffer with the extra space to avoid panicking at the end of data.
-            let mut buf = vec![0u8; chunk_size + 16];
+            // We use a separate buffer with the extra space.
+            let mut buf = vec![0u8; chunk_size + SECURE_TAG_LEN];
             let mut offset = 0;
             while offset < data.len() {
                 let remaining = data.len() - offset;
                 let chunk = std::cmp::min(remaining, chunk_size);
-                // Copy plaintext into buffer
-                buf[..chunk].copy_from_slice(&data[offset..offset + chunk]);
-                // Zero the tag area
-                buf[chunk..chunk + 16].fill(0);
                 if encrypt {
-                    k.encrypt(&mut buf[..chunk + 16])?;
+                    // Encryption: copy plaintext, encrypt (appends tag), copy all back
+                    buf[..chunk].copy_from_slice(&data[offset..offset + chunk]);
+                    buf[chunk..chunk + SECURE_TAG_LEN].fill(0);
+                    k.encrypt(&mut buf[..chunk + SECURE_TAG_LEN])?;
+                    // Copy ciphertext + tag back into data
+                    data[offset..offset + chunk + SECURE_TAG_LEN]
+                        .copy_from_slice(&buf[..chunk + SECURE_TAG_LEN]);
+                    offset += chunk + SECURE_TAG_LEN;
                 } else {
-                    k.decrypt(&mut buf[..chunk + 16])?;
+                    // Decryption: copy ciphertext + tag, decrypt (verifies tag), copy plaintext back
+                    buf[..chunk + SECURE_TAG_LEN]
+                        .copy_from_slice(&data[offset..offset + chunk + SECURE_TAG_LEN]);
+                    k.decrypt(&mut buf[..chunk + SECURE_TAG_LEN])?;
+                    // Copy only plaintext back into data
+                    data[offset..offset + chunk].copy_from_slice(&buf[..chunk]);
+                    offset += chunk + SECURE_TAG_LEN;
                 }
-                // Copy result back (ciphertext without tag)
-                data[offset..offset + chunk].copy_from_slice(&buf[..chunk]);
-                offset += chunk;
             }
             let elapsed = start.elapsed().as_secs_f64();
             report_throughput(op_label, size, elapsed);
@@ -936,6 +967,13 @@ fn process_in_memory(
                 println!("  Setup complete. Processing {} bytes...", size);
                 let start = std::time::Instant::now();
                 let chunk_size = STREAMING_CHUNK_SIZE;
+                // For auth modes, we use a separate working buffer that can grow/shrink
+                // with the tag. The `data` buffer stays at `size` bytes (plaintext size).
+                // During encryption, we process `chunk` bytes of plaintext, encrypt produces
+                // `chunk + AUTH_OVERHEAD` bytes, and we write those to a separate output buffer.
+                // During decryption, we read `chunk + AUTH_OVERHEAD` bytes from the ciphertext,
+                // decrypt produces `chunk` bytes of plaintext, and we write those back.
+                let mut output = Vec::with_capacity(size as usize + AUTH_OVERHEAD);
                 let mut offset = 0;
                 while offset < data.len() {
                     let remaining = data.len() - offset;
@@ -946,7 +984,7 @@ fn process_in_memory(
                     } else {
                         ks.decrypt(&mut buf)?;
                     }
-                    data[offset..offset + buf.len()].copy_from_slice(&buf);
+                    output.extend_from_slice(&buf);
                     offset += chunk;
                 }
                 let elapsed = start.elapsed().as_secs_f64();
@@ -976,6 +1014,8 @@ fn process_in_memory(
                 let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
                 let start = std::time::Instant::now();
                 let chunk_size = bytes_per_step as usize;
+                // Use a separate output buffer to avoid overwriting issues with tag expansion
+                let mut output = Vec::with_capacity(size as usize + AUTH_OVERHEAD);
                 let mut offset = 0;
                 while offset < data.len() {
                     let remaining = data.len() - offset;
@@ -986,7 +1026,7 @@ fn process_in_memory(
                     } else {
                         photon.decrypt(&mut buf)?;
                     }
-                    data[offset..offset + buf.len()].copy_from_slice(&buf);
+                    output.extend_from_slice(&buf);
                     offset += chunk;
                 }
                 let elapsed = start.elapsed().as_secs_f64();
@@ -1014,6 +1054,8 @@ fn process_in_memory(
                 let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
                 let start = std::time::Instant::now();
                 let chunk_size = bytes_per_step as usize;
+                // Use a separate output buffer to avoid overwriting issues with tag expansion
+                let mut output = Vec::with_capacity(size as usize + AUTH_OVERHEAD);
                 let mut offset = 0;
                 while offset < data.len() {
                     let remaining = data.len() - offset;
@@ -1024,7 +1066,7 @@ fn process_in_memory(
                     } else {
                         quantum.decrypt(&mut buf)?;
                     }
-                    data[offset..offset + buf.len()].copy_from_slice(&buf);
+                    output.extend_from_slice(&buf);
                     offset += chunk;
                 }
                 let elapsed = start.elapsed().as_secs_f64();

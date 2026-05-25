@@ -40,8 +40,9 @@ use zeroize::Zeroize;
 
 use crate::error::KelvinError;
 use crate::parameters::{
-    DOMSEP_MAC_KEY_V1, DOMSEP_STREAMING_MAC_KEY_V1, EXTRACT_BUF_SIZE, MAC_KEY_SIZE,
-    PHOTON_BASE_SEED_SIZE, QUANTUM_BASE_SEED_SIZE,
+    AUTH_FORMAT_VERSION, AUTH_OVERHEAD, AUTH_TAG_LEN, DOMSEP_MAC_KEY_V1,
+    DOMSEP_STREAMING_MAC_KEY_V1, EXTRACT_BUF_SIZE, MAC_KEY_SIZE, PHOTON_BASE_SEED_SIZE,
+    QUANTUM_BASE_SEED_SIZE,
 };
 use crate::photon::KelvinPhoton;
 use crate::quantum::KelvinQuantum;
@@ -49,7 +50,7 @@ use kelvin_core::{Fixed, OrbitalBody};
 use kelvin_kdf::{extract_shake256_into, OrbitalConfig};
 
 /// Size of the KMAC128 tag in bytes.
-const TAG_LEN: usize = 32;
+const TAG_LEN: usize = AUTH_TAG_LEN;
 
 /// Derive a MAC key from the 2048-byte seed using HKDF-SHA512.
 ///
@@ -125,51 +126,63 @@ impl KelvinPhotonAuthenticated {
 
     /// Encrypt data in-place with authentication.
     ///
-    /// The buffer must have `TAG_LEN` (32) extra bytes after the plaintext
-    /// for the KMAC128 authentication tag.
+    /// The buffer must have `AUTH_OVERHEAD` (33) extra bytes after the
+    /// plaintext for the version byte + KMAC128 authentication tag.
     ///
-    /// The tag is computed over the ciphertext and appended to the buffer.
+    /// Wire format: `ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)`
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < TAG_LEN {
+        if data.len() < AUTH_OVERHEAD {
             return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for tag, got {}",
-                TAG_LEN,
+                "buffer too short: need at least {} bytes for auth overhead, got {}",
+                AUTH_OVERHEAD,
                 data.len()
             )));
         }
 
-        let plaintext_len = data.len() - TAG_LEN;
-        let (plaintext, tag_out) = data.split_at_mut(plaintext_len);
+        let plaintext_len = data.len() - AUTH_OVERHEAD;
+        let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
 
         // Encrypt the plaintext in-place
         self.inner.encrypt(plaintext)?;
 
+        // Write version byte
+        auth_out[0] = AUTH_FORMAT_VERSION;
+
         // Compute KMAC128 tag over the ciphertext
         let tag = compute_tag(&self.mac_key, plaintext, b"KelvinPhotonAuthenticated-v1");
-        tag_out.copy_from_slice(&tag);
+        auth_out[1..].copy_from_slice(&tag);
 
         Ok(())
     }
 
     /// Decrypt data in-place with authentication verification.
     ///
-    /// The buffer must contain ciphertext + 32-byte authentication tag.
-    /// Returns an error if the tag doesn't match (tampered data).
+    /// The buffer must contain ciphertext + version byte + 32-byte
+    /// authentication tag. Returns an error if the tag doesn't match
+    /// (tampered data) or the version is unknown.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < TAG_LEN {
+        if data.len() < AUTH_OVERHEAD {
             return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for tag, got {}",
-                TAG_LEN,
+                "buffer too short: need at least {} bytes for auth overhead, got {}",
+                AUTH_OVERHEAD,
                 data.len()
             )));
         }
 
-        let ciphertext_len = data.len() - TAG_LEN;
-        let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
+        let ciphertext_len = data.len() - AUTH_OVERHEAD;
+        let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+
+        // Check version byte
+        if auth_in[0] != AUTH_FORMAT_VERSION {
+            return Err(KelvinError::AuthenticationFailed(format!(
+                "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
+                AUTH_FORMAT_VERSION, auth_in[0]
+            )));
+        }
 
         // Verify the tag before decrypting (constant-time comparison)
         let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinPhotonAuthenticated-v1");
-        if !bool::from(expected_tag.ct_eq(tag_in)) {
+        if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
 
@@ -249,48 +262,62 @@ impl KelvinQuantumAuthenticated {
 
     /// Encrypt data in-place with authentication.
     ///
-    /// The buffer must have `TAG_LEN` (32) extra bytes after the plaintext
-    /// for the KMAC128 authentication tag.
+    /// The buffer must have `AUTH_OVERHEAD` (33) extra bytes after the
+    /// plaintext for the version byte + KMAC128 authentication tag.
+    ///
+    /// Wire format: `ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)`
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < TAG_LEN {
+        if data.len() < AUTH_OVERHEAD {
             return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for tag, got {}",
-                TAG_LEN,
+                "buffer too short: need at least {} bytes for auth overhead, got {}",
+                AUTH_OVERHEAD,
                 data.len()
             )));
         }
 
-        let plaintext_len = data.len() - TAG_LEN;
-        let (plaintext, tag_out) = data.split_at_mut(plaintext_len);
+        let plaintext_len = data.len() - AUTH_OVERHEAD;
+        let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
 
         // Encrypt the plaintext in-place
         self.inner.encrypt(plaintext)?;
 
+        // Write version byte
+        auth_out[0] = AUTH_FORMAT_VERSION;
+
         // Compute KMAC128 tag over the ciphertext
         let tag = compute_tag(&self.mac_key, plaintext, b"KelvinQuantumAuthenticated-v1");
-        tag_out.copy_from_slice(&tag);
+        auth_out[1..].copy_from_slice(&tag);
 
         Ok(())
     }
 
     /// Decrypt data in-place with authentication verification.
     ///
-    /// Returns an error if the tag doesn't match (tampered data).
+    /// Returns an error if the tag doesn't match (tampered data) or the
+    /// version is unknown.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < TAG_LEN {
+        if data.len() < AUTH_OVERHEAD {
             return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for tag, got {}",
-                TAG_LEN,
+                "buffer too short: need at least {} bytes for auth overhead, got {}",
+                AUTH_OVERHEAD,
                 data.len()
             )));
         }
 
-        let ciphertext_len = data.len() - TAG_LEN;
-        let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
+        let ciphertext_len = data.len() - AUTH_OVERHEAD;
+        let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+
+        // Check version byte
+        if auth_in[0] != AUTH_FORMAT_VERSION {
+            return Err(KelvinError::AuthenticationFailed(format!(
+                "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
+                AUTH_FORMAT_VERSION, auth_in[0]
+            )));
+        }
 
         // Verify the tag before decrypting (constant-time comparison)
         let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinQuantumAuthenticated-v1");
-        if !bool::from(expected_tag.ct_eq(tag_in)) {
+        if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
 
@@ -407,49 +434,63 @@ impl KelvinStreamingAuthenticated {
 
     /// Encrypt data in-place with authentication.
     ///
-    /// The buffer must have `TAG_LEN` (32) extra bytes after the plaintext
-    /// for the KMAC128 authentication tag.
+    /// The buffer must have `AUTH_OVERHEAD` (33) extra bytes after the
+    /// plaintext for the version byte + KMAC128 authentication tag.
+    ///
+    /// Wire format: `ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)`
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < TAG_LEN {
+        if data.len() < AUTH_OVERHEAD {
             return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for tag, got {}",
-                TAG_LEN,
+                "buffer too short: need at least {} bytes for auth overhead, got {}",
+                AUTH_OVERHEAD,
                 data.len()
             )));
         }
 
-        let plaintext_len = data.len() - TAG_LEN;
-        let (plaintext, tag_out) = data.split_at_mut(plaintext_len);
+        let plaintext_len = data.len() - AUTH_OVERHEAD;
+        let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
 
         // Encrypt the plaintext in-place
         self.inner.encrypt(plaintext)?;
 
+        // Write version byte
+        auth_out[0] = AUTH_FORMAT_VERSION;
+
         // Compute KMAC128 tag over the ciphertext
         let tag = compute_tag(&self.mac_key, plaintext, b"KelvinStreamingAuthenticated-v1");
-        tag_out.copy_from_slice(&tag);
+        auth_out[1..].copy_from_slice(&tag);
 
         Ok(())
     }
 
     /// Decrypt data in-place with authentication verification.
     ///
-    /// Returns an error if the tag doesn't match (tampered data).
+    /// Returns an error if the tag doesn't match (tampered data) or the
+    /// version is unknown.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < TAG_LEN {
+        if data.len() < AUTH_OVERHEAD {
             return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for tag, got {}",
-                TAG_LEN,
+                "buffer too short: need at least {} bytes for auth overhead, got {}",
+                AUTH_OVERHEAD,
                 data.len()
             )));
         }
 
-        let ciphertext_len = data.len() - TAG_LEN;
-        let (ciphertext, tag_in) = data.split_at_mut(ciphertext_len);
+        let ciphertext_len = data.len() - AUTH_OVERHEAD;
+        let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+
+        // Check version byte
+        if auth_in[0] != AUTH_FORMAT_VERSION {
+            return Err(KelvinError::AuthenticationFailed(format!(
+                "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
+                AUTH_FORMAT_VERSION, auth_in[0]
+            )));
+        }
 
         // Verify the tag before decrypting (constant-time comparison)
         let expected_tag =
             compute_tag(&self.mac_key, ciphertext, b"KelvinStreamingAuthenticated-v1");
-        if !bool::from(expected_tag.ct_eq(tag_in)) {
+        if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
             return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
         }
 
@@ -503,8 +544,8 @@ mod tests {
     #[test]
     fn test_photon_auth_round_trip() {
         let mut auth = KelvinPhotonAuthenticated::new(test_seed(), 1000);
-        // Buffer needs 32 extra bytes for KMAC128 tag
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        // Buffer needs AUTH_OVERHEAD (33) extra bytes for version byte + KMAC128 tag
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         let original = data.clone();
 
         auth.encrypt(&mut data).unwrap();
@@ -520,7 +561,7 @@ mod tests {
     #[test]
     fn test_photon_auth_tamper_detection() {
         let mut auth = KelvinPhotonAuthenticated::new(test_seed(), 1000);
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         auth.encrypt(&mut data).unwrap();
 
         // Tamper with the ciphertext
@@ -534,10 +575,10 @@ mod tests {
     #[test]
     fn test_photon_auth_tag_mismatch() {
         let mut auth = KelvinPhotonAuthenticated::new(test_seed(), 1000);
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         auth.encrypt(&mut data).unwrap();
 
-        // Tamper with the tag
+        // Tamper with the tag (last byte)
         let last = data.len() - 1;
         data[last] ^= 0x01;
 
@@ -547,9 +588,32 @@ mod tests {
     }
 
     #[test]
+    fn test_photon_auth_version_mismatch() {
+        let mut auth = KelvinPhotonAuthenticated::new(test_seed(), 1000);
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
+        auth.encrypt(&mut data).unwrap();
+
+        // Tamper with the version byte
+        let version_pos = 64; // version byte is right after ciphertext
+        data[version_pos] ^= 0x01;
+
+        // Decryption should fail with version error
+        let mut auth2 = KelvinPhotonAuthenticated::new(test_seed(), 1000);
+        let result = auth2.decrypt(&mut data);
+        assert!(result.is_err(), "version mismatch should fail");
+        let err = result.unwrap_err();
+        match err {
+            KelvinError::AuthenticationFailed(msg) => {
+                assert!(msg.contains("version"), "error should mention version");
+            },
+            _ => panic!("expected AuthenticationFailed error"),
+        }
+    }
+
+    #[test]
     fn test_photon_auth_too_short() {
         let mut auth = KelvinPhotonAuthenticated::new(test_seed(), 1000);
-        let mut data = vec![0xABu8; TAG_LEN - 1]; // Too short for tag
+        let mut data = vec![0xABu8; AUTH_OVERHEAD - 1]; // Too short for auth overhead
         assert!(auth.encrypt(&mut data).is_err());
         assert!(auth.decrypt(&mut data).is_err());
     }
@@ -559,7 +623,7 @@ mod tests {
     #[test]
     fn test_quantum_auth_round_trip() {
         let mut auth = KelvinQuantumAuthenticated::new(test_quantum_seed(), 1000);
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         let original = data.clone();
 
         auth.encrypt(&mut data).unwrap();
@@ -573,7 +637,7 @@ mod tests {
     #[test]
     fn test_quantum_auth_tamper_detection() {
         let mut auth = KelvinQuantumAuthenticated::new(test_quantum_seed(), 1000);
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         auth.encrypt(&mut data).unwrap();
 
         data[0] ^= 0x01;
@@ -585,7 +649,7 @@ mod tests {
     #[test]
     fn test_quantum_auth_too_short() {
         let mut auth = KelvinQuantumAuthenticated::new(test_quantum_seed(), 1000);
-        let mut data = vec![0xABu8; TAG_LEN - 1];
+        let mut data = vec![0xABu8; AUTH_OVERHEAD - 1];
         assert!(auth.encrypt(&mut data).is_err());
         assert!(auth.decrypt(&mut data).is_err());
     }
@@ -629,7 +693,7 @@ mod tests {
     fn test_streaming_auth_round_trip() {
         let config = streaming_config();
         let mut auth = KelvinStreamingAuthenticated::new(config, 64).unwrap();
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         let original = data.clone();
 
         auth.encrypt(&mut data).unwrap();
@@ -644,7 +708,7 @@ mod tests {
     fn test_streaming_auth_tamper_detection() {
         let config = streaming_config();
         let mut auth = KelvinStreamingAuthenticated::new(config, 64).unwrap();
-        let mut data = vec![0xABu8; 64 + TAG_LEN];
+        let mut data = vec![0xABu8; 64 + AUTH_OVERHEAD];
         auth.encrypt(&mut data).unwrap();
 
         data[0] ^= 0x01;
@@ -657,7 +721,7 @@ mod tests {
     fn test_streaming_auth_too_short() {
         let config = streaming_config();
         let mut auth = KelvinStreamingAuthenticated::new(config, 64).unwrap();
-        let mut data = vec![0xABu8; TAG_LEN - 1];
+        let mut data = vec![0xABu8; AUTH_OVERHEAD - 1];
         assert!(auth.encrypt(&mut data).is_err());
         assert!(auth.decrypt(&mut data).is_err());
     }
