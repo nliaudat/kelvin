@@ -211,12 +211,6 @@ impl KelvinQuantum {
     /// then extracts fresh entropy via SHAKE256 and XORs it into the base seed.
     /// This provides forward secrecy beyond BLAKE3's deterministic reseeding.
     fn reseed_from_orbital_chaos(&mut self) {
-        // Diagnostic: count orbital reseeds to verify the reduced frequency
-        eprintln!(
-            "[KELVIN_DIAG] Quantum orbital reseed at byte offset {} ({} steps, {} steps/reseed)",
-            self.total_bytes_generated, self.orbital_steps_per_reseed, self.reseed_interval_bytes
-        );
-
         // Advance orbital simulation using the configured integration method
         for _ in 0..self.orbital_steps_per_reseed {
             // Ignore errors from integration steps (stability checks may fail for
