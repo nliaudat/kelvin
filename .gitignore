@@ -54,3 +54,5 @@ keystream_nist.bin
 ea_iid_output.txt
 ea_restart_1mb.txt
 tests/ea_iid
+scripts/test_aead.py
+scripts/chunk_size_compare.py
