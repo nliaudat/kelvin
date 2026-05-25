@@ -439,11 +439,11 @@ fn test_secure_streaming_wrong_tag() {
     encryptor.update(plaintext, &mut ciphertext).unwrap();
     let _tag = encryptor.finalize().unwrap();
 
-    // Try to decrypt with a wrong tag
+    // Try to decrypt with a wrong tag (BLAKE3 produces 32-byte tags)
     let mut decryptor = SecureDecryptor::new(key, nonce);
     let mut decrypted = Vec::new();
     decryptor.update(&ciphertext, &mut decrypted).unwrap();
-    let wrong_tag = [0xFFu8; 16];
+    let wrong_tag = [0xFFu8; 32];
     assert!(decryptor.finalize(&wrong_tag).is_err());
 }
 

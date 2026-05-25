@@ -14,8 +14,13 @@
 //!   GitHub: https://github.com/nliaudat/kelvin
 
 // FFI inherently requires unsafe code for C interop
+// Safety docs are provided in the C header comments; clippy's missing_safety_doc
+// is too noisy for FFI functions that are documented at the module level.
+// missing_docs is allowed because FFI functions are documented in the C header.
 #![allow(unsafe_code)]
-#![warn(missing_docs, missing_debug_implementations)]
+#![allow(clippy::missing_safety_doc)]
+#![allow(missing_docs)]
+#![warn(missing_debug_implementations)]
 
 mod c_api;
 

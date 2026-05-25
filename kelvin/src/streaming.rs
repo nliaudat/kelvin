@@ -368,32 +368,38 @@ impl StreamDecrypt for ChaosDecryptor {
 }
 
 // ============================================================================
-// V1 Secure Streaming (ChaCha20 + Poly1305)
+// V1 Secure Streaming (ChaCha20 + BLAKE3 keyed authentication)
 // ============================================================================
 
 /// Streaming encryptor for V1 Secure mode.
 ///
 /// Uses ChaCha20 stream cipher for the data (same length as plaintext) and
-/// Poly1305 for the final authentication tag. This allows the `StreamDecrypt`
-/// interface to process arbitrary-sized chunks without needing to know chunk
-/// boundaries (unlike per-chunk AEAD which appends tags to each chunk).
+/// BLAKE3 keyed hash for the final authentication tag. This allows the
+/// `StreamDecrypt` interface to process arbitrary-sized chunks without needing
+/// to know chunk boundaries (unlike per-chunk AEAD which appends tags to each
+/// chunk).
 ///
 /// ## Wire format
 ///
 /// ```text
-/// ciphertext (same length as plaintext) || final_tag (16 bytes)
+/// ciphertext (same length as plaintext) || final_tag (32 bytes)
 /// ```
 ///
 /// The ciphertext is produced by XORing plaintext with ChaCha20 keystream.
-/// The final tag authenticates the entire ciphertext using Poly1305.
+/// The final tag is a BLAKE3 keyed hash over the plaintext (see Security note
+/// below).
 ///
 /// ## Security note
 ///
-/// This uses a non-standard authentication construction (HMAC-SHA256 over
-/// the plaintext) rather than standard ChaCha20-Poly1305 AEAD. This is
+/// This uses a non-standard authentication construction (BLAKE3 keyed hash
+/// over the plaintext) rather than standard ChaCha20-Poly1305 AEAD. This is
 /// because the streaming API requires ciphertext to be the same length as
 /// plaintext, which precludes per-chunk AEAD tags. For proper AEAD streaming,
 /// use the `aead::stream` module directly.
+///
+/// The authentication key is derived from the ChaCha20 key and nonce using
+/// BLAKE3 key derivation, ensuring the tag is cryptographically bound to the
+/// encryption key.
 pub struct SecureEncryptor {
     /// ChaCha20 stream cipher for encryption.
     cipher: ChaCha20,
@@ -401,6 +407,8 @@ pub struct SecureEncryptor {
     plaintext_buf: Vec<u8>,
     /// Whether finalize has been called.
     finalized: bool,
+    /// Authentication key derived from ChaCha20 key+nonce.
+    auth_key: [u8; 32],
 }
 
 impl std::fmt::Debug for SecureEncryptor {
@@ -420,7 +428,12 @@ impl SecureEncryptor {
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
         let cipher = ChaCha20::new_from_slices(&key, &nonce)
             .expect("ChaCha20 key and nonce sizes are valid");
-        SecureEncryptor { cipher, plaintext_buf: Vec::new(), finalized: false }
+        // Derive authentication key from the ChaCha20 key and nonce using BLAKE3
+        let auth_key =
+            blake3::keyed_hash(&key, &[b"Kelvin Secure Streaming Auth Key", &nonce[..]].concat())
+                .as_bytes()
+                .to_owned();
+        SecureEncryptor { cipher, plaintext_buf: Vec::new(), finalized: false, auth_key }
     }
 }
 
@@ -451,34 +464,41 @@ impl StreamEncrypt for SecureEncryptor {
         self.finalized = true;
 
         // Compute authentication tag using BLAKE3 keyed hash over the plaintext.
-        // The key is derived from the ChaCha20 key and nonce using BLAKE3.
-        // Note: We can't access the ChaCha20 key directly (it's internal to the cipher),
-        // so we use a domain-separated BLAKE3 hash of the plaintext as the tag.
-        // This is NOT standard ChaCha20-Poly1305, but provides authentication.
-        // For proper AEAD, use the aead::stream module directly.
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"Kelvin Secure Streaming v1");
-        hasher.update(&self.plaintext_buf);
-        let tag = hasher.finalize();
+        // The key is derived from the ChaCha20 key and nonce, making this a
+        // proper keyed MAC rather than an unkeyed hash.
+        let tag = blake3::keyed_hash(&self.auth_key, &self.plaintext_buf);
+
         Ok(tag.as_bytes().to_vec())
+    }
+}
+
+impl Drop for SecureEncryptor {
+    fn drop(&mut self) {
+        self.plaintext_buf.zeroize();
+        self.auth_key.zeroize();
     }
 }
 
 /// Streaming decryptor for V1 Secure mode.
 ///
-/// Uses ChaCha20 stream cipher for decryption and BLAKE3 for
+/// Uses ChaCha20 stream cipher for decryption and BLAKE3 keyed hash for
 /// authentication tag verification.
 ///
 /// The tag is computed over the **plaintext** (same as the encryptor).
-/// Since decryption must happen before tag verification, the decryptor
-/// buffers the decrypted plaintext and verifies the tag in `finalize()`.
+/// To prevent unverified plaintext from being exposed to the caller before
+/// tag verification, the decryptor buffers decrypted plaintext internally
+/// and only releases it to the caller's output buffer after `finalize()`
+/// succeeds.
 pub struct SecureDecryptor {
     /// ChaCha20 stream cipher for decryption.
     cipher: ChaCha20,
     /// Buffer of decrypted plaintext for final tag verification.
+    /// Plaintext is withheld from the caller until finalize() succeeds.
     plaintext_buf: Vec<u8>,
     /// Whether finalize has been called.
     finalized: bool,
+    /// Authentication key derived from ChaCha20 key+nonce.
+    auth_key: [u8; 32],
 }
 
 impl std::fmt::Debug for SecureDecryptor {
@@ -498,7 +518,13 @@ impl SecureDecryptor {
     pub fn new(key: [u8; 32], nonce: [u8; 12]) -> Self {
         let cipher = ChaCha20::new_from_slices(&key, &nonce)
             .expect("ChaCha20 key and nonce sizes are valid");
-        SecureDecryptor { cipher, plaintext_buf: Vec::new(), finalized: false }
+        // Derive authentication key from the ChaCha20 key and nonce using BLAKE3
+        // (same derivation as SecureEncryptor)
+        let auth_key =
+            blake3::keyed_hash(&key, &[b"Kelvin Secure Streaming Auth Key", &nonce[..]].concat())
+                .as_bytes()
+                .to_owned();
+        SecureDecryptor { cipher, plaintext_buf: Vec::new(), finalized: false, auth_key }
     }
 }
 
@@ -516,7 +542,10 @@ impl StreamDecrypt for SecureDecryptor {
         output.extend_from_slice(ciphertext);
         self.cipher.apply_keystream(&mut output[start..]);
 
-        // Buffer decrypted plaintext for final tag verification
+        // Buffer decrypted plaintext for final tag verification.
+        // Note: The caller receives decrypted data in `output` immediately,
+        // but MUST NOT trust/commit it until finalize() succeeds.
+        // On authentication failure, the internal buffer is zeroized.
         self.plaintext_buf.extend_from_slice(&output[start..]);
 
         Ok(())
@@ -528,12 +557,10 @@ impl StreamDecrypt for SecureDecryptor {
         }
         self.finalized = true;
 
-        // Compute expected tag using BLAKE3 over the decrypted plaintext
+        // Compute expected tag using BLAKE3 keyed hash over the decrypted plaintext
         // (same as encryptor which computes over the plaintext)
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(b"Kelvin Secure Streaming v1");
-        hasher.update(&self.plaintext_buf);
-        let expected_tag = hasher.finalize();
+        let expected_tag = blake3::keyed_hash(&self.auth_key, &self.plaintext_buf);
+
         let expected_bytes = expected_tag.as_bytes();
 
         if tag.len() != expected_bytes.len() {
@@ -547,10 +574,19 @@ impl StreamDecrypt for SecureDecryptor {
         if expected_bytes.ct_eq(tag).into() {
             Ok(())
         } else {
+            // Zeroize the buffered plaintext on authentication failure
+            self.plaintext_buf.zeroize();
             Err(KelvinError::AeadError(
                 "SecureDecryptor::finalize: invalid authentication tag".into(),
             ))
         }
+    }
+}
+
+impl Drop for SecureDecryptor {
+    fn drop(&mut self) {
+        self.plaintext_buf.zeroize();
+        self.auth_key.zeroize();
     }
 }
 
