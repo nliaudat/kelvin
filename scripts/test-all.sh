@@ -85,8 +85,28 @@ pass
 # ---------------------------------------------------------------------------
 # 4. Integration tests
 # ---------------------------------------------------------------------------
+step "Integration: V1 round-trip"
+cargo test -p kelvin --test v1_round_trip
+pass
+
+step "Integration: Photon cipher"
+cargo test -p kelvin --test photon
+pass
+
+step "Integration: Quantum cipher"
+cargo test -p kelvin --test quantum
+pass
+
+step "Integration: Authenticated encryption"
+cargo test -p kelvin --test authenticated
+pass
+
 step "Integration: Full pipeline"
 cargo test -p kelvin --test full_pipeline
+pass
+
+step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+cargo test -p kelvin --test streaming_api
 pass
 
 step "Integration: Chaos test (Lyapunov estimation)"

@@ -98,8 +98,38 @@ echo %GREEN%PASSED%NC%
 REM ---------------------------------------------------------------------------
 REM 4. Integration tests
 REM ---------------------------------------------------------------------------
+call :step "Integration: V1 round-trip"
+cargo test -p kelvin --test v1_round_trip
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
+call :step "Integration: Photon cipher"
+cargo test -p kelvin --test photon
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
+call :step "Integration: Quantum cipher"
+cargo test -p kelvin --test quantum
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
+call :step "Integration: Authenticated encryption"
+cargo test -p kelvin --test authenticated
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
 call :step "Integration: Full pipeline"
 cargo test -p kelvin --test full_pipeline
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
+call :step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+cargo test -p kelvin --test streaming_api
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%

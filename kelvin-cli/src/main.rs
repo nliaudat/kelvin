@@ -932,34 +932,38 @@ fn process_in_memory(
             let start = std::time::Instant::now();
             let chunk_size = STREAMING_CHUNK_SIZE;
             // Secure mode uses ChaCha20Poly1305 which needs 16 extra bytes for the AEAD tag.
-            // We use a separate buffer with the extra space.
+            // Use a separate output vector to avoid out-of-bounds panics when the tag
+            // expansion exceeds the fixed-size data buffer.
             let mut buf = vec![0u8; chunk_size + SECURE_TAG_LEN];
+            let mut output = Vec::with_capacity(size as usize + SECURE_TAG_LEN);
             let mut offset = 0;
             while offset < data.len() {
                 let remaining = data.len() - offset;
-                let chunk = std::cmp::min(remaining, chunk_size);
                 if encrypt {
-                    // Encryption: copy plaintext, encrypt (appends tag), copy all back
+                    let chunk = std::cmp::min(remaining, chunk_size);
+                    // Encryption: copy plaintext, encrypt (appends tag), extend output
                     buf[..chunk].copy_from_slice(&data[offset..offset + chunk]);
                     buf[chunk..chunk + SECURE_TAG_LEN].fill(0);
                     k.encrypt(&mut buf[..chunk + SECURE_TAG_LEN])?;
-                    // Copy ciphertext + tag back into data
-                    data[offset..offset + chunk + SECURE_TAG_LEN]
-                        .copy_from_slice(&buf[..chunk + SECURE_TAG_LEN]);
-                    offset += chunk + SECURE_TAG_LEN;
+                    output.extend_from_slice(&buf[..chunk + SECURE_TAG_LEN]);
+                    offset += chunk;
                 } else {
-                    // Decryption: copy ciphertext + tag, decrypt (verifies tag), copy plaintext back
+                    if remaining < SECURE_TAG_LEN {
+                        anyhow::bail!("Invalid ciphertext: truncated data at offset {}", offset);
+                    }
+                    let chunk = std::cmp::min(remaining - SECURE_TAG_LEN, chunk_size);
+                    // Decryption: copy ciphertext + tag, decrypt (verifies tag), extend output with plaintext
                     buf[..chunk + SECURE_TAG_LEN]
                         .copy_from_slice(&data[offset..offset + chunk + SECURE_TAG_LEN]);
                     k.decrypt(&mut buf[..chunk + SECURE_TAG_LEN])?;
-                    // Copy only plaintext back into data
-                    data[offset..offset + chunk].copy_from_slice(&buf[..chunk]);
+                    output.extend_from_slice(&buf[..chunk]);
                     offset += chunk + SECURE_TAG_LEN;
                 }
             }
             let elapsed = start.elapsed().as_secs_f64();
             report_throughput(op_label, size, elapsed);
         },
+
         CryptoMode::Chaos => {
             if auth {
                 let mut ks = KelvinStreamingAuthenticated::new(config, bytes_per_step)

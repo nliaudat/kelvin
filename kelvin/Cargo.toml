@@ -13,7 +13,7 @@ path = "src/lib.rs"
 kelvin-core = { path = "../kelvin-core" }
 kelvin-kdf = { path = "../kelvin-kdf" }
 kelvin-stream = { path = "../kelvin-stream" }
-aead = "0.5"
+aead = { version = "0.5", features = ["stream"] }
 blake3 = "1.5"
 hkdf = "0.12"
 sha3 = { version = "0.10", default-features = false }
@@ -23,6 +23,8 @@ serde_json = { version = "1.0", optional = true }
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
 subtle = "2"
 sha3-kmac = "0.3.0"
+chacha20poly1305 = "0.10"
+chacha20 = "0.9"
 
 
 [features]
