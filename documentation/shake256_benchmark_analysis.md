@@ -7,7 +7,7 @@ implementation achieves ~560 MB/s on a Ryzen 5 5600 CPU, and the Photon/Quantum
 modes reach ~520–540 MB/s in-memory — close to the raw SHAKE256 throughput.
 
 The original file-based benchmark showing ~48 MB/s was entirely **I/O-bound**
-(reading/writing 1 GB through `D:/temp/`), not crypto-bound.
+(reading/writing 1 GB through a dedicated SSD), not crypto-bound.
 
 ## Benchmark Results
 
@@ -28,7 +28,7 @@ The original file-based benchmark showing ~48 MB/s was entirely **I/O-bound**
 | photon | **0.53 GB/s (542 MB/s)** | HKDF→SHAKE256 XOR |
 | quantum | **0.50 GB/s (512 MB/s)** | Hybrid cache+XOR + orbital reseed |
 
-### File-Based Benchmark (1 GB via `D:/temp/`)
+### File-Based Benchmark (1 GB)
 
 | Mode | Throughput |
 |------|-----------|
@@ -42,7 +42,7 @@ The original file-based benchmark showing ~48 MB/s was entirely **I/O-bound**
 ### Why the 10x difference?
 
 The file-based benchmark reads 1 GB from disk, encrypts it, and writes 1 GB back
-to disk. On `D:/temp/` (a standard HDD/SSD), this I/O is the bottleneck:
+to disk. This I/O is the bottleneck:
 
 - **Disk read:** ~100–500 MB/s (depends on drive)
 - **Disk write:** ~100–500 MB/s (depends on drive)
@@ -88,11 +88,4 @@ file I/O entirely. Results are written to `documentation/bench_1gb.md`.
 python scripts/bench.py 1 --level paranoid
 ```
 
-## Conclusion
 
-**No changes needed to `sha3` dependencies.** The `asm` feature would provide
-negligible benefit on this CPU, and SHAKE256 is already fast enough that it's
-not the bottleneck in any mode except chaos (which is slow by design).
-
-If you want to improve the file-based benchmark throughput, use a RAM disk or
-NVMe drive instead of `D:/temp/`.
