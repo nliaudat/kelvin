@@ -50,9 +50,16 @@ if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
+call :step "2c/8: Build kelvin-ffi (C FFI bindings)"
+cargo build -p kelvin-ffi
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
 REM ---------------------------------------------------------------------------
 REM 2. Lint -- clippy + rustfmt
 REM ---------------------------------------------------------------------------
+
 call :step "3/8: Clippy (deny warnings)"
 cargo clippy --workspace -- -D warnings
 if errorlevel 1 set EXITCODE=1

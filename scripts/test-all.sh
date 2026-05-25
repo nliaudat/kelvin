@@ -51,9 +51,14 @@ step "2b/8: Build V2 Streaming example"
 cargo build --example simple_streaming -p kelvin
 pass
 
+step "2c/8: Build kelvin-ffi (C FFI bindings)"
+cargo build -p kelvin-ffi
+pass
+
 # ---------------------------------------------------------------------------
 # 2. Lint — clippy + rustfmt
 # ---------------------------------------------------------------------------
+
 step "3/8: Clippy (deny warnings)"
 cargo clippy --workspace -- -D warnings
 pass

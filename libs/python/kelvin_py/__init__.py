@@ -106,9 +106,11 @@ def _streaming_update(lib_fn, ctx, input_data: bytes) -> bytes:
         return b""
     output = (ctypes.c_uint8 * len(input_data))()
     output_len = ctypes.c_size_t()
+    # Wrap bytes in c_char_p first before casting to avoid ArgumentError
+    input_ptr = ctypes.cast(ctypes.c_char_p(input_data), ctypes.POINTER(ctypes.c_uint8))
     res = lib_fn(
         ctx,
-        ctypes.cast(input_data, ctypes.POINTER(ctypes.c_uint8)),
+        input_ptr,
         len(input_data),
         output,
         len(input_data),
@@ -117,6 +119,7 @@ def _streaming_update(lib_fn, ctx, input_data: bytes) -> bytes:
     if res != 0:
         raise KelvinError("streaming update failed")
     return bytes(output[:output_len.value])
+
 
 
 def _streaming_finalize(lib_fn, ctx) -> bytes:
@@ -131,10 +134,11 @@ def _streaming_finalize(lib_fn, ctx) -> bytes:
 
 def _streaming_decrypt_finalize(lib_fn, ctx, tag: bytes) -> None:
     """Perform a streaming decrypt finalize."""
-    tag_ptr = ctypes.cast(tag, ctypes.POINTER(ctypes.c_uint8)) if tag else None
+    tag_ptr = ctypes.cast(ctypes.c_char_p(tag), ctypes.POINTER(ctypes.c_uint8)) if tag else None
     res = lib_fn(ctx, tag_ptr, len(tag))
     if res != 0:
         raise KelvinError("streaming decrypt finalize failed (tag mismatch)")
+
 
 
 # ============================================================================
@@ -151,10 +155,11 @@ class PhotonEncryptor:
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
         ctx = _lib.kelvin_photon_encryptor_new(
-            ctypes.cast(seed, ctypes.POINTER(ctypes.c_uint8)),
-            len(seed), max_reseeds, ctypes.byref(error_out),
+            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
         )
+
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create PhotonEncryptor")
         self._ctx = ctx
@@ -198,10 +203,11 @@ class PhotonDecryptor:
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
         ctx = _lib.kelvin_photon_decryptor_new(
-            ctypes.cast(seed, ctypes.POINTER(ctypes.c_uint8)),
-            len(seed), max_reseeds, ctypes.byref(error_out),
+            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
         )
+
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create PhotonDecryptor")
         self._ctx = ctx
@@ -248,10 +254,11 @@ class QuantumEncryptor:
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
         ctx = _lib.kelvin_quantum_encryptor_new(
-            ctypes.cast(seed, ctypes.POINTER(ctypes.c_uint8)),
-            len(seed), max_reseeds, ctypes.byref(error_out),
+            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
         )
+
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create QuantumEncryptor")
         self._ctx = ctx
@@ -295,10 +302,11 @@ class QuantumDecryptor:
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
         ctx = _lib.kelvin_quantum_decryptor_new(
-            ctypes.cast(seed, ctypes.POINTER(ctypes.c_uint8)),
-            len(seed), max_reseeds, ctypes.byref(error_out),
+            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
         )
+
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create QuantumDecryptor")
         self._ctx = ctx
@@ -443,11 +451,12 @@ class SecureEncryptor:
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
+        key_ptr = ctypes.cast(ctypes.c_char_p(key), ctypes.POINTER(ctypes.c_uint8))
+        nonce_ptr = ctypes.cast(ctypes.c_char_p(nonce), ctypes.POINTER(ctypes.c_uint8))
         ctx = _lib.kelvin_secure_encryptor_new(
-            ctypes.cast(key, ctypes.POINTER(ctypes.c_uint8)), 32,
-            ctypes.cast(nonce, ctypes.POINTER(ctypes.c_uint8)), 12,
-            ctypes.byref(error_out),
+            key_ptr, 32, nonce_ptr, 12, ctypes.byref(error_out),
         )
+
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create SecureEncryptor")
         self._ctx = ctx
@@ -496,11 +505,12 @@ class SecureDecryptor:
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
+        key_ptr = ctypes.cast(ctypes.c_char_p(key), ctypes.POINTER(ctypes.c_uint8))
+        nonce_ptr = ctypes.cast(ctypes.c_char_p(nonce), ctypes.POINTER(ctypes.c_uint8))
         ctx = _lib.kelvin_secure_decryptor_new(
-            ctypes.cast(key, ctypes.POINTER(ctypes.c_uint8)), 32,
-            ctypes.cast(nonce, ctypes.POINTER(ctypes.c_uint8)), 12,
-            ctypes.byref(error_out),
+            key_ptr, 32, nonce_ptr, 12, ctypes.byref(error_out),
         )
+
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create SecureDecryptor")
         self._ctx = ctx

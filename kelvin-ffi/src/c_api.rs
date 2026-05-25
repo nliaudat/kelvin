@@ -85,6 +85,10 @@ pub unsafe extern "C" fn kelvin_new(
     config_json: *const c_char,
     error_out: *mut *mut c_char,
 ) -> *mut KelvinCtx {
+    if config_json.is_null() {
+        set_error(error_out, "config_json must not be null");
+        return std::ptr::null_mut();
+    }
     let config_str = match unsafe { CStr::from_ptr(config_json) }.to_str() {
         Ok(s) => s,
         Err(e) => {
@@ -92,7 +96,6 @@ pub unsafe extern "C" fn kelvin_new(
             return std::ptr::null_mut();
         },
     };
-
     let config = match OrbitalConfig::from_json(config_str) {
         Ok(c) => c,
         Err(e) => {
@@ -100,7 +103,6 @@ pub unsafe extern "C" fn kelvin_new(
             return std::ptr::null_mut();
         },
     };
-
     let kelvin = match Kelvin::new(config) {
         Ok(k) => k,
         Err(e) => {
@@ -108,7 +110,6 @@ pub unsafe extern "C" fn kelvin_new(
             return std::ptr::null_mut();
         },
     };
-
     Box::into_raw(Box::new(KelvinCtx { inner: kelvin }))
 }
 
@@ -233,9 +234,9 @@ define_streaming_ctx!(SecureDecryptorCtx, SecureDecryptor);
 /// # Safety
 ///
 /// - `ctx` must be a valid non-null pointer.
-/// - `input` must point to `input_len` readable bytes.
-/// - `output` must point to at least `output_cap` writable bytes.
-/// - `output_len` must be a valid pointer to a `size_t`.
+/// - `input` must point to `input_len` readable bytes (may be null if input_len == 0).
+/// - `output` must point to at least `output_cap` writable bytes (may be null if output_cap == 0).
+/// - `output_len` must be a valid non-null pointer to a `size_t`.
 unsafe fn streaming_update_impl(
     ctx: &mut dyn StreamEncrypt,
     input: *const u8,
@@ -244,15 +245,29 @@ unsafe fn streaming_update_impl(
     output_cap: usize,
     output_len: *mut usize,
 ) -> i32 {
-    let input_slice = unsafe { std::slice::from_raw_parts(input, input_len) };
+    if output_len.is_null() {
+        return -1;
+    }
+    let input_slice = if input_len == 0 || input.is_null() {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(input, input_len) }
+    };
     let mut out = Vec::new();
     match ctx.update(input_slice, &mut out) {
         Ok(()) => {
             if out.len() > output_cap {
                 return -1; // buffer too small
             }
+            if !out.is_empty() {
+                if output.is_null() {
+                    return -1;
+                }
+                unsafe {
+                    std::ptr::copy_nonoverlapping(out.as_ptr(), output, out.len());
+                }
+            }
             unsafe {
-                std::ptr::copy_nonoverlapping(out.as_ptr(), output, out.len());
                 *output_len = out.len();
             }
             0
@@ -274,15 +289,29 @@ unsafe fn streaming_decrypt_update_impl(
     output_cap: usize,
     output_len: *mut usize,
 ) -> i32 {
-    let input_slice = unsafe { std::slice::from_raw_parts(input, input_len) };
+    if output_len.is_null() {
+        return -1;
+    }
+    let input_slice = if input_len == 0 || input.is_null() {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(input, input_len) }
+    };
     let mut out = Vec::new();
     match ctx.update(input_slice, &mut out) {
         Ok(()) => {
             if out.len() > output_cap {
                 return -1;
             }
+            if !out.is_empty() {
+                if output.is_null() {
+                    return -1;
+                }
+                unsafe {
+                    std::ptr::copy_nonoverlapping(out.as_ptr(), output, out.len());
+                }
+            }
             unsafe {
-                std::ptr::copy_nonoverlapping(out.as_ptr(), output, out.len());
                 *output_len = out.len();
             }
             0
@@ -296,21 +325,31 @@ unsafe fn streaming_decrypt_update_impl(
 /// # Safety
 ///
 /// - `ctx` must be a valid non-null pointer.
-/// - `tag_out` must point to at least `tag_cap` writable bytes.
-/// - `tag_len` must be a valid pointer to a `size_t`.
+/// - `tag_out` must point to at least `tag_cap` writable bytes (may be null if tag_cap == 0).
+/// - `tag_len` must be a valid non-null pointer to a `size_t`.
 unsafe fn streaming_finalize_impl(
     ctx: &mut dyn StreamEncrypt,
     tag_out: *mut u8,
     tag_cap: usize,
     tag_len: *mut usize,
 ) -> i32 {
+    if tag_len.is_null() {
+        return -1;
+    }
     match ctx.finalize() {
         Ok(tag) => {
             if tag.len() > tag_cap {
                 return -1;
             }
+            if !tag.is_empty() {
+                if tag_out.is_null() {
+                    return -1;
+                }
+                unsafe {
+                    std::ptr::copy_nonoverlapping(tag.as_ptr(), tag_out, tag.len());
+                }
+            }
             unsafe {
-                std::ptr::copy_nonoverlapping(tag.as_ptr(), tag_out, tag.len());
                 *tag_len = tag.len();
             }
             0
@@ -324,15 +363,18 @@ unsafe fn streaming_finalize_impl(
 /// # Safety
 ///
 /// - `ctx` must be a valid non-null pointer.
-/// - `tag` must point to `tag_len` readable bytes.
+/// - `tag` must point to `tag_len` readable bytes (may be null if tag_len == 0).
 unsafe fn streaming_decrypt_finalize_impl(
     ctx: &mut dyn StreamDecrypt,
     tag: *const u8,
     tag_len: usize,
 ) -> i32 {
-    let tag_slice =
-        if tag_len > 0 { Some(unsafe { std::slice::from_raw_parts(tag, tag_len) }) } else { None };
-    match ctx.finalize(tag_slice.unwrap_or(&[])) {
+    let tag_slice = if tag_len == 0 || tag.is_null() {
+        &[]
+    } else {
+        unsafe { std::slice::from_raw_parts(tag, tag_len) }
+    };
+    match ctx.finalize(tag_slice) {
         Ok(()) => 0,
         Err(_) => -1,
     }
@@ -363,7 +405,6 @@ macro_rules! gen_stream_encrypt_ffi {
                 let inner = <$inner_type>::new(seed_arr, max_reseeds);
                 Box::into_raw(Box::new($ctx_type { inner }))
             }
-
 
             #[no_mangle]
             pub unsafe extern "C" fn [<kelvin_ $prefix _encryptor_update>](
@@ -428,7 +469,6 @@ macro_rules! gen_stream_decrypt_ffi {
                 let inner = <$inner_type>::new(seed_arr, max_reseeds);
                 Box::into_raw(Box::new($ctx_type { inner }))
             }
-
 
             #[no_mangle]
             pub unsafe extern "C" fn [<kelvin_ $prefix _decryptor_update>](
@@ -924,6 +964,7 @@ pub unsafe extern "C" fn kelvin_file_photon_decrypt(
 }
 
 // Quantum file streaming
+
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_file_quantum_encrypt(
     seed: *const u8,
