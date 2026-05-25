@@ -59,6 +59,7 @@ mod error;
 mod parameters;
 mod photon;
 mod quantum;
+mod streaming;
 
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
@@ -92,6 +93,7 @@ pub use parameters::{
 };
 pub use photon::KelvinPhoton;
 pub use quantum::KelvinQuantum;
+pub use streaming::*;
 
 pub use kelvin_core::IntegrationMethod;
 use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};

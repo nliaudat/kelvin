@@ -241,7 +241,7 @@ impl KelvinQuantum {
     /// of calling `next_keystream_byte` in a loop.
     ///
     /// Also triggers orbital reseeding at the configured interval.
-    fn keystream_bytes(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
+    pub fn keystream_bytes(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
         let mut remaining = output.len();
         let mut out_pos = 0;
         while remaining > 0 {

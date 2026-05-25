@@ -184,7 +184,7 @@ impl KelvinPhoton {
     ///
     /// Uses the persistent SHAKE256 reader. If the reader is not yet initialized
     /// or has exhausted its reseed interval, `ensure_reader()` is called first.
-    fn generate_keystream_into(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
+    pub fn generate_keystream_into(&mut self, output: &mut [u8]) -> Result<(), KelvinError> {
         if output.is_empty() {
             return Ok(());
         }
