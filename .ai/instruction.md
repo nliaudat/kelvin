@@ -40,6 +40,7 @@ RUST BEST PRACTICES (MANDATORY)
 - criterion for benchmarks, proptest for property tests
 - rustfmt + clippy (strict) in CI
 - Safety docs on all pub fn that touch secrets
+- Dead code forbidden (no `#[allow(dead_code)]`, no unused imports/variables/fields)
 
 ===============================================================================
 
