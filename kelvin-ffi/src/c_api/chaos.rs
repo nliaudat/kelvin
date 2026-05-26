@@ -29,6 +29,10 @@ pub unsafe extern "C" fn kelvin_chaos_encryptor_new(
     bytes_per_step: u64,
     error_out: *mut *mut c_char,
 ) -> *mut ChaosEncryptorCtx {
+    if config_json.is_null() {
+        set_error(error_out, "config_json must not be null");
+        return std::ptr::null_mut();
+    }
     let config_str = match unsafe { CStr::from_ptr(config_json) }.to_str() {
         Ok(s) => s,
         Err(e) => {
@@ -66,6 +70,10 @@ pub unsafe extern "C" fn kelvin_chaos_encryptor_new_with_method(
     method: i32,
     error_out: *mut *mut c_char,
 ) -> *mut ChaosEncryptorCtx {
+    if config_json.is_null() {
+        set_error(error_out, "config_json must not be null");
+        return std::ptr::null_mut();
+    }
     let config_str = match unsafe { CStr::from_ptr(config_json) }.to_str() {
         Ok(s) => s,
         Err(e) => {
@@ -139,6 +147,10 @@ pub unsafe extern "C" fn kelvin_chaos_decryptor_new(
     bytes_per_step: u64,
     error_out: *mut *mut c_char,
 ) -> *mut ChaosDecryptorCtx {
+    if config_json.is_null() {
+        set_error(error_out, "config_json must not be null");
+        return std::ptr::null_mut();
+    }
     let config_str = match unsafe { CStr::from_ptr(config_json) }.to_str() {
         Ok(s) => s,
         Err(e) => {

@@ -27,6 +27,10 @@ pub unsafe extern "C" fn kelvin_file_photon_encrypt(
     buffer_size: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     if seed.is_null() || seed_len != std::mem::size_of::<[u8; PHOTON_BASE_SEED_SIZE]>() {
         set_error(error_out, "invalid seed");
         return -1;
@@ -72,6 +76,10 @@ pub unsafe extern "C" fn kelvin_file_photon_decrypt(
     tag_len: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     if seed.is_null() || seed_len != std::mem::size_of::<[u8; PHOTON_BASE_SEED_SIZE]>() {
         set_error(error_out, "invalid seed");
         return -1;
@@ -119,6 +127,10 @@ pub unsafe extern "C" fn kelvin_file_quantum_encrypt(
     buffer_size: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     if seed.is_null() || seed_len != std::mem::size_of::<[u8; QUANTUM_BASE_SEED_SIZE]>() {
         set_error(error_out, "invalid seed");
         return -1;
@@ -164,6 +176,10 @@ pub unsafe extern "C" fn kelvin_file_quantum_decrypt(
     tag_len: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     if seed.is_null() || seed_len != std::mem::size_of::<[u8; QUANTUM_BASE_SEED_SIZE]>() {
         set_error(error_out, "invalid seed");
         return -1;
@@ -210,6 +226,14 @@ pub unsafe extern "C" fn kelvin_file_chaos_encrypt(
     buffer_size: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if config_json.is_null() {
+        set_error(error_out, "config_json must not be null");
+        return -1;
+    }
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     let config_str = match unsafe { CStr::from_ptr(config_json) }.to_str() {
         Ok(s) => s,
         Err(e) => {
@@ -263,6 +287,14 @@ pub unsafe extern "C" fn kelvin_file_chaos_decrypt(
     tag_len: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if config_json.is_null() {
+        set_error(error_out, "config_json must not be null");
+        return -1;
+    }
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     let config_str = match unsafe { CStr::from_ptr(config_json) }.to_str() {
         Ok(s) => s,
         Err(e) => {
@@ -320,6 +352,10 @@ pub unsafe extern "C" fn kelvin_file_secure_encrypt(
     buffer_size: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     if key.is_null() || key_len != 32 {
         set_error(error_out, "key must be 32 bytes");
         return -1;
@@ -372,6 +408,10 @@ pub unsafe extern "C" fn kelvin_file_secure_decrypt(
     tag_len: usize,
     error_out: *mut *mut c_char,
 ) -> i32 {
+    if input_path.is_null() || output_path.is_null() {
+        set_error(error_out, "input_path and output_path must not be null");
+        return -1;
+    }
     if key.is_null() || key_len != 32 {
         set_error(error_out, "key must be 32 bytes");
         return -1;

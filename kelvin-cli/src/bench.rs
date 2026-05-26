@@ -28,7 +28,9 @@ pub fn run_benchmark() -> Result<()> {
         let start = std::time::Instant::now();
         k.encrypt(&mut data)?;
         let duration = start.elapsed();
-        println!("  Encryption Throughput (ChaCha20): {:.2} MB/s", 1.0 / duration.as_secs_f64());
+        let secs = duration.as_secs_f64();
+        let throughput = if secs > 0.0 { (data.len() as f64 / 1_000_000.0) / secs } else { 0.0 };
+        println!("  Encryption Throughput (ChaCha20): {:.2} MB/s", throughput);
     }
 
     Ok(())

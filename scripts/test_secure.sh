@@ -40,46 +40,46 @@ pass
 # 2. Unit tests (all workspace members)
 # ---------------------------------------------------------------------------
 step "2/9: Unit tests (all workspace members)"
-cargo test --lib --workspace
+cargo test --release --lib --workspace
 pass
 
 step "3/9: Unit tests - kelvin-stream (AES-NI feature)"
-cargo test --lib -p kelvin-stream --features aes-ni
+cargo test --release --lib -p kelvin-stream --features aes-ni
 pass
 
 # ---------------------------------------------------------------------------
 # 3. Integration tests
 # ---------------------------------------------------------------------------
 step "4/9: Integration: V1 round-trip"
-cargo test -p kelvin --test v1_round_trip
+cargo test --release -p kelvin --test v1_round_trip
 pass
 
 step "5/9: Integration: Photon cipher"
-cargo test -p kelvin --test photon
+cargo test --release -p kelvin --test photon
 pass
 
 step "6/9: Integration: Quantum cipher"
-cargo test -p kelvin --test quantum
+cargo test --release -p kelvin --test quantum
 pass
 
 step "7/9: Integration: Authenticated encryption"
-cargo test -p kelvin --test authenticated
+cargo test --release -p kelvin --test authenticated
 pass
 
 step "8/9: Integration: Full pipeline"
-cargo test -p kelvin --test full_pipeline
+cargo test --release -p kelvin --test full_pipeline
 pass
 
 step "9/9: Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
-cargo test -p kelvin --test streaming_api
+cargo test --release -p kelvin --test streaming_api
 pass
 
 step "Integration: Chaos test (Lyapunov estimation)"
-cargo test -p kelvin-kdf --test chaos_test
+cargo test --release -p kelvin-kdf --test chaos_test
 pass
 
 step "Integration: Client/Server self-test (V1 + V2 Streaming)"
-cargo run -p kelvin-test-client
+cargo run --release -p kelvin-test-client
 pass
 
 # ---------------------------------------------------------------------------
