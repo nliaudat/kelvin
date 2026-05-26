@@ -257,6 +257,26 @@ pub const DOMSEP_MAC_KEY_V1: &[u8] = b"kelvin-mac-key-v1";
 /// **Changing this** would break authentication for existing V2 ciphertexts.
 pub const DOMSEP_STREAMING_MAC_KEY_V1: &[u8] = b"kelvin-streaming-mac-key-v1";
 
+/// Domain separator for Prism OTP key generation.
+///
+/// Used in `KelvinPrism::generate_keystream_into` to domain-separate the
+/// HKDF-SHA512 expand step that derives the XOF seed for OTP key material.
+/// This ensures Prism-generated OTP keys are cryptographically isolated
+/// from normal V3 Photon keystream, preventing related-key attacks when
+/// both are used in the same system.
+///
+/// **Changing this** would break compatibility with existing Prism OTP keys.
+pub const DOMSEP_PRISM_KEYSTREAM_V1: &[u8] = b"kelvin-prism-keystream-v1";
+
+/// Domain separator for Prism reseed (BLAKE3).
+///
+/// Used in `KelvinPrism::generate_keystream_into` to domain-separate the
+/// BLAKE3 reseed that derives the next 2048-byte seed pool. This ensures
+/// the forward secrecy chain is independent from V3 Photon's reseed chain.
+///
+/// **Changing this** would break forward secrecy chain compatibility.
+pub const DOMSEP_PRISM_RESEED_V1: &[u8] = b"kelvin-prism-reseed-v1";
+
 // ============================================================================
 // Quantum Mode Defaults
 // ============================================================================

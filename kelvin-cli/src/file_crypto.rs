@@ -16,6 +16,24 @@ use std::io::{Read, Write};
 
 use crate::CryptoMode;
 
+/// Read exactly `buf.len()` bytes from `reader`, handling short reads.
+///
+/// Returns the number of bytes actually read (0 if EOF at start, or less than
+/// `buf.len()` only if EOF is reached before the buffer is full). This ensures
+/// that partial chunks are not processed as if they were complete chunks.
+fn read_full<R: Read>(reader: &mut R, buf: &mut [u8]) -> std::io::Result<usize> {
+    let mut total = 0;
+    while total < buf.len() {
+        match reader.read(&mut buf[total..]) {
+            Ok(0) => break, // EOF
+            Ok(n) => total += n,
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(total)
+}
+
 /// Dispatch to the correct processing function based on mode.
 #[allow(clippy::too_many_arguments)]
 pub fn process_file_mode(
@@ -112,7 +130,7 @@ fn process_file_secure(
             // 2. Call encrypt(&mut buffer[..chunk + 16]) — the extra 16 bytes are
             //    zeroed and receive the AEAD tag at position chunk..chunk+16
             // 3. Write buffer[..chunk + 16] to output (ciphertext + tag)
-            let bytes_read = input_file.read(&mut buffer[..STREAMING_CHUNK_SIZE])?;
+            let bytes_read = read_full(&mut input_file, &mut buffer[..STREAMING_CHUNK_SIZE])?;
             if bytes_read == 0 {
                 break;
             }
@@ -126,7 +144,7 @@ fn process_file_secure(
             // 1. Read STREAMING_CHUNK_SIZE + 16 bytes of ciphertext+tag into buffer
             // 2. Call decrypt(&mut buffer[..bytes_read]) — verifies the tag
             // 3. Write buffer[..bytes_read - 16] to output (plaintext only)
-            let bytes_read = input_file.read(&mut buffer[..STREAMING_CHUNK_SIZE + 16])?;
+            let bytes_read = read_full(&mut input_file, &mut buffer[..STREAMING_CHUNK_SIZE + 16])?;
             if bytes_read == 0 {
                 break;
             }
@@ -190,7 +208,7 @@ fn process_file_chaos(
         let mut chunk = Vec::with_capacity(chunk_size + AUTH_OVERHEAD);
         let mut total_processed = 0u64;
         loop {
-            let bytes_read = input_file.read(&mut buffer)?;
+            let bytes_read = read_full(&mut input_file, &mut buffer)?;
             if bytes_read == 0 {
                 break;
             }
@@ -231,7 +249,7 @@ fn process_file_chaos(
     let mut buffer = vec![0u8; STREAMING_CHUNK_SIZE];
     let mut total_processed = 0u64;
     loop {
-        let bytes_read = input_file.read(&mut buffer)?;
+        let bytes_read = read_full(&mut input_file, &mut buffer)?;
         if bytes_read == 0 {
             break;
         }
@@ -296,7 +314,7 @@ fn process_file_photon(
         let mut chunk = Vec::with_capacity(chunk_size + AUTH_OVERHEAD);
         let mut total_processed = 0u64;
         loop {
-            let bytes_read = input_file.read(&mut buffer)?;
+            let bytes_read = read_full(&mut input_file, &mut buffer)?;
             if bytes_read == 0 {
                 break;
             }
@@ -324,7 +342,7 @@ fn process_file_photon(
     let mut buffer = vec![0u8; chunk_size];
     let mut total_processed = 0u64;
     loop {
-        let bytes_read = input_file.read(&mut buffer)?;
+        let bytes_read = read_full(&mut input_file, &mut buffer)?;
         if bytes_read == 0 {
             break;
         }
@@ -393,7 +411,7 @@ fn process_file_quantum(
         let mut chunk = Vec::with_capacity(chunk_size + AUTH_OVERHEAD);
         let mut total_processed = 0u64;
         loop {
-            let bytes_read = input_file.read(&mut buffer)?;
+            let bytes_read = read_full(&mut input_file, &mut buffer)?;
             if bytes_read == 0 {
                 break;
             }
@@ -422,7 +440,7 @@ fn process_file_quantum(
     let mut buffer = vec![0u8; chunk_size];
     let mut total_processed = 0u64;
     loop {
-        let bytes_read = input_file.read(&mut buffer)?;
+        let bytes_read = read_full(&mut input_file, &mut buffer)?;
         if bytes_read == 0 {
             break;
         }

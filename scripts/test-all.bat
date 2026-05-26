@@ -29,29 +29,29 @@ if not exist .gitmodules goto :skip_submodules
 git submodule update --init --recursive
 :skip_submodules
 
-call :step "1/8: Build workspace (default features)"
-cargo build --workspace
+call :step "1/8: Build workspace (release mode)"
+cargo build --workspace --release
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "2/8: Build with AES-NI feature"
-cargo build -p kelvin-stream --features aes-ni
+cargo build --release -p kelvin-stream --features aes-ni
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
-cargo build -p kelvin --features aes-ni
+cargo build --release -p kelvin --features aes-ni
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "2b/8: Build V2 Streaming example"
-cargo build --example simple_streaming -p kelvin
+cargo build --release --example simple_streaming -p kelvin
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "2c/8: Build kelvin-ffi (C FFI bindings)"
-cargo build -p kelvin-ffi
+cargo build --release -p kelvin-ffi
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
@@ -76,13 +76,13 @@ REM ---------------------------------------------------------------------------
 REM 3. Unit tests (all workspace members)
 REM ---------------------------------------------------------------------------
 call :step "5/8: Unit tests (all workspace members)"
-cargo test --lib --workspace
+cargo test --release --lib --workspace
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "6/8: Unit tests - kelvin-stream (AES-NI feature)"
-cargo test --lib -p kelvin-stream --features aes-ni
+cargo test --release --lib -p kelvin-stream --features aes-ni
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
@@ -91,49 +91,49 @@ REM ---------------------------------------------------------------------------
 REM 4. Integration tests
 REM ---------------------------------------------------------------------------
 call :step "Integration: V1 round-trip"
-cargo test -p kelvin --test v1_round_trip
+cargo test --release -p kelvin --test v1_round_trip
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Photon cipher"
-cargo test -p kelvin --test photon
+cargo test --release -p kelvin --test photon
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Quantum cipher"
-cargo test -p kelvin --test quantum
+cargo test --release -p kelvin --test quantum
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Authenticated encryption"
-cargo test -p kelvin --test authenticated
+cargo test --release -p kelvin --test authenticated
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Full pipeline"
-cargo test -p kelvin --test full_pipeline
+cargo test --release -p kelvin --test full_pipeline
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
-cargo test -p kelvin --test streaming_api
+cargo test --release -p kelvin --test streaming_api
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Chaos test (Lyapunov estimation)"
-cargo test -p kelvin-kdf --test chaos_test
+cargo test --release -p kelvin-kdf --test chaos_test
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 call :step "Integration: Client/Server self-test (V1 + V2 Streaming)"
-cargo run -p kelvin-test-client
+cargo run --release -p kelvin-test-client
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%

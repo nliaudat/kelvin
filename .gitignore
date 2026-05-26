@@ -56,3 +56,4 @@ ea_restart_1mb.txt
 tests/ea_iid
 scripts/test_aead.py
 scripts/chunk_size_compare.py
+/documentation/related_papers

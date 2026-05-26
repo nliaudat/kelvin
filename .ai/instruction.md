@@ -64,6 +64,8 @@ kelvin-core/        no_std, no alloc. Fixed math + integrator + body types.
 kelvin-kdf/         Depends on core. Config, Lyapunov estimator, extraction.
 kelvin-stream/      Depends on nothing from kelvin. ChaCha20 (+ optional AES).
 kelvin/             Orchestrator. Depends on kdf + stream. Public API.
+                    Contains 5 modes: Secure (V1), Chaos (V2), Photon (V3),
+                    Quantum (H), Prism (HE OTP key generator).
 kelvin-cli/         Binary. Depends on kelvin. Keygen, encrypt/decrypt.
 kelvin-ffi/         C ABI exports. For mobile bindings.
 kelvin-test-server/ Test vector golden file server (serde feature).

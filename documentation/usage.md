@@ -424,3 +424,69 @@ The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.h
 - The domain separator `b"kelvin-streaming-v2-v1-000000000"` ensures domain separation from V1.
 - **Deterministic**: same config + same step count = same keystream, regardless of how the caller chunks the data (as long as total bytes processed is the same).
 - **Unlimited keystream**: Unlike V1's finite key schedule, V2 can keep simulating indefinitely — there is no `SeedExhausted` error.
+
+---
+
+## 7. Prism Mode — OTP Key Generator for Homomorphic Encryption
+
+`KelvinPrism` is a standalone OTP key generator designed for integration with
+homomorphic encryption (HE) systems. It produces domain-separated OTP key
+material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
+
+### Architecture
+
+```
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keys
+```
+
+Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+The domain separators (`DOMSEP_PRISM_KEYSTREAM_V1`, `DOMSEP_PRISM_RESEED_V1`)
+ensure cryptographic isolation from V3 Photon keystream.
+
+### Rust API
+
+```rust
+use kelvin::{KelvinPrism, PHOTON_BASE_SEED_SIZE};
+
+// 1. Get a 2048-byte seed from orbital simulation
+let (seed, _bodies) = kelvin::simulate_and_extract_seed(&config)?;
+
+// 2. Create a Prism instance (max 100,000 reseeds)
+let mut prism = KelvinPrism::new(seed, 100_000);
+
+// 3. Generate an OTP key for FHE recryption
+let otp_key = prism.generate_otp_key(32)?;
+
+// 4. Split a key for XOR homomorphism: A ⊕ B = K
+let (a, b) = prism.split_key(256)?;
+
+// 5. Encrypt/decrypt with domain-separated keystream
+let mut data = b"Secret message".to_vec();
+prism.encrypt(&mut data)?;
+prism.decrypt(&mut data)?;
+assert_eq!(&data, b"Secret message");
+
+// 6. Static recryption (pure XOR, no state)
+KelvinPrism::recrypt(&mut data, &otp_key);
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Domain separation** | Prism keys cannot collide with V3 Photon keystream |
+| **Forward secrecy** | BLAKE3 reseeding ensures past keys are not recoverable from future state |
+| **Quantum resistance** | SHAKE256 provides 256-bit classical / 128-bit quantum security |
+| **No authentication** | XOR is malleable — use with external MAC or in environments where malleability is acceptable |
+
+### Use Cases
+
+1. **Recryption layer**: Generate OTP keys for `parasol_runtime::recrypt_one_time_pad`
+   or any FHE library's recryption API.
+2. **Split-key XOR homomorphism**: Use `split_key()` to produce (A, B) where
+   A ⊕ B = K, enabling XOR operations on encrypted data.
+3. **Chaotic FHE key generation**: Use `generate_otp_key()` to produce
+   high-entropy key material for FHE secret keys.
+
+See the [Homomorphic Cryptosystem Analysis](homomorphic_cryptosystem.md) for
+full details on integrating Kelvin with FHE systems.

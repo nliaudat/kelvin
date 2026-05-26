@@ -108,11 +108,12 @@ pub fn process_in_memory(
                 // `chunk + AUTH_OVERHEAD` bytes, and we write those to a separate output buffer.
                 // During decryption, we read `chunk + AUTH_OVERHEAD` bytes from the ciphertext,
                 // decrypt produces `chunk` bytes of plaintext, and we write those back.
+                let read_chunk_size = if encrypt { chunk_size } else { chunk_size + AUTH_OVERHEAD };
                 let mut output = Vec::with_capacity(size as usize + AUTH_OVERHEAD);
                 let mut offset = 0;
                 while offset < data.len() {
                     let remaining = data.len() - offset;
-                    let chunk = std::cmp::min(remaining, chunk_size);
+                    let chunk = std::cmp::min(remaining, read_chunk_size);
                     let mut buf = data[offset..offset + chunk].to_vec();
                     if encrypt {
                         ks.encrypt(&mut buf)?;
@@ -149,12 +150,13 @@ pub fn process_in_memory(
                 let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
                 let start = std::time::Instant::now();
                 let chunk_size = bytes_per_step as usize;
+                let read_chunk_size = if encrypt { chunk_size } else { chunk_size + AUTH_OVERHEAD };
                 // Use a separate output buffer to avoid overwriting issues with tag expansion
                 let mut output = Vec::with_capacity(size as usize + AUTH_OVERHEAD);
                 let mut offset = 0;
                 while offset < data.len() {
                     let remaining = data.len() - offset;
-                    let chunk = std::cmp::min(remaining, chunk_size);
+                    let chunk = std::cmp::min(remaining, read_chunk_size);
                     let mut buf = data[offset..offset + chunk].to_vec();
                     if encrypt {
                         photon.encrypt(&mut buf)?;
@@ -189,12 +191,13 @@ pub fn process_in_memory(
                 let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
                 let start = std::time::Instant::now();
                 let chunk_size = bytes_per_step as usize;
+                let read_chunk_size = if encrypt { chunk_size } else { chunk_size + AUTH_OVERHEAD };
                 // Use a separate output buffer to avoid overwriting issues with tag expansion
                 let mut output = Vec::with_capacity(size as usize + AUTH_OVERHEAD);
                 let mut offset = 0;
                 while offset < data.len() {
                     let remaining = data.len() - offset;
-                    let chunk = std::cmp::min(remaining, chunk_size);
+                    let chunk = std::cmp::min(remaining, read_chunk_size);
                     let mut buf = data[offset..offset + chunk].to_vec();
                     if encrypt {
                         quantum.encrypt(&mut buf)?;
