@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Kelvin cryptosystem provides four encryption modes, each with different
+The Kelvin cryptosystem provides five encryption modes, each with different
 security properties and performance characteristics:
 
 | Mode | Cipher | Authentication | Key Derivation |
@@ -11,6 +11,7 @@ security properties and performance characteristics:
 | **Chaos** | Per-step SHAKE256 XOR | None (malleable) | Orbital simulation (1 step per chunk) |
 | **Photon** | HKDF→SHAKE256 XOR | None (malleable) | HKDF-SHA512 → SHAKE256 XOF |
 | **Quantum** | Hybrid cache+XOR + orbital reseed | None (malleable) | BLAKE3 → SHAKE256 cache + orbital reseed |
+| **Prism** | OTP key generator (HE integration) | None (XOR is malleable) | HKDF-SHA512 → SHAKE256 XOF (isolated domain) |
 
 ---
 
@@ -576,16 +577,16 @@ sequenceDiagram
 
 ## Mode Comparison
 
-| Feature | Secure | Chaos | Photon | Quantum |
-|---------|--------|-------|--------|---------|
-| **Encryption** | ChaCha20 stream | SHAKE256 XOR | HKDF→SHAKE256 XOR | Cache+XOR + orbital reseed |
-| **Authentication** | BLAKE3 keyed hash (32B) | None | None | None |
-| **Keystream source** | ChaCha20 | Orbital simulation | HKDF→SHAKE256 | BLAKE3→SHAKE256 + orbital |
-| **Forward secrecy** | ❌ | ✅ (per step) | ✅ (per 64 MiB) | ✅ (per reseed interval) |
-| **Quantum resistant** | ❌ (128-bit) | ✅ | ✅ | ✅ |
-| **Performance** | Fast | Slowest | Fastest | Moderate |
-| **Streaming API** | ✅ | ✅ | ✅ | ✅ |
-| **Authenticated wrapper** | Built-in | `KelvinStreamingAuthenticated` | `KelvinPhotonAuthenticated` | `KelvinQuantumAuthenticated` |
+| Feature | Secure | Chaos | Photon | Quantum | Prism |
+|---------|--------|-------|--------|---------|-------|
+| **Encryption** | ChaCha20 stream | SHAKE256 XOR | HKDF→SHAKE256 XOR | Cache+XOR + orbital reseed | OTP key generator |
+| **Authentication** | BLAKE3 keyed hash (32B) | None | None | None | None |
+| **Keystream source** | ChaCha20 | Orbital simulation | HKDF→SHAKE256 | BLAKE3→SHAKE256 + orbital | HKDF→SHAKE256 (isolated) |
+| **Forward secrecy** | ❌ | ✅ (per step) | ✅ (per 64 MiB) | ✅ (per reseed interval) | ✅ (per 64 MiB) |
+| **Quantum resistant** | ❌ (128-bit) | ✅ | ✅ | ✅ | ✅ |
+| **Performance** | Fast | Slowest | Fastest | Moderate | Fastest |
+| **Streaming API** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Authenticated wrapper** | Built-in | `KelvinStreamingAuthenticated` | `KelvinPhotonAuthenticated` | `KelvinQuantumAuthenticated` | N/A (OTP only) |
 
 ---
 

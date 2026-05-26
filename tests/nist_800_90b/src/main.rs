@@ -54,7 +54,7 @@ struct Args {
 }
 
 enum Command {
-    Generate { size: u64, output: String, config: Option<String>, euler: bool },
+    Generate { size: u64, output: String, config: Option<String>, euler: bool, prism: bool },
     Analyze { input: String },
 }
 
@@ -63,7 +63,7 @@ fn parse_args() -> Args {
     if args.len() < 2 {
         eprintln!("Usage:");
         eprintln!(
-            "  nist_800_90b generate --size <BYTES> --output <FILE> [--config <JSON>] [--euler]"
+            "  nist_800_90b generate --size <BYTES> --output <FILE> [--config <JSON>] [--euler] [--prism]"
         );
         eprintln!("  nist_800_90b analyze --input <FILE>");
         std::process::exit(1);
@@ -75,6 +75,7 @@ fn parse_args() -> Args {
             let mut output = String::from("keystream.bin");
             let mut config: Option<String> = None;
             let mut euler = false;
+            let mut prism = false;
             let mut nist = false;
 
             let mut i = 2;
@@ -99,6 +100,7 @@ fn parse_args() -> Args {
                         }
                     },
                     "--euler" => euler = true,
+                    "--prism" => prism = true,
                     "--nist" => nist = true,
                     _ => {},
                 }
@@ -111,7 +113,7 @@ fn parse_args() -> Args {
                 size = 1_000_000;
             }
 
-            Args { command: Command::Generate { size, output, config, euler } }
+            Args { command: Command::Generate { size, output, config, euler, prism } }
         },
         "analyze" => {
             let mut input = String::from("keystream.bin");
@@ -544,38 +546,104 @@ fn analyze_keystream_file(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+// ── Prism keystream generation ────────────────────────────────────────────────
+
+fn generate_prism_keystream(size: u64, output_path: &str) -> Result<(), String> {
+    use kelvin::{simulate_and_extract_seed, KelvinPrism};
+
+    let bodies = default_config().bodies.clone();
+    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .map_err(|e| format!("Failed to create config: {:?}", e))?;
+
+    let (seed, _bodies) = simulate_and_extract_seed(&config)
+        .map_err(|e| format!("Failed to extract seed: {:?}", e))?;
+
+    let mut prism = KelvinPrism::new(seed, 1000);
+
+    let mut output_file = fs::File::create(output_path)
+        .map_err(|e| format!("Failed to create output file: {}", e))?;
+
+    let chunk_size = 64 * 1024; // 64 KB chunks
+    let mut buffer = vec![0u8; chunk_size];
+    let mut total_written: u64 = 0;
+    let mut last_progress: u64 = 0;
+    let progress_interval = size / 100;
+
+    eprintln!("Generating Prism keystream...");
+    while total_written < size {
+        let remaining = (size - total_written) as usize;
+        let write_size = std::cmp::min(remaining, chunk_size);
+
+        buffer[..write_size].fill(0);
+        prism
+            .encrypt(&mut buffer[..write_size])
+            .map_err(|e| format!("Encryption failed at byte {}: {:?}", total_written, e))?;
+
+        output_file
+            .write_all(&buffer[..write_size])
+            .map_err(|e| format!("Write failed at byte {}: {}", total_written, e))?;
+
+        total_written += write_size as u64;
+
+        if total_written - last_progress >= progress_interval {
+            let pct = total_written as f64 / size as f64 * 100.0;
+            eprint!("\r  Progress: {:.1}% ({}/{})", pct, total_written, size);
+            let _ = std::io::stderr().flush();
+            last_progress = total_written;
+        }
+    }
+    eprintln!("\r  Progress: 100.0% ({}/{})", total_written, size);
+    eprintln!("Prism keystream written to: {}", output_path);
+
+    Ok(())
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 fn main() {
     let args = parse_args();
 
     match args.command {
-        Command::Generate { size, output, config, euler } => {
-            let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
-
-            let orbital_config = if let Some(config_path) = &config {
-                let json = fs::read_to_string(config_path).unwrap_or_else(|e| {
-                    eprintln!("Failed to read config file '{}': {}", config_path, e);
+        Command::Generate { size, output, config, euler, prism } => {
+            if prism {
+                eprintln!("NIST SP 800-90B Keystream Generator (Prism Mode)");
+                eprintln!("  Size: {} bytes ({:.2} GB)", size, size as f64 / 1_073_741_824.0);
+                eprintln!("  Output: {}", output);
+                if let Err(e) = generate_prism_keystream(size, &output) {
+                    eprintln!("Error: {}", e);
                     std::process::exit(1);
-                });
-                OrbitalConfig::from_json(&json).unwrap_or_else(|e| {
-                    eprintln!("Failed to parse config: {:?}", e);
-                    std::process::exit(1);
-                })
+                }
             } else {
-                default_config()
-            };
+                let method =
+                    if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
 
-            let method_label = if euler { "Euler" } else { "Verlet" };
-            eprintln!("NIST SP 800-90B Keystream Generator");
-            eprintln!("  Size: {} bytes ({:.2} GB)", size, size as f64 / 1_073_741_824.0);
-            eprintln!("  Output: {}", output);
-            eprintln!("  Integration: {}", method_label);
-            eprintln!("  Config: {}", if config.is_some() { "custom" } else { "default 5-body" });
+                let orbital_config = if let Some(config_path) = &config {
+                    let json = fs::read_to_string(config_path).unwrap_or_else(|e| {
+                        eprintln!("Failed to read config file '{}': {}", config_path, e);
+                        std::process::exit(1);
+                    });
+                    OrbitalConfig::from_json(&json).unwrap_or_else(|e| {
+                        eprintln!("Failed to parse config: {:?}", e);
+                        std::process::exit(1);
+                    })
+                } else {
+                    default_config()
+                };
 
-            if let Err(e) = generate_keystream(orbital_config, size, method, &output) {
-                eprintln!("Error: {}", e);
-                std::process::exit(1);
+                let method_label = if euler { "Euler" } else { "Verlet" };
+                eprintln!("NIST SP 800-90B Keystream Generator");
+                eprintln!("  Size: {} bytes ({:.2} GB)", size, size as f64 / 1_073_741_824.0);
+                eprintln!("  Output: {}", output);
+                eprintln!("  Integration: {}", method_label);
+                eprintln!(
+                    "  Config: {}",
+                    if config.is_some() { "custom" } else { "default 5-body" }
+                );
+
+                if let Err(e) = generate_keystream(orbital_config, size, method, &output) {
+                    eprintln!("Error: {}", e);
+                    std::process::exit(1);
+                }
             }
         },
         Command::Analyze { input } => {

@@ -76,10 +76,20 @@ fn main() {
     all_passed.push(p);
     all_total.push(t);
 
+    // ── P Prism: Domain-separated OTP key generator for HE ────────────────
+    println!();
+    println!("--- P Prism (OTP Key Generator) ---");
+    let keystream = generate_prism_keystream(seed);
+    let data = BitsData::from_binary(keystream);
+    let (p, t) = run_all_tests(&data);
+    all_passed.push(p);
+    all_total.push(t);
+
     // ── Summary ────────────────────────────────────────────────────────────
     println!();
     println!("=== Summary ===");
-    let labels = ["V1 Verlet", "V1 Euler", "V2 Verlet", "V2 Euler", "V3 Photon", "H Quantum"];
+    let labels =
+        ["V1 Verlet", "V1 Euler", "V2 Verlet", "V2 Euler", "V3 Photon", "H Quantum", "P Prism"];
     for (i, label) in labels.iter().enumerate() {
         let status = if all_passed[i] == all_total[i] { "✅" } else { "⚠️" };
         println!("  {}: {}/{} {}", label, all_passed[i], all_total[i], status);
@@ -425,5 +435,16 @@ fn generate_h_keystream(seed: [u8; 2048]) -> Vec<u8> {
     let mut quantum = KelvinQuantum::new(seed, 1000);
     let mut data = vec![0u8; 1_048_576];
     quantum.encrypt(&mut data).expect("Failed to encrypt");
+    data
+}
+
+// ── P Prism: Domain-separated OTP key generator for HE ───────────────────────
+
+fn generate_prism_keystream(seed: [u8; 2048]) -> Vec<u8> {
+    use kelvin::KelvinPrism;
+
+    let mut prism = KelvinPrism::new(seed, 1000);
+    let mut data = vec![0u8; 1_048_576];
+    prism.encrypt(&mut data).expect("Failed to encrypt");
     data
 }

@@ -72,6 +72,9 @@ use crate::parameters::{
     XOF_SEED_SIZE,
 };
 
+/// A pair of zeroizing OTP pads `(A, B)` where `A ⊕ B = K`.
+type OtpPadPair = (Zeroizing<Vec<u8>>, Zeroizing<Vec<u8>>);
+
 /// Bytes of keystream generated before triggering a reseed (64 MiB).
 ///
 /// Within one reseed period, the SHAKE256 XOF reader is kept alive and
@@ -194,6 +197,7 @@ impl KelvinPrism {
         let mut reseed_buf = [0u8; PHOTON_BASE_SEED_SIZE];
         reseed_hasher.finalize_xof().fill(&mut reseed_buf);
         self.seed = reseed_buf;
+        reseed_buf.zeroize();
 
         self.reseed_count += 1;
         self.bytes_since_reseed = 0;
@@ -244,9 +248,9 @@ impl KelvinPrism {
     /// let (public_otp, secret_otp) = parasol_runtime::generate_one_time_pad(...);
     /// // Use Kelvin's key as the OTP key material
     /// ```
-    pub fn generate_otp_key(&mut self, len: usize) -> Result<Vec<u8>, KelvinError> {
+    pub fn generate_otp_key(&mut self, len: usize) -> Result<Zeroizing<Vec<u8>>, KelvinError> {
         if len == 0 {
-            return Ok(Vec::new());
+            return Ok(Zeroizing::new(Vec::new()));
         }
 
         let mut key = Zeroizing::new(vec![0u8; len]);
@@ -258,7 +262,7 @@ impl KelvinPrism {
             offset += chunk_size;
         }
         self.bytes_processed += len as u64;
-        Ok(key.to_vec())
+        Ok(key)
     }
 
     /// Split an OTP key into two pads `(A, B)` such that `A ⊕ B = key`.
@@ -277,7 +281,7 @@ impl KelvinPrism {
     /// ## Panics
     ///
     /// Panics if `len` is 0.
-    pub fn split_key(&mut self, len: usize) -> Result<(Vec<u8>, Vec<u8>), KelvinError> {
+    pub fn split_key(&mut self, len: usize) -> Result<OtpPadPair, KelvinError> {
         assert!(len > 0, "split_key: len must be > 0");
 
         // Generate the master key K
@@ -300,7 +304,7 @@ impl KelvinPrism {
             *b_byte ^= k_byte;
         }
 
-        Ok((a.to_vec(), b.to_vec()))
+        Ok((a, b))
     }
 
     /// Encrypt data in-place using domain-separated OTP keystream.
@@ -477,19 +481,23 @@ mod tests {
         let _a_from_prism2 = prism2.generate_otp_key(len).unwrap();
 
         // K_recovered should equal K_direct
-        assert_eq!(k_recovered, k_direct);
+        assert_eq!(k_recovered, &**k_direct);
     }
 
     #[test]
     fn test_encrypt_decrypt_round_trip() {
-        let mut prism = KelvinPrism::new(test_seed(), 1000);
+        // Use two separate instances (same seed = same keystream)
+        let seed = test_seed();
+        let mut enc = KelvinPrism::new(seed, 1000);
+        let mut dec = KelvinPrism::new(seed, 1000);
+
         let original = b"Hello, Kelvin-Prism!".to_vec();
         let mut data = original.clone();
 
-        prism.encrypt(&mut data).unwrap();
+        enc.encrypt(&mut data).unwrap();
         assert_ne!(data, original); // Should be encrypted
 
-        prism.decrypt(&mut data).unwrap();
+        dec.decrypt(&mut data).unwrap();
         assert_eq!(data, original); // Should be restored
     }
 
@@ -505,14 +513,18 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_large() {
-        let mut prism = KelvinPrism::new(test_seed(), 1000);
+        // Use two separate instances (same seed = same keystream)
+        let seed = test_seed();
+        let mut enc = KelvinPrism::new(seed, 1000);
+        let mut dec = KelvinPrism::new(seed, 1000);
+
         let original = vec![0xABu8; 5 * 1024 * 1024]; // 5 MB
         let mut data = original.clone();
 
-        prism.encrypt(&mut data).unwrap();
+        enc.encrypt(&mut data).unwrap();
         assert_ne!(data, original);
 
-        prism.decrypt(&mut data).unwrap();
+        dec.decrypt(&mut data).unwrap();
         assert_eq!(data, original);
     }
 
@@ -551,7 +563,7 @@ mod tests {
         photon.encrypt(&mut photon_buf).unwrap();
 
         // Prism key should differ from Photon keystream
-        assert_ne!(prism_key, photon_buf);
+        assert_ne!(&**prism_key, &photon_buf[..]);
     }
 
     #[test]

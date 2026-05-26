@@ -242,10 +242,11 @@ fn test_split_key_xor_property() {
     // A ⊕ B should equal the original key K
     let k_recovered: Vec<u8> = a.iter().zip(b.iter()).map(|(x, y)| x ^ y).collect();
 
-    // Generate another key from a fresh instance to verify K is deterministic
+    // Generate another key from a fresh instance to verify K is deterministic.
+    // split_key internally generates K (len bytes via generate_otp_key),
+    // then A (len bytes via generate_keystream_into). So K is the first
+    // len bytes of keystream from a fresh instance.
     let mut prism2 = KelvinPrism::new(test_seed(), 1000);
-    // Skip the first generate_otp_key call (split_key consumed one)
-    let _first = prism2.generate_otp_key(128).unwrap();
     let k_expected = prism2.generate_otp_key(128).unwrap();
 
     assert_eq!(k_recovered, k_expected, "A ⊕ B should equal the original key K");
