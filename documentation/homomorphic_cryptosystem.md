@@ -65,6 +65,42 @@ recrypt_one_time_pad(otp_key, ciphertext)
 
 **Kelvin's role:** Generate the one-time pad keys `k` using your orbital entropy source. This gives you information-theoretic security for the OTP layer while the FHE layer provides homomorphic computation.
 
+#### Using `Prism mode` for Recryption
+
+The `KelvinPrism` struct provides a dedicated API for generating OTP keys for
+homomorphic encryption integration:
+
+```rust
+use kelvin::{KelvinPrism, PHOTON_BASE_SEED_SIZE};
+
+// 1. Get a 2048-byte seed from orbital simulation
+let (seed, _bodies) = kelvin::simulate_and_extract_seed(&config)?;
+
+// 2. Create a Prism instance
+let mut prism = KelvinPrism::new(seed, 100_000);
+
+// 3. Generate an OTP key for FHE recryption
+let otp_key = prism.generate_otp_key(32)?;
+
+// 4. Pass to your FHE library's recryption API
+// (e.g., parasol_runtime::recrypt_one_time_pad)
+```
+
+Key features of `KelvinPrism`:
+
+- **Domain-separated keystream**: Prism keys are cryptographically isolated from
+  normal V3 Photon keystream via `DOMSEP_PRISM_KEYSTREAM_V1` and
+  `DOMSEP_PRISM_RESEED_V1`, preventing related-key attacks.
+- **No FHE dependencies**: `KelvinPrism` is a standalone generator — it produces
+  raw OTP key bytes that can be plugged into any FHE library.
+- **Forward secrecy**: BLAKE3 reseeding ensures past keys are not recoverable
+  from future state.
+- **Quantum-resistant**: SHAKE256 provides 256-bit classical / 128-bit quantum
+  security.
+- **Static recryption**: The `KelvinPrism::recrypt(data, key)` static method
+  provides a pure XOR operation matching the `parasol_runtime::recrypt_one_time_pad`
+  concept.
+
 ### Strategy 2: Chaotic Key Generation for FHE
 
 A 2025 paper by Jawad proposes **DUff-skg**: generating FHE secret keys using chaotic Duffing equations.

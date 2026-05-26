@@ -71,8 +71,8 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet/Euler integrator
 kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHAKE256 XOF extractor, KeySchedule
 kelvin-stream/   — ChaCha20 wrapper with StreamCipher trait
-kelvin/          — Top-level struct with 4 modes: Secure (V1), Chaos (V2),
-                   Photon (V3), Quantum (H)
+kelvin/          — Top-level struct with 5 modes: Secure (V1), Chaos (V2),
+                   Photon (V3), Quantum (H), Prism (HE OTP key generator)
 kelvin-cli/      — CLI tool (keygen, encrypt/decrypt with --mode, benchmark, identify)
 kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 kelvin-demo/     — Demo kit: 3D orbital visualizer, test binaries, sample keys
@@ -106,6 +106,20 @@ Kelvin provides four cryptographic modes, each optimized for different use cases
 >
 > **Authentication:** Append `--auth` to encrypt/decrypt commands for chaos, photon, or quantum modes to append a 32-byte KMAC128 tag (NIST SP 800-185), defeating ciphertext malleability. The secure mode has built-in AEAD and ignores the flag.
 
+### Prism Mode — OTP Key Generator for Homomorphic Encryption
+
+**Prism** (`KelvinPrism`) is a standalone OTP key generator designed specifically for integration with homomorphic encryption (HE) systems. It is not an encryption mode itself — it produces domain-separated OTP key material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
+
+| Property | Prism |
+|----------|-------|
+| **Engine** | `KelvinPrism` |
+| **Purpose** | Generate OTP keys for FHE recryption, split-key XOR homomorphism, chaotic FHE keygen |
+| **Keystream** | HKDF→SHAKE256 XOR (domain-separated from V3 Photon) |
+| **Forward secrecy** | ✅ BLAKE3 reseeding |
+| **Quantum resistance** | ✅ SHAKE256 (256-bit classical / 128-bit quantum) |
+| **Key features** | `generate_otp_key()`, `split_key()`, `recrypt()` |
+
+See the [Homomorphic Cryptosystem Analysis](documentation/homomorphic_cryptosystem.md) for full details on integrating Kelvin with FHE systems.
 
 ## Security Levels
 

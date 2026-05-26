@@ -589,6 +589,149 @@ sequenceDiagram
 
 ---
 
+## Prism Mode — OTP Key Generator for Homomorphic Encryption
+
+### Architecture
+
+Prism mode (`KelvinPrism`) is a standalone OTP key generator designed for
+integration with homomorphic encryption (HE) systems. It wraps `KelvinPhoton`
+internally but uses distinct domain separators to ensure Prism-generated OTP
+keys are cryptographically isolated from normal V3 Photon keystream.
+
+```
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keys
+```
+
+Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+The domain separators (`DOMSEP_PRISM_KEYSTREAM_V1`, `DOMSEP_PRISM_RESEED_V1`)
+ensure cryptographic isolation from V3 Photon.
+
+### Flowchart
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+flowchart TD
+    subgraph Initialization
+        A1["KelvinPrism::new(seed, max_reseeds)"] --> A2["Store seed, set reseed_count=0"]
+        A2 --> A3["reader = None, bytes_since_reseed = 0"]
+    end
+
+    subgraph Generate OTP Key
+        B1["generate_otp_key(len)"] --> B2["Allocate output[len]"]
+        B2 --> B3["generate_keystream_into(&mut output)"]
+        B3 --> B4["Return output"]
+    end
+
+    subgraph Split Key
+        C1["split_key(len)"] --> C2["Generate K = generate_otp_key(len)"]
+        C2 --> C3["Generate random A of length len"]
+        C3 --> C4["B = A ⊕ K"]
+        C4 --> C5["Return (A, B)"]
+        C5 --> C6["Zeroize K"]
+    end
+
+    subgraph Encrypt/Decrypt
+        D1["encrypt(data) / decrypt(data)"] --> D2{"data empty?"}
+        D2 -->|Yes| D3["Return Ok"]
+        D2 -->|No| D4["Process data in 1 MiB chunks"]
+        D4 --> D5["generate_keystream_into(&mut keystream[..chunk_size])"]
+        D5 --> D6["XOR chunk with keystream"]
+        D6 --> D7{"More chunks?"}
+        D7 -->|Yes| D5
+        D7 -->|No| D8["Return Ok"]
+    end
+
+    subgraph Generate Keystream
+        E1["generate_keystream_into(output)"] --> E2{"reader is None OR\nbytes_since_reseed >= 64 MiB?"}
+        E2 -->|Yes| E3["ensure_reader()"]
+        E2 -->|No| E7
+        E3 --> E4{"reseed_count >= max_reseeds?"}
+        E4 -->|Yes| E5["Return SeedExhausted"]
+        E4 -->|No| E6["HKDF-SHA512(seed, reseed_count) → XOF seed"]
+        E6 --> E7["SHAKE256 XOF init with xof_seed + domain sep (PRISM)"]
+        E7 --> E8["XofReader::read(reader, output)"]
+        E8 --> E9["bytes_since_reseed += output.len()"]
+        E9 --> E10["Return Ok"]
+    end
+
+    subgraph Reseed
+        F1["After ensure_reader()"] --> F2["BLAKE3 XOF(PRISM domain || seed || reseed_count)"]
+        F2 --> F3["Fill new 2048B seed"]
+        F3 --> F4["reseed_count += 1"]
+        F4 --> F5["bytes_since_reseed = 0"]
+        F5 --> F6["Zeroize old XOF seed"]
+    end
+
+    A3 --> B1
+    A3 --> C1
+    A3 --> D1
+    B3 --> E1
+    D5 --> E1
+    E3 --> F1
+```
+
+### Sequence Diagram
+
+```mermaid
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant Caller
+    participant KelvinPrism
+    participant SHAKE256
+
+    Note over Caller,SHAKE256: OTP Key Generation
+
+    Caller->>KelvinPrism: new(seed, max_reseeds)
+    KelvinPrism->>KelvinPrism: Store seed, reader=None
+    KelvinPrism-->>Caller: KelvinPrism instance
+
+    Caller->>KelvinPrism: generate_otp_key(256)
+    KelvinPrism->>KelvinPrism: generate_keystream_into(&mut buf)
+
+    alt First call or 64 MiB exhausted
+        KelvinPrism->>KelvinPrism: ensure_reader()
+        KelvinPrism->>KelvinPrism: HKDF-SHA512(seed, reseed_count) → XOF seed
+        KelvinPrism->>SHAKE256: Shake256::default() + xof_seed (PRISM domain)
+        SHAKE256-->>KelvinPrism: Shake256Reader
+        KelvinPrism->>KelvinPrism: BLAKE3 reseed → new seed
+    end
+
+    KelvinPrism->>SHAKE256: XofReader::read(reader, buf)
+    SHAKE256-->>KelvinPrism: 256 OTP key bytes
+    KelvinPrism-->>Caller: OTP key
+
+    Note over Caller,KelvinPrism: Split Key (XOR Homomorphism)
+
+    Caller->>KelvinPrism: split_key(256)
+    KelvinPrism->>KelvinPrism: Generate K = generate_otp_key(256)
+    KelvinPrism->>KelvinPrism: Generate random A (256 bytes)
+    KelvinPrism->>KelvinPrism: B = A ⊕ K
+    KelvinPrism->>KelvinPrism: Zeroize K
+    KelvinPrism-->>Caller: (A, B) where A ⊕ B = original K
+
+    Note over Caller,KelvinPrism: Static Recryption
+
+    Caller->>KelvinPrism: recrypt(&mut data, &otp_key)
+    KelvinPrism->>KelvinPrism: XOR data with otp_key
+    KelvinPrism-->>Caller: data XORed in-place
+```
+
+### Key Properties
+
+| Property | Value |
+|----------|-------|
+| **Purpose** | Generate OTP keys for FHE recryption, split-key XOR homomorphism, chaotic FHE keygen |
+| **Keystream source** | HKDF-SHA512 → SHAKE256 XOF (persistent reader) |
+| **Domain separation** | `DOMSEP_PRISM_KEYSTREAM_V1` / `DOMSEP_PRISM_RESEED_V1` (isolated from V3 Photon) |
+| **Reseed interval** | 64 MiB |
+| **Reseed mechanism** | BLAKE3 XOF (forward secrecy) |
+| **Forward secrecy** | Yes — BLAKE3 reseed derives fresh seed each interval |
+| **Quantum resistance** | Yes — SHAKE256 provides 256-bit classical / 128-bit quantum security |
+| **Authentication** | None (XOR is malleable) |
+| **Key features** | `generate_otp_key()`, `split_key()`, `recrypt()` |
+
+---
+
 ## Authenticated Wrappers
 
 All three XOR-based modes (Chaos, Photon, Quantum) can be wrapped with
