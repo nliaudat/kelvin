@@ -22,6 +22,6 @@
 #![allow(missing_docs)]
 #![warn(missing_debug_implementations)]
 
-mod c_api;
+pub mod c_api;
 
 pub use c_api::*;

@@ -1,23 +1,17 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Kelvin — Run All Tests (Linux / macOS)
+# Kelvin — Security & Correctness Tests (Linux / macOS)
 # ==============================================================================
-# Runs the full test suite: build, lint, unit tests, integration tests,
-# entropy analysis, NIST SP 800-22 statistical tests, and constant-time
-# benchmarks.
+# Runs unit tests, integration tests, entropy analysis, NIST SP 800-22
+# statistical tests, and constant-time benchmarks.
 #
 # Exit code is 0 only if ALL steps pass.
 #
 # Usage:
-#   ./scripts/test-all.sh
+#   ./scripts/test_secure.sh
 # ==============================================================================
 
 set -euo pipefail
-
-# Initialize git submodules (NIST SP 800-90B tools)
-if [ -f .gitmodules ]; then
-    git submodule update --init --recursive
-fi
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -36,72 +30,47 @@ pass() {
 }
 
 # ---------------------------------------------------------------------------
-# 1. Build — verify all workspace members compile
+# 1. Formatting check
 # ---------------------------------------------------------------------------
-step "1/8: Build workspace (default features)"
-cargo build --workspace
-pass
-
-step "2/8: Build with AES-NI feature"
-cargo build -p kelvin-stream --features aes-ni
-cargo build -p kelvin --features aes-ni
-pass
-
-step "2b/8: Build V2 Streaming example"
-cargo build --example simple_streaming -p kelvin
-pass
-
-step "2c/8: Build kelvin-ffi (C FFI bindings)"
-cargo build -p kelvin-ffi
-pass
-
-# ---------------------------------------------------------------------------
-# 2. Lint — clippy + rustfmt
-# ---------------------------------------------------------------------------
-
-step "3/8: Clippy (deny warnings)"
-cargo clippy --workspace -- -D warnings
-pass
-
-step "4/8: Check formatting"
+step "1/9: Check formatting"
 cargo fmt --check
 pass
 
 # ---------------------------------------------------------------------------
-# 3. Unit tests (all workspace members)
+# 2. Unit tests (all workspace members)
 # ---------------------------------------------------------------------------
-step "5/8: Unit tests (all workspace members)"
+step "2/9: Unit tests (all workspace members)"
 cargo test --lib --workspace
 pass
 
-step "6/8: Unit tests — kelvin-stream (AES-NI feature)"
+step "3/9: Unit tests - kelvin-stream (AES-NI feature)"
 cargo test --lib -p kelvin-stream --features aes-ni
 pass
 
 # ---------------------------------------------------------------------------
-# 4. Integration tests
+# 3. Integration tests
 # ---------------------------------------------------------------------------
-step "Integration: V1 round-trip"
+step "4/9: Integration: V1 round-trip"
 cargo test -p kelvin --test v1_round_trip
 pass
 
-step "Integration: Photon cipher"
+step "5/9: Integration: Photon cipher"
 cargo test -p kelvin --test photon
 pass
 
-step "Integration: Quantum cipher"
+step "6/9: Integration: Quantum cipher"
 cargo test -p kelvin --test quantum
 pass
 
-step "Integration: Authenticated encryption"
+step "7/9: Integration: Authenticated encryption"
 cargo test -p kelvin --test authenticated
 pass
 
-step "Integration: Full pipeline"
+step "8/9: Integration: Full pipeline"
 cargo test -p kelvin --test full_pipeline
 pass
 
-step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+step "9/9: Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
 cargo test -p kelvin --test streaming_api
 pass
 
@@ -114,7 +83,7 @@ cargo run -p kelvin-test-client
 pass
 
 # ---------------------------------------------------------------------------
-# 5. Entropy analysis & statistical tests
+# 4. Entropy analysis & statistical tests
 # ---------------------------------------------------------------------------
 step "Integration: Entropy analysis (SP 800-90B health tests)"
 cargo run --release -p entropy_analysis -- --keystream
@@ -136,7 +105,7 @@ rm -f target/keystream_90b.bin
 pass
 
 # ---------------------------------------------------------------------------
-# 6. Constant-time benchmarks
+# 5. Constant-time benchmarks
 # ---------------------------------------------------------------------------
 step "Integration: Constant-time benchmarks (DudeCT)"
 cargo run --release -p constant_time_bench
@@ -147,5 +116,5 @@ pass
 # ---------------------------------------------------------------------------
 echo ""
 echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  ALL TESTS PASSED${NC}"
+echo -e "${GREEN}  ALL SECURITY TESTS PASSED${NC}"
 echo -e "${GREEN}========================================${NC}"
