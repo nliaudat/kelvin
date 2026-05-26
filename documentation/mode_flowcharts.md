@@ -11,7 +11,9 @@ security properties and performance characteristics:
 | **Chaos** | Per-step SHAKE256 XOR | None (malleable) | Orbital simulation (1 step per chunk) |
 | **Photon** | HKDF→SHAKE256 XOR | None (malleable) | HKDF-SHA512 → SHAKE256 XOF |
 | **Quantum** | Hybrid cache+XOR + orbital reseed | None (malleable) | BLAKE3 → SHAKE256 cache + orbital reseed |
-| **Prism** | OTP key generator (HE integration) | None (XOR is malleable) | HKDF-SHA512 → SHAKE256 XOF (isolated domain) |
+| **Prism** | OTP key generator (HE recryption) | None (XOR is malleable) | HKDF-SHA512 → SHAKE256 XOF (isolated domain) |
+| **Split** | XOR key-splitter (HE homomorphism) | None (XOR is malleable) | HKDF-SHA512 → SHAKE256 XOF (isolated domain) |
+| **Flare** | Chaotic FHE secret key generator | None (key material only) | HKDF-SHA512 → SHAKE256 XOF (isolated domain) |
 
 ---
 

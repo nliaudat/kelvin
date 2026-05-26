@@ -71,8 +71,10 @@ Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The 
 kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet/Euler integrator
 kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHAKE256 XOF extractor, KeySchedule
 kelvin-stream/   — ChaCha20 wrapper with StreamCipher trait
-kelvin/          — Top-level struct with 5 modes: Secure (V1), Chaos (V2),
-                   Photon (V3), Quantum (H), Prism (HE OTP key generator)
+kelvin/          — Top-level struct with 7 modes: Secure (V1), Chaos (V2),
+                   Photon (V3), Quantum (H), Prism (HE OTP key generator),
+                   Split (XOR key-splitter), Flare (FHE secret key generator)
+
 kelvin-cli/      — CLI tool (keygen, encrypt/decrypt with --mode, benchmark, identify)
 kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 kelvin-demo/     — Demo kit: 3D orbital visualizer, test binaries, sample keys
@@ -185,7 +187,7 @@ Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 Int
 If you use Kelvin in academic work, please cite:
 
 ```bibtex
-@misc{liaudat2026kelvin,
+@misc{nliaudat2026kelvin,
   author    = {Nicolas Liaudat},
   title     = {{Kelvin}: Orbital Chaos {KDF} Cryptosystem},
   year      = {2026},

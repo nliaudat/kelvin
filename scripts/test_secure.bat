@@ -150,6 +150,15 @@ if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
+REM 6. Zeroize verification tests
+REM ---------------------------------------------------------------------------
+call :step "Integration: Zeroize verification tests"
+cargo test --release -p zeroize_verify
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
+REM ---------------------------------------------------------------------------
 REM All passed
 REM ---------------------------------------------------------------------------
 echo.

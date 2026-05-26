@@ -249,5 +249,5 @@ fn test_split_key_xor_property() {
     let mut prism2 = KelvinPrism::new(test_seed(), 1000);
     let k_expected = prism2.generate_otp_key(128).unwrap();
 
-    assert_eq!(k_recovered, k_expected, "A ⊕ B should equal the original key K");
+    assert_eq!(k_recovered, *k_expected, "A ⊕ B should equal the original key K");
 }

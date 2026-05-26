@@ -277,6 +277,47 @@ pub const DOMSEP_PRISM_KEYSTREAM_V1: &[u8] = b"kelvin-prism-keystream-v1";
 /// **Changing this** would break forward secrecy chain compatibility.
 pub const DOMSEP_PRISM_RESEED_V1: &[u8] = b"kelvin-prism-reseed-v1";
 
+/// Domain separator for Split OTP key generation.
+///
+/// Used in `KelvinSplit::generate_keystream_into` to domain-separate the
+/// HKDF-SHA512 expand step that derives the XOF seed for split-key XOR
+/// homomorphism. This ensures Split-generated keys are cryptographically
+/// isolated from Prism and V3 Photon keystream, preventing related-key
+/// attacks when all three are used in the same system.
+///
+/// **Changing this** would break compatibility with existing Split keys.
+pub const DOMSEP_SPLIT_KEYSTREAM_V1: &[u8] = b"kelvin-split-keystream-v1";
+
+/// Domain separator for Split reseed (BLAKE3).
+///
+/// Used in `KelvinSplit::generate_keystream_into` to domain-separate the
+/// BLAKE3 reseed that derives the next 2048-byte seed pool. This ensures
+/// the forward secrecy chain is independent from Prism and Photon reseed chains.
+///
+/// **Changing this** would break forward secrecy chain compatibility.
+pub const DOMSEP_SPLIT_RESEED_V1: &[u8] = b"kelvin-split-reseed-v1";
+
+/// Domain separator for Flare FHE key generation.
+///
+/// Used in `KelvinFlare::generate_keystream_into` to domain-separate the
+/// HKDF-SHA512 expand step that derives the XOF seed for chaotic FHE
+/// secret key material. This ensures Flare-generated keys are cryptographically
+/// isolated from Split, Prism, and V3 Photon keystream, preventing related-key
+/// attacks when all are used in the same system.
+///
+/// **Changing this** would break compatibility with existing Flare keys.
+pub const DOMSEP_FLARE_KEYSTREAM_V1: &[u8] = b"kelvin-flare-keystream-v1";
+
+/// Domain separator for Flare reseed (BLAKE3).
+///
+/// Used in `KelvinFlare::generate_keystream_into` to domain-separate the
+/// BLAKE3 reseed that derives the next 2048-byte seed pool. This ensures
+/// the forward secrecy chain is independent from Split, Prism, and Photon
+/// reseed chains.
+///
+/// **Changing this** would break forward secrecy chain compatibility.
+pub const DOMSEP_FLARE_RESEED_V1: &[u8] = b"kelvin-flare-reseed-v1";
+
 // ============================================================================
 // Quantum Mode Defaults
 // ============================================================================
