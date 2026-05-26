@@ -1,0 +1,16 @@
+[package]
+name = "zeroize_verify"
+version = "0.1.0"
+edition = "2021"
+description = "Verifies that Zeroizing/zeroize correctly clears sensitive memory in the Kelvin cryptosystem"
+
+[[bin]]
+name = "zeroize_verify"
+path = "src/main.rs"
+
+[dependencies]
+kelvin = { path = "../../kelvin" }
+kelvin-core = { path = "../../kelvin-core" }
+kelvin-kdf = { path = "../../kelvin-kdf" }
+kelvin-stream = { path = "../../kelvin-stream" }
+zeroize = { version = "1.6", features = ["zeroize_derive"] }

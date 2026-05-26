@@ -13,6 +13,7 @@ members = [
     "tests/entropy_analysis",
     "tests/nist_800_90b",
     "tests/shake256_bench",
+    "tests/zeroize_verify",
     "fuzz",
     "libs/python/kelvin_pyo3",
 ]
