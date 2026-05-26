@@ -185,7 +185,7 @@ Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 Int
 If you use Kelvin in academic work, please cite:
 
 ```bibtex
-@misc{liaudat2025kelvin,
+@misc{liaudat2026kelvin,
   author    = {Nicolas Liaudat},
   title     = {{Kelvin}: Orbital Chaos {KDF} Cryptosystem},
   year      = {2026},
