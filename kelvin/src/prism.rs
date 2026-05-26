@@ -482,14 +482,18 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_round_trip() {
-        let mut prism = KelvinPrism::new(test_seed(), 1000);
+        // Use two separate instances (same seed = same keystream)
+        let seed = test_seed();
+        let mut enc = KelvinPrism::new(seed, 1000);
+        let mut dec = KelvinPrism::new(seed, 1000);
+
         let original = b"Hello, Kelvin-Prism!".to_vec();
         let mut data = original.clone();
 
-        prism.encrypt(&mut data).unwrap();
+        enc.encrypt(&mut data).unwrap();
         assert_ne!(data, original); // Should be encrypted
 
-        prism.decrypt(&mut data).unwrap();
+        dec.decrypt(&mut data).unwrap();
         assert_eq!(data, original); // Should be restored
     }
 
@@ -505,14 +509,18 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_large() {
-        let mut prism = KelvinPrism::new(test_seed(), 1000);
+        // Use two separate instances (same seed = same keystream)
+        let seed = test_seed();
+        let mut enc = KelvinPrism::new(seed, 1000);
+        let mut dec = KelvinPrism::new(seed, 1000);
+
         let original = vec![0xABu8; 5 * 1024 * 1024]; // 5 MB
         let mut data = original.clone();
 
-        prism.encrypt(&mut data).unwrap();
+        enc.encrypt(&mut data).unwrap();
         assert_ne!(data, original);
 
-        prism.decrypt(&mut data).unwrap();
+        dec.decrypt(&mut data).unwrap();
         assert_eq!(data, original);
     }
 

@@ -112,6 +112,21 @@ fn generate_keystream() -> Vec<u8> {
     plaintext[..1_048_576].to_vec()
 }
 
+fn generate_prism_keystream() -> Vec<u8> {
+    use kelvin::{simulate_and_extract_seed, KelvinPrism, OrbitalConfig};
+
+    let bodies = default_bodies();
+    let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        .expect("Failed to create config");
+
+    let (seed, _bodies) = simulate_and_extract_seed(&config).expect("Failed to extract seed");
+
+    let mut prism = KelvinPrism::new(seed, 1000);
+    let mut data = vec![0u8; 1_048_576];
+    prism.encrypt(&mut data).expect("Failed to encrypt");
+    data
+}
+
 // ── Shannon Entropy ───────────────────────────────────────────────────────────
 
 fn compute_shannon_entropy(data: &[u8]) -> f64 {
@@ -540,6 +555,147 @@ fn analyze_keystream() -> String {
     out
 }
 
+/// Run the same statistical analysis on Prism keystream.
+fn analyze_prism_keystream() -> String {
+    let mut out = String::new();
+
+    out.push_str(&format!("\n{:=^60}\n", ""));
+    out.push_str(" PRISM KEYSTREAM STATISTICAL ANALYSIS\n");
+    out.push_str(&format!("{:=^60}\n", ""));
+
+    out.push_str("\nGenerating 1MB keystream via KelvinPrism (OTP Key Generator)...\n");
+    let keystream = generate_prism_keystream();
+    out.push_str(&format!("  Keystream size: {} bytes\n", keystream.len()));
+
+    // ── Shannon Entropy ────────────────────────────────────────────────────
+    let shannon = compute_shannon_entropy(&keystream);
+    out.push_str(&format!("  Shannon Entropy: {:.4} bits/byte (max 8.0)\n", shannon));
+    if shannon > 7.5 {
+        out.push_str("  [PASS] Near-maximal entropy (good randomness)\n");
+    } else if shannon > 6.0 {
+        out.push_str("  [WARN] Moderate entropy\n");
+    } else {
+        out.push_str("  [FAIL] Low entropy\n");
+    }
+
+    // ── Correlation Coefficient ─────────────────────────────────────────────
+    let corr = compute_correlation(&keystream);
+    out.push_str(&format!("  Adjacent-byte Correlation: {:.6} (expected ~0)\n", corr));
+    if corr.abs() < 0.01 {
+        out.push_str("  [PASS] No significant correlation detected\n");
+    } else if corr.abs() < 0.05 {
+        out.push_str("  [WARN] Weak correlation detected\n");
+    } else {
+        out.push_str("  [FAIL] Strong correlation detected\n");
+    }
+
+    // ── Byte value distribution (chi-square test) ──────────────────────────
+    let mut counts = [0u64; 256];
+    for &b in &keystream {
+        counts[b as usize] += 1;
+    }
+    let min_count = *counts.iter().min().unwrap_or(&0);
+    let max_count = *counts.iter().max().unwrap_or(&0);
+    let expected = keystream.len() as f64 / 256.0;
+    let missing: usize = counts.iter().filter(|&&c| c == 0).count();
+    let chi_square: f64 = counts
+        .iter()
+        .map(|&c| {
+            let diff = c as f64 - expected;
+            diff * diff / expected
+        })
+        .sum();
+    out.push_str(&format!(
+        "  Byte value distribution: min={}, max={}, expected={:.0}, χ²={:.1}\n",
+        min_count, max_count, expected, chi_square
+    ));
+    if missing > 0 {
+        out.push_str(&format!("  [FAIL] {} byte values never appear in keystream\n", missing));
+    } else if chi_square < 310.0 {
+        out.push_str(&format!("  [PASS] Chi-square = {:.1} (critical: 310, df=255)\n", chi_square));
+    } else {
+        out.push_str(&format!(
+            "  [FAIL] Chi-square = {:.1} exceeds critical value 310\n",
+            chi_square
+        ));
+    }
+
+    // ── SP 800-90B Entropy Health Tests ────────────────────────────────────
+    out.push_str("\n  ── SP 800-90B Entropy Health Tests ──\n");
+
+    let (rep_pass, max_cons) = repetition_test(&keystream);
+    out.push_str(&format!(
+        "  [{}] Repetition Test (max {} consecutive identical bytes)\n",
+        if rep_pass { "PASS" } else { "FAIL" },
+        max_cons
+    ));
+
+    let (apt_pass, worst_count, worst_off) = adaptive_proportion_test(&keystream, 512);
+    out.push_str(&format!(
+        "  [{}] Adaptive Proportion Test (worst window: {}/512 at offset {})\n",
+        if apt_pass { "PASS" } else { "FAIL" },
+        worst_count,
+        worst_off
+    ));
+
+    let (runs_pass, runs, expected_runs) = runs_test_bit_level(&keystream);
+    out.push_str(&format!(
+        "  [{}] Runs Test ({} runs, expected ~{})\n",
+        if runs_pass { "PASS" } else { "FAIL" },
+        runs,
+        expected_runs
+    ));
+
+    let longest_result = longest_run_bit_test(&keystream);
+    out.push_str(&format!(
+        "  [{}] Longest Run Test ({})\n",
+        if longest_result.pass { "PASS" } else { "FAIL" },
+        longest_result.detail
+    ));
+
+    // ── Summary ────────────────────────────────────────────────────────────
+    let shannon_pass = shannon > 7.5;
+    let corr_pass = corr.abs() < 0.01;
+    let dist_pass = missing == 0 && chi_square < 310.0;
+
+    let results = [
+        ("Shannon Entropy", shannon_pass, format!("{:.4} bits/byte", shannon)),
+        ("Correlation", corr_pass, format!("{:.6}", corr)),
+        ("Byte Distribution", dist_pass, format!("min={}, max={}", min_count, max_count)),
+        ("Repetition Test", rep_pass, format!("max {} consecutive", max_cons)),
+        ("Adaptive Proportion", apt_pass, format!("worst {}/512", worst_count)),
+        ("Runs Test", runs_pass, format!("{} runs", runs)),
+        (
+            "Longest Run Test",
+            longest_result.pass,
+            format!("longest {} bits", longest_result.longest_run),
+        ),
+    ];
+
+    let passed = results.iter().filter(|(_, ok, _)| *ok).count();
+    let total = results.len();
+
+    out.push_str("\n  ── Summary ──\n");
+    for (name, ok, detail) in &results {
+        let icon = if *ok { "✓" } else { "✗" };
+        out.push_str(&format!(
+            "  {} {}: {} [{}]\n",
+            icon,
+            name,
+            detail,
+            if *ok { "PASS" } else { "FAIL" }
+        ));
+    }
+    out.push_str(&format!(
+        "  Result: {}/{} tests passed {}\n",
+        passed,
+        total,
+        if passed == total { "✅" } else { "⚠️" }
+    ));
+
+    out
+}
+
 // ── Key entropy analysis (returns report string) ──────────────────────────────
 
 #[derive(serde::Deserialize)]
@@ -815,6 +971,10 @@ fn main() {
         let ks_report = analyze_keystream();
         print!("{}", ks_report);
         report.push_str(&ks_report);
+
+        let prism_report = analyze_prism_keystream();
+        print!("{}", prism_report);
+        report.push_str(&prism_report);
     }
 
     // Save output to file

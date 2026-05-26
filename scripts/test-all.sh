@@ -105,6 +105,10 @@ step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
 cargo test --release -p kelvin --test streaming_api
 pass
 
+step "Integration: Prism OTP key generator"
+cargo test --release -p kelvin --test prism
+pass
+
 step "Integration: Chaos test (Lyapunov estimation)"
 cargo test --release -p kelvin-kdf --test chaos_test
 pass
@@ -128,11 +132,15 @@ step "Integration: NIST SP 800-90B keystream generation + analysis"
 cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b.bin
 cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b.bin
 
+step "Integration: NIST SP 800-90B Prism keystream generation + analysis"
+cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b_prism.bin --prism
+cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b_prism.bin
+
 step "Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)"
 python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t mcv target/keystream_90b.bin -s 10000
 python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t ttuple target/keystream_90b.bin -s 10000
 
-rm -f target/keystream_90b.bin
+rm -f target/keystream_90b.bin target/keystream_90b_prism.bin
 pass
 
 # ---------------------------------------------------------------------------

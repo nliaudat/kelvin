@@ -126,6 +126,12 @@ if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 echo %GREEN%PASSED%NC%
 
+call :step "Integration: Prism OTP key generator"
+cargo test --release -p kelvin --test prism
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+echo %GREEN%PASSED%NC%
+
 call :step "Integration: Chaos test (Lyapunov estimation)"
 cargo test --release -p kelvin-kdf --test chaos_test
 if errorlevel 1 set EXITCODE=1
@@ -158,6 +164,14 @@ cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystrea
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 cargo run --release -p nist_800_90b -- analyze --input keystream_90b_test.bin
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+
+call :step "Integration: NIST SP 800-90B Prism keystream generation + analysis"
+cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_prism.bin --prism
+if errorlevel 1 set EXITCODE=1
+if !EXITCODE! neq 0 exit /b !EXITCODE!
+cargo run --release -p nist_800_90b -- analyze --input keystream_90b_prism.bin
 if errorlevel 1 set EXITCODE=1
 if !EXITCODE! neq 0 exit /b !EXITCODE!
 
