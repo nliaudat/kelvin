@@ -750,31 +750,35 @@ mod tests {
     use kelvin_core::{DEFAULT_DT, SOFTENING_FACTOR};
 
     fn five_body_config() -> OrbitalConfig {
+        // Stable 5-body system: central sun (mass 1) + 4 small planets.
+        // Planets have tiny masses (~1e-12 to 1e-15 solar masses) at close
+        // distances (1-2 AU) with appropriate orbital velocities.
+        // This configuration remains bound for 500 Verlet steps.
         let bodies = vec![
             OrbitalBody::new(
-                Fixed::from_int(1000),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(0), Fixed::from_int(0)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(0), Fixed::from_int(0)),
+                Fixed::ONE,
+                Vec3::new(Fixed::ZERO, Fixed::ZERO, Fixed::ZERO),
+                Vec3::new(Fixed::ZERO, Fixed::ZERO, Fixed::ZERO),
             ),
             OrbitalBody::new(
-                Fixed::from_int(1),
-                Vec3::new(Fixed::from_int(10), Fixed::from_int(0), Fixed::from_int(0)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(5), Fixed::from_int(0)),
+                Fixed::from_raw(1 << 54), // ~1e-6 solar masses
+                Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
             ),
             OrbitalBody::new(
-                Fixed::from_int(1),
-                Vec3::new(Fixed::from_int(-10), Fixed::from_int(0), Fixed::from_int(0)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(-5), Fixed::from_int(0)),
+                Fixed::from_raw(1 << 53),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
+                Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
             ),
             OrbitalBody::new(
-                Fixed::from_int(1),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(10), Fixed::from_int(0)),
-                Vec3::new(Fixed::from_int(-5), Fixed::from_int(0), Fixed::from_int(0)),
+                Fixed::from_raw(1 << 52),
+                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-1), Fixed::ZERO),
+                Vec3::new(Fixed::from_int(3), Fixed::from_int(-2), Fixed::ZERO),
             ),
             OrbitalBody::new(
-                Fixed::from_int(1),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(-10), Fixed::from_int(0)),
-                Vec3::new(Fixed::from_int(5), Fixed::from_int(0), Fixed::from_int(0)),
+                Fixed::from_raw(1 << 51),
+                Vec3::new(Fixed::from_int(2), Fixed::from_int(-1), Fixed::from_int(1)),
+                Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
             ),
         ];
         OrbitalConfig::new(bodies, 500, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
@@ -786,24 +790,36 @@ mod tests {
     #[test]
     fn test_kelvin_new_and_round_trip() {
         let config = five_body_config();
-        let mut k = Kelvin::new(config).expect("Kelvin::new should succeed");
+        let mut enc = Kelvin::new(config.clone()).expect("Kelvin::new should succeed");
+        let mut dec = Kelvin::new(config).expect("Kelvin::new should succeed");
         let original = b"Hello, Kelvin!".to_vec();
-        let mut data = original.clone();
-        k.encrypt(&mut data).unwrap();
-        assert_ne!(data, original);
-        k.decrypt(&mut data).unwrap();
-        assert_eq!(data, original);
+        // AEAD requires 16 extra bytes for the authentication tag
+        let mut data = {
+            let mut buf = original.clone();
+            buf.extend_from_slice(&[0u8; 16]);
+            buf
+        };
+        enc.encrypt(&mut data).unwrap();
+        // The first 14 bytes should be ciphertext (different from plaintext)
+        assert_ne!(data[..14], original[..]);
+        dec.decrypt(&mut data).unwrap();
+        // After decryption, the first 14 bytes should be restored
+        assert_eq!(data[..14], original[..]);
     }
 
     #[test]
     fn test_kelvin_empty_data() {
         let config = five_body_config();
-        let mut k = Kelvin::new(config).expect("Kelvin::new should succeed");
-        let mut data = Vec::new();
-        k.encrypt(&mut data).unwrap();
-        assert!(data.is_empty());
-        k.decrypt(&mut data).unwrap();
-        assert!(data.is_empty());
+        let mut enc = Kelvin::new(config.clone()).expect("Kelvin::new should succeed");
+        let mut dec = Kelvin::new(config).expect("Kelvin::new should succeed");
+        // AEAD requires at least 16 bytes for the authentication tag.
+        // An empty plaintext still needs the tag space.
+        let mut data = vec![0u8; 16]; // 0 plaintext + 16 tag
+        enc.encrypt(&mut data).unwrap();
+        // After encrypting 0 plaintext bytes, the buffer still has 16 bytes (tag)
+        assert_eq!(data.len(), 16);
+        dec.decrypt(&mut data).unwrap();
+        assert_eq!(data.len(), 16);
     }
 
     #[test]
@@ -811,7 +827,9 @@ mod tests {
         let config = five_body_config();
         let mut k = Kelvin::new(config).expect("Kelvin::new should succeed");
         assert_eq!(k.bytes_processed(), 0);
-        let mut data = vec![0u8; 100];
+        // AEAD requires 16 extra bytes for the authentication tag.
+        // bytes_processed counts plaintext bytes only (data.len() - 16).
+        let mut data = vec![0u8; 100 + 16]; // 100 plaintext + 16 tag
         k.encrypt(&mut data).unwrap();
         assert_eq!(k.bytes_processed(), 100);
     }
