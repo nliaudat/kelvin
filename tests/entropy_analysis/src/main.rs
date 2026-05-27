@@ -119,9 +119,10 @@ fn generate_prism_keystream() -> Vec<u8> {
     let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("Failed to create config");
 
-    let (seed, _bodies) = simulate_and_extract_seed(&config).expect("Failed to extract seed");
+    let (mut seed, _bodies) = simulate_and_extract_seed(&config).expect("Failed to extract seed");
 
     let mut prism = KelvinPrism::new(seed, 1000);
+    seed.fill(0);
     let mut data = vec![0u8; 1_048_576];
     prism.encrypt(&mut data).expect("Failed to encrypt");
     data

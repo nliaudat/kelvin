@@ -440,10 +440,11 @@ fn generate_h_keystream(seed: [u8; 2048]) -> Vec<u8> {
 
 // ── P Prism: Domain-separated OTP key generator for HE ───────────────────────
 
-fn generate_prism_keystream(seed: [u8; 2048]) -> Vec<u8> {
+fn generate_prism_keystream(mut seed: [u8; 2048]) -> Vec<u8> {
     use kelvin::KelvinPrism;
 
     let mut prism = KelvinPrism::new(seed, 1000);
+    seed.fill(0);
     let mut data = vec![0u8; 1_048_576];
     prism.encrypt(&mut data).expect("Failed to encrypt");
     data
