@@ -272,3 +272,422 @@
   note      = {Motivates Kelvin's deterministic build and cross-platform
                test vector verification}
 }
+
+% ---- Formal Verification ----
+
+@misc{apple2026corecrypto,
+  author    = {{Apple Security Research}},
+  title     = {Formal Verification of corecrypto for Post-Quantum
+               Cryptography},
+  year      = {2026},
+  howpublished = {\url{https://security.apple.com/blog/formal-verification-corecrypto/}},
+  note      = {Blueprint for Kelvin's formal verification strategy:
+               proving functional equivalence of cryptographic
+               implementations against mathematical specifications.
+               Key innovations: (1) proving ARM64 assembly equivalent
+               to C code, then C code equivalent to FIPS spec;
+               (2) reusable Isabelle lemma libraries for scaling
+               verification; (3) early bug detection in ML-DSA
+               implementation. Kelvin adapts this blueprint for
+               Rust + Kani: proving Fixed arithmetic, Vec3 ops,
+               compute_accelerations, and Verlet integrator against
+               mathematical specifications.}
+}
+
+@misc{apple2026corecrypto_repo,
+  author    = {{Apple Inc.}},
+  title     = {corecrypto},
+  year      = {2026},
+  howpublished = {\url{https://github.com/apple/corecrypto}},
+  note      = {Open source release of Apple's corecrypto library
+               including C code, ARM64 assembly, and Isabelle/HOL
+               formal verification theories. Kelvin studies this
+               release for proof structure patterns (e.g., polynomial
+               addition loops vs. abstract map operations in Isabelle)
+               to structure its own Kani proofs for orbital force
+               calculations.}
+}
+
+@misc{kani2026,
+  author    = {{Amazon Web Services}},
+  title     = {Kani Rust Verifier},
+  year      = {2026},
+  howpublished = {\url{https://model-checking.github.io/kani/}},
+  note      = {Bit-precise model checker for Rust. Kelvin uses Kani
+               to prove functional equivalence of Q32.64 fixed-point
+               arithmetic operations against their mathematical
+               specifications, following Apple's corecrypto blueprint.
+               Five proof harnesses verify add, sub, mul, div, and
+               sqrt operations under physically-realistic bounds.}
+}
+
+@inproceedings{isabelle2026,
+  author    = {Tobias Nipkow and Lawrence C. Paulson and Makarius Wenzel},
+  title     = {Isabelle/HOL: A Proof Assistant for Higher-Order Logic},
+  year      = {2026},
+  howpublished = {\url{https://isabelle.in.tum.de/}},
+  note      = {Theorem prover used by Apple's corecrypto team for
+               formal verification. Kelvin's Kani-based approach
+               targets the same level of assurance for Rust code.
+               Future work may explore isabelle-rust translation
+               for deeper integration.}
+}
+
+@inproceedings{saw2026,
+  author    = {{Galois Inc.}},
+  title     = {Software Analysis Workbench (SAW)},
+  year      = {2026},
+  howpublished = {\url{https://github.com/GaloisInc/saw-script}},
+  note      = {SAW is used by Apple's corecrypto team to prove
+               equivalence between C code and Cryptol specifications.
+               Kelvin's approach uses Kani for Rust-to-spec
+               equivalence, but SAW/Cryptol would be relevant if
+               Kelvin ever adds optimized assembly routines.}
+}
+
+@misc{cryptol2026,
+  author    = {{Galois Inc.}},
+  title     = {Cryptol: The Language of Cryptography},
+  year      = {2026},
+  howpublished = {\url{https://cryptol.net/}},
+  note      = {Domain-specific language for specifying cryptographic
+               algorithms. Used by Apple's corecrypto team as the
+               mathematical specification layer. Kelvin's
+               mathematical specifications in proofs/specs/ serve
+               the same role, but in Markdown rather than Cryptol.}
+}
+
+% ---- Vector Algebra & Classical Mechanics ----
+
+@book{arfken2005mathematical,
+  author    = {George B. Arfken and Hans J. Weber},
+  title     = {Mathematical Methods for Physicists},
+  edition   = {6th},
+  publisher = {Elsevier},
+  year      = {2005},
+  isbn      = {978-0-12-088584-8},
+  note      = {Standard reference for vector algebra (dot product,
+               cross product, vector identities) used in Vec3 spec}
+}
+
+@book{goldstein2002classical,
+  author    = {Herbert Goldstein and Charles Poole and John Safko},
+  title     = {Classical Mechanics},
+  edition   = {3rd},
+  publisher = {Addison-Wesley},
+  year      = {2002},
+  isbn      = {978-0-201-65702-9},
+  note      = {Standard reference for kinetic energy, momentum,
+               and gravitational potential used in OrbitalBody
+               and stability specs}
+}
+
+@book{binney2008galactic,
+  author    = {James Binney and Scott Tremaine},
+  title     = {Galactic Dynamics},
+  edition   = {2nd},
+  series    = {Princeton Series in Astrophysics},
+  publisher = {Princeton University Press},
+  year      = {2008},
+  isbn      = {978-0-691-13027-9},
+  note      = {Standard reference for gravitational potential,
+               escape velocity, and ejection criteria used in
+               stability monitoring spec}
+}
+
+% ---- Numerical Integration ----
+
+@book{hairer1993solving,
+  author    = {Ernst Hairer and Syvert P. N{\o}rsett and Gerhard Wanner},
+  title     = {Solving Ordinary Differential Equations I: Nonstiff Problems},
+  edition   = {2nd},
+  series    = {Springer Series in Computational Mathematics},
+  volume    = {8},
+  publisher = {Springer},
+  year      = {1993},
+  isbn      = {978-3-540-56670-0},
+  note      = {Analysis of Euler method stability and error bounds,
+               referenced in Euler integrator spec}
+}
+
+% ---- Key Derivation ----
+
+@inproceedings{krawczyk2010hkdf,
+  author    = {Hugo Krawczyk},
+  title     = {Cryptographic Extraction and Key Derivation: The {HKDF} Scheme},
+  booktitle = {Advances in Cryptology -- {CRYPTO} 2010},
+  pages     = {631--648},
+  year      = {2010},
+  publisher = {Springer},
+  doi       = {10.1007/978-3-642-14623-7_34},
+  note      = {HKDF specification used in Kelvin's key schedule
+               for extract-and-expand key derivation}
+}
+
+@techreport{nist2020sp80056c,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {Recommendation for Key-Derivation Methods in
+                 Key-Establishment Schemes},
+  institution = {U.S. Department of Commerce},
+  number      = {SP 800-56C Rev. 2},
+  year        = {2020},
+  doi         = {10.6028/NIST.SP.800-56Cr2},
+  note        = {NIST key derivation guidelines followed by
+                 Kelvin's key schedule}
+}
+
+% ---- Post-Quantum Signatures ----
+
+@techreport{nist2024fips204,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {Module-Lattice-Based Digital Signature Standard},
+  institution = {U.S. Department of Commerce},
+  number      = {FIPS PUB 204},
+  year        = {2024},
+  doi         = {10.6028/NIST.FIPS.204},
+  note        = {ML-DSA (CRYSTALS-Dilithium) specification used
+                 for post-quantum signatures in Kelvin's asymmetric
+                 key derivation}
+}
+
+@article{bernstein2012ed25519,
+  author    = {Daniel J. Bernstein and Niels Duif and Tanja Lange and
+               Peter Schwabe and Bo-Yin Yang},
+  title     = {High-Speed High-Security Signatures},
+  journal   = {Journal of Cryptographic Engineering},
+  volume    = {2},
+  number    = {2},
+  pages     = {77--89},
+  year      = {2012},
+  doi       = {10.1007/s13389-012-0027-1},
+  note      = {Ed25519 specification used for classical signatures
+               in Kelvin's asymmetric key derivation}
+}
+
+% ---- AEAD & Stream Ciphers ----
+
+@techreport{nist2001fips197,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {Advanced Encryption Standard ({AES})},
+  institution = {U.S. Department of Commerce},
+  number      = {FIPS PUB 197},
+  year        = {2001},
+  doi         = {10.6028/NIST.FIPS.197},
+  note        = {AES-256 specification used in Kelvin's AES-GCM
+                 stream cipher}
+}
+
+@techreport{nist2007sp80038d,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {Recommendation for Block Cipher Modes of Operation:
+                 {Galois/Counter Mode ({GCM})} and {GMAC}},
+  institution = {U.S. Department of Commerce},
+  number      = {SP 800-38D},
+  year        = {2007},
+  doi         = {10.6028/NIST.SP.800-38D},
+  note        = {GCM mode specification used in Kelvin's AES-GCM
+                 stream cipher implementation}
+}
+
+% ---- Formal Verification (Kani) ----
+
+@misc{kani2026vec3,
+  author    = {{Kelvin Project}},
+  title     = {vec3_proofs.rs: Kani Proof Harnesses for Vec3 Vector Operations},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/kani/vec3_proofs.rs}},
+  note      = {15 Kani proof harnesses verifying Vec3 addition
+               commutativity/associativity/identity, subtraction
+               self-zero, negation self-zero, dot product
+               commutativity/zero, cross product anticommutativity/
+               self-zero/orthogonality, length nonnegativity,
+               length-squared = dot, scale zero/one, and OrbitalBody
+               kinetic energy/momentum invariants}
+}
+
+@misc{kani2026integrator,
+  author    = {{Kelvin Project}},
+  title     = {integrator_proofs.rs: Kani Proof Harnesses for Integrators},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/kani/integrator_proofs.rs}},
+  note      = {9 Kani proof harnesses verifying compute_accelerations
+               (single-body zero, two-body equal-mass, Newton's third
+               law), Verlet step (momentum conservation, single-body
+               no-change), Euler step (momentum conservation,
+               single-body no-change), total energy negative for
+               bound systems, and center of mass for equal masses}
+}
+
+@misc{kani2026stability,
+  author    = {{Kelvin Project}},
+  title     = {stability_proofs.rs: Kani Proof Harnesses for Stability Monitoring},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/kani/stability_proofs.rs}},
+  note      = {5 Kani proof harnesses verifying gravitational
+               potential (negative for multi-body, zero for single),
+               ejection detection (no false positive for bound,
+               detects escape velocity), and collapse detection
+               (no false positive for distant, detects close bodies)}
+}
+
+@misc{kani2026extraction,
+  author    = {{Kelvin Project}},
+  title     = {extraction_proofs.rs: Kani Proof Harnesses for Entropy Extraction},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/kani/extraction_proofs.rs}},
+  note      = {6 Kani proof harnesses verifying feed_orbital_state
+               buffer sizes (empty, single, multi-body), extract_seed
+               output lengths (32-byte, 64-byte extended), and
+               domain separator properties (non-empty, unique across
+               all 8 modes)}
+}
+
+@misc{kani2026orbitalstate,
+  author    = {{Kelvin Project}},
+  title     = {orbital_state_proofs.rs: Kani Proof Harnesses for OrbitalState},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/kani/orbital_state_proofs.rs}},
+  note      = {6 Kani proof harnesses verifying OrbitalState
+               construction (body count range, step counter type),
+               Verlet/Euler step safety (no panic for single body),
+               entropy extraction output buffer sizes, Lyapunov
+               estimation preconditions (minimum bodies, positive
+               steps), and zeroization clears state}
+}
+
+% ---- Specification Documents ----
+
+@misc{kelvin2026spec_euler,
+  author    = {{Kelvin Project}},
+  title     = {Euler Integrator Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/euler_spec.md}},
+  note      = {Mathematical specification of the explicit Euler
+               integrator: first-order, non-symplectic, non-time-
+               reversible, with ~10× faster chaos amplification
+               than Verlet. Used with --euler flag for faster
+               entropy generation.}
+}
+
+@misc{kelvin2026spec_vec3,
+  author    = {{Kelvin Project}},
+  title     = {Vec3 Vector Operations Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/vec3_spec.md}},
+  note      = {Mathematical specification of Vec3 3D vector type:
+               addition, subtraction, negation, scalar multiplication/
+               division, dot product, cross product, length, and
+               length-squared operations using Q32.64 fixed-point
+               arithmetic}
+}
+
+@misc{kelvin2026spec_body,
+  author    = {{Kelvin Project}},
+  title     = {OrbitalBody Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/orbital_body_spec.md}},
+  note      = {Mathematical specification of OrbitalBody: mass,
+               position, velocity representation, kinetic energy
+               (0.5 × m × |v|²), and momentum (m × v) calculations}
+}
+
+@misc{kelvin2026spec_config,
+  author    = {{Kelvin Project}},
+  title     = {OrbitalConfig Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/orbital_config_spec.md}},
+  note      = {Mathematical specification of OrbitalConfig:
+               simulation parameters (num_bodies, steps, dt,
+               softening, g, method, domain), validation rules,
+               and binary serialization format}
+}
+
+@misc{kelvin2026spec_state,
+  author    = {{Kelvin Project}},
+  title     = {OrbitalState Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/orbital_state_spec.md}},
+  note      = {Mathematical specification of OrbitalState: high-level
+               state machine wrapping the n-body simulation with
+               Verlet/Euler stepping, entropy extraction, Lyapunov
+               estimation, stability checking, and zeroization}
+}
+
+@misc{kelvin2026spec_stability,
+  author    = {{Kelvin Project}},
+  title     = {Stability Monitoring Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/stability_spec.md}},
+  note      = {Mathematical specification of stability monitoring:
+               ejection detection (KE + PE > 0), collapse detection
+               (distance < threshold), gravitational potential
+               calculation, and simulation with monitoring for
+               both Verlet and Euler integrators}
+}
+
+@misc{kelvin2026spec_shake256,
+  author    = {{Kelvin Project}},
+  title     = {SHAKE256 Entropy Extraction Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/shake256_extraction_spec.md}},
+  note      = {Mathematical specification of the SHAKE256 entropy
+               extraction pipeline: feed_orbital_state serialization,
+               SHAKE256 absorption with domain separation, seed
+               squeezing (32 bytes), and extended extraction (64
+               bytes)}
+}
+
+@misc{kelvin2026spec_lyapunov,
+  author    = {{Kelvin Project}},
+  title     = {Lyapunov Exponent Estimation Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/lyapunov_spec.md}},
+  note      = {Mathematical specification of Lyapunov exponent
+               estimation using the orbit separation method:
+               perturbation, divergence measurement, renormalization,
+               and confidence estimation}
+}
+
+@misc{kelvin2026spec_keyschedule,
+  author    = {{Kelvin Project}},
+  title     = {Key Schedule Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/key_schedule_spec.md}},
+  note      = {Mathematical specification of the key schedule:
+               HKDF-SHA256 extract/expand with domain separation,
+               Blake3 reseed for forward secrecy, key/nonce output
+               format, and exhaustion tracking}
+}
+
+@misc{kelvin2026spec_asymmetric,
+  author    = {{Kelvin Project}},
+  title     = {Asymmetric Key Derivation Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/asymmetric_spec.md}},
+  note      = {Mathematical specification of asymmetric key
+               derivation: ML-DSA-65 (FIPS 204) and Ed25519
+               (RFC 8032) key pairs derived from orbital entropy,
+               with determinism and domain separation properties}
+}
+
+@misc{kelvin2026spec_ciphermodes,
+  author    = {{Kelvin Project}},
+  title     = {Cipher Modes Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/cipher_modes_spec.md}},
+  note      = {Mathematical specification of all Kelvin cipher modes:
+               Photon (symmetric streaming), Quantum (PQ-safe),
+               Prism (OTP), Split (secret sharing), Flare (FHE),
+               and Authenticated variants with domain separation}
+}
+
+@misc{kelvin2026spec_streamciphers,
+  author    = {{Kelvin Project}},
+  title     = {Stream Ciphers Specification},
+  year      = {2026},
+  howpublished = {\url{https://github.com/nliaudat/kelvin/blob/main/proofs/specs/stream_ciphers_spec.md}},
+  note      = {Mathematical specification of AES-256-GCM and
+               ChaCha20-Poly1305 stream ciphers: key/nonce sizes,
+               encryption/decryption operations, position tracking,
+               exhaustion safety, and feature comparison}
+}

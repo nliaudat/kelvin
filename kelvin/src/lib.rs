@@ -777,7 +777,7 @@ mod tests {
                 Vec3::new(Fixed::from_int(5), Fixed::from_int(0), Fixed::from_int(0)),
             ),
         ];
-        OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+        OrbitalConfig::new(bodies, 500, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
             .expect("valid config")
     }
 

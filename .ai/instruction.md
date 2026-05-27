@@ -144,7 +144,7 @@ ai/instruction.md         This file (session restoration)
 
 CURRENT STATE
 
-Implementation complete. All 181 tests pass across 4 crates.
+Implementation complete. All 181+ tests pass across 4 crates.
 - kelvin-core: 61 tests (fixed math, body, integrator, constants, stability)
 - kelvin-kdf: 64 tests (config, Lyapunov, extractor, schedule, asymmetric)
 - kelvin-stream: 10 tests (ChaCha20 stream cipher, AEAD, rekey)
@@ -157,7 +157,20 @@ Additional test infrastructure:
 - tests/entropy_analysis/ — entropy quality analysis scripts
 - tests/nist_tests/ — NIST statistical test suite integration
 
-Next actions: integration tests, known-answer vectors, benchmarks.
+Formal Verification (Apple corecrypto-inspired):
+- proofs/README.md — Multi-level proof architecture (L0-L4)
+- proofs/specs/fixed_spec.md — Q32.64 arithmetic mathematical specification
+- proofs/specs/verlet_spec.md — Verlet integrator specification with invariants
+- proofs/kani/fixed_equivalence.rs — Functional equivalence proof harnesses (add, sub, mul, div, sqrt, Vec3)
+- proofs/kani/acceleration_proofs.rs — Composite proof harnesses (Newton's laws, symmetry, mass proportionality)
+- kelvin-core/src/fixed_math.rs — Enhanced Kani harnesses with functional equivalence assertions
+
+Key references:
+- Apple Security Research (2026). "Formal verification of corecrypto for post-quantum cryptography."
+  https://security.apple.com/blog/formal-verification-corecrypto/
+- Apple Inc. (2026). corecrypto open source release. https://github.com/apple/corecrypto
+
+Next actions: integration tests, known-answer vectors, benchmarks, acceleration composite proofs, end-to-end keystream proof.
 
 ===============================================================================
 

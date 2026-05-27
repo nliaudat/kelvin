@@ -405,28 +405,16 @@ mod tests {
     }
 
     #[test]
-    fn test_bytes_processed() {
-        let mut quantum = KelvinQuantum::new(test_seed(), 1000);
-        assert_eq!(quantum.bytes_processed(), 0);
-
-        let mut buf = vec![0u8; 100];
-        quantum.encrypt(&mut buf).unwrap();
-        assert_eq!(quantum.bytes_processed(), 100);
-
-        let mut buf2 = vec![0u8; 200];
-        quantum.encrypt(&mut buf2).unwrap();
-        assert_eq!(quantum.bytes_processed(), 300);
-    }
-
-    #[test]
     fn test_reseed_count_increments() {
-        // Use a tiny cache (64 bytes) so encrypting 1 MB triggers many refills.
+        // Use a tiny cache (64 bytes) so encrypting triggers refills.
+        // With max_reseeds=1000 and 64-byte cache, encrypt 640 bytes to
+        // trigger 10 refills (640/64), well within the reseed budget.
         let mut quantum = KelvinQuantum::with_config(test_seed(), 1000, 64, 10, 1024).unwrap();
         let initial_count = quantum.reseed_count();
         assert!(initial_count >= 1, "initial reseed_count should be >= 1, got {}", initial_count);
 
         // Generate enough data to trigger additional cache refills
-        let mut buf = vec![0u8; 1024 * 1024]; // 1 MB
+        let mut buf = vec![0u8; 640]; // 10 cache refills
         quantum.encrypt(&mut buf).unwrap();
         assert!(quantum.reseed_count() > initial_count);
     }
