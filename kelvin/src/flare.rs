@@ -213,9 +213,9 @@ impl KelvinFlare {
         // HKDF-SHA512 expand: derive XOF seed from 2048-byte pool
         let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
         let mut xof_seed = [0u8; XOF_SEED_SIZE];
-        let mut info = Vec::with_capacity(32);
-        info.extend_from_slice(DOMSEP_FLARE_KEYSTREAM_V1);
-        info.extend_from_slice(&self.reseed_count.to_le_bytes());
+        let mut info = [0u8; 33];
+        info[..25].copy_from_slice(DOMSEP_FLARE_KEYSTREAM_V1);
+        info[25..].copy_from_slice(&self.reseed_count.to_le_bytes());
 
         hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
 

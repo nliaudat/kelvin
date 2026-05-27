@@ -229,7 +229,7 @@ fn generate_keystream(
 
         // Progress indicator
         if total_written - last_progress >= progress_interval {
-            let pct = total_written as f64 / size as f64 * 100.0;
+            let pct = if size > 0 { total_written as f64 / size as f64 * 100.0 } else { 100.0 };
             eprint!("\r  Progress: {:.1}% ({}/{})", pct, total_written, size);
             let _ = std::io::stderr().flush();
             last_progress = total_written;
@@ -555,10 +555,11 @@ fn generate_prism_keystream(size: u64, output_path: &str) -> Result<(), String> 
     let config = OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .map_err(|e| format!("Failed to create config: {:?}", e))?;
 
-    let (seed, _bodies) = simulate_and_extract_seed(&config)
+    let (mut seed, _bodies) = simulate_and_extract_seed(&config)
         .map_err(|e| format!("Failed to extract seed: {:?}", e))?;
 
     let mut prism = KelvinPrism::new(seed, 1000);
+    seed.fill(0);
 
     let mut output_file = fs::File::create(output_path)
         .map_err(|e| format!("Failed to create output file: {}", e))?;
@@ -567,7 +568,7 @@ fn generate_prism_keystream(size: u64, output_path: &str) -> Result<(), String> 
     let mut buffer = vec![0u8; chunk_size];
     let mut total_written: u64 = 0;
     let mut last_progress: u64 = 0;
-    let progress_interval = size / 100;
+    let progress_interval = (size / 100).max(1);
 
     eprintln!("Generating Prism keystream...");
     while total_written < size {

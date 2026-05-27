@@ -162,9 +162,9 @@ impl KelvinSplit {
         // HKDF-SHA512 expand: derive XOF seed from 2048-byte pool
         let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
         let mut xof_seed = [0u8; XOF_SEED_SIZE];
-        let mut info = Vec::with_capacity(32);
-        info.extend_from_slice(DOMSEP_SPLIT_KEYSTREAM_V1);
-        info.extend_from_slice(&self.reseed_count.to_le_bytes());
+        let mut info = [0u8; 33];
+        info[..25].copy_from_slice(DOMSEP_SPLIT_KEYSTREAM_V1);
+        info[25..].copy_from_slice(&self.reseed_count.to_le_bytes());
 
         hk.expand(&info, &mut xof_seed).map_err(|_| KelvinError::SeedExhausted)?;
 
@@ -248,11 +248,10 @@ impl KelvinSplit {
     /// The server can XOR the two ciphertexts without ever seeing the
     /// plaintexts or the master key `K`.
     ///
-    /// ## Panics
-    ///
-    /// Panics if `len` is 0.
     pub fn split_key(&mut self, len: usize) -> Result<SplitPadPair, KelvinError> {
-        assert!(len > 0, "split_key: len must be > 0");
+        if len == 0 {
+            return Ok((Zeroizing::new(Vec::new()), Zeroizing::new(Vec::new())));
+        }
 
         // Generate the master key K
         let k = self.generate_master_key(len)?;
