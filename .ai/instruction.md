@@ -68,8 +68,8 @@ kelvin/             Orchestrator. Depends on kdf + stream. Public API.
                     Quantum (H), Prism (HE OTP key generator).
 kelvin-cli/         Binary. Depends on kelvin. Keygen, encrypt/decrypt.
 kelvin-ffi/         C ABI exports. For mobile bindings.
-kelvin-test-server/ Test vector golden file server (serde feature).
-kelvin-test-client/ Test vector verification client (serde feature).
+tests/kelvin-test-server/ Test vector golden file server (serde feature).
+tests/kelvin-test-client/ Test vector verification client (serde feature).
 
 Tests live in each crate's tests/ + workspace tests/ for integration.
 Known-answer vectors in tests/vectors/ (golden files, checked into git).

@@ -18,7 +18,7 @@ Security is the primary requirement for production readiness. We must move beyon
         5. `verify_sqrt_bounded` — sqrt safe for all squared distances up to (200 AU)²
     - CI workflow available at `.github/workflows/kani.yml_disabled` (disabled pending CI runner capacity)
 - [x] **Determinism Proof**: Verify that the Symplectic Verlet integrator produces bit-identical results across all supported SIMD instructions (SSE, AVX, NEON). *(Completed 2026-05-22)*
-    - **18 tests** implemented in `kelvin-core/tests/determinism.rs` covering:
+    - **18 tests** implemented in `tests/kelvin_tests/determinism.rs` covering:
         - `compute_accelerations` golden hash — SHA3-256 of acceleration vectors matches reference
         - `verlet_step` intra-process determinism — two independent 1000-step simulations produce identical states
         - `euler_step` intra-process determinism — two independent 1000-step simulations produce identical states

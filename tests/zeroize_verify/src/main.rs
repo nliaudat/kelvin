@@ -298,8 +298,8 @@ fn test_kelvin_drop_zeroizes_bodies() {
 
     let config = OrbitalConfig::new(
         vec![sun, planet1, planet2, planet3, planet4],
-        100, // total_steps
-        10,  // reseed_interval
+        1000, // total_steps
+        10,   // reseed_interval
         kelvin::DEFAULT_DT,
         Fixed::from_raw(1 << 44),
         kelvin::DEFAULT_G,
@@ -345,7 +345,7 @@ fn test_kelvin_streaming_drop_zeroizes_bodies() {
 
     let config = OrbitalConfig::new(
         vec![sun, planet1, planet2, planet3, planet4],
-        100,
+        1000,
         10,
         kelvin::DEFAULT_DT,
         Fixed::from_raw(1 << 44),

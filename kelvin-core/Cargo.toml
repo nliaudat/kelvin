@@ -18,6 +18,10 @@ zeroize = { version = "1.6", features = ["zeroize_derive"], optional = true }
 sha3 = { version = "0.10", default-features = false }
 hex = "0.4"
 
+[[test]]
+name = "determinism"
+path = "../tests/kelvin_tests/determinism.rs"
+
 [features]
 default = ["zeroize"]
 serde = ["dep:serde", "dep:serde_json"]

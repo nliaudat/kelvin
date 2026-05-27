@@ -78,8 +78,10 @@ kelvin/          — Top-level struct with 7 modes: Secure (V1), Chaos (V2),
 kelvin-cli/      — CLI tool (keygen, encrypt/decrypt with --mode, benchmark, identify)
 kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
 kelvin-demo/     — Demo kit: 3D orbital visualizer, test binaries, sample keys
-kelvin-test-client/ — Integration test client (self-test + test vector verification)
-kelvin-test-server/ — Test vector generation server
+tests/kelvin-test-client/ — Integration test client (self-test + test vector verification)
+tests/kelvin-test-server/ — Test vector generation server
+tests/test_cli/ — CLI test fixtures (configs, encrypted files, test vectors)
+tests/test_results/ — Entropy analysis reports and key generation output
 ```
 
 ## Cryptographic Modes

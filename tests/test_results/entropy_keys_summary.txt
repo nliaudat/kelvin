@@ -1,0 +1,37 @@
+
+============================================================
+ KELVIN ENTROPY ANALYSIS: 10 KEYS
+============================================================
+
+[ Sun Mass ]
+  Samples:    10
+  Unique:     10 (100.00%)
+  Sample Entropy: ~3.32 bits
+
+[ Planet Masses ]
+  Samples:    40
+  Unique:     40 (100.00%)
+  Sample Entropy: ~5.32 bits
+
+[ Position Vectors (3D) ]
+  Samples:    40
+  Unique:     40 (100.00%)
+  Sample Entropy: ~5.32 bits
+
+[ Velocity Vectors (3D) ]
+  Samples:    40
+  Unique:     40 (100.00%)
+  Sample Entropy: ~5.32 bits
+
+============================================================
+ SUCCESS: No collisions detected in sun mass or configurations.
+============================================================
+
+  ── Summary ──
+  Mode: Key Entropy Analysis (10 keys)
+    ✓ Sun Mass: 10 samples, 10 unique (100%) [PASS]
+    ✓ Planet Masses: 40 samples, 40 unique (100%) [PASS]
+    ✓ Positions: 40 samples, 40 unique (100%) [PASS]
+    ✓ Velocities: 40 samples, 40 unique (100%) [PASS]
+    ✓ Collisions: none detected [PASS]
+  Result: 5/5 checks passed ✅
