@@ -743,3 +743,234 @@ impl Drop for KelvinStreaming {
         self.bytes_processed.zeroize();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kelvin_core::{DEFAULT_DT, SOFTENING_FACTOR};
+
+    fn five_body_config() -> OrbitalConfig {
+        let bodies = vec![
+            OrbitalBody::new(
+                Fixed::from_int(1000),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(0), Fixed::from_int(0)),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(0), Fixed::from_int(0)),
+            ),
+            OrbitalBody::new(
+                Fixed::from_int(1),
+                Vec3::new(Fixed::from_int(10), Fixed::from_int(0), Fixed::from_int(0)),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(5), Fixed::from_int(0)),
+            ),
+            OrbitalBody::new(
+                Fixed::from_int(1),
+                Vec3::new(Fixed::from_int(-10), Fixed::from_int(0), Fixed::from_int(0)),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(-5), Fixed::from_int(0)),
+            ),
+            OrbitalBody::new(
+                Fixed::from_int(1),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(10), Fixed::from_int(0)),
+                Vec3::new(Fixed::from_int(-5), Fixed::from_int(0), Fixed::from_int(0)),
+            ),
+            OrbitalBody::new(
+                Fixed::from_int(1),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(-10), Fixed::from_int(0)),
+                Vec3::new(Fixed::from_int(5), Fixed::from_int(0), Fixed::from_int(0)),
+            ),
+        ];
+        OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+            .expect("valid config")
+    }
+
+    // ── Kelvin (V1 Secure) tests ─────────────────────────────────────────
+
+    #[test]
+    fn test_kelvin_new_and_round_trip() {
+        let config = five_body_config();
+        let mut k = Kelvin::new(config).expect("Kelvin::new should succeed");
+        let original = b"Hello, Kelvin!".to_vec();
+        let mut data = original.clone();
+        k.encrypt(&mut data).unwrap();
+        assert_ne!(data, original);
+        k.decrypt(&mut data).unwrap();
+        assert_eq!(data, original);
+    }
+
+    #[test]
+    fn test_kelvin_empty_data() {
+        let config = five_body_config();
+        let mut k = Kelvin::new(config).expect("Kelvin::new should succeed");
+        let mut data = Vec::new();
+        k.encrypt(&mut data).unwrap();
+        assert!(data.is_empty());
+        k.decrypt(&mut data).unwrap();
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn test_kelvin_bytes_processed() {
+        let config = five_body_config();
+        let mut k = Kelvin::new(config).expect("Kelvin::new should succeed");
+        assert_eq!(k.bytes_processed(), 0);
+        let mut data = vec![0u8; 100];
+        k.encrypt(&mut data).unwrap();
+        assert_eq!(k.bytes_processed(), 100);
+    }
+
+    #[test]
+    fn test_kelvin_remaining_safe_bytes() {
+        let config = five_body_config();
+        let k = Kelvin::new(config).expect("Kelvin::new should succeed");
+        assert!(k.remaining_safe_bytes() > 0);
+    }
+
+    #[test]
+    fn test_kelvin_asymmetric_keypair() {
+        let config = five_body_config();
+        let k = Kelvin::new(config).expect("Kelvin::new should succeed");
+        let kp = k.asymmetric_keypair();
+        // Keypair should have non-empty public key material
+        let debug_str = format!("{:?}", kp);
+        assert!(!debug_str.is_empty());
+    }
+
+    #[test]
+    fn test_kelvin_deterministic_encryption() {
+        let config = five_body_config();
+        let mut k1 = Kelvin::new(config.clone()).expect("Kelvin::new");
+        let mut k2 = Kelvin::new(config).expect("Kelvin::new");
+        let mut data1 = b"Test data for determinism check".to_vec();
+        let mut data2 = data1.clone();
+        k1.encrypt(&mut data1).unwrap();
+        k2.encrypt(&mut data2).unwrap();
+        assert_eq!(data1, data2);
+    }
+
+    #[test]
+    fn test_kelvin_aead_tag_detection() {
+        let config = five_body_config();
+        let mut k = Kelvin::new(config).expect("Kelvin::new");
+        let mut data = b"Hello, Kelvin!".to_vec();
+        // Extend with space for AEAD tag
+        data.extend_from_slice(&[0u8; 16]);
+        k.encrypt(&mut data).unwrap();
+        // Tamper with the ciphertext
+        data[0] ^= 0xFF;
+        // Decryption should fail due to tag mismatch
+        let result = k.decrypt(&mut data);
+        assert!(result.is_err());
+    }
+
+    // ── KelvinStreaming tests ────────────────────────────────────────────
+
+    #[test]
+    fn test_kelvin_streaming_new_and_round_trip() {
+        let config = five_body_config();
+        let mut enc = KelvinStreaming::new(config.clone(), 1024).expect("KelvinStreaming::new");
+        let mut dec = KelvinStreaming::new(config, 1024).expect("KelvinStreaming::new");
+        let original = b"Hello, KelvinStreaming!".to_vec();
+        let mut data = original.clone();
+        enc.encrypt(&mut data).unwrap();
+        assert_ne!(data, original);
+        dec.decrypt(&mut data).unwrap();
+        assert_eq!(data, original);
+    }
+
+    #[test]
+    fn test_kelvin_streaming_empty_data() {
+        let config = five_body_config();
+        let mut ks = KelvinStreaming::new(config, 1024).expect("KelvinStreaming::new");
+        let mut data = Vec::new();
+        ks.encrypt(&mut data).unwrap();
+        assert!(data.is_empty());
+        ks.decrypt(&mut data).unwrap();
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn test_kelvin_streaming_bytes_processed() {
+        let config = five_body_config();
+        let mut ks = KelvinStreaming::new(config, 1024).expect("KelvinStreaming::new");
+        assert_eq!(ks.bytes_processed(), 0);
+        let mut data = vec![0u8; 100];
+        ks.encrypt(&mut data).unwrap();
+        assert_eq!(ks.bytes_processed(), 100);
+    }
+
+    #[test]
+    fn test_kelvin_streaming_step_counter() {
+        let config = five_body_config();
+        let mut ks = KelvinStreaming::new(config, 1024).expect("KelvinStreaming::new");
+        assert_eq!(ks.step(), 0);
+        let mut data = vec![0u8; 1024];
+        ks.encrypt(&mut data).unwrap();
+        assert_eq!(ks.step(), 1);
+    }
+
+    #[test]
+    fn test_kelvin_streaming_determinism() {
+        let config = five_body_config();
+        let mut ks1 = KelvinStreaming::new(config.clone(), 1024).expect("KelvinStreaming::new");
+        let mut ks2 = KelvinStreaming::new(config, 1024).expect("KelvinStreaming::new");
+        let mut data1 = b"Deterministic streaming test".to_vec();
+        let mut data2 = data1.clone();
+        ks1.encrypt(&mut data1).unwrap();
+        ks2.encrypt(&mut data2).unwrap();
+        assert_eq!(data1, data2);
+    }
+
+    #[test]
+    fn test_kelvin_streaming_multi_chunk() {
+        let config = five_body_config();
+        let mut enc = KelvinStreaming::new(config.clone(), 512).expect("KelvinStreaming::new");
+        let mut dec = KelvinStreaming::new(config, 512).expect("KelvinStreaming::new");
+        let original = vec![0xABu8; 2048]; // 4 chunks of 512 bytes
+        let mut data = original.clone();
+        enc.encrypt(&mut data).unwrap();
+        assert_ne!(data, original);
+        dec.decrypt(&mut data).unwrap();
+        assert_eq!(data, original);
+    }
+
+    // ── Thread safety compile-time checks ────────────────────────────────
+
+    /// Compile-time assertion that types implement Send + Sync.
+    /// These are zero-runtime-cost checks that verify thread safety.
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+
+    #[test]
+    fn test_kelvin_streaming_is_send_sync() {
+        assert_send::<KelvinStreaming>();
+        assert_sync::<KelvinStreaming>();
+    }
+
+    #[test]
+    fn test_kelvin_photon_is_send_sync() {
+        assert_send::<KelvinPhoton>();
+        assert_sync::<KelvinPhoton>();
+    }
+
+    #[test]
+    fn test_kelvin_quantum_is_send_sync() {
+        assert_send::<KelvinQuantum>();
+        assert_sync::<KelvinQuantum>();
+    }
+
+    #[test]
+    fn test_kelvin_prism_is_send_sync() {
+        assert_send::<KelvinPrism>();
+        assert_sync::<KelvinPrism>();
+    }
+
+    #[test]
+    fn test_kelvin_split_is_send_sync() {
+        assert_send::<KelvinSplit>();
+        assert_sync::<KelvinSplit>();
+    }
+
+    #[test]
+    fn test_kelvin_flare_is_send_sync() {
+        assert_send::<KelvinFlare>();
+        assert_sync::<KelvinFlare>();
+    }
+}

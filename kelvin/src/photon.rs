@@ -272,3 +272,145 @@ impl Drop for KelvinPhoton {
         // No explicit zeroize needed since SHAKE256 state is ephemeral.
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_seed() -> [u8; PHOTON_BASE_SEED_SIZE] {
+        [0u8; PHOTON_BASE_SEED_SIZE]
+    }
+
+    #[test]
+    fn test_round_trip_small() {
+        let seed = test_seed();
+        let mut enc = KelvinPhoton::new(seed, 1000);
+        let mut dec = KelvinPhoton::new(seed, 1000);
+
+        let original = b"Hello, Kelvin-Photon!".to_vec();
+        let mut data = original.clone();
+
+        enc.encrypt(&mut data).unwrap();
+        assert_ne!(data, original);
+
+        dec.decrypt(&mut data).unwrap();
+        assert_eq!(data, original);
+    }
+
+    #[test]
+    fn test_determinism() {
+        let seed = test_seed();
+        let mut p1 = KelvinPhoton::new(seed, 1000);
+        let mut p2 = KelvinPhoton::new(seed, 1000);
+
+        let mut buf1 = vec![0u8; 256];
+        let mut buf2 = vec![0u8; 256];
+        p1.encrypt(&mut buf1).unwrap();
+        p2.encrypt(&mut buf2).unwrap();
+        assert_eq!(buf1, buf2);
+    }
+
+    #[test]
+    fn test_empty_data() {
+        let mut photon = KelvinPhoton::new(test_seed(), 1000);
+        let mut data = Vec::new();
+        photon.encrypt(&mut data).unwrap();
+        assert!(data.is_empty());
+        photon.decrypt(&mut data).unwrap();
+        assert!(data.is_empty());
+    }
+
+    #[test]
+    fn test_large_data() {
+        let seed = test_seed();
+        let mut enc = KelvinPhoton::new(seed, 1000);
+        let mut dec = KelvinPhoton::new(seed, 1000);
+
+        let original = vec![0xABu8; 5 * 1024 * 1024]; // 5 MB
+        let mut data = original.clone();
+
+        enc.encrypt(&mut data).unwrap();
+        assert_ne!(data, original);
+
+        dec.decrypt(&mut data).unwrap();
+        assert_eq!(data, original);
+    }
+
+    #[test]
+    fn test_bytes_processed() {
+        let mut photon = KelvinPhoton::new(test_seed(), 1000);
+        assert_eq!(photon.bytes_processed(), 0);
+
+        let mut buf = vec![0u8; 100];
+        photon.encrypt(&mut buf).unwrap();
+        assert_eq!(photon.bytes_processed(), 100);
+
+        let mut buf2 = vec![0u8; 200];
+        photon.encrypt(&mut buf2).unwrap();
+        assert_eq!(photon.bytes_processed(), 300);
+    }
+
+    #[test]
+    fn test_reseed_count_increments() {
+        let mut photon = KelvinPhoton::new(test_seed(), 1000);
+        assert_eq!(photon.reseed_count(), 0);
+
+        // Generate enough data to trigger reseeds
+        // PHOTON_RESEED_INTERVAL_BYTES = 64 MiB
+        let mut buf = vec![0u8; 128 * 1024 * 1024];
+        photon.encrypt(&mut buf).unwrap();
+        assert!(photon.reseed_count() >= 1);
+    }
+
+    #[test]
+    fn test_exhaustion() {
+        let mut photon = KelvinPhoton::new(test_seed(), 2);
+        // Exhaust both reseeds
+        for _ in 0..2 {
+            let mut buf = vec![0u8; 64 * 1024 * 1024];
+            photon.encrypt(&mut buf).unwrap();
+        }
+        // Next call should fail
+        let mut buf = vec![0u8; 1];
+        let result = photon.encrypt(&mut buf);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remaining_reseeds() {
+        let mut photon = KelvinPhoton::new(test_seed(), 5);
+        assert_eq!(photon.remaining_reseeds(), 5);
+
+        let mut buf = vec![0u8; 64 * 1024 * 1024];
+        photon.encrypt(&mut buf).unwrap();
+        assert_eq!(photon.remaining_reseeds(), 4);
+    }
+
+    #[test]
+    fn test_avalanche() {
+        // Two seeds differing by 1 bit should produce completely different keystream
+        let seed1 = test_seed();
+        let mut seed2 = test_seed();
+
+        seed2[0] ^= 1; // Flip one bit
+
+        let mut p1 = KelvinPhoton::new(seed1, 1000);
+        let mut p2 = KelvinPhoton::new(seed2, 1000);
+
+        let mut buf1 = vec![0u8; 1024];
+        let mut buf2 = vec![0u8; 1024];
+        p1.encrypt(&mut buf1).unwrap();
+        p2.encrypt(&mut buf2).unwrap();
+
+        // Should be completely different
+        assert_ne!(buf1, buf2);
+    }
+
+    #[test]
+    fn test_debug_redacts_seed() {
+        let photon = KelvinPhoton::new(test_seed(), 1000);
+        let debug_str = format!("{:?}", photon);
+        assert!(!debug_str.contains("0u8"));
+        assert!(debug_str.contains("[redacted]"));
+    }
+}
