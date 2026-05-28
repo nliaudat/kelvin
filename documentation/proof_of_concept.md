@@ -30,9 +30,10 @@ Test 5: Large data (10KB round-trip, two instances)...
 **What this proves:**
 - **Determinism**: Two independent `Kelvin` instances with the same `OrbitalConfig` produce identical ciphertext. This is the fundamental requirement for a KDF — the same key material must be derived from the same configuration.
 - **Round-trip**: Encryption followed by decryption (using separate instances) returns the original plaintext. This proves the ChaCha20 XOR stream cipher works correctly.
-- **Idempotency**: Double encryption returns the original plaintext (XOR is its own inverse). This is a mathematical property of stream ciphers.
+- **Idempotency**: Double encryption returns the original plaintext (XOR is its own inverse). This is a mathematical property of OTP stream ciphers.
 - **Empty data**: Edge case handling works correctly.
 - **Large data**: The system handles 10KB of data efficiently (~26ms).
+
 
 ---
 

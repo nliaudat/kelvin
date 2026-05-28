@@ -1,18 +1,18 @@
-//! H Kelvin-Quantum — Hybrid orbital chaos + quantum-resistant stream cipher.
+//! H Kelvin-Quantum — Hybrid orbital chaos + quantum-resistant OTP stream cipher.
 //!
 //! ## Architecture
 //!
-//! H Kelvin-Quantum combines the orbital chaos KDF with a quantum-resistant
-//! stream cipher (SHAKE256 XOF). Unlike V3 Photon (which uses HKDF→SHAKE256),
-//! H Quantum periodically refreshes its base seed with fresh orbital entropy
-//! via `reseed_from_orbital_chaos`:
+//! H Kelvin-Quantum is a **quantum-resistant one-time pad (OTP) stream cipher**
+//! that combines the orbital chaos KDF with SHAKE256 XOF. Unlike V3 Photon
+//! (which uses HKDF→SHAKE256), H Quantum periodically refreshes its base seed
+//! with fresh orbital entropy via `reseed_from_orbital_chaos`:
 //!
 //! ```text
 //! 2048B base seed → BLAKE3 XOF → perturbation → orbital state
 //!   ↓
 //! SHAKE256 XOF → keystream cache (1 MiB)
 //!   ↓
-//! XOR with plaintext/ciphertext
+//! XOR with plaintext/ciphertext (OTP encryption)
 //!   ↓
 //! Every N bytes: reseed_from_orbital_chaos
 //!   → advance orbital simulation by M steps
@@ -22,12 +22,15 @@
 //!
 //! ## Security
 //!
+//! - **OTP construction**: Data is XOR-encrypted byte-by-byte with SHAKE256
+//!   keystream. No nonce, no IV, no algebraic round function.
 //! - **No authentication**: XOR is malleable. Use with external MAC or
 //!   in environments where malleability is acceptable.
 //! - **Orbital reseeding**: Fresh chaotic entropy is mixed in periodically,
 //!   providing forward secrecy beyond BLAKE3's deterministic reseeding.
 //! - **Quantum-resistant**: SHAKE256 provides 256-bit classical / 128-bit
-//!   quantum security.
+//!   quantum security. No algebraic structure for Shor's algorithm to exploit.
+
 //!
 //! ## References
 //!

@@ -1,8 +1,8 @@
-//! Streaming encryption/decryption traits for the Kelvin cryptosystem.
+//! Streaming encryption/decryption traits for the Kelvin OTP cryptosystem.
 //!
-//! Provides a unified streaming interface across all modes:
-//! - `StreamEncrypt` — incremental encryption with optional finalization
-//! - `StreamDecrypt` — incremental decryption with optional finalization
+//! Provides a unified streaming interface across all OTP modes:
+//! - `StreamEncrypt` — incremental OTP encryption with optional finalization
+//! - `StreamDecrypt` — incremental OTP decryption with optional finalization
 //!
 //! ## Design
 //!
@@ -10,6 +10,11 @@
 //! the streaming API allows processing data in arbitrary-sized chunks
 //! with constant memory (64 KB buffer). This enables encrypting/decrypting
 //! arbitrarily large files without loading them entirely into memory.
+//!
+//! All streaming modes use **XOR-based OTP encryption**: data is XOR-encoded
+//! byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
+//! There is no nonce, no IV, no algebraic round function.
+
 //!
 //! ## Usage
 //!

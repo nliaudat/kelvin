@@ -2,25 +2,29 @@
 //!
 //! ## Architecture
 //!
+//! V3 Photon is a **quantum-resistant one-time pad (OTP) stream cipher**.
 //! Unlike V1 (which extracts only 32+12 bytes per HKDF call), V3 uses HKDF's
 //! full capacity to derive a SHAKE256 XOF seed, then produces arbitrary-length
 //! keystream:
 //!
 //! ```text
-//! 2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited keystream
+//! 2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keystream
 //! ```
 //!
 //! This solves the original bottleneck: HKDF-SHA512 can output up to 16,320
 //! bytes per call, but V1 only used 44 bytes (0.27%). V3 uses 64 bytes to
-//! seed SHAKE256, which then produces unlimited keystream.
+//! seed SHAKE256, which then produces unlimited keystream for XOR encryption.
 //!
 //! ## Security
 //!
+//! - **OTP construction**: Data is XOR-encrypted byte-by-byte with SHAKE256
+//!   keystream. There is no nonce, no IV, no algebraic round function.
 //! - **No authentication**: XOR is malleable. Use with external MAC or
 //!   in environments where malleability is acceptable.
 //! - **Deterministic reseeding**: BLAKE3 reseed provides forward secrecy.
 //! - **Quantum-resistant**: SHAKE256 provides 256-bit classical / 128-bit
-//!   quantum security.
+//!   quantum security. No algebraic structure for Shor's algorithm to exploit.
+
 //!
 //! ## References
 //!

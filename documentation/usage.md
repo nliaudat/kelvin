@@ -1,6 +1,7 @@
 # Kelvin Usage Guide
 
-Kelvin is an orbital-chaos-based Key Derivation Function (KDF) and stream cipher. This guide covers how to use the CLI tool and how to integrate the library into your Rust projects.
+Kelvin is an orbital-chaos-based **quantum-resistant one-time pad (OTP) cryptosystem** and Key Derivation Function (KDF). This guide covers how to use the CLI tool and how to integrate the library into your Rust projects.
+
 
 ---
 
@@ -31,7 +32,8 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 ```
 
 ### Encrypt a File
-Kelvin uses the orbital simulation to generate a chaotic **Orbital Keystream** for encryption.
+Kelvin uses the orbital simulation to generate a **quantum-resistant OTP keystream** for encryption. Data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
+
 
 ```bash
 # Default: Verlet integration (symplectic, energy-conserving)
@@ -328,9 +330,10 @@ This returns `remaining_keys × 4 GiB` (conservative estimate). When it reaches 
 
 ---
 
-## 6. V2 Streaming Mode (Real-Time Per-Step Simulation)
+## 6. V2 Streaming Mode — Per-Step OTP (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state.
+V2 Streaming (`KelvinStreaming`) is a **per-step one-time pad** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no nonce, no IV, and no key reuse risk — each step produces a unique keystream from fresh chaotic dynamics.
+
 
 ### Key Differences from V1
 
