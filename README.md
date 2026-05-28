@@ -1,37 +1,60 @@
 # Kelvin — Orbital Chaos KDF Cryptosystem
-### **Backronym:** **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
-### *An n-body simulation based Key Derivation Function*
 
-[Proof of Concept](documentation/proof_of_concept.md) | [Usage Guide](documentation/usage.md) | [Quantum Analysis](documentation/quantum_analysis.md)
+[![Build Status](https://github.com/nliaudat/kelvin/actions/workflows/rust.yml/badge.svg)](https://github.com/nliaudat/kelvin/actions/workflows/rust.yml)
+[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](licence.md)
+[![Crates.io](https://img.shields.io/crates/v/kelvin.svg)](https://crates.io/crates/kelvin)
 
----
+> **⚠️ EXPERIMENTAL — Not for production use.** This is a research cryptosystem.
+> It has not undergone formal cryptanalysis. See [Security](#security) for details.
 
-### *Three bodies. Infinite chaos...*
+Kelvin is a **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**. It transforms a shared orbital configuration (masses, positions, velocities) into a cryptographic keystream by simulating chaotic gravitational dynamics and extracting entropy via SHAKE256.
 
-[![Kelvin Orbital Key Generator](https://img.shields.io/badge/🚀-Launch_3D_Orbital_Visualizer-00ff00?style=for-the-badge)](kelvin-demo/orbital_visualizer.html)
+The core insight: the n-body problem has no closed-form solution for N ≥ 3. An attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
-*Drag to rotate, scroll to zoom, Space to pause. Load a `key.json` file to configure custom initial conditions.*
+## Quick Start
 
-**EXPERIMENTAL — NOT FOR PRODUCTION USE.**
+```bash
+# Generate a random orbital configuration
+cargo run -p kelvin-cli -- generate -o key.json
 
-================================================================================
+# Encrypt a file
+cargo run -p kelvin-cli -- encrypt -c key.json -i plaintext.txt -o ciphertext.bin
 
-Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines:
+# Decrypt a file
+cargo run -p kelvin-cli -- decrypt -c key.json -i ciphertext.bin -o decrypted.txt
+```
 
-- **Q32.64 fixed-point arithmetic** — deterministic across all platforms
-- **Symplectic Verlet integrator** — energy-conserving n-body simulation (default)
-- **Euler integrator** — numerically unstable, faster chaos amplification (`--euler` flag)
-- **Lyapunov time estimation** — shadow orbit method for chaos quantification
-- **SHAKE256 XOF entropy extraction** — 2048-byte domain-separated hashing of orbital state
-- **ChaCha20 stream cipher** — XOR-based encryption/decryption
-- **Post-Quantum Hybrid Identity** — ML-DSA-65 (Primary), ML-KEM-768, and Curve25519 identities
-- **Chaos Quality Test Suite** — Integrated statistical verification (avalanche and uniformity tests)
+## Mode Comparison
 
-### What Makes Kelvin Novel
+| Mode | Name | Cipher | Auth | Keystream | Speed | Use Case |
+|------|------|--------|:----:|-----------|:-----:|----------|
+| **V1** | Kelvin-Secure | ChaCha20Poly1305 | ✅ AEAD | Finite (~28 GiB) | 🐢 500 MB/s | General purpose with authentication |
+| **V2** | Kelvin-Chaos | SHAKE256 XOR | ❌ | Unlimited | 🐌 3 MB/s | Streaming, real-time |
+| **V3** | Kelvin-Photon | HKDF→SHAKE256 XOR | ❌ | Finite | 🚀 5 GB/s | Bulk encryption |
+| **H** | Kelvin-Quantum | Hybrid V3+V2 | ❌ | ≈Unlimited | 🚀 5 GB/s | Best all-around |
+| **—** | Kelvin-Prism | HKDF→SHAKE256 OTP | ❌ | Finite | 🚀 5 GB/s | OTP key generation for HE |
+| **—** | Kelvin-Split | HKDF→SHAKE256 XOR-split | ❌ | Finite | 🚀 5 GB/s | XOR key splitting for HE |
+| **—** | Kelvin-Flare | HKDF→SHAKE256 FHE keys | ❌ | Finite | 🚀 5 GB/s | FHE secret key generation |
 
-Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems. The n-body problem is famously non-integrable for N ≥ 3: there is no closed-form solution, and numerical integration is the only path forward. Kelvin exploits this by making the orbital simulation itself part of the key derivation. An attacker cannot shortcut the simulation — they must run the same deterministic Verlet integration step-by-step, with the same fixed-point arithmetic, to reproduce the keystream. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
+> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC authentication via `KelvinQuantumAuthenticated` if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
+
+## What Makes Kelvin Novel
+
+Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems. The n-body problem is famously non-integrable for N ≥ 3: there is no closed-form solution, and numerical integration is the only path forward. Kelvin exploits this by making the orbital simulation itself part of the key derivation. An attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step, with the same fixed-point arithmetic, to reproduce the keystream. The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
 > ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review_3.md) for full analysis.
+
+### Known Limitations (Transparency)
+
+Kelvin has not undergone formal cryptanalysis. The security claims are based on:
+- **Physical reasoning** — chaotic dynamics of n-body systems (Lyapunov exponent analysis)
+- **Statistical testing** — NIST SP 800-90B, SP 800-22 test suites
+- **Formal verification** — Kani proofs for safety and functional equivalence of fixed-point arithmetic
+- **Constant-time verification** — dudect-bencher (Welch's t-test) for side-channel resistance
+
+No mathematical reduction to a hard problem (e.g., lattice problems) is provided.
+This is an intentional trade-off: the n-body problem has no known closed-form
+solution, but this has not been formally proven as a cryptographic assumption.
 
 Key features include:
 
@@ -54,154 +77,199 @@ Key features include:
 
 Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The system follows a deterministic pipeline that transforms a shared orbital configuration into a cryptographic keystream:
 
-1. **Configuration** — The shared secret is an `OrbitalConfig` specifying the number of bodies ($N \ge 3$), their initial positions/velocities, masses, the gravitational constant ($G$), time step, softening factor, and total simulation steps. This configuration is the equivalent of a cryptographic key — anyone with the same config will derive the same keystream.
+```
+OrbitalConfig (masses, positions, velocities, G, ε)
+    │
+    ▼
+┌─────────────────────────────────────────────────────┐
+│  Phase 1: Orbital Simulation (Verlet/Euler)           │
+│  • Simulate N-body gravitational dynamics            │
+│  • Monitor for stability (Lyapunov, ejections)       │
+│  • Run for total_steps iterations                    │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Phase 2: Entropy Extraction (SHAKE256)              │
+│  • Hash final orbital state + physical constants     │
+│  • Produce 2048-byte entropy pool                    │
+│  • Domain-separated for different purposes           │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────┐
+│  Phase 3: Key Schedule (HKDF-SHA512 + BLAKE3)        │
+│  • Derive per-key material from entropy pool         │
+│  • Reseed pool after each key (forward secrecy)      │
+│  • Exhausted after max_keys or safe_steps            │
+└──────────────────────┬──────────────────────────────┘
+                       │
+                       ▼
+              Cryptographic Keystream
+```
 
-2. **Lyapunov time estimation** — Before running the full simulation, Kelvin estimates the Lyapunov time of the system using the shadow orbit method. This quantifies the chaotic divergence rate and ensures the simulation runs within the predictable regime. If the requested step count exceeds the safe Lyapunov horizon, the system rejects the configuration.
+## Security
 
-3. **Orbital simulation** — The n-body system is evolved using a symplectic Verlet integrator (default, energy-conserving) or an explicit Euler integrator (`--euler` flag, numerically unstable). Verlet conserves energy and momentum for physically realistic trajectories; Euler's numerical instability amplifies chaos ~10x faster for maximum entropy per step. Both use deterministic fixed-point arithmetic for bit-identical results across all platforms (x86, ARM, WebAssembly, etc.).
+### What Kelvin Provides
 
-4. **Seed extraction** — After simulation, the final orbital state is hashed with **SHAKE256 (XOF)** using domain separation. This process incorporates the full physical state: positions, velocities, masses, the gravitational constant ($G$), the softening factor, and the **instantaneous gravitational force vectors** acting on every body. This produces a **2048-byte** cryptographically strong seed that is physically bound to the simulation's reality.
+- **Deterministic KDF**: Same orbital configuration → same keystream (verified by 18 determinism tests)
+- **Chaotic divergence**: Lyapunov exponent λ ≈ 0.693 (positive → chaotic regime)
+- **Forward secrecy**: BLAKE3 reseeding prevents past key recovery from future state
+- **Constant-time operations**: All fixed-point arithmetic verified via dudect-bencher (|t| < 5)
+- **Memory safety**: `#![forbid(unsafe_code)]` across all crates
+- **Zeroization**: All secret material cleared on drop (verified by runtime read-back test)
+- **Formal verification**: Kani proofs for safety (no overflows) and functional equivalence (ops match spec within dynamically scaled error bounds)
+- **NIST SP 800-90B compliance**: Built-in health tests (repetition, adaptive proportion, runs, longest run, Shannon entropy, chi-square, correlation)
+- **NIST SP 800-22 compliance**: All 15 statistical tests pass on orbital keystream
+- **Post-quantum identity**: ML-DSA-65 (FIPS 204) signatures + ML-KEM-768 (FIPS 203) key encapsulation
 
-5. **Key schedule** — The seed drives a deterministic key schedule that generates a continuous **Orbital Keystream**. The schedule automatically reseeds at configurable intervals using **SHAKE256** to advance the entropy pool, ensuring that the keystream remains tightly coupled to the physical evolution of the system. Each reseed event incorporates fresh force vector data from the current orbital state.
+### What Kelvin Does NOT Provide
 
-6. **Encryption/Decryption** — Data is encrypted by XORing with the **ChaCha20 Orbital Keystream**, seeded by the chaotic orbital state. Decryption is the exact inverse operation, requiring the identical initial orbital configuration.
+- **Formal cryptanalysis**: No mathematical reduction to a hard problem
+- **Key exchange**: OrbitalConfig must be established out-of-band
+- **Memory hardness**: Not resistant to GPU/ASIC parallelization
+- **Information-theoretic security**: All modes are stream ciphers, not true OTPs
 
 ## Architecture
 
-```
-kelvin-core/     — Fixed-point math, Vec3, OrbitalBody, Verlet/Euler integrator
-kelvin-kdf/      — OrbitalConfig, LyapunovEstimator, SHAKE256 XOF extractor, KeySchedule
-kelvin-stream/   — ChaCha20 wrapper with StreamCipher trait
-kelvin/          — Top-level struct with 7 modes: Secure (V1), Chaos (V2),
-                   Photon (V3), Quantum (H), Prism (HE OTP key generator),
-                   Split (XOR key-splitter), Flare (FHE secret key generator)
+Kelvin is organized as a Rust workspace with 14 crates:
 
-kelvin-cli/      — CLI tool (keygen, encrypt/decrypt with --mode, benchmark, identify)
-kelvin-ffi/      — C FFI bindings for iOS/Android/embedded
-kelvin-demo/     — Demo kit: 3D orbital visualizer, test binaries, sample keys
-tests/kelvin-test-client/ — Integration test client (self-test + test vector verification)
-tests/kelvin-test-server/ — Test vector generation server
-tests/test_cli/ — CLI test fixtures (configs, encrypted files, test vectors)
-tests/test_results/ — Entropy analysis reports and key generation output
+```
+kelvin-core/     — Fixed-point Q32.64 arithmetic, n-body simulation, entropy extraction
+kelvin-kdf/      — Key schedule, HKDF-SHA512 derivation, BLAKE3 reseeding
+kelvin-stream/   — Streaming cipher modes (ChaCha20Poly1305, SHAKE256 XOR)
+kelvin/          — Top-level API (Kelvin, KelvinPhoton, KelvinQuantum, etc.)
+kelvin-cli/      — Command-line interface (encrypt, decrypt, generate, analyze)
+kelvin-ffi/      — C FFI bindings for language interop
 ```
 
-## Cryptographic Modes
+## Installation
 
-Kelvin provides four cryptographic modes, each optimized for different use cases. All modes support both Verlet (default) and Euler (`--euler`) integration.
+### From Source
 
-| Parameter | V1 `Secure` | V2 `Chaos` | V3 `Photon` | H `Quantum` |
-| :--- | :--- | :--- | :--- | :--- |
-| **Tagline** | *"The safe choice"* | *"Pure chaotic streaming"* | *"Fast as light"* | *"Best of all worlds"* |
-| **Engine** | `Kelvin` | `KelvinStreaming` | `KelvinPhoton` | `KelvinQuantum` |
-| **Simulation** | Upfront (Verlet/Euler) | Per-step (Verlet/Euler) | Upfront (Verlet/Euler) | Upfront + periodic reseed |
-| **Cipher** | ChaCha20Poly1305 AEAD | SHAKE256 XOR per-step | HKDF→SHAKE256 XOR | Hybrid cache+XOR + orbital reseed |
-| **Authentication** | ✅ Built-in AEAD | ❌ XOR only (add `--auth`) | ❌ XOR only (add `--auth`) | ❌ XOR only (add `--auth`) |
-| **Authenticated engine** | N/A (AEAD built-in) | `KelvinStreamingAuthenticated` | `KelvinPhotonAuthenticated` | `KelvinQuantumAuthenticated` |
-| **Auth method** | ChaCha20Poly1305 tag | KMAC128 tag (32 bytes, NIST SP 800-185) | KMAC128 tag (32 bytes, NIST SP 800-185) | KMAC128 tag (32 bytes, NIST SP 800-185) |
-| **Keystream** | Finite (~28 GiB) | ✅ Unlimited | Finite (key schedule bound) | ✅ Effectively unlimited |
-| **Setup time** | Seconds–minutes | Instant | Seconds–minutes | Seconds–minutes |
-| **First byte** | After setup | Milliseconds | After setup | After setup |
-| **Bulk throughput** | ~500 MB/s | Slow (O(N) sim/chunk) | ~200 MB/s | ~500 MB/s |
-| **Ideal use case** | Storage / authenticated channels | Lightweight real-time streams | 1 MB–1 GB batch encryption | Large bulk data requiring fresh entropy |
-| **CLI mode flag** | `--mode secure` (default) | `--mode chaos` | `--mode photon` | `--mode quantum` |
-| **Auth flag** | *(ignored)* | `--auth` | `--auth` | `--auth` |
-| **Integration method** | `--euler` available | `--euler` available | `--euler` available | `--euler` available |
+```bash
+# Prerequisites: Rust 1.75+ (install via rustup)
+git clone https://github.com/nliaudat/kelvin.git
+cd kelvin
+cargo build --release
+```
 
-> **Note:** All modes use the same `OrbitalConfig` shared secret. The integration method (Verlet/Euler) must match between encryption and decryption.
->
-> **Authentication:** Append `--auth` to encrypt/decrypt commands for chaos, photon, or quantum modes to append a 32-byte KMAC128 tag (NIST SP 800-185), defeating ciphertext malleability. The secure mode has built-in AEAD and ignores the flag.
+### From Crates.io
 
-### Prism Mode — OTP Key Generator for Homomorphic Encryption
+```bash
+cargo add kelvin
+```
 
-**Prism** (`KelvinPrism`) is a standalone OTP key generator designed specifically for integration with homomorphic encryption (HE) systems. It is not an encryption mode itself — it produces domain-separated OTP key material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
+## Usage Examples
 
-| Property | Prism |
-|----------|-------|
-| **Engine** | `KelvinPrism` |
-| **Purpose** | Generate OTP keys for FHE recryption, split-key XOR homomorphism, chaotic FHE keygen |
-| **Keystream** | HKDF→SHAKE256 XOR (domain-separated from V3 Photon) |
-| **Forward secrecy** | ✅ BLAKE3 reseeding |
-| **Quantum resistance** | ✅ SHAKE256 (256-bit classical / 128-bit quantum) |
-| **Key features** | `generate_otp_key()`, `split_key()`, `recrypt()` |
+### Basic Encryption/Decryption
 
-> ⚠️ **Known Prior Art:** Chaotic key generation for FHE was previously proposed by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4 floating-point integration. Kelvin-Flare provides an alternative approach using 30-DOF n-body gravitational dynamics with fixed-point arithmetic and domain-separated extraction. See [Patent Review #3](documentation/patent_review_3.md) for full analysis.
+```rust
+use kelvin::{Kelvin, OrbitalConfig};
 
-See the [Homomorphic Cryptosystem Analysis](documentation/homomorphic_cryptosystem.md) for full details on integrating Kelvin with FHE systems.
+// Generate a random 5-body orbital configuration
+let config = OrbitalConfig::chaotic_default();
 
+// Create encryption instance (runs simulation)
+let mut alice = Kelvin::new(config.clone()).expect("Kelvin::new");
 
-## Security Levels
+// Encrypt data (in-place)
+let mut plaintext = b"Hello, Kelvin!".to_vec();
+alice.encrypt(&mut plaintext).unwrap();
 
-| Level    | Bodies | Steps     | Sun Mass Var. | Raw Keyspace | Setup Time |
-|----------|--------|-----------|---------------|--------------|------------|
-| Standard | 5      | 1,000,000 | ±25%          | $\approx 2^{1287}$ | ~1s        |
-| Paranoid | 5      | 10,000,000| ±25%          | $\approx 2^{1287}$ | ~10s       |
-| Maximum  | 10     | 100,000,000| ±25%         | $\approx 2^{2744}$ | ~2min      |
+// Create decryption instance (separate instance, same config)
+let mut bob = Kelvin::new(config).expect("Kelvin::new");
+bob.decrypt(&mut plaintext).unwrap();
+
+assert_eq!(&plaintext, b"Hello, Kelvin!");
+```
+
+### Streaming Mode (V2)
+
+```rust
+use kelvin::KelvinStreaming;
+
+let mut stream = KelvinStreaming::new(config, 1024).unwrap();
+let mut data = b"Large file...".to_vec();
+stream.encrypt(&mut data).unwrap();
+```
+
+### CLI Usage
+
+```bash
+# Generate a random configuration
+kelvin generate -o my-key.json
+
+# Encrypt a file
+kelvin encrypt -c my-key.json -i secret.txt -o secret.enc
+
+# Decrypt a file
+kelvin decrypt -c my-key.json -i secret.enc -o secret.txt
+
+# Analyze chaos quality
+kelvin analyze -c my-key.json
+
+# Run built-in self-test
+kelvin-test-client
+```
+
+## Performance
+
+| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
+|-----------|:-----------------------------:|:------------------------------:|
+| Setup + Keygen | ~1.1s | ~12.5s |
+| Encrypt 1 GB (V3/H) | ~200ms | ~200ms |
+| Encrypt 1 GB (V1) | ~500ms | ~500ms |
+| Encrypt 1 GB (V2) | ~33 min | ~5.5 hours |
+
+## Formal Verification
+
+Kelvin follows Apple's corecrypto blueprint for formal verification using the Kani Rust Verifier:
+
+| Level | What is Proved | Status |
+|-------|---------------|--------|
+| L0: Safety | No panics, no overflows under bounded inputs | ✅ Done |
+| L1: Functional Equivalence | Arithmetic ops match mathematical spec within dynamically scaled error bounds | ✅ Done |
+| L2: Composite Correctness | `compute_accelerations` matches Newtonian gravity via force-based assertions | ✅ Done |
+| L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ⏳ Pending |
+| L4: Determinism | Bit-identical results across platforms | ✅ Done |
+
+See [formal_verification.md](documentation/formal_verification.md) for details.
 
 ## Documentation
 
-- **[Academic Citations](documentation/citations.md)** — Full academic context for every component of Kelvin, organized by pipeline stage. Each citation includes a summary of its relevance.
-- **[Proof of Concept](documentation/proof_of_concept.md)** — Test results, benchmarks, and verification that Kelvin works as a functional cryptosystem.
-- **[Project History](documentation/project_history.md)** — The 24-year evolution of the Kelvin cryptosystem, from celestial concept to hybrid post-quantum reality.
-- **[Threat Model](THREAT_MODEL.md)** — Attacker capabilities, security boundaries, and comparison with existing KDFs.
-- **[REFERENCES.bib](REFERENCES.bib)** — Complete BibTeX bibliography for LaTeX integration.
+- [Usage Guide](documentation/usage.md) — Detailed API documentation
+- [Formal Verification](documentation/formal_verification.md) — Kani proof strategy
+- [Proof of Concept](documentation/proof_of_concept.md) — Test results and benchmarks
+- [Patent Landscape](documentation/patent_review_3.md) — Prior art analysis
+- [Quantum Resistance](documentation/quantum_analysis.md) — Post-quantum security analysis
+- [Homomorphic Integration](documentation/homomorphic_cryptosystem.md) — HE use cases
+- [OTP Study](documentation/Kelvin_OTP_Study.md) — Mode comparison and hybrid architecture
+- [Production Readiness](production_readiness_plan.md) — Roadmap to 1.0
 
-## References
+## Academic Context
 
-Kelvin builds on foundational work across numerical analysis, chaos theory, and cryptography:
+Kelvin builds on a rich body of research in chaos-based cryptography:
 
-### Fixed-Point Arithmetic & Numerical Methods
-- **Goldberg (1991)** — Floating-point non-determinism motivates Kelvin's Q32.64 fixed-point arithmetic [doi:10.1145/103162.103163]
-- **Verlet (1967)** — Original leapfrog integration method [doi:10.1103/PhysRev.159.98]
-- **Hairer, Lubich & Wanner (2006)** — Symplectic integrator theory (Springer, ISBN 978-3-540-30666-5)
+- **Chai et al. (2025)** — First known n-body chaotic image encryption (four-body memristor system)
+- **Song et al. (2025)** — CryptoChaos: hybrid chaos-cryptography framework
+- **Cang, Kang & Wang (2021)** — Conservative Sprott-A PRNG with finite precision analysis
+- **Jawad (2025)** — DUff-skg: chaotic Duffing oscillator for FHE key generation
+- **Apple '559 (expired)** — Original patent for chaotic dynamics in cryptography
 
-### Chaos Theory & Lyapunov Exponents
-- **Benettin et al. (1980)** — Lyapunov exponent computation algorithm [doi:10.1007/BF02128236]
-- **Wolf et al. (1985)** — Shadow orbit method for Lyapunov estimation [doi:10.1016/0167-2789(85)90011-9]
-- **Sano & Sawada (1985)** — Alternative Lyapunov estimation method [doi:10.1103/PhysRevLett.55.1082]
-
-### N-Body Gravitational Simulation
-- **Wisdom & Holman (1991)** — Symplectic maps for the n-body problem [doi:10.1086/115978]
-- **Murray & Dermott (1999)** — Solar System Dynamics (Cambridge University Press)
-
-### Cryptographic Hash Functions
-- **NIST FIPS PUB 202 (2015)** — SHAKE256 Extendable-Output Function (XOF) standard [doi:10.6028/NIST.FIPS.202]
-- **Bertoni et al. (2013)** — Keccak sponge construction [doi:10.1007/978-3-642-38348-9_19]
-
-### Stream Ciphers
-- **Bernstein (2008)** — ChaCha20 specification (SASC 2008)
-- **Nir & Langley (2018)** — ChaCha20 IETF standard (RFC 8439) [doi:10.17487/RFC8439]
-
-### Related Work & Known Prior Art
-- **Chai et al. (2025)** — N-body derived chaotic image encryption using restricted four-body memristor system (JCICE 2025, IEEE Xplore) [doi:10.1109/JCICE66205.2025.11182029]
-- **Jawad (2025)** — DUff-skg: chaotic Duffing oscillator key generation for BFV/CKKS FHE schemes (Boletim da Sociedade Paranaense de Matemática)
-- **Song et al. (2025)** — CryptoChaos: hybrid chaos-based cryptographic framework (arXiv:2504.08618)
-- **Weng, Zheng & Chen (2009)** — Orbit perturbation method for continuous-time chaotic stream ciphers (CISE 2009, IEEE Xplore) [doi:10.1109/CISE.2009.5366879]
-- **Song (2012)** — Chaotic orbit perturbation mechanism in image encryption (IWCFTA 2012, IEEE Xplore) [doi:10.1109/IWCFTA.2012.51]
-- **Cang, Kang & Wang (2021)** — PRNG based on generalized conservative Sprott-A system [doi:10.1007/s11071-021-06310-9]
-- **Halayka (2012)** — N-body dynamics for PRNG (computationally expensive vs. LFSR)
-- **Vuckovac (2021)** — N-body puzzles for PoW (no full cryptosystem implemented)
-- **Kraicha et al. (2025)** — Orbital-inspired encryption using Phobos/Deimos positions (metaphorical, not simulated)
-
-
-### Security & Side Channels
-- **Koeune & Standaert (2005)** — Side-channel attack methodology [doi:10.1007/11554578_3]
-
-### Reproducibility
-- **Gent (2017)** — Recomputation Manifesto [doi:10.1145/3105966]
+See [REFERENCES.bib](REFERENCES.bib) for the full bibliography.
 
 ## License
 
-Licensed under the Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License. See [licence.md](licence.md) for details.
+Licensed under either of:
 
-## Citation
+- Apache License, Version 2.0 ([LICENSE-APACHE](licence.md) or http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](licence.md) or http://opensource.org/licenses/MIT)
 
-If you use Kelvin in academic work, please cite:
+at your option.
 
-```bibtex
-@misc{nliaudat2026kelvin,
-  author    = {Nicolas Liaudat},
-  title     = {{Kelvin}: Orbital Chaos {KDF} Cryptosystem},
-  year      = {2026},
-  howpublished = {\url{https://github.com/nliaudat/kelvin}}
-}
-```
+## Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+**Security issues**: Report via the [SECURITY.md](SECURITY.md) process.

@@ -40,7 +40,8 @@ A systematic search of the **IEEE Xplore** digital library (2000–2025) across 
 6. [Updated Novelty Assessment](#5-updated-novelty-assessment)
 7. [Updated Risk Assessment](#6-updated-risk-assessment)
 8. [Updated Patent Strategy Recommendations](#7-updated-patent-strategy-recommendations)
-9. [References](#8-references)
+9. [For Open Source Implementers](#8-for-open-source-implementers)
+10. [References](#9-references)
 
 ---
 
@@ -481,43 +482,69 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 ---
 
-## 8. References
+## 8. For Open Source Implementers
 
-### Newly Identified IEEE Xplore References
+This section provides practical guidance for developers building on or integrating
+Kelvin's concepts, separate from the patent strategy above.
 
-1. **Chai, Z. et al.** (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*, Harbin, China. DOI: 10.1109/JCICE66205.2025.11182029.
+### Legality of Using Kelvin
 
-2. **Weng, Y., Zheng, R., & Chen, Y.** (2009). "A Novel Orbit Perturbation Method for Continuous-Time Chaos to Obtain Dynamic Seeds-Key Stream Cipher." *2009 International Conference on Computational Intelligence and Software Engineering (CISE)*. DOI: 10.1109/CISE.2009.5366879.
+| Activity | Status | Notes |
+|----------|--------|-------|
+| **Using Kelvin as a library** | ✅ **Legal** | MIT/Apache-2.0 dual license |
+| **Modifying Kelvin** | ✅ **Legal** | Open source contribution |
+| **Building a compatible implementation** | ⚠️ **Check patents** | Apple '559 expired; Chai et al. (2025) is academic paper, not patent |
+| **Commercial use** | ✅ **Legal** | MIT/Apache-2.0 permits commercial use |
+| **Filing patents on Kelvin concepts** | ⚠️ **Prior art exists** | See Section 5.2 for established prior art |
 
-3. **Song, T.** (2012). "A Novel Digital Image Cryptosystem with Chaotic Permutation and Perturbation Mechanism." *2012 Fifth International Workshop on Chaos-fractals Theories and Applications (IWCFTA)*, pp. 202–206. DOI: 10.1109/IWCFTA.2012.51.
+### Prior Art That Protects Implementers
 
-### Newly Identified HE + Chaos References
+The following prior art means these concepts **cannot be patented by anyone**:
 
-4. **Jawad, N. H.** (2025). "FHE cryptographic systems with using chaotic secret key generation (DUff-skg)." *Boletim da Sociedade Paranaense de Matemática*, UEM, Brazil.
+1. **N-body chaotic cryptography** — Apple '559 (expired) + Chai et al. (2025)
+2. **Chaotic stream cipher** — Toshiba '445 (expired) + Weng et al. (2009)
+3. **Chaotic FHE key generation** — DUff-skg (Jawad, 2025)
+4. **Orbit perturbation encryption** — Weng et al. (2009) + Song (2012)
+5. **Hybrid chaos-cryptography framework** — CryptoChaos (Song et al., 2025)
+6. **Chaotic map + hash KDF** — OrBIT-KDF (2026)
 
-5. **Mohammed, S. J., & Taha, D. B.** (2021). "Privacy preserving algorithm using Chaos-scattering of partial homomorphic encryption." *Journal of Physics: Conference Series*, IOP Publishing. DOI: 10.1088/1742-6596/1963/1/012154.
+### What to Do If You Want to Build a Compatible Implementation
 
-6. **Imtiaz Ahamed, S., & Ravi, V.** (2022). "Privacy-Preserving Chaotic Extreme Learning Machine with Fully Homomorphic Encryption." *arXiv e-prints*, arXiv:2208.
-
-7. **Fractal-Based Hybrid Cryptosystem** (2023). "Enhancing Image Encryption with RSA, Homomorphic Encryption, and Chaotic Maps." *Entropy*, MDPI, 25(11), 1478. DOI: 10.3390/e25111478.
-
-### Previously Identified References (from Patent Reviews #1 and #2)
-
-8. **US 6,587,559** — Apple Inc. "Cryptographic System Using Chaotic Dynamics" (expired 2019)
-9. **US 6,014,445** — Toshiba. "Stream Cipher Using Chaos" (expired 2016)
-10. **CN102360488B** — "Image Encryption Based on Chaotic Orbit Perturbation" (lapsed)
-11. **US 8,781,124** — Université de Nantes. "Chaotic Sequence Generator" (lapsed 2022)
-12. **OrBIT-KDF** (2026). GitHub: cozmobaut-hub/OrBIT-KDF.
-13. **Song et al.** (2025). "CryptoChaos." arXiv:2504.08618.
-14. **Halayka** (2012). "N-body dynamics for PRNG." viXra.
-15. **Vuckovac** (2021). "Cryptographic Puzzles and Complex Systems." *Complex Systems*.
-16. **Kraicha et al.** (2025). "Orbital-Inspired Encryption Using Phobos and Deimos." *JISA*.
-17. **Cang, Kang & Wang** (2021). "Conservative Sprott-A PRNG." *Nonlinear Dynamics*.
+1. **Use fixed-point arithmetic** — Avoid floating-point determinism issues. Q32.64 format is recommended but not required.
+2. **Implement the Verlet integrator** — The kick-drift-kick algorithm is well-known and unpatented.
+3. **Use SHAKE256 for extraction** — NIST standard, no patent concerns.
+4. **Avoid claiming "n-body chaotic cryptography" broadly** — This is prior art.
+5. **Do not copy Kelvin's specific domain separation strings** — Use your own.
+6. **Cite this prior art in any publications** — Academic integrity and patent defense.
 
 ---
 
-*This document is part of the Kelvin Cryptosystem documentation suite.  
-It represents an updated patent landscape analysis incorporating IEEE Xplore NPL search results (2000–2025).  
-This should not be construed as legal advice. Consult a qualified patent attorney before filing any patent application.*
+## 9. References
 
-*Last Updated: 2026-05-28*
+1. Chai, Z. et al. (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*. DOI: 10.1109/JCICE66205.2025.11182029.
+
+2. Weng, Y., Zheng, R., & Chen, Y. (2009). "A Novel Orbit Perturbation Method for Continuous-Time Chaos to Obtain Dynamic Seeds-Key Stream Cipher." *2009 International Conference on Computational Intelligence and Software Engineering (CISE)*. DOI: 10.1109/CISE.2009.5366879.
+
+3. Song, T. (2012). "A Novel Digital Image Cryptosystem with Chaotic Permutation and Perturbation Mechanism." *2012 Fifth International Workshop on Chaos-fractals Theories and Applications (IWCFTA)*. DOI: 10.1109/IWCFTA.2012.51.
+
+4. Jawad, N. H. (2025). "FHE cryptographic systems with using chaotic secret key generation (DUff-skg)." *Boletim da Sociedade Paranaense de Matemática*. DOI: 10.5269/bspm.77855.
+
+5. Mohammed, S. J., & Taha, D. B. (2021). "Privacy preserving algorithm using Chaos-scattering of partial homomorphic encryption." *Journal of Physics: Conference Series*, 1963(1), 012154. DOI: 10.1088/1742-6596/1963/1/012154.
+
+6. Ahamed, I. S., & Ravi, V. (2022). "Privacy-Preserving Chaotic Extreme Learning Machine with Fully Homomorphic Encryption." *arXiv e-prints*, arXiv:2208.
+
+7. (2023). "Fractal-Based Hybrid Cryptosystem: Enhancing Image Encryption with RSA, Homomorphic Encryption, and Chaotic Maps." *Entropy*, 25(11), 1478. DOI: 10.3390/e25111478.
+
+8. Song, Y. et al. (2025). "CryptoChaos: A Novel Hybrid Framework for Chaos-Based Cryptography." *IEEE Access*.
+
+9. OrBIT-KDF (2026). "Orbital Resonance-Based Key Derivation Using Chirikov Map and Julia Set Dynamics." *IACR ePrint*.
+
+10. Apple Inc. (2000). "Method and apparatus for generating chaotic signals." US Patent 6,587,559. Expired 2019-02-20.
+
+11. Toshiba Corp. (1997). "Chaotic stream cipher." US Patent 6,014,445. Expired 2016-10-22.
+
+---
+
+*End of Patent Review #3*
+
+

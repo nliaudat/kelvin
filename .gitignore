@@ -58,3 +58,4 @@ scripts/test_aead.py
 scripts/chunk_size_compare.py
 /documentation/related_papers
 /tests/test_results
+*.bin

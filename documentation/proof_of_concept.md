@@ -94,7 +94,9 @@ All unit tests pass across the core crates:
 | **Lib subtotal** | **181** | **✅ ALL PASS** |
 | Integration (full_pipeline) | 16 | ✅ PASS |
 | Chaos (chaos_test) | 2 | ✅ PASS |
-| **Grand total** | **199** | **✅ ALL PASS** |
+| Streaming (streaming_api) | 8 | ✅ PASS |
+| **Grand total** | **207** | **✅ ALL PASS** |
+
 
 
 ---
@@ -113,7 +115,7 @@ This proves that the orbital simulation operates in the chaotic regime, where sm
 
 ### 4.2 No Shortcut Attacks
 
-The Verlet integrator is inherently sequential — step N+1 requires the output of step N. This means:
+The n-body integrator (Verlet or Euler) is inherently sequential — step N+1 requires the output of step N. This means:
 
 - **No parallelization advantage**: An attacker with 1,000 cores cannot simulate 1,000 steps faster than a single core.
 - **No closed-form solution**: The n-body problem ($N \ge 3$) has no known analytical solution. Kelvin strictly enforces $N \ge 3$ to prevent integration of predictable 2-body orbits.
@@ -153,7 +155,7 @@ The KDF pipeline operates in two distinct time domains:
 
 **Real Time (Orbital Simulation):**
 - Runs once during `Kelvin::new()` for `total_steps` iterations
-- Uses Verlet integration to evolve the n-body system
+- Uses Verlet or Euler integration to evolve the n-body system
 - Monitored for stability (ejections, collapses)
 - Final state is extracted into a 2048-byte entropy pool via SHAKE256
 
@@ -231,7 +233,7 @@ The Sprott-A system is conservative (Hamiltonian), preserving phase-space volume
 
 ## 4.9 V2 Streaming Mode (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) introduces a true one-time pad streaming mode where each chunk of data advances the orbital simulation by one Verlet step. This is verified by the built-in self-test:
+V2 Streaming (`KelvinStreaming`) introduces a true one-time pad streaming mode where each chunk of data advances the orbital simulation by one integration step (Verlet or Euler). This is verified by the built-in self-test:
 
 ```
 === V2 Streaming Self-Tests ===
@@ -257,7 +259,7 @@ Test S4: Streaming benchmark...
 
 ### `bytes_per_step` Determinism
 
-The streaming API processes data in fixed-size chunks of `bytes_per_step` bytes, advancing the simulation by one Verlet step per chunk. This ensures:
+The streaming API processes data in fixed-size chunks of `bytes_per_step` bytes, advancing the simulation by one integration step (Verlet or Euler) per chunk. This ensures:
 
 - **Chunking independence**: A 100-byte call and two 50-byte calls produce the same ciphertext for the same total bytes.
 - **Consistent ETA**: `estimate_time()` divides file size by `bytes_per_step`, matching actual processing step count exactly.
