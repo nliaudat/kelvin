@@ -103,12 +103,19 @@ Key features of `KelvinPrism`:
 
 ### Strategy 2: Chaotic Key Generation for FHE (Kelvin-Flare)
 
+> ⚠️ **Known Prior Art:** Chaotic key generation for FHE was previously proposed
+> by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4
+> floating-point integration. Kelvin-Flare offers an alternative approach using
+> 30-DOF n-body gravitational dynamics with fixed-point arithmetic and
+> domain-separated extraction. See [Patent Review #3](patent_review_3.md) for
+> full analysis.
+
 A 2025 paper by Jawad proposes **DUff-skg**: generating FHE secret keys using chaotic Duffing equations.
 
 | Aspect | DUff-skg (Jawad, 2025) | Kelvin-Flare |
 |--------|------------------------|--------------|
 | Chaos source | Duffing oscillator (2 DOF) | 5-body orbital simulation (30 DOF) |
-| Key size | 2³²⁵ bits (massive) | 2¹⁹²⁰ bits (even larger) |
+| Key size | 2³²⁵ bits | 2¹⁹²⁰ bits |
 | NIST tests | ✅ Passed | ✅ Passed (Kelvin's own tests) |
 | Integration | BFV, CKKS, TFHE | Same standards |
 | Forward secrecy | ❌ Not specified | ✅ BLAKE3 reseeding |
@@ -122,7 +129,8 @@ sk = integer((x + y + 0.5) × 1000)
 
 Where `(x, y)` come from modified Duffing equations.
 
-**Kelvin's equivalent:** The `KelvinFlare` struct replaces the 2-DOF Duffing system with Kelvin's 5-body orbital chaos (30 DOF) for even higher-quality key material.
+**Kelvin's alternative:** The `KelvinFlare` struct uses 5-body orbital chaos (30 DOF) instead of the 2-DOF Duffing system, with fixed-point arithmetic and domain-separated SHAKE256 extraction.
+
 
 #### Using `Flare mode` for FHE Key Generation
 
@@ -294,7 +302,8 @@ fn split_key_example(split: &mut KelvinSplit) -> Result<()> {
 |------|--------|---------|-------------------|
 | **Prism** | `KelvinPrism` | OTP key generation for FHE recryption | `DOMSEP_PRISM_KEYSTREAM_V1`, `DOMSEP_PRISM_RESEED_V1` |
 | **Split** | `KelvinSplit` | XOR key-splitter for partial homomorphism | `DOMSEP_SPLIT_KEYSTREAM_V1`, `DOMSEP_SPLIT_RESEED_V1` |
-| **Flare** | `KelvinFlare` | Chaotic FHE secret key generation | `DOMSEP_FLARE_KEYSTREAM_V1`, `DOMSEP_FLARE_RESEED_V1` |
+| **Flare** | `KelvinFlare` | N-body gravitational FHE secret key generation | `DOMSEP_FLARE_KEYSTREAM_V1`, `DOMSEP_FLARE_RESEED_V1` |
+
 
 All three modes are **domain-separated** from each other and from V3 Photon,
 preventing related-key attacks when multiple modes are used in the same system.
@@ -307,7 +316,8 @@ preventing related-key attacks when multiple modes are used in the same system.
 |----------|-------------|----------|
 | Kelvin alone | ❌ No | OTP doesn't support multiplicative homomorphism |
 | Kelvin + FHE recryption | ✅ Yes | Use `KelvinPrism` keys in recryption layer |
-| Kelvin + chaotic FHE keygen | ✅ Yes | Use `KelvinFlare` to replace Duffing with 5-body chaos |
+| Kelvin + chaotic FHE keygen | ✅ Yes | Use `KelvinFlare` as an alternative to Duffing-based keygen |
+
 | Kelvin for XOR homomorphism | ✅ Yes | Use `KelvinSplit` split-key approach |
 
 ---

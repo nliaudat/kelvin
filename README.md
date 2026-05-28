@@ -29,17 +29,17 @@ Kelvin is an experimental cryptosystem that derives cryptographic keys from the 
 
 ### What Makes Kelvin Novel
 
-Kelvin is the first cryptosystem to harness the **computational difficulty of n-body orbital integration** as a cryptographic primitive. Unlike traditional KDFs that rely on algebraic hardness (discrete log, factorization) or memory-hard functions (Argon2, scrypt), Kelvin's security derives from the inherent unpredictability of chaotic gravitational dynamics — a fundamentally different source of cryptographic entropy.
+Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems. The n-body problem is famously non-integrable for N ≥ 3: there is no closed-form solution, and numerical integration is the only path forward. Kelvin exploits this by making the orbital simulation itself part of the key derivation. An attacker cannot shortcut the simulation — they must run the same deterministic Verlet integration step-by-step, with the same fixed-point arithmetic, to reproduce the keystream. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
-The n-body problem is famously non-integrable for N ≥ 3: there is no closed-form solution, and numerical integration is the only path forward. Kelvin exploits this by making the orbital simulation itself part of the key derivation. An attacker cannot shortcut the simulation — they must run the same deterministic Verlet integration step-by-step, with the same fixed-point arithmetic, to reproduce the keystream. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
+> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review_3.md) for full analysis.
 
-Key innovations include:
+Key features include:
 
-- **Deterministic chaos as a one-way function** — The exponential divergence of nearby trajectories (quantified by the Lyapunov exponent) ensures that even microscopic differences in initial conditions produce completely different orbital states after sufficient steps. This maps naturally to a cryptographic one-way function: given the final state, recovering the initial configuration is computationally infeasible.
+- **Fixed-point gravitational n-body as a deterministic one-way function** — The exponential divergence of nearby trajectories (quantified by the Lyapunov exponent) ensures that even microscopic differences in initial conditions produce completely different orbital states after sufficient steps. This maps naturally to a cryptographic one-way function: given the final state, recovering the initial configuration is computationally infeasible.
 
 - **Platform-independent fixed-point arithmetic** — Kelvin uses Q32.64 fixed-point math instead of floating-point, guaranteeing bit-identical simulation results across all architectures (x86, ARM, WebAssembly, RISC-V). This is essential for a KDF — the same orbital configuration must produce the same keystream everywhere.
 
-- **Lyapunov time as a security parameter** — The Lyapunov time quantifies the horizon beyond which the system becomes truly unpredictable. Kelvin's shadow orbit method estimates this horizon and rejects configurations that would produce unreliable keystreams, providing a rigorous bound on the security margin.
+- **Lyapunov time as an active security parameter** — While Lyapunov exponents are widely used as a passive validation metric for chaotic systems, Kelvin uses the Lyapunov time as an **active** security parameter. The shadow orbit method estimates the horizon beyond which the system becomes truly unpredictable, and Kelvin rejects configurations that would produce unreliable keystreams, providing a rigorous bound on the security margin.
 
 - **Entropy Extraction past the Lyapunov Horizon** — To ensure maximum uncertainty, Kelvin requires that the total simulation steps exceed the estimated Lyapunov time. This guarantees that the extractable entropy is fully randomized and decoupled from the initial configuration secrets.
 
@@ -48,6 +48,7 @@ Key innovations include:
 - **Post-Quantum Hybrid Identity** — Kelvin bridges chaotic dynamics and Post-Quantum Cryptography. By applying **domain-separated hashing (SHAKE256)** to the orbital state, it derives uniform key pairs for **ML-DSA-65** (Quantum-Safe Signature), **ML-KEM-768** (Quantum-Safe KEM), and **Curve25519** (Classical). This allows a shared chaotic configuration to serve as a universally identifiable and quantum-resistant identity.
 
 - **Negotiable physical constants** — Kelvin supports a dynamic gravitational constant ($G$), allowing communicating parties to initialize their chaotic environment with unique physical laws. This increases the configuration space and prevents pre-computation attacks based on fixed gravitational models. Strict validation bounds ($1.0 \le G \le 1000.0$) ensure the system remains within a chaotic yet numerically stable regime.
+
 
 ## How It Works
 
@@ -123,7 +124,10 @@ Kelvin provides four cryptographic modes, each optimized for different use cases
 | **Quantum resistance** | ✅ SHAKE256 (256-bit classical / 128-bit quantum) |
 | **Key features** | `generate_otp_key()`, `split_key()`, `recrypt()` |
 
+> ⚠️ **Known Prior Art:** Chaotic key generation for FHE was previously proposed by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4 floating-point integration. Kelvin-Flare provides an alternative approach using 30-DOF n-body gravitational dynamics with fixed-point arithmetic and domain-separated extraction. See [Patent Review #3](documentation/patent_review_3.md) for full analysis.
+
 See the [Homomorphic Cryptosystem Analysis](documentation/homomorphic_cryptosystem.md) for full details on integrating Kelvin with FHE systems.
+
 
 ## Security Levels
 
@@ -167,12 +171,17 @@ Kelvin builds on foundational work across numerical analysis, chaos theory, and 
 - **Bernstein (2008)** — ChaCha20 specification (SASC 2008)
 - **Nir & Langley (2018)** — ChaCha20 IETF standard (RFC 8439) [doi:10.17487/RFC8439]
 
-### Related Work
+### Related Work & Known Prior Art
+- **Chai et al. (2025)** — N-body derived chaotic image encryption using restricted four-body memristor system (JCICE 2025, IEEE Xplore) [doi:10.1109/JCICE66205.2025.11182029]
+- **Jawad (2025)** — DUff-skg: chaotic Duffing oscillator key generation for BFV/CKKS FHE schemes (Boletim da Sociedade Paranaense de Matemática)
 - **Song et al. (2025)** — CryptoChaos: hybrid chaos-based cryptographic framework (arXiv:2504.08618)
+- **Weng, Zheng & Chen (2009)** — Orbit perturbation method for continuous-time chaotic stream ciphers (CISE 2009, IEEE Xplore) [doi:10.1109/CISE.2009.5366879]
+- **Song (2012)** — Chaotic orbit perturbation mechanism in image encryption (IWCFTA 2012, IEEE Xplore) [doi:10.1109/IWCFTA.2012.51]
 - **Cang, Kang & Wang (2021)** — PRNG based on generalized conservative Sprott-A system [doi:10.1007/s11071-021-06310-9]
 - **Halayka (2012)** — N-body dynamics for PRNG (computationally expensive vs. LFSR)
 - **Vuckovac (2021)** — N-body puzzles for PoW (no full cryptosystem implemented)
 - **Kraicha et al. (2025)** — Orbital-inspired encryption using Phobos/Deimos positions (metaphorical, not simulated)
+
 
 ### Security & Side Channels
 - **Koeune & Standaert (2005)** — Side-channel attack methodology [doi:10.1007/11554578_3]
