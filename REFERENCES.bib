@@ -183,6 +183,51 @@
                four discrete chaotic maps with X25519 and AES-GCM}
 }
 
+@misc{orbitkdf2026,
+  author    = {cozmobaut-hub},
+  title     = {{OrBIT-KDF}: Chirikov Standard Map and Julia Set Key
+               Derivation Function},
+  year      = {2026},
+  howpublished = {\url{https://github.com/cozmobaut-hub/OrBIT-KDF}},
+  note      = {Related work: experimental KDF using Chirikov standard
+               map + Julia set iteration + SHA-512. Uses chaotic fractal
+               dynamics to turn user credentials into high-entropy keys.
+               Licensed Apache-2.0. Created 2026-01-30.}
+}
+
+@misc{chaoticflux2026,
+  author    = {Anonymous},
+  title     = {A chaotic flux cipher based on the random cubic family
+               $f_{c_n}(z)=z^3+c_n z$},
+  year      = {2026},
+  howpublished = {arXiv:2603.20937},
+  note      = {Related work: symmetric stream cipher using random cubic
+               mappings in the complex plane for pseudo-random keystream
+               generation}
+}
+
+@misc{relativistic3body2024,
+  author    = {Anonymous},
+  title     = {Partial suppression of chaos in relativistic three-body
+               problems},
+  year      = {2024},
+  howpublished = {arXiv:2410.15410},
+  note      = {Studies chaos in gravitational n-body (3 <= N <= 10^3),
+               relevant to understanding chaos properties of Kelvin's
+               core dynamics}
+}
+
+@misc{whfast2015,
+  author    = {Hanno Rein and David S. Spiegel},
+  title     = {{WHFast}: A fast and unbiased implementation of a
+               symplectic Wisdom-Holman integrator for long term
+               gravitational simulations},
+  year      = {2015},
+  howpublished = {arXiv:1506.01084},
+  note      = {Fast symplectic integrator for gravitational simulations,
+               relevant to Kelvin's integrator choices}
+}
+
 @misc{halayka2012nbody,
   author    = {Halayka, S.},
   title     = {On leveraging the chaotic and combinatorial nature of
@@ -690,4 +735,106 @@
                ChaCha20-Poly1305 stream ciphers: key/nonce sizes,
                encryption/decryption operations, position tracking,
                exhaustion safety, and feature comparison}
+}
+
+% ---- IEEE Xplore NPL Prior Art (Patent Review #3) ----
+
+@inproceedings{chai2025fourbody,
+  author    = {Chai, Zhijun and others},
+  title     = {Chaotic Image Encryption Based on an Improved Seven-Dimensional
+               Memristor-based Restricted Four-Body System},
+  booktitle = {2025 4th International Joint Conference on Information and
+               Communication Engineering (JCICE)},
+  year      = {2025},
+  address   = {Harbin, China},
+  doi       = {10.1109/JCICE66205.2025.11182029},
+  note      = {Prior art: first known n-body derived chaotic cryptosystem.
+               Uses restricted four-body memristor system for image encryption.
+               Kelvin distinguishes via full gravitational 10-body simulation,
+               fixed-point arithmetic, and general-purpose multi-mode architecture}
+}
+
+@inproceedings{weng2009orbitperturbation,
+  author    = {Weng, Yifang and Zheng, Rong and Chen, Yi},
+  title     = {A Novel Orbit Perturbation Method for Continuous-Time Chaos to
+               Obtain Dynamic Seeds-Key Stream Cipher},
+  booktitle = {2009 International Conference on Computational Intelligence and
+               Software Engineering (CISE)},
+  year      = {2009},
+  doi       = {10.1109/CISE.2009.5366879},
+  note      = {Prior art: orbit perturbation method for continuous-time chaotic
+               stream ciphers. Validated on Lorenz, R{\"o}ssler, and Chen systems.
+               Kelvin distinguishes via discrete-time n-body simulation,
+               fixed-point arithmetic, and SHAKE256 extraction}
+}
+
+@inproceedings{song2012orbitperturbation,
+  author    = {Song, Tao},
+  title     = {A Novel Digital Image Cryptosystem with Chaotic Permutation and
+               Perturbation Mechanism},
+  booktitle = {2012 Fifth International Workshop on Chaos-fractals Theories and
+               Applications (IWCFTA)},
+  year      = {2012},
+  pages     = {202--206},
+  doi       = {10.1109/IWCFTA.2012.51},
+  note      = {Prior art: chaotic orbit perturbation mechanism in diffusion
+               procedure using 2D Cat map and Baker map. Kelvin distinguishes
+               via n-body gravitational dynamics, fixed-point determinism,
+               and Lyapunov-based stability monitoring}
+}
+
+@article{jawad2025duffskg,
+  author    = {Jawad, Nibras Hadi},
+  title     = {{FHE} cryptographic systems with using chaotic secret key
+               generation ({DUff-skg})},
+  journal   = {Boletim da Sociedade Paranaense de Matem{\'a}tica},
+  year      = {2025},
+  publisher = {Universidade Estadual de Maring{\'a} (UEM)},
+  note      = {Prior art: Duffing oscillator chaotic key generation for
+               BFV and CKKS FHE schemes. Direct overlap with Kelvin's Flare
+               mode. Kelvin distinguishes via 30-DOF n-body vs. 2-DOF Duffing,
+               fixed-point vs. RK4 floating, domain-separated extraction}
+}
+
+@article{mohammed2021chaosphe,
+  author    = {Mohammed, S. J. and Taha, D. B.},
+  title     = {Privacy preserving algorithm using Chaos-scattering of partial
+               homomorphic encryption},
+  journal   = {Journal of Physics: Conference Series},
+  volume    = {1963},
+  number    = {1},
+  pages     = {012154},
+  year      = {2021},
+  publisher = {IOP Publishing},
+  doi       = {10.1088/1742-6596/1963/1/012154},
+  note      = {Prior art: Lorenz chaotic system for partial homomorphic
+               encryption. Kelvin distinguishes via full FHE/OTP modes,
+               n-body simulation, and domain separation}
+}
+
+@misc{ahamed2022chaoticelm,
+  author    = {Imtiaz Ahamed, S. and Ravi, V.},
+  title     = {Privacy-Preserving Chaotic Extreme Learning Machine with
+               Fully Homomorphic Encryption},
+  year      = {2022},
+  howpublished = {arXiv:2208},
+  note      = {Prior art: chaotic logistic map for FHE key generation in
+               ML context. Kelvin distinguishes via general-purpose encryption,
+               n-body simulation, and multi-mode architecture}
+}
+
+@article{fractal2023hybrid,
+  author    = {Anonymous},
+  title     = {Fractal-Based Hybrid Cryptosystem: Enhancing Image Encryption
+               with {RSA}, Homomorphic Encryption, and Chaotic Maps},
+  journal   = {Entropy},
+  volume    = {25},
+  number    = {11},
+  pages     = {1478},
+  year      = {2023},
+  publisher = {MDPI},
+  doi       = {10.3390/e25111478},
+  note      = {Prior art: Paillier homomorphic encryption + logistic/sine
+               chaotic maps + fractal Sierpinski triangle. Kelvin distinguishes
+               via n-body simulation, BFV/CKKS/TFHE, and fixed-point arithmetic}
 }
