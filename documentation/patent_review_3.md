@@ -545,6 +545,62 @@ The following prior art means these concepts **cannot be patented by anyone**:
 
 ---
 
+## 10. OTP Framing Addendum — Patent Implications of the "One-Time Pad" Claim
+
+This section assesses how Kelvin's enhanced OTP framing (documented in [`otp_bulletproof.md`](otp_bulletproof.md), [`README.md`](../README.md), and [`usage.md`](usage.md)) affects the patent landscape. The OTP language has been integrated throughout the project's public documentation to emphasize quantum resistance and the nonce-less architecture.
+
+### 10.1 Prior Art for "Computational OTP" / "Stream Cipher as OTP"
+
+| Concept | Prior Art Status | Impact |
+|---------|-----------------|--------|
+| **One-time pad (Vernam cipher)** | Prior art since 1919 — unpatentable | ✅ No risk. The "OTP" name is prior art, not a problem. |
+| **Stream cipher producing OTP-like keystream** | Extensive prior art (e.g., AES-CTR described as "OTP equivalent", ChaCha20, Salsa20) | 🟡 **Moderate**. Claiming "OTP keystream from a KDF" broadly would be obvious. Must tie to n-body + fixed-point. |
+| **Computational OTP / Indifferentiable OTP** | Academic literature (e.g., "computational equivalence to OTP" via random oracle) | 🟡 **Moderate**. The "computational OTP" framing is known literature. |
+| **Nonce-less stream cipher** | Less common — most stream ciphers require nonces. No specific blocking patent found. | 🟢 **Low**. Nonce-less XOR with domain-separated extraction is novel in combination. |
+| **OTP key generation from physical simulation** | No prior art found combining OTP framing with n-body gravitational simulation | ✅ **Novel**. The specific application (OTP keystream from n-body chaos extraction) is not described in prior art. |
+
+**Bottom line:** Claiming "a one-time pad cryptosystem" broadly would be obvious. Claiming "a nonce-less OTP keystream generator using fixed-point n-body gravitational simulation with SHAKE256 extraction and Lyapunov-monitored reseeding" is novel.
+
+### 10.2 How OTP Framing Strengthens Flare / Prism / Split vs. DUff-skg (2025)
+
+| Aspect | DUff-skg (Jawad, 2025) | Kelvin with OTP Framing | Distinction Strength |
+|--------|------------------------|------------------------|---------------------|
+| **Key type** | Deterministic FHE secret key | Unlimited OTP keystream (key = plaintext length) | 🔴 Strong — fundamentally different output model |
+| **Nonce/IV** | Not applicable (key generation) | **No nonce, no IV** — single orbital config | 🔴 Strong — DUff-skg doesn't address this |
+| **Key reuse** | Single key per config | **Forward-secret reseeding** prevents any reuse | 🟡 Moderate |
+| **Entropy renewal** | Static Duffing iteration | Continuous chaotic reseeding (Quantum H) | 🟡 Moderate |
+| **Extraction** | Simple integer formula `(x+y+0.5)×1000` | SHAKE256 XOF with domain separation | 🔴 Strong — fundamentally different extraction |
+
+The OTP framing fundamentally changes the claim: DUff-skg claims "chaotic FHE secret key generation." Kelvin claims "a nonce-less OTP keystream generator for homomorphic encryption." These are architecturally different — one produces a bounded-length secret key, the other produces unlimited keystream with OTP properties.
+
+### 10.3 Updated Claim Drafting Guidance for OTP-Specific Language
+
+| Claim Language | Risk | Recommendation |
+|----------------|------|----------------|
+| "A one-time pad encryption system..." | 🔴 **High** — too broad, obvious over prior art | ❌ Avoid standalone |
+| "A nonce-less stream cipher using chaotic n-body simulation..." | 🟡 **Moderate** — "stream cipher" is broad | ⚠️ Use cautiously |
+| "A computational OTP keystream generator using fixed-point n-body simulation..." | 🟢 **Low** — specific mechanism | ✅ Preferred |
+| "An OTP key-splitter for XOR homomorphic encryption..." | 🟢 **Low** — specific application | ✅ Preferred |
+| "A method for generating OTP keystream with no nonce, no IV, and key-length = plaintext-length..." | 🟢 **Low** — enumerates specific OTP properties | ✅ Preferred |
+
+**Key principle:** Every claim must include at least one of the following to avoid being obvious from OTP + stream cipher prior art: fixed-point n-body, Lyapunov monitoring, domain-separated reseeding, or nonce-less architecture.
+
+### 10.4 Updated Risk Matrix (OTP-Specific)
+
+| Risk | Level | Mitigation |
+|------|-------|------------|
+| "Computational OTP" as standalone concept | 🟡 **Moderate** | Always tie to n-body + fixed-point specifics |
+| "OTP from stream cipher" (broad) | 🔴 **High** | Emphasize nonce-less, no-IV, continuous reseeding differences |
+| "OTP key for FHE" (vs DUff-skg) | 🟡 **Moderate** | Emphasize unlimited keystream vs bounded key; SHAKE256 vs integer formula |
+| "Nonce-less OTP" as patent claim | 🟢 **Low** | No prior art for nonce-less + n-body + SHAKE256 combination |
+
+### 10.5 Summary
+
+> The OTP framing **does not introduce new blocking patent risks**. The one-time pad concept is prior art since 1919 and cannot be patented. The "computational OTP" concept is well-known academic literature. **However, the OTP framing strengthens Kelvin's distinctiveness** from DUff-skg and other chaotic key generation prior art by emphasizing nonce-less architecture, unlimited keystream, forward-secret reseeding, and SHAKE256 extraction — all features absent from the prior art. Claims should tie OTP language to n-body + fixed-point + Lyapunov specifics to avoid obviousness rejections.
+
+---
+
 *End of Patent Review #3*
+
 
 
