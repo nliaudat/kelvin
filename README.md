@@ -79,40 +79,42 @@ Key features include:
 
 ## How It Works
 
-Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The system follows a deterministic pipeline that transforms a shared orbital configuration into a **quantum-resistant one-time pad keystream**:
+Kelvin's security rests on the unpredictability of chaotic n-body dynamics. The system follows a deterministic pipeline that transforms a shared orbital configuration into a **quantum-resistant one-time pad (OTP) keystream**:
 
 ```
 OrbitalConfig (masses, positions, velocities, G, ε)
     │
     ▼
-┌─────────────────────────────────────────────────────┐
-│  Phase 1: Orbital Simulation (Verlet/Euler)           │
-│  • Simulate N-body gravitational dynamics            │
-│  • Monitor for stability (Lyapunov, ejections)       │
-│  • Run for total_steps iterations                    │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Phase 2: Entropy Extraction (SHAKE256)              │
-│  • Hash final orbital state + physical constants     │
-│  • Produce 2048-byte entropy pool                    │
-│  • Domain-separated for different purposes           │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  Phase 3: Key Schedule (HKDF-SHA512 + BLAKE3)        │
-│  • Derive per-key material from entropy pool         │
-│  • Reseed pool after each key (forward secrecy)      │
-│  • Exhausted after max_keys or safe_steps            │
-└──────────────────────┬──────────────────────────────┘
-                       │
-                       ▼
-              OTP Keystream (XOR encrypt/decrypt)
+┌──────────────────────────────────────────────────────────────┐
+│  Phase 1: Orbital Simulation (Verlet/Euler)                   │
+│  • Simulate N-body gravitational dynamics (30 DOF chaos)      │
+│  • Monitor for stability (Lyapunov, ejections, collapses)     │
+│  • Run for total_steps iterations (chaotic regime enforced)   │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Phase 2: OTP Entropy Extraction (SHAKE256)                   │
+│  • Hash final orbital state + physical constants + forces     │
+│  • Produce 2048-byte OTP entropy pool                         │
+│  • Domain-separated: V2/V3/H/Prism/Split/Flare are isolated  │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+                           ▼
+┌──────────────────────────────────────────────────────────────┐
+│  Phase 3: OTP Key Schedule (HKDF-SHA512 + BLAKE3)             │
+│  • Derive OTP keystream: key ≥ plaintext, no nonce, no IV     │
+│  • Reseed pool after each key (forward secrecy — no reuse)    │
+│  • Exhausted after max_keys (each key used exactly once)      │
+└──────────────────────────┬───────────────────────────────────┘
+                           │
+                           ▼
+         Quantum-Resistant OTP Keystream
+         (computationally indistinguishable from random)
 ```
 
 The resulting keystream is used as a **quantum-resistant one-time pad**: data is XOR-encrypted byte-by-byte with the keystream. Since the keystream is derived via SHAKE256 (NIST PQC standard) from chaotic dynamics with no closed-form solution, it is computationally indistinguishable from random — and no quantum algorithm can shortcut the simulation.
+
 
 ## Why One-Time Pad?
 
