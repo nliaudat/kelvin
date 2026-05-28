@@ -866,15 +866,16 @@ mod tests {
     #[test]
     fn test_kelvin_aead_tag_detection() {
         let config = five_body_config();
-        let mut k = Kelvin::new(config).expect("Kelvin::new");
+        let mut enc = Kelvin::new(config.clone()).expect("Kelvin::new");
+        let mut dec = Kelvin::new(config).expect("Kelvin::new");
         let mut data = b"Hello, Kelvin!".to_vec();
         // Extend with space for AEAD tag
         data.extend_from_slice(&[0u8; 16]);
-        k.encrypt(&mut data).unwrap();
+        enc.encrypt(&mut data).unwrap();
         // Tamper with the ciphertext
         data[0] ^= 0xFF;
         // Decryption should fail due to tag mismatch
-        let result = k.decrypt(&mut data);
+        let result = dec.decrypt(&mut data);
         assert!(result.is_err());
     }
 

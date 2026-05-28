@@ -1,0 +1,35 @@
+
+running 30 tests
+test test_chaos_streaming_determinism ... ok
+test test_chaos_streaming_chunk_independence ... ok
+test test_chaos_streaming_multi_chunk ... ok
+test test_chaos_streaming_round_trip ... ok
+test test_chaos_streaming_misaligned_chunks ... ok
+test test_chaos_streaming_vs_batch_consistency ... ok
+test test_photon_streaming_chunk_independence ... ok
+test test_photon_streaming_determinism ... ok
+test test_photon_streaming_empty ... ok
+test test_photon_streaming_multi_chunk ... ok
+test test_photon_streaming_round_trip ... ok
+test test_photon_streaming_vs_batch_consistency ... ok
+test test_secure_streaming_double_finalize ... ok
+test test_secure_streaming_empty ... ok
+test test_secure_streaming_multi_chunk ... ok
+test test_secure_streaming_round_trip ... ok
+test test_secure_streaming_tamper_detection ... ok
+test test_secure_streaming_update_after_finalize ... ok
+test test_secure_streaming_wrong_tag ... ok
+test test_streaming_trait_object_dispatch ... ok
+test test_file_streaming_chaos_round_trip ... ok
+test test_file_streaming_secure_round_trip ... ok
+test test_file_streaming_photon_round_trip ... ok
+test test_file_streaming_secure_tamper_detection ... ok
+test test_quantum_streaming_vs_batch_consistency ... ok
+test test_quantum_streaming_round_trip ... ok
+test test_quantum_streaming_determinism ... ok
+test test_quantum_streaming_max_reseed_exhaustion ... ok
+test test_photon_streaming_large_data ... ok
+test test_file_streaming_large_buffer ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+

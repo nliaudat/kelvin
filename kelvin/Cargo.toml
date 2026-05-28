@@ -55,6 +55,14 @@ path = "../tests/kelvin_tests/streaming_api.rs"
 name = "v1_round_trip"
 path = "../tests/kelvin_tests/v1_round_trip.rs"
 
+[[test]]
+name = "split"
+path = "../tests/kelvin_tests/split.rs"
+
+[[test]]
+name = "flare"
+path = "../tests/kelvin_tests/flare.rs"
+
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "kelvin-kdf/serde"]
