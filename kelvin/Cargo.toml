@@ -27,6 +27,34 @@ chacha20poly1305 = "0.10"
 chacha20 = "0.9"
 
 
+[[test]]
+name = "authenticated"
+path = "../tests/kelvin_tests/authenticated.rs"
+
+[[test]]
+name = "full_pipeline"
+path = "../tests/kelvin_tests/full_pipeline.rs"
+
+[[test]]
+name = "photon"
+path = "../tests/kelvin_tests/photon.rs"
+
+[[test]]
+name = "prism"
+path = "../tests/kelvin_tests/prism.rs"
+
+[[test]]
+name = "quantum"
+path = "../tests/kelvin_tests/quantum.rs"
+
+[[test]]
+name = "streaming_api"
+path = "../tests/kelvin_tests/streaming_api.rs"
+
+[[test]]
+name = "v1_round_trip"
+path = "../tests/kelvin_tests/v1_round_trip.rs"
+
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "kelvin-kdf/serde"]

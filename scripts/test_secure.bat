@@ -16,9 +16,11 @@ setlocal enabledelayedexpansion
 set RED=[91m
 set GREEN=[92m
 set CYAN=[96m
+set YELLOW=[93m
 set NC=[0m
 
 set EXITCODE=0
+set FAILED_STEPS=
 
 REM Change to workspace root (parent of scripts/)
 cd /d "%~dp0.."
@@ -26,150 +28,225 @@ cd /d "%~dp0.."
 REM ---------------------------------------------------------------------------
 REM 1. Formatting check
 REM ---------------------------------------------------------------------------
-call :step "1/9: Check formatting"
+set STEP_NAME=1/9: Check formatting
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo fmt --check
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 2. Unit tests (all workspace members)
 REM ---------------------------------------------------------------------------
-call :step "2/9: Unit tests (all workspace members)"
+set STEP_NAME=2/9: Unit tests (all workspace members)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release --lib --workspace
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "3/9: Unit tests - kelvin-stream (AES-NI feature)"
+set STEP_NAME=3/9: Unit tests - kelvin-stream (AES-NI feature)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release --lib -p kelvin-stream --features aes-ni
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 3. Integration tests
 REM ---------------------------------------------------------------------------
-call :step "4/9: Integration: V1 round-trip"
+set STEP_NAME=4/9: Integration: Secure round-trip
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test v1_round_trip
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "5/9: Integration: Photon cipher"
+set STEP_NAME=5/9: Integration: Photon cipher
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test photon
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "6/9: Integration: Quantum cipher"
+set STEP_NAME=6/9: Integration: Quantum cipher
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test quantum
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "7/9: Integration: Authenticated encryption"
+set STEP_NAME=7/9: Integration: Authenticated encryption
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test authenticated
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "8/9: Integration: Full pipeline"
+set STEP_NAME=8/9: Integration: Full pipeline
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test full_pipeline
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "9/9: Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
+set STEP_NAME=9/9: Integration: Streaming API - Photon, Quantum, Chaos, Secure
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test streaming_api
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Chaos test (Lyapunov estimation)"
+set STEP_NAME=Integration: Prism OTP key generator
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cargo test --release -p kelvin --test prism
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
+set STEP_NAME=Integration: Determinism (cross-platform golden hash)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cargo test --release -p kelvin-core --test determinism
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
+set STEP_NAME=Integration: Chaos test (Lyapunov estimation)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p kelvin-kdf --test chaos_test
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: Client/Server self-test (V1 + V2 Streaming)"
+set STEP_NAME=Integration: Client/Server self-test - Secure + Chaos Streaming
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo run --release -p kelvin-test-client
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 4. Entropy analysis & statistical tests
 REM ---------------------------------------------------------------------------
-call :step "Integration: Entropy analysis (SP 800-90B health tests)"
+set STEP_NAME=Integration: Entropy analysis (SP 800-90B health tests)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo run --release -p entropy_analysis -- --keystream
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: NIST SP 800-22 statistical tests (all 6 variants)"
+set STEP_NAME=Integration: NIST SP 800-22 statistical tests (all 6 variants)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo run --release -p nist_tests
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
-call :step "Integration: NIST SP 800-90B keystream generation + analysis"
-cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_test.bin
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-cargo run --release -p nist_800_90b -- analyze --input keystream_90b_test.bin
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-
-call :step "Integration: NIST SP 800-90B Prism keystream generation + analysis"
-cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_prism.bin --prism
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-cargo run --release -p nist_800_90b -- analyze --input keystream_90b_prism.bin
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-
-call :step "Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)"
-python tests\sp800_90b_non_iid\sp800_90b_tests.py -t mcv keystream_90b_test.bin -s 10000
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-python tests\sp800_90b_non_iid\sp800_90b_tests.py -t ttuple keystream_90b_test.bin -s 10000
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
-
-del keystream_90b_test.bin
+set STEP_NAME=Integration: NIST SP 800-90B keystream generation + analysis
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cmd /c "cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_test.bin && cargo run --release -p nist_800_90b -- analyze --input keystream_90b_test.bin"
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
+
+set STEP_NAME=Integration: NIST SP 800-90B Prism keystream generation + analysis
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cmd /c "cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_prism.bin --prism && cargo run --release -p nist_800_90b -- analyze --input keystream_90b_prism.bin"
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
+set STEP_NAME=Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cmd /c "python tests\sp800_90b_non_iid\sp800_90b_tests.py -t mcv keystream_90b_test.bin -s 10000 && python tests\sp800_90b_non_iid\sp800_90b_tests.py -t ttuple keystream_90b_test.bin -s 10000"
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
+del keystream_90b_test.bin 2>nul
 
 REM ---------------------------------------------------------------------------
 REM 5. Constant-time benchmarks
 REM ---------------------------------------------------------------------------
-call :step "Integration: Constant-time benchmarks (DudeCT)"
+set STEP_NAME=Integration: Constant-time benchmarks (DudeCT)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo run --release -p constant_time_bench
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 6. Zeroize verification tests
 REM ---------------------------------------------------------------------------
-call :step "Integration: Zeroize verification tests"
+set STEP_NAME=Integration: Zeroize verification tests
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
 cargo test --release -p zeroize_verify
-if errorlevel 1 set EXITCODE=1
-if !EXITCODE! neq 0 exit /b !EXITCODE!
+if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
-REM All passed
+REM Summary
 REM ---------------------------------------------------------------------------
 echo.
-echo %GREEN%========================================%NC%
-echo %GREEN%  ALL SECURITY TESTS PASSED%NC%
-echo %GREEN%========================================%NC%
-exit /b 0
+if !EXITCODE! equ 0 (
+    echo %GREEN%========================================%NC%
+    echo %GREEN%  ALL SECURITY TESTS PASSED%NC%
+    echo %GREEN%========================================%NC%
+    exit /b 0
+) else (
+    echo %RED%========================================%NC%
+    echo %RED%  SOME SECURITY TESTS FAILED%NC%
+    echo %RED%========================================%NC%
+    echo.
+    echo %YELLOW%Failed steps:%NC%
+    echo !FAILED_STEPS!
+    echo.
+    exit /b 1
+)
 
-:step
-echo.
-echo %CYAN%========================================%NC%
-echo %CYAN%  %~1%NC%
-echo %CYAN%========================================%NC%
+:fail
+set EXITCODE=1
+set FAILED_STEPS=!FAILED_STEPS!  - !STEP_NAME!^|^
+echo %RED%FAILED%NC%
 exit /b 0

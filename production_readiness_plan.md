@@ -4,12 +4,43 @@ This document outlines the roadmap to transition the **Kelvin Cryptosystem** fro
 
 ---
 
+## 0. Formal Specification (Phase 0)
+
+Before hardening, we establish a formal mathematical specification for all core
+components. This follows Apple's corecrypto blueprint: proving functional
+equivalence against a specification, not just absence of panics.
+
+### 0.1 Mathematical Specification
+- [x] **Q32.64 Arithmetic Spec**: Write a formal specification for all fixed-point
+    operations (add, sub, mul, div, sqrt) including error bounds and physical
+    bounds. *(Completed 2026-05-27)*
+    - Document at `proofs/specs/fixed_spec.md`
+    - Covers: format, constants, operation specifications, error bounds, invariants
+- [x] **Verlet Integrator Spec**: Document the kick-drift-kick algorithm with
+    invariants (momentum conservation, energy stability, time reversibility).
+    *(Completed 2026-05-27)*
+    - Document at `proofs/specs/verlet_spec.md`
+- [x] **Proof Directory Structure**: Create `proofs/` with README, Kani harnesses,
+    and specification documents. *(Completed 2026-05-27)*
+    - `proofs/README.md` — Overview of proof architecture and strategy
+    - `proofs/specs/` — Mathematical specifications
+    - `proofs/kani/` — Kani proof harness templates
+
+### 0.2 Proof Strategy Document
+- [x] **Apple-Inspired Blueprint**: Document the multi-level proof strategy
+    modeled on Apple's corecrypto formal verification pipeline. *(Completed 2026-05-27)*
+    - Level 0: Safety (no panics, no overflows)
+    - Level 1: Functional equivalence (ops match spec within 1 ULP)
+    - Level 2: Composite correctness (accelerations match Newtonian gravity)
+    - Level 3: Pipeline integrity (full simulate+extract_seed)
+    - Level 4: Determinism (bit-identical across platforms)
+
 ## 1. Security Hardening & Verification
 
 Security is the primary requirement for production readiness. We must move beyond "it passes unit tests" to "it is verified against classes of vulnerabilities."
 
 ### 1.1 Formal Verification
-- [x] **Core Math Verification**: Use [Kani](https://model-checking.github.io/kani/) to formally verify that the fixed-point arithmetic (`Q32.64`) never overflows under valid orbital configurations. *(Completed 2026-05-22)*
+- [x] **Core Math Verification (Safety)**: Use [Kani](https://model-checking.github.io/kani/) to formally verify that the fixed-point arithmetic (`Q32.64`) never overflows under valid orbital configurations. *(Completed 2026-05-22)*
     - Five proof harnesses implemented in `kelvin-core/src/fixed_math.rs`:
         1. `verify_add_no_overflow` — add never wraps for positions in [-100, 100] AU
         2. `verify_sub_no_overflow` — sub never wraps for positions in [-100, 100] AU
@@ -17,8 +48,23 @@ Security is the primary requirement for production readiness. We must move beyon
         4. `verify_div_no_panic` — div never panics for G / bounded_dist³
         5. `verify_sqrt_bounded` — sqrt safe for all squared distances up to (200 AU)²
     - CI workflow available at `.github/workflows/kani.yml_disabled` (disabled pending CI runner capacity)
+- [x] **Core Math Verification (Functional Equivalence)**: Upgrade Kani harnesses to
+    prove functional equivalence against mathematical specification, following Apple's
+    corecrypto blueprint. *(Completed 2026-05-27)*
+    - Addition: prove `Fixed::add(a,b) == a + b` (exact match for bounded inputs)
+    - Subtraction: prove `Fixed::sub(a,b) == a - b` (exact match for bounded inputs)
+    - Multiplication: prove commutativity (`a*b == b*a`), identity (`a*1 == a`), zero (`a*0 == 0`)
+    - Division: prove inverse property (`(a/b)*b ≈ a` within 2 ULP)
+    - Square root: prove inverse property (`sqrt(a)² ≈ a` within 3 ULP)
+    - Template harnesses for Vec3 dot product and length_squared at `proofs/kani/fixed_equivalence.rs`
+- [ ] **Acceleration Composite Proof**: Add Kani harnesses proving `compute_accelerations`
+    satisfies Newton's laws (action-reaction, direction, proportionality to mass).
+    - Template harnesses at `proofs/kani/acceleration_proofs.rs`
+    - 5 harnesses: action-reaction, direction, single-body zero, three-body symmetry, mass proportionality
+- [ ] **End-to-End Keystream Proof**: Prove the full `simulate_and_extract_seed` pipeline
+    produces correct output for a known configuration (golden hash proof).
 - [x] **Determinism Proof**: Verify that the Symplectic Verlet integrator produces bit-identical results across all supported SIMD instructions (SSE, AVX, NEON). *(Completed 2026-05-22)*
-    - **18 tests** implemented in `kelvin-core/tests/determinism.rs` covering:
+    - **18 tests** implemented in `tests/kelvin_tests/determinism.rs` covering:
         - `compute_accelerations` golden hash — SHA3-256 of acceleration vectors matches reference
         - `verlet_step` intra-process determinism — two independent 1000-step simulations produce identical states
         - `euler_step` intra-process determinism — two independent 1000-step simulations produce identical states
@@ -41,7 +87,6 @@ Security is the primary requirement for production readiness. We must move beyon
         - AVX-512 (`+avx512f`): ⚠️ CPU does not support (STATUS_ILLEGAL_INSTRUCTION)
     - **NEON (aarch64)**: Test is architecture-agnostic; should be run on ARM CI runners
     - **Golden hashes** captured on x86_64 reference platform; any algorithm change requires updating them
-- [x] **XOF Integrity**: Prove that SHAKE256 output is uniformly distributed across the entire 2048-byte pool when using chaotic inputs. *(Completed 2026-05-11 via 1000-key entropy analysis)*
 
 ### 1.2 Cryptographic Hardening
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*

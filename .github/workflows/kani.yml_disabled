@@ -1,23 +1,23 @@
 # ==============================================================================
-# Kani Formal Verification — kelvin-core Fixed-Point Arithmetic
+# Kani Formal Verification — Full Kelvin Proof Suite
 # ==============================================================================
 #
-# Uses the model-checking/kani-github-action to run Kani model-checker proofs
-# on the Q32.64 fixed-point arithmetic engine in kelvin-core.
+# Uses the model-checking/kani-github-action to run all 56 Kani model-checker
+# proof harnesses across 7 proof files in proofs/kani/.
 #
-# The proof harnesses (in kelvin-core/src/fixed_math.rs) formally verify that
-# the arithmetic engine cannot overflow or panic under physically-realistic
-# orbital simulation bounds (r ∈ [10⁻⁶, 100] AU).
+# Proof files:
+#   1. fixed_equivalence.rs   (5)  — Q32.64 arithmetic functional equivalence
+#   2. acceleration_proofs.rs (3)  — compute_accelerations composite proofs
+#   3. vec3_proofs.rs         (18) — Vec3 vector operation proofs
+#   4. integrator_proofs.rs   (9)  — Verlet + Euler integrator proofs
+#   5. stability_proofs.rs    (6)  — Ejection + collapse detection proofs
+#   6. extraction_proofs.rs   (7)  — Entropy extraction safety proofs
+#   7. orbital_state_proofs.rs(8)  — OrbitalState safety proofs
 #
-# Five harnesses are verified:
-#   1. verify_add_no_overflow  — add never wraps i128 for positions ∈ [−100, 100] AU
-#   2. verify_sub_no_overflow  — sub never wraps i128 for positions ∈ [−100, 100] AU
-#   3. verify_mul_no_overflow  — mul splitting handles all products ∈ [−100, 100] AU
-#   4. verify_div_no_panic     — div never panics for G / bounded_dist³
-#   5. verify_sqrt_bounded     — sqrt safe for all squared distances up to (200 AU)²
+# Total: 56 harnesses
 #
 # Triggers:
-#   - On push/PR to main when kelvin-core files change
+#   - On push/PR to main when kelvin-core or proofs files change
 #   - On a monthly schedule (1st of every month)
 #   - Manually via workflow_dispatch
 #
@@ -33,11 +33,13 @@ on:
     branches: [main]
     paths:
       - 'kelvin-core/**'
+      - 'proofs/kani/**'
       - '.github/workflows/kani.yml'
   pull_request:
     branches: [main]
     paths:
       - 'kelvin-core/**'
+      - 'proofs/kani/**'
       - '.github/workflows/kani.yml'
   schedule:
     # Monthly formal verification (1st of every month at midnight UTC)
@@ -47,16 +49,193 @@ on:
 
 jobs:
   verification:
-    name: Kani Model Check
+    name: Kani Model Check (56 harnesses)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Run Kani verification on kelvin-core
+      - name: Run Kani verification — fixed_equivalence (5 harnesses)
         uses: model-checking/kani-github-action@v1.1
         with:
-          args: -p kelvin-core --default-unwind 192
+          args: -p kelvin-core --harness verify_fixed_add_commutative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_fixed_add_associative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_fixed_mul_commutative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_fixed_mul_associative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_fixed_sub_self_zero --default-unwind 192
+
+      - name: Run Kani verification — acceleration_proofs (3 harnesses)
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_acceleration_single_body --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_acceleration_two_body --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_acceleration_newton_third --default-unwind 192
+
+      - name: Run Kani verification — vec3_proofs (18 harnesses)
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_add_commutative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_add_associative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_add_identity --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_sub_self_zero --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_neg_add_self_zero --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_dot_commutative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_dot_zero --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_cross_anticommutative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_cross_self_zero --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_cross_orthogonal_dot --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_length_nonnegative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_length_squared_nonnegative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_length_squared_eq_dot --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_scale_zero --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_vec3_scale_one --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_orbital_body_kinetic_energy_nonnegative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_orbital_body_zero_velocity_zero_ke --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_orbital_body_momentum_proportional_to_velocity --default-unwind 192
+
+      - name: Run Kani verification — integrator_proofs (9 harnesses)
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_compute_accelerations_single_body_zero --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_compute_accelerations_two_body_equal_mass --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_compute_accelerations_newton_third_law --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_verlet_step_conserves_momentum --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_verlet_step_single_body_no_change --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_euler_step_conserves_momentum --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_euler_step_single_body_no_change --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_total_energy_negative_for_bound_system --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_center_of_mass_two_equal_bodies --default-unwind 192
+
+      - name: Run Kani verification — stability_proofs (6 harnesses)
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_gravitational_potential_negative --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_gravitational_potential_zero_for_single_body --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_is_body_ejected_no_false_positive_for_bound --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_is_body_ejected_detects_escape_velocity --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_detect_collapse_no_false_positive --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_detect_collapse_detects_close_bodies --default-unwind 192
+
+      - name: Run Kani verification — extraction_proofs (7 harnesses)
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_feed_orbital_state_empty_bodies --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_feed_orbital_state_single_body --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_feed_orbital_state_buffer_size --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_extract_seed_length --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_extract_seed_extended_length --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_domain_separator_non_empty --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_domain_separators_unique --default-unwind 192
+
+      - name: Run Kani verification — orbital_state_proofs (8 harnesses)
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_chaotic_default_body_count --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_step_counter_type --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_verlet_step_no_panic_single_body --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_euler_step_no_panic_single_body --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_extract_entropy_output_size --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_lyapunov_minimum_bodies --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_lyapunov_positive_steps --default-unwind 192
+      - uses: model-checking/kani-github-action@v1.1
+        with:
+          args: -p kelvin-core --harness verify_zeroize_clears_state --default-unwind 192
 
       - name: Upload Kani report (on failure)
         if: failure()

@@ -22,7 +22,11 @@ fi
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
+
+EXITCODE=0
+FAILED_STEPS=()
 
 step() {
     echo ""
@@ -31,136 +35,92 @@ step() {
     echo -e "${CYAN}========================================${NC}"
 }
 
-pass() {
-    echo -e "${GREEN}PASSED${NC}"
+run() {
+    local name="$1"
+    shift
+    step "$name"
+    if "$@"; then
+        echo -e "${GREEN}PASSED${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        EXITCODE=1
+        FAILED_STEPS+=("$name")
+    fi
 }
 
 # ---------------------------------------------------------------------------
 # 1. Build — verify all workspace members compile
 # ---------------------------------------------------------------------------
-step "1/8: Build workspace (release mode)"
-cargo build --workspace --release
-pass
-
-step "2/8: Build with AES-NI feature"
-cargo build --release -p kelvin-stream --features aes-ni
-cargo build --release -p kelvin --features aes-ni
-pass
-
-step "2b/8: Build V2 Streaming example"
-cargo build --release --example simple_streaming -p kelvin
-pass
-
-step "2c/8: Build kelvin-ffi (C FFI bindings)"
-cargo build --release -p kelvin-ffi
-pass
+run "1/8: Build workspace (release mode)" cargo build --workspace --release
+run "2/8: Build with AES-NI feature" bash -c "cargo build --release -p kelvin-stream --features aes-ni && cargo build --release -p kelvin --features aes-ni"
+run "2b/8: Build Chaos Streaming example" cargo build --release --example simple_streaming -p kelvin
+run "2c/8: Build kelvin-ffi (C FFI bindings)" cargo build --release -p kelvin-ffi
 
 # ---------------------------------------------------------------------------
 # 2. Lint — clippy + rustfmt
 # ---------------------------------------------------------------------------
-
-step "3/8: Clippy (deny warnings)"
-cargo clippy --workspace -- -D warnings
-pass
-
-step "4/8: Check formatting"
-cargo fmt --check
-pass
+run "3/8: Clippy (deny warnings)" cargo clippy --workspace -- -D warnings
+run "4/8: Check formatting" cargo fmt --check
 
 # ---------------------------------------------------------------------------
 # 3. Unit tests (all workspace members)
 # ---------------------------------------------------------------------------
-step "5/8: Unit tests (all workspace members)"
-cargo test --release --lib --workspace
-pass
-
-step "6/8: Unit tests — kelvin-stream (AES-NI feature)"
-cargo test --release --lib -p kelvin-stream --features aes-ni
-pass
+run "5/8: Unit tests (all workspace members)" cargo test --release --lib --workspace
+run "6/8: Unit tests — kelvin-stream (AES-NI feature)" cargo test --release --lib -p kelvin-stream --features aes-ni
 
 # ---------------------------------------------------------------------------
 # 4. Integration tests
 # ---------------------------------------------------------------------------
-step "Integration: V1 round-trip"
-cargo test --release -p kelvin --test v1_round_trip
-pass
-
-step "Integration: Photon cipher"
-cargo test --release -p kelvin --test photon
-pass
-
-step "Integration: Quantum cipher"
-cargo test --release -p kelvin --test quantum
-pass
-
-step "Integration: Authenticated encryption"
-cargo test --release -p kelvin --test authenticated
-pass
-
-step "Integration: Full pipeline"
-cargo test --release -p kelvin --test full_pipeline
-pass
-
-step "Integration: Streaming API (Photon, Quantum, Chaos, Secure)"
-cargo test --release -p kelvin --test streaming_api
-pass
-
-step "Integration: Prism OTP key generator"
-cargo test --release -p kelvin --test prism
-pass
-
-step "Integration: Chaos test (Lyapunov estimation)"
-cargo test --release -p kelvin-kdf --test chaos_test
-pass
-
-step "Integration: Client/Server self-test (V1 + V2 Streaming)"
-cargo run --release -p kelvin-test-client
-pass
+run "Integration: Secure round-trip" cargo test --release -p kelvin --test v1_round_trip
+run "Integration: Photon cipher" cargo test --release -p kelvin --test photon
+run "Integration: Quantum cipher" cargo test --release -p kelvin --test quantum
+run "Integration: Authenticated encryption" cargo test --release -p kelvin --test authenticated
+run "Integration: Full pipeline" cargo test --release -p kelvin --test full_pipeline
+run "Integration: Streaming API - Photon, Quantum, Chaos, Secure" cargo test --release -p kelvin --test streaming_api
+run "Integration: Prism OTP key generator" cargo test --release -p kelvin --test prism
+run "Integration: Determinism (cross-platform golden hash)" cargo test --release -p kelvin-core --test determinism
+run "Integration: Chaos test (Lyapunov estimation)" cargo test --release -p kelvin-kdf --test chaos_test
+run "Integration: Client/Server self-test - Secure + Chaos Streaming" cargo run --release -p kelvin-test-client
 
 # ---------------------------------------------------------------------------
 # 5. Entropy analysis & statistical tests
 # ---------------------------------------------------------------------------
-step "Integration: Entropy analysis (SP 800-90B health tests)"
-cargo run --release -p entropy_analysis -- --keystream
-pass
-
-step "Integration: NIST SP 800-22 statistical tests (all 6 variants)"
-cargo run --release -p nist_tests
-pass
-
-step "Integration: NIST SP 800-90B keystream generation + analysis"
-cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b.bin
-cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b.bin
-
-step "Integration: NIST SP 800-90B Prism keystream generation + analysis"
-cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b_prism.bin --prism
-cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b_prism.bin
-
-step "Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)"
-python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t mcv target/keystream_90b.bin -s 10000
-python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t ttuple target/keystream_90b.bin -s 10000
+run "Integration: Entropy analysis (SP 800-90B health tests)" cargo run --release -p entropy_analysis -- --keystream
+run "Integration: NIST SP 800-22 statistical tests (all 6 variants)" cargo run --release -p nist_tests
+run "Integration: NIST SP 800-90B keystream generation + analysis" bash -c "cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b.bin && cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b.bin"
+run "Integration: NIST SP 800-90B Prism keystream generation + analysis" bash -c "cargo run --release -p nist_800_90b -- generate --size 1048576 --output target/keystream_90b_prism.bin --prism && cargo run --release -p nist_800_90b -- analyze --input target/keystream_90b_prism.bin"
+run "Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)" bash -c "python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t mcv target/keystream_90b.bin -s 10000 && python3 tests/sp800_90b_non_iid/sp800_90b_tests.py -t ttuple target/keystream_90b.bin -s 10000"
 
 rm -f target/keystream_90b.bin target/keystream_90b_prism.bin
-pass
 
 # ---------------------------------------------------------------------------
 # 6. Constant-time benchmarks
 # ---------------------------------------------------------------------------
-step "Integration: Constant-time benchmarks (DudeCT)"
-cargo run --release -p constant_time_bench
-pass
+run "Integration: Constant-time benchmarks (DudeCT)" cargo run --release -p constant_time_bench
 
 # ---------------------------------------------------------------------------
 # 7. Zeroize verification tests
 # ---------------------------------------------------------------------------
-step "Integration: Zeroize verification tests"
-cargo test --release -p zeroize_verify
-pass
+run "Integration: Zeroize verification tests" cargo test --release -p zeroize_verify
 
 # ---------------------------------------------------------------------------
-# All passed
+# Summary
 # ---------------------------------------------------------------------------
 echo ""
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  ALL TESTS PASSED${NC}"
-echo -e "${GREEN}========================================${NC}"
+if [ "$EXITCODE" -eq 0 ]; then
+    echo -e "${GREEN}========================================${NC}"
+    echo -e "${GREEN}  ALL TESTS PASSED${NC}"
+    echo -e "${GREEN}========================================${NC}"
+    exit 0
+else
+    echo -e "${RED}========================================${NC}"
+    echo -e "${RED}  SOME TESTS FAILED${NC}"
+    echo -e "${RED}========================================${NC}"
+    echo ""
+    echo -e "${YELLOW}Failed steps:${NC}"
+    for failed in "${FAILED_STEPS[@]}"; do
+        echo "  - $failed"
+    done
+    echo ""
+    exit 1
+fi

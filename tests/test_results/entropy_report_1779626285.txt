@@ -1,0 +1,29 @@
+
+============================================================
+ KEYSTREAM STATISTICAL ANALYSIS
+============================================================
+
+Generating 1MB keystream via Kelvin (V1 Verlet)...
+  Keystream size: 1048576 bytes
+  Shannon Entropy: 7.9998 bits/byte (max 8.0)
+  [PASS] Near-maximal entropy (good randomness)
+  Adjacent-byte Correlation: 0.001579 (expected ~0)
+  [PASS] No significant correlation detected
+  Byte value distribution: min=3938, max=4293, expected=4096, χ²=269.9
+  [PASS] Chi-square = 269.9 (critical: 310, df=255)
+
+  ── SP 800-90B Entropy Health Tests ──
+  [PASS] Repetition Test (max 3 consecutive identical bytes)
+  [PASS] Adaptive Proportion Test (worst window: 13/512 at offset 422927)
+  [PASS] Runs Test (4196992 runs, expected ~4194304)
+  [PASS] Longest Run Test (χ²=1.21 (critical: 18.475, df=6), longest block run: 20 bits, dist: [72, 165, 217, 166, 99, 57, 62])
+
+  ── Summary ──
+  ✓ Shannon Entropy: 7.9998 bits/byte [PASS]
+  ✓ Correlation: 0.001579 [PASS]
+  ✓ Byte Distribution: min=3938, max=4293 [PASS]
+  ✓ Repetition Test: max 3 consecutive [PASS]
+  ✓ Adaptive Proportion: worst 13/512 [PASS]
+  ✓ Runs Test: 4196992 runs [PASS]
+  ✓ Longest Run Test: longest 20 bits [PASS]
+  Result: 7/7 tests passed ✅

@@ -32,7 +32,7 @@ fn parse_args() -> Args {
     let mut keystream = false;
     let mut num_keys = 100usize;
     let mut level = "standard".to_string();
-    let mut dir = "test_results".to_string();
+    let mut dir = "tests/test_results".to_string();
     let mut output: Option<String> = None;
 
     let mut i = 1;
@@ -941,7 +941,7 @@ fn main() {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs();
-        format!("test_results/entropy_report_{}.txt", ts)
+        format!("tests/test_results/entropy_report_{}.txt", ts)
     });
 
     let mut report = String::new();

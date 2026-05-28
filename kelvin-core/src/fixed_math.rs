@@ -640,6 +640,13 @@ mod kani_proofs {
     //
     // Worst case: 100 AU + 100 AU = 200 AU → raw = 200 << 64 ≈ 3.69e21
     // i128::MAX ≈ 1.70e38 → 17 orders of magnitude headroom.
+    //
+    // Functional equivalence: For Q32.64 values a, b:
+    //   a + b = (a_raw / 2^64) + (b_raw / 2^64)
+    //         = (a_raw + b_raw) / 2^64
+    //         = Fixed::from_raw(a_raw + b_raw)
+    // Since Fixed::add uses i128::wrapping_add (exact for non-wrapping),
+    // and we prove no wrapping occurs, the result is mathematically exact.
     #[kani::proof]
     fn verify_add_no_overflow() {
         let a_raw: i128 = kani::any();
@@ -655,6 +662,13 @@ mod kani_proofs {
         // The result should be within [-200, 200] AU
         let raw = result.to_raw();
         kani::assert(raw >= -2 * MAX_AU && raw <= 2 * MAX_AU, "add: result within [-200, 200] AU");
+
+        // Functional equivalence: result must match mathematical a + b
+        let expected_raw = a_raw.wrapping_add(b_raw);
+        kani::assert(
+            result.to_raw() == expected_raw,
+            "add: functional equivalence (result == a + b)",
+        );
     }
 
     // ── Harness 2: Subtraction ─────────────────────────────────────────
@@ -663,6 +677,8 @@ mod kani_proofs {
     // positions within [-100, 100] AU.
     //
     // Worst case: -100 AU - 100 AU = -200 AU → raw = -200 << 64
+    //
+    // Functional equivalence: same reasoning as addition.
     #[kani::proof]
     fn verify_sub_no_overflow() {
         let a_raw: i128 = kani::any();
@@ -676,6 +692,13 @@ mod kani_proofs {
 
         let raw = result.to_raw();
         kani::assert(raw >= -2 * MAX_AU && raw <= 2 * MAX_AU, "sub: result within [-200, 200] AU");
+
+        // Functional equivalence: result must match mathematical a - b
+        let expected_raw = a_raw.wrapping_sub(b_raw);
+        kani::assert(
+            result.to_raw() == expected_raw,
+            "sub: functional equivalence (result == a - b)",
+        );
     }
 
     // ── Harness 3: Multiplication ──────────────────────────────────────
@@ -693,6 +716,11 @@ mod kani_proofs {
     //   - G: ≈ 39.478
     //   - dt: [10⁻⁸, 10⁻¹] yr
     //   - Softening: ≈ 2⁻²⁰ AU
+    //
+    // Functional equivalence: verify algebraic properties:
+    //   - Commutativity: a*b == b*a
+    //   - Identity: a*1 == a
+    //   - Zero: a*0 == 0
     #[kani::proof]
     fn verify_mul_no_overflow() {
         let a_raw: i128 = kani::any();
@@ -715,6 +743,18 @@ mod kani_proofs {
             raw >= -10000 * (1 << 64) && raw <= 10000 * (1 << 64),
             "mul: result within [-10000, 10000] AU²",
         );
+
+        // Functional equivalence: commutativity
+        let ba = b * a;
+        kani::assert(result == ba, "mul: commutative (a*b == b*a)");
+
+        // Functional equivalence: identity
+        let a_times_one = a * Fixed::ONE;
+        kani::assert(a_times_one == a, "mul: identity (a*1 == a)");
+
+        // Functional equivalence: zero
+        let a_times_zero = a * Fixed::ZERO;
+        kani::assert(a_times_zero == Fixed::ZERO, "mul: zero property (a*0 == 0)");
     }
 
     // ── Harness 4: Division ────────────────────────────────────────────
@@ -749,6 +789,9 @@ mod kani_proofs {
     // Safe bound: |numerator_raw| ≤ 40 << 64 (G ≈ 39.478)
     // and |denominator_raw| ≥ 1 << 24 (softening_sq in raw, which
     // corresponds to dist_cubed ≈ 2⁻⁶⁰ AU³).
+    //
+    // Functional equivalence: verify inverse property
+    //   div(a, b) * b ≈ a  (within 2 ULP)
     #[kani::proof]
     fn verify_div_no_panic() {
         let num_raw: i128 = kani::any();
@@ -775,6 +818,15 @@ mod kani_proofs {
         // G / dist³ for dist ≥ 2⁻²⁰ AU gives at most ~2.6×10⁶ AU⁻²
         // In Q32.64: 2.6×10⁶ × 2⁶⁴ ≈ 4.8×10²⁵, well within i128::MAX
         kani::assert(raw != i128::MIN && raw != i128::MAX, "div: result is not at extreme bounds");
+
+        // Functional equivalence: inverse property
+        // result * den should approximately equal num
+        let product = result * den;
+        let error = (product - num).abs();
+        kani::assert(
+            error.to_raw() <= 2,
+            "div: inverse property (result*den ≈ num, error ≤ 2 ULP)",
+        );
     }
 
     // ── Harness 5: Square Root ─────────────────────────────────────────
@@ -785,6 +837,9 @@ mod kani_proofs {
     // The sqrt implementation runs exactly 96 iterations regardless of
     // input. It uses only comparisons, subtractions, and bit shifts.
     // For negative inputs, it returns zero via constant-time masking.
+    //
+    // Functional equivalence: verify inverse property
+    //   sqrt(a)² ≈ a  (within 3 ULP)
     #[kani::proof]
     fn verify_sqrt_bounded() {
         let raw: i128 = kani::any();
@@ -797,8 +852,11 @@ mod kani_proofs {
 
         // sqrt should return a non-negative result
         kani::assert(result.to_raw() >= 0, "sqrt: result is non-negative");
-        // Kani already proves sqrt completes without panic or overflow
-        // for all inputs in [0, (200 AU)²]. Numerical accuracy is
-        // verified by the unit test test_sqrt.
+
+        // Functional equivalence: inverse property
+        // sqrt(a)² should approximately equal a
+        let squared = result * result;
+        let error = (squared - val).abs();
+        kani::assert(error.to_raw() <= 3, "sqrt: inverse property (sqrt(a)² ≈ a, error ≤ 3 ULP)");
     }
 }
