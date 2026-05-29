@@ -80,6 +80,7 @@ run "Integration: Streaming API - Photon, Quantum, Chaos, Secure" cargo test --r
 run "Integration: Prism OTP key generator" cargo test --release -p kelvin --test prism
 run "Integration: Flare FHE key generator" cargo test --release -p kelvin --test flare
 run "Integration: Split secret sharing" cargo test --release -p kelvin --test split
+run "Integration: Canonical test vectors (all modes)" cargo test --release -p kelvin --test test_vectors
 run "Integration: Determinism (cross-platform golden hash)" cargo test --release -p kelvin-core --test determinism
 run "Integration: Chaos test (Lyapunov estimation)" cargo test --release -p kelvin-kdf --test chaos_test
 run "Integration: Client/Server self-test - Secure + Chaos Streaming" cargo run --release -p kelvin-test-client

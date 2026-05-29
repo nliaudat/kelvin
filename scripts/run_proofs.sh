@@ -20,6 +20,11 @@ list_harnesses() {
     echo " KELVIN FORMAL VERIFICATION — Available Proof Harnesses"
     echo "==============================================================================="
     echo ""
+    echo " pipeline_proofs.rs (3) — L3 Pipeline Integrity:"
+    echo "   verify_pipeline_invariants"
+    echo "   verify_extract_domain_sep_symbolic"
+    echo "   verify_simulate_loop_equivalence"
+    echo ""
     echo " fixed_equivalence.rs (5):"
     echo "   verify_fixed_add_commutative"
     echo "   verify_fixed_add_associative"
@@ -90,7 +95,8 @@ list_harnesses() {
     echo "   verify_lyapunov_positive_steps"
     echo "   verify_zeroize_clears_state"
     echo ""
-    echo " Total: 56 harnesses"
+    echo ""
+    echo " Total: 59 harnesses (56 previous + 3 L3 pipeline proofs)"
 }
 
 run_fast() {
@@ -197,8 +203,15 @@ run_full() {
     echo "  ✓ orbital_state_proofs.rs passed"
     echo ""
 
+    echo "[8/8] pipeline_proofs.rs — L3 Pipeline Integrity proofs (3 harnesses)"
+    cargo kani -p kelvin-core --harness verify_pipeline_invariants $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_extract_domain_sep_symbolic $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_simulate_loop_equivalence $KANI_ARGS
+    echo "  ✓ pipeline_proofs.rs passed"
+    echo ""
+
     echo "==============================================================================="
-    echo " ALL PROOFS PASSED — 56/56 harnesses verified"
+    echo " ALL PROOFS PASSED — 59/59 harnesses verified"
     echo "==============================================================================="
 }
 

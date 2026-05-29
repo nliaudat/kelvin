@@ -142,6 +142,15 @@ cargo test --release -p kelvin --test split
 if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
+set STEP_NAME=Integration: Canonical test vectors (all modes)
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cargo test --release -p kelvin --test test_vectors
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
 set STEP_NAME=Integration: Determinism (cross-platform golden hash)
 echo.
 echo %CYAN%========================================%NC%
@@ -244,6 +253,18 @@ if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
+REM 7. L3 Pipeline Integrity Proofs (optional, requires Kani)
+REM ---------------------------------------------------------------------------
+set STEP_NAME=Optional: L3 Pipeline Integrity Kani proofs
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%C
+echo This step is optional — requires `cargo kani` to be installed.
+echo See scripts\run_proofs.bat for details.
+echo %GREEN%SKIPPED (install Kani to enable)%NC%
+
+REM ---------------------------------------------------------------------------
 REM Summary
 REM ---------------------------------------------------------------------------
 echo.
@@ -268,3 +289,8 @@ set EXITCODE=1
 set FAILED_STEPS=!FAILED_STEPS!  - !STEP_NAME!^|^
 echo %RED%FAILED%NC%
 exit /b 0
+
+REM ==============================================================================
+REM End of scripts\test_secure.bat
+REM Updated: 2026-05-29 — Added test_vectors and L3 proof placeholders
+REM ==============================================================================

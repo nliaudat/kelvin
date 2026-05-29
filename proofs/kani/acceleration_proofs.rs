@@ -98,9 +98,10 @@ fn verify_acceleration_action_reaction() {
     // Due to fixed-point rounding differences during intermediate multiplications,
     // f01_x and -f10_x may differ by a few ULPs. Check that the absolute difference
     // is within a small rounding tolerance (2 ULPs).
-    let diff_x = (f01_x + f10_x).abs().to_raw();
-    let diff_y = (f01_y + f10_y).abs().to_raw();
-    let diff_z = (f01_z + f10_z).abs().to_raw();
+    // Use unsigned_abs() to avoid potential panic on i128::MIN in Kani verification.
+    let diff_x = (f01_x + f10_x).to_raw().unsigned_abs();
+    let diff_y = (f01_y + f10_y).to_raw().unsigned_abs();
+    let diff_z = (f01_z + f10_z).to_raw().unsigned_abs();
     kani::assert(
         diff_x <= 2 && diff_y <= 2 && diff_z <= 2,
         "acceleration: action-reaction (F_01 ≈ -F_10 within rounding tolerance)",

@@ -580,3 +580,195 @@ func (d *SecureDecryptor) Close() {
 		d.ctx = nil
 	}
 }
+
+// ============================================================================
+// Prism — OTP Key Generator for Homomorphic Encryption
+// ============================================================================
+
+// Prism is an OTP key generator for homomorphic encryption.
+type Prism struct {
+	ctx *C.PrismCtx
+}
+
+// NewPrism creates a new Prism instance from a 2048-byte seed.
+func NewPrism(seed []byte, maxReseeds uint64) (*Prism, error) {
+	var cError *C.char
+	ctx := C.kelvin_prism_new((*C.uint8_t)(&seed[0]), C.size_t(len(seed)), C.uint64_t(maxReseeds), &cError)
+	if ctx == nil {
+		errStr := C.GoString(cError)
+		C.kelvin_free_string(cError)
+		return nil, errors.New("failed to create Prism: " + errStr)
+	}
+	return &Prism{ctx: ctx}, nil
+}
+
+// GenerateOTPKey generates an OTP key of the given length.
+func (p *Prism) GenerateOTPKey(length int) ([]byte, error) {
+	if p.ctx == nil {
+		return nil, ErrClosed
+	}
+	output := make([]byte, length)
+	res := C.kelvin_prism_generate_otp_key(p.ctx, (*C.uint8_t)(&output[0]), C.size_t(length))
+	if res != 0 {
+		return nil, errors.New("generate_otp_key failed")
+	}
+	return output, nil
+}
+
+// SplitKey splits a key into two pads (A, B) where A xor B = K.
+func (p *Prism) SplitKey(length int) ([]byte, []byte, error) {
+	if p.ctx == nil {
+		return nil, nil, ErrClosed
+	}
+	a := make([]byte, length)
+	b := make([]byte, length)
+	res := C.kelvin_prism_split_key(p.ctx, C.size_t(length), (*C.uint8_t)(&a[0]), (*C.uint8_t)(&b[0]))
+	if res != 0 {
+		return nil, nil, errors.New("split_key failed")
+	}
+	return a, b, nil
+}
+
+// Encrypt encrypts data in-place using Prism's domain-separated keystream.
+func (p *Prism) Encrypt(data []byte) error {
+	if p.ctx == nil {
+		return ErrClosed
+	}
+	if len(data) == 0 {
+		return nil
+	}
+	res := C.kelvin_prism_encrypt(p.ctx, (*C.uint8_t)(&data[0]), C.size_t(len(data)))
+	if res != 0 {
+		return errors.New("prism encrypt failed")
+	}
+	return nil
+}
+
+// Decrypt decrypts data in-place using Prism's domain-separated keystream.
+func (p *Prism) Decrypt(data []byte) error { return p.Encrypt(data) }
+
+// Close releases resources.
+func (p *Prism) Close() {
+	if p.ctx != nil {
+		C.kelvin_prism_free(p.ctx)
+		p.ctx = nil
+	}
+}
+
+// ============================================================================
+// Split — XOR Key-Splitter for Homomorphic Encryption
+// ============================================================================
+
+// Split is an XOR key-splitter for homomorphic encryption.
+type Split struct {
+	ctx *C.SplitCtx
+}
+
+// NewSplit creates a new Split instance from a 2048-byte seed.
+func NewSplit(seed []byte, maxReseeds uint64) (*Split, error) {
+	var cError *C.char
+	ctx := C.kelvin_split_new((*C.uint8_t)(&seed[0]), C.size_t(len(seed)), C.uint64_t(maxReseeds), &cError)
+	if ctx == nil {
+		errStr := C.GoString(cError)
+		C.kelvin_free_string(cError)
+		return nil, errors.New("failed to create Split: " + errStr)
+	}
+	return &Split{ctx: ctx}, nil
+}
+
+// GenerateMasterKey generates a master key of the given length.
+func (s *Split) GenerateMasterKey(length int) ([]byte, error) {
+	if s.ctx == nil {
+		return nil, ErrClosed
+	}
+	output := make([]byte, length)
+	res := C.kelvin_split_generate_master_key(s.ctx, (*C.uint8_t)(&output[0]), C.size_t(length))
+	if res != 0 {
+		return nil, errors.New("generate_master_key failed")
+	}
+	return output, nil
+}
+
+// SplitKey splits a master key into two pads (A, B) where A xor B = K.
+func (s *Split) SplitKey(length int) ([]byte, []byte, error) {
+	if s.ctx == nil {
+		return nil, nil, ErrClosed
+	}
+	a := make([]byte, length)
+	b := make([]byte, length)
+	res := C.kelvin_split_key(s.ctx, C.size_t(length), (*C.uint8_t)(&a[0]), (*C.uint8_t)(&b[0]))
+	if res != 0 {
+		return nil, nil, errors.New("split_key failed")
+	}
+	return a, b, nil
+}
+
+// Close releases resources.
+func (s *Split) Close() {
+	if s.ctx != nil {
+		C.kelvin_split_free(s.ctx)
+		s.ctx = nil
+	}
+}
+
+// ============================================================================
+// Flare — Chaotic FHE Secret Key Generator
+// ============================================================================
+
+// FlareScheme constants
+const (
+	FlareSchemeBFV  = 0
+	FlareSchemeCKKS = 1
+	FlareSchemeTFHE = 2
+)
+
+// Flare is a chaotic FHE secret key generator.
+type Flare struct {
+	ctx *C.FlareCtx
+}
+
+// NewFlare creates a new Flare instance from a 2048-byte seed.
+func NewFlare(seed []byte, maxReseeds uint64) (*Flare, error) {
+	var cError *C.char
+	ctx := C.kelvin_flare_new((*C.uint8_t)(&seed[0]), C.size_t(len(seed)), C.uint64_t(maxReseeds), &cError)
+	if ctx == nil {
+		errStr := C.GoString(cError)
+		C.kelvin_free_string(cError)
+		return nil, errors.New("failed to create Flare: " + errStr)
+	}
+	return &Flare{ctx: ctx}, nil
+}
+
+// GenerateSecretKey generates a raw FHE secret key.
+func (f *Flare) GenerateSecretKey(length int) ([]byte, error) {
+	if f.ctx == nil {
+		return nil, ErrClosed
+	}
+	output := make([]byte, length)
+	res := C.kelvin_flare_generate_secret_key(f.ctx, (*C.uint8_t)(&output[0]), C.size_t(length))
+	if res != 0 {
+		return nil, errors.New("generate_secret_key failed")
+	}
+	return output, nil
+}
+
+// GenerateFHEKey generates an FHE secret key for the specified scheme.
+func (f *Flare) GenerateFHEKey(scheme int32, length int) ([]byte, error) {
+	if f.ctx == nil {
+		return nil, ErrClosed
+	}
+	output := make([]byte, length)
+	res := C.kelvin_flare_generate_fhe_key(f.ctx, C.int32_t(scheme), (*C.uint8_t)(&output[0]), C.size_t(length))
+	if res != 0 {
+		return nil, errors.New("generate_fhe_key failed")
+	}
+	return output, nil
+}
+
+// Close releases resources.
+func (f *Flare) Close() {
+	if f.ctx != nil {
+		C.kelvin_flare_free(f.ctx)
+		f.ctx = nil
+	}
+}

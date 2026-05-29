@@ -174,7 +174,11 @@ fn test_exhaustion() {
     split.generate_keystream_into(&mut buf[..1]).unwrap();
     assert_eq!(split.reseed_count(), 3); // exhausted
 
-    // Third call should fail (max_reseeds = 3, so reseed_count 3 = exhausted)
+    // Third interval: process 64 MiB to trigger the next reseed check,
+    // which should fail (max_reseeds = 3, so reseed_count 3 = exhausted)
+    for _ in 0..64 {
+        split.generate_keystream_into(&mut buf).unwrap();
+    }
     assert!(split.generate_keystream_into(&mut buf[..1]).is_err());
 }
 

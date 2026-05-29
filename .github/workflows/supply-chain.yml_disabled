@@ -1,0 +1,50 @@
+# ==============================================================================
+# Supply Chain Security — Dependency Auditing
+# ==============================================================================
+#
+# Runs cargo-audit (RustSec advisory database) and cargo-deny (license + advisory
+# checking) on every push and PR to main.
+#
+# Triggers:
+#   - On push/PR to main
+#   - Manually via workflow_dispatch
+# ==============================================================================
+
+name: Supply Chain Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly dependency audit (every Monday at midnight UTC)
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: cargo-audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+
+      - name: Run RustSec advisory audit
+        run: cargo audit
+
+  deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+
+      - name: Run license + advisory check
+        run: cargo deny check

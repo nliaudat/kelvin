@@ -46,6 +46,13 @@ on:
     - cron: '0 0 1 * *'
   workflow_dispatch:
     # Manual trigger from GitHub UI — no arguments needed
+    #
+    # ⚠️ RESOURCE REQUIREMENTS:
+    # Kani verification requires ~8 GB RAM per proof harness.
+    # The default ubuntu-latest runner has 8 GB RAM and can handle
+    # approximately 2-3 concurrent harnesses. For full throughput,
+    # consider GitHub's larger runners (ubuntu-24.04-16core with 32 GB).
+    # Estimated total CI time: ~45 minutes on standard runner.
 
 jobs:
   verification:

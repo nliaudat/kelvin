@@ -63,6 +63,10 @@ path = "../tests/kelvin_tests/split.rs"
 name = "flare"
 path = "../tests/kelvin_tests/flare.rs"
 
+[[test]]
+name = "test_vectors"
+path = "../tests/kelvin_tests/test_vectors.rs"
+
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "kelvin-kdf/serde"]

@@ -18,17 +18,23 @@ use std::os::raw::c_char;
 use kelvin::KelvinError;
 
 pub mod file;
+pub mod flare;
 pub mod photon;
+pub mod prism;
 pub mod quantum;
 pub mod secure;
+pub mod split;
 pub mod streaming;
 pub mod v1;
 
 // Re-export all public items from submodules
 pub use file::*;
+pub use flare::*;
 pub use photon::*;
+pub use prism::*;
 pub use quantum::*;
 pub use secure::*;
+pub use split::*;
 pub use streaming::*;
 pub use v1::*;
 

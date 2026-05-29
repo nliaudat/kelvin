@@ -38,10 +38,12 @@ use pyo3::prelude::*;
 use pyo3::types::PyByteArray;
 
 use kelvin::{
-    Kelvin as KelvinRust, KelvinError, KelvinPhoton as KelvinPhotonRust,
-    KelvinPhotonAuthenticated as KelvinPhotonAuthRust, KelvinQuantum as KelvinQuantumRust,
-    KelvinQuantumAuthenticated as KelvinQuantumAuthRust, KelvinStreaming as KelvinStreamingRust,
-    OrbitalConfig, PHOTON_BASE_SEED_SIZE, QUANTUM_BASE_SEED_SIZE,
+    FlareScheme, Kelvin as KelvinRust, KelvinError, KelvinFlare as KelvinFlareRust,
+    KelvinPhoton as KelvinPhotonRust, KelvinPhotonAuthenticated as KelvinPhotonAuthRust,
+    KelvinPrism as KelvinPrismRust, KelvinQuantum as KelvinQuantumRust,
+    KelvinQuantumAuthenticated as KelvinQuantumAuthRust, KelvinSplit as KelvinSplitRust,
+    KelvinStreaming as KelvinStreamingRust, OrbitalConfig, PHOTON_BASE_SEED_SIZE,
+    QUANTUM_BASE_SEED_SIZE,
 };
 
 // ============================================================================
@@ -486,8 +488,159 @@ impl KelvinStreaming {
 }
 
 // ============================================================================
-// Module definition
+// KelvinPrism — OTP Key Generator for Homomorphic Encryption
 // ============================================================================
+
+/// Prism OTP key generator for homomorphic encryption.
+#[pyclass(unsendable)]
+struct KelvinPrism {
+    inner: KelvinPrismRust,
+}
+
+#[pymethods]
+impl KelvinPrism {
+    #[new]
+    fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
+        if seed.len() != PHOTON_BASE_SEED_SIZE {
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly {} bytes, got {}",
+                PHOTON_BASE_SEED_SIZE,
+                seed.len()
+            )));
+        }
+        let mut seed_arr = [0u8; PHOTON_BASE_SEED_SIZE];
+        seed_arr.copy_from_slice(seed);
+        Ok(KelvinPrism { inner: KelvinPrismRust::new(seed_arr, max_reseeds) })
+    }
+
+    fn generate_otp_key(&mut self, len: usize) -> Vec<u8> {
+        self.inner.generate_otp_key(len).expect("generate_otp_key").to_vec()
+    }
+
+    fn split_key(&mut self, len: usize) -> (Vec<u8>, Vec<u8>) {
+        let (a, b) = self.inner.split_key(len).expect("split_key");
+        (a.to_vec(), b.to_vec())
+    }
+
+    fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let slice = get_mut_slice(data);
+        self.inner.encrypt(slice).map_err(map_error)
+    }
+
+    fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let slice = get_mut_slice(data);
+        self.inner.decrypt(slice).map_err(map_error)
+    }
+
+    fn bytes_processed(&self) -> u64 {
+        self.inner.bytes_processed()
+    }
+    fn reseed_count(&self) -> u64 {
+        self.inner.reseed_count()
+    }
+    fn remaining_reseeds(&self) -> u64 {
+        self.inner.remaining_reseeds()
+    }
+}
+
+/// Split XOR key-splitter for homomorphic encryption.
+#[pyclass(unsendable)]
+struct KelvinSplit {
+    inner: KelvinSplitRust,
+}
+
+#[pymethods]
+impl KelvinSplit {
+    #[new]
+    fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
+        if seed.len() != PHOTON_BASE_SEED_SIZE {
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly {} bytes, got {}",
+                PHOTON_BASE_SEED_SIZE,
+                seed.len()
+            )));
+        }
+        let mut seed_arr = [0u8; PHOTON_BASE_SEED_SIZE];
+        seed_arr.copy_from_slice(seed);
+        Ok(KelvinSplit { inner: KelvinSplitRust::new(seed_arr, max_reseeds) })
+    }
+
+    fn generate_master_key(&mut self, len: usize) -> Vec<u8> {
+        self.inner.generate_master_key(len).expect("generate_master_key").to_vec()
+    }
+
+    fn split_key(&mut self, len: usize) -> (Vec<u8>, Vec<u8>) {
+        let (a, b) = self.inner.split_key(len).expect("split_key");
+        (a.to_vec(), b.to_vec())
+    }
+
+    fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let slice = get_mut_slice(data);
+        self.inner.encrypt(slice).map_err(map_error)
+    }
+
+    fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let slice = get_mut_slice(data);
+        self.inner.decrypt(slice).map_err(map_error)
+    }
+
+    fn bytes_processed(&self) -> u64 {
+        self.inner.bytes_processed()
+    }
+    fn reseed_count(&self) -> u64 {
+        self.inner.reseed_count()
+    }
+    fn remaining_reseeds(&self) -> u64 {
+        self.inner.remaining_reseeds()
+    }
+}
+
+/// Flare chaotic FHE secret key generator.
+#[pyclass(unsendable)]
+struct KelvinFlare {
+    inner: KelvinFlareRust,
+}
+
+#[pymethods]
+impl KelvinFlare {
+    #[new]
+    fn new(seed: &[u8], max_reseeds: u64) -> PyResult<Self> {
+        if seed.len() != PHOTON_BASE_SEED_SIZE {
+            return Err(PyValueError::new_err(format!(
+                "seed must be exactly {} bytes, got {}",
+                PHOTON_BASE_SEED_SIZE,
+                seed.len()
+            )));
+        }
+        let mut seed_arr = [0u8; PHOTON_BASE_SEED_SIZE];
+        seed_arr.copy_from_slice(seed);
+        Ok(KelvinFlare { inner: KelvinFlareRust::new(seed_arr, max_reseeds) })
+    }
+
+    fn generate_secret_key(&mut self, len: usize) -> Vec<u8> {
+        self.inner.generate_secret_key(len).expect("generate_secret_key").to_vec()
+    }
+
+    fn generate_fhe_key(&mut self, scheme: i32, len: usize) -> PyResult<Vec<u8>> {
+        let fs = match scheme {
+            0 => FlareScheme::Bfv,
+            1 => FlareScheme::Ckks,
+            2 => FlareScheme::Tfhe,
+            _ => return Err(PyValueError::new_err("invalid scheme (0=BFV, 1=CKKS, 2=TFHE)")),
+        };
+        Ok(self.inner.generate_fhe_key(fs, len).expect("generate_fhe_key").key().to_vec())
+    }
+
+    fn bytes_processed(&self) -> u64 {
+        self.inner.bytes_processed()
+    }
+    fn reseed_count(&self) -> u64 {
+        self.inner.reseed_count()
+    }
+    fn remaining_reseeds(&self) -> u64 {
+        self.inner.remaining_reseeds()
+    }
+}
 
 /// Python bindings for the Kelvin Orbital Chaos KDF Cryptosystem.
 #[pymodule]
@@ -500,6 +653,9 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<KelvinPhotonAuthenticated>()?;
     m.add_class::<KelvinQuantumAuthenticated>()?;
     m.add_class::<KelvinStreaming>()?;
+    m.add_class::<KelvinPrism>()?;
+    m.add_class::<KelvinSplit>()?;
+    m.add_class::<KelvinFlare>()?;
 
     Ok(())
 }

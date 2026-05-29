@@ -213,19 +213,28 @@ impl KelvinQuantum {
     /// using the configured integration method (Verlet or Euler),
     /// then extracts fresh entropy via SHAKE256 and XORs it into the base seed.
     /// This provides forward secrecy beyond BLAKE3's deterministic reseeding.
+    ///
+    /// If the orbital simulation experiences a body ejection or gravitational
+    /// collapse, the simulation is re-derived from the base seed to maintain
+    /// the security invariant that N ≥ 3 bodies are present (N=2 has a
+    /// closed-form solution). This re-derivation ensures forward secrecy
+    /// continues even after a transient instability.
     fn reseed_from_orbital_chaos(&mut self) {
         // Advance orbital simulation using the configured integration method
         for _ in 0..self.orbital_steps_per_reseed {
-            // Ignore errors from integration steps (stability checks may fail for
-            // perturbed systems, but we still get useful entropy from the
-            // simulation state before the error would occur).
-            let _ = match self.integration_method {
+            let result = match self.integration_method {
                 IntegrationMethod::Verlet => self.orbital_state.verlet_step(),
                 IntegrationMethod::Euler => self.orbital_state.euler_step(),
             };
+            // On stability failure (ejection/collapse), re-derive orbital state
+            // from the base seed to restore a healthy N-body chaotic regime.
+            if result.is_err() {
+                self.recover_orbital_state();
+                return;
+            }
         }
 
-        // Extract fresh entropy from orbital state using the built-in extractor
+        // Extract fresh entropy from orbital state using SHAKE256
         let mut fresh_entropy = [0u8; EXTRACT_BUF_SIZE];
         self.orbital_state.extract_entropy(&mut fresh_entropy);
 
@@ -235,6 +244,42 @@ impl KelvinQuantum {
         }
 
         fresh_entropy.zeroize();
+    }
+
+    /// Recover from an orbital stability failure by re-deriving the orbital
+    /// state from the current base seed. This ensures the system always has
+    /// at least 5 chaotic bodies, maintaining the security invariant that
+    /// N ≥ 3 (no closed-form solution for the attacker).
+    fn recover_orbital_state(&mut self) {
+        // Perturb the orbital state using material derived from the base seed.
+        // This is the same perturbation logic as in with_config(), ensuring
+        // deterministic recovery from the current base seed.
+        let mut perturb_hasher = Hasher::new();
+        perturb_hasher.update(DOMSEP_QUANTUM_PERTURB_V1);
+        perturb_hasher.update(&self.base_seed[..]);
+        perturb_hasher.update(&self.reseed_count.to_le_bytes());
+        let mut perturb_buf = [0u8; XOF_SEED_SIZE];
+        perturb_hasher.finalize_xof().fill(&mut perturb_buf);
+
+        let mut orbital_state = OrbitalState::chaotic_default();
+        // Perturb positions using the seed-derived buffer
+        for i in 0..orbital_state.positions.len() {
+            for j in 0..3 {
+                let idx = (i * 3 + j) % perturb_buf.len();
+                let perturbation = (perturb_buf[idx] as f64 - 128.0) * QUANTUM_PERTURB_SCALE;
+                orbital_state.positions[i][j] += perturbation;
+            }
+        }
+        // Perturb velocities too
+        for i in 0..orbital_state.velocities.len() {
+            for j in 0..3 {
+                let idx = (i * 3 + j + 15) % perturb_buf.len();
+                let perturbation = (perturb_buf[idx] as f64 - 128.0) * QUANTUM_PERTURB_SCALE;
+                orbital_state.velocities[i][j] += perturbation;
+            }
+        }
+
+        self.orbital_state = orbital_state;
     }
 
     /// Fill `output` with keystream bytes from the cache, refilling as needed.
