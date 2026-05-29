@@ -156,19 +156,26 @@ fn test_reseed_count_increments() {
 fn test_exhaustion() {
     let mut split = KelvinSplit::new(test_seed(), 3);
     // Encrypt enough to trigger 3 reseeds (each reseed lasts 64 MiB)
-    // 3 reseeds = 192 MiB of keystream
-    let mut data = vec![0u8; 64 * 1024 * 1024 + 1]; // 64 MiB + 1 byte
+    // 3 reseeds = 192 MiB of keystream. Use a small reusable buffer (1 MiB)
+    // in a loop to trigger reseeds without large allocations.
+    let mut buf = vec![0u8; 1024 * 1024]; // 1 MiB buffer
 
     // First 64 MiB + 1 byte: triggers reseed at 64 MiB boundary
-    assert!(split.encrypt(&mut data).is_ok());
+    for _ in 0..64 {
+        split.generate_keystream_into(&mut buf).unwrap();
+    }
+    split.generate_keystream_into(&mut buf[..1]).unwrap();
     assert_eq!(split.reseed_count(), 2); // initial + 1 reseed
 
     // Second 64 MiB + 1 byte: triggers another reseed
-    assert!(split.encrypt(&mut data).is_ok());
+    for _ in 0..64 {
+        split.generate_keystream_into(&mut buf).unwrap();
+    }
+    split.generate_keystream_into(&mut buf[..1]).unwrap();
     assert_eq!(split.reseed_count(), 3); // exhausted
 
     // Third call should fail (max_reseeds = 3, so reseed_count 3 = exhausted)
-    assert!(split.encrypt(&mut data).is_err());
+    assert!(split.generate_keystream_into(&mut buf[..1]).is_err());
 }
 
 #[test]
