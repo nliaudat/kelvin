@@ -24,6 +24,7 @@ ml-kem = { version = "0.3", default-features = false, features = ["alloc"] }
 ml-dsa = { version = "0.1.0-rc.4", default-features = false }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
+fail = { version = "0.5", optional = true }
 
 [[test]]
 name = "chaos_test"
@@ -32,3 +33,4 @@ path = "../tests/kelvin_tests/chaos_test.rs"
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "kelvin-core/serde"]
+failpoints = ["dep:fail", "kelvin-core/failpoints"]

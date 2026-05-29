@@ -13,6 +13,7 @@ path = "src/lib.rs"
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 zeroize = { version = "1.6", features = ["zeroize_derive"], optional = true }
+fail = { version = "0.5", optional = true }
 
 [dev-dependencies]
 sha3 = { version = "0.10", default-features = false }
@@ -26,3 +27,4 @@ path = "../tests/kelvin_tests/determinism.rs"
 default = ["zeroize"]
 serde = ["dep:serde", "dep:serde_json"]
 zeroize = ["dep:zeroize"]
+failpoints = ["dep:fail"]

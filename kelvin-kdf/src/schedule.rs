@@ -126,6 +126,8 @@ impl KeySchedule {
     ///
     /// Returns `None` if the schedule is exhausted.
     pub fn next_key(&mut self) -> Option<([u8; 32], [u8; 12])> {
+        #[cfg(feature = "failpoints")]
+        fail::fail_point!("key-schedule-exhaust");
         if self.state == ScheduleState::Exhausted {
             return None;
         }

@@ -96,6 +96,8 @@ pub fn compute_accelerations(bodies: &[OrbitalBody], softening: Fixed, g: Fixed)
 ///
 /// Verlet remains the default for backward compatibility. Use `--euler` to opt in.
 pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) {
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("euler-step");
     // Step 1: Compute accelerations from current positions
     let acc = compute_accelerations(bodies, softening, g);
 
@@ -120,6 +122,8 @@ pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fi
 /// 3. Compute new accelerations a'
 /// 4. Kick:   v ← v + a' * dt/2
 pub fn verlet_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fixed) {
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("verlet-step");
     let half_dt = dt / Fixed::from_int(2);
 
     // Step 1: Kick (half step)

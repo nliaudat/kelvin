@@ -8,9 +8,22 @@ description = "Verifies that Zeroizing/zeroize correctly clears sensitive memory
 name = "zeroize_verify"
 path = "src/main.rs"
 
+[[bin]]
+name = "memory_access_test"
+path = "src/memory_access_test.rs"
+
 [dependencies]
 kelvin = { path = "../../kelvin" }
 kelvin-core = { path = "../../kelvin-core" }
 kelvin-kdf = { path = "../../kelvin-kdf" }
 kelvin-stream = { path = "../../kelvin-stream" }
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_System_Memory",
+    "Win32_System_SystemInformation",
+    "Win32_System_LibraryLoader",
+    "Win32_Foundation",
+] }
