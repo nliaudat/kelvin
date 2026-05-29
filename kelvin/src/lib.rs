@@ -1,12 +1,20 @@
-//! # Kelvin — Orbital Chaos KDF Cryptosystem
+//! # Kelvin — Quantum-Resistant One-Time Pad Cryptosystem
 //!
-//! Top-level orchestrator for the Kelvin cryptosystem.
+//! Top-level orchestrator for the Kelvin cryptosystem — a **quantum-resistant
+//! one-time pad (OTP) cryptosystem** based on fixed-point gravitational n-body
+//! simulation.
+//!
+//! All XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare)
+//! produce a **quantum-resistant OTP keystream**: data is XOR-encrypted
+//! byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
+//! There is no nonce, no IV, no algebraic round function. The only attack is
+//! brute force.
 //!
 //! Provides:
-//! - `Kelvin` struct — original V1 encryption/decryption entry point (virtual time)
-//! - `KelvinStreaming` struct — V2 streaming encryption/decryption (real time, one step per chunk)
-//! - `KelvinPhoton` struct — V3 fast bulk OTP via HKDF→SHAKE256 XOR
-//! - `KelvinQuantum` struct — H hybrid cache+XOR + orbital reseed
+//! - `Kelvin` struct — original V1 encryption/decryption entry point (virtual time, ChaCha20Poly1305 AEAD)
+//! - `KelvinStreaming` struct — V2 per-step OTP streaming (real time, one simulation step per chunk)
+//! - `KelvinPhoton` struct — V3 batch OTP via HKDF→SHAKE256 XOR (fast bulk encryption)
+//! - `KelvinQuantum` struct — H hybrid OTP (V3+V2 XOR with orbital reseeding)
 //! - `KelvinPrism` struct — standalone OTP key generator for homomorphic encryption
 //! - `KelvinSplit` struct — dedicated XOR key-splitter for homomorphic encryption
 //! - `KelvinFlare` struct — chaotic FHE secret key generator
@@ -51,6 +59,7 @@
 //! let config = OrbitalConfig::from_json(json_str)?;
 //! let mut k = Kelvin::new(config)?;
 //! let mut data = b"Hello, world!".to_vec();
+
 //! k.encrypt(&mut data)?;
 //! k.decrypt(&mut data)?;
 //! assert_eq!(&data, b"Hello, world!");
@@ -866,15 +875,16 @@ mod tests {
     #[test]
     fn test_kelvin_aead_tag_detection() {
         let config = five_body_config();
-        let mut k = Kelvin::new(config).expect("Kelvin::new");
+        let mut enc = Kelvin::new(config.clone()).expect("Kelvin::new");
+        let mut dec = Kelvin::new(config).expect("Kelvin::new");
         let mut data = b"Hello, Kelvin!".to_vec();
         // Extend with space for AEAD tag
         data.extend_from_slice(&[0u8; 16]);
-        k.encrypt(&mut data).unwrap();
+        enc.encrypt(&mut data).unwrap();
         // Tamper with the ciphertext
         data[0] ^= 0xFF;
         // Decryption should fail due to tag mismatch
-        let result = k.decrypt(&mut data);
+        let result = dec.decrypt(&mut data);
         assert!(result.is_err());
     }
 

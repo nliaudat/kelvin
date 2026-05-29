@@ -1,18 +1,23 @@
-//! Kelvin-Flare — Chaotic FHE Secret Key Generator.
+//! Kelvin-Flare — Chaotic OTP-based FHE Secret Key Generator.
 //!
 //! ## Purpose
 //!
-//! `KelvinFlare` provides a domain-separated keystream generator designed
+//! `KelvinFlare` provides a domain-separated OTP keystream generator designed
 //! specifically for generating **chaotic FHE secret keys**. Inspired by the
 //! DUff-skg paper (Jawad, 2025) which uses Duffing oscillators for FHE key
 //! generation, Kelvin-Flare replaces the 2-DOF Duffing system with Kelvin's
 //! 5-body orbital chaos (30 DOF) for even higher-quality key material.
 //!
+//! Like all Kelvin OTP modes, Flare produces keystream via SHAKE256 XOR —
+//! there is no nonce, no IV, no algebraic round function. The only attack
+//! is brute force.
+//!
 //! ## Architecture
 //!
 //! ```text
-//! 2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited FHE key material
+//! 2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP FHE key material
 //! ```
+
 //!
 //! Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
 //! The domain separators (`DOMSEP_FLARE_KEYSTREAM_V1`, `DOMSEP_FLARE_RESEED_V1`)

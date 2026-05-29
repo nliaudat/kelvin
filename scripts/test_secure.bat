@@ -124,6 +124,24 @@ cargo test --release -p kelvin --test prism
 if errorlevel 1 call :fail
 echo %GREEN%PASSED%NC%
 
+set STEP_NAME=Integration: Flare FHE key generator
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cargo test --release -p kelvin --test flare
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
+set STEP_NAME=Integration: Split secret sharing
+echo.
+echo %CYAN%========================================%NC%
+echo %CYAN%  %STEP_NAME%%NC%
+echo %CYAN%========================================%NC%
+cargo test --release -p kelvin --test split
+if errorlevel 1 call :fail
+echo %GREEN%PASSED%NC%
+
 set STEP_NAME=Integration: Determinism (cross-platform golden hash)
 echo.
 echo %CYAN%========================================%NC%

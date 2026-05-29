@@ -1,8 +1,8 @@
-//! Kelvin-Split — Dedicated XOR Key-Splitter for Homomorphic Encryption.
+//! Kelvin-Split — Dedicated OTP XOR Key-Splitter for Homomorphic Encryption.
 //!
 //! ## Purpose
 //!
-//! `KelvinSplit` provides a domain-separated keystream generator designed
+//! `KelvinSplit` provides a domain-separated OTP keystream generator designed
 //! specifically for the **split-key XOR homomorphism**:
 //!
 //! ```text

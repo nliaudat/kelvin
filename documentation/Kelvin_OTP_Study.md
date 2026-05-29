@@ -17,7 +17,7 @@ Kelvin currently has two modes, and this study proposes two more:
 | # | Name | Description |
 |---|------|-------------|
 | V1 | **Kelvin-Secure** | ChaCha20Poly1305 AEAD with upfront simulation + virtual key schedule |
-| V2 | **Kelvin-Chaos** | Pure XOR streaming with per-step real-time simulation (one Verlet step per chunk) |
+| V2 | **Kelvin-Chaos** | Pure XOR streaming with per-step real-time simulation (one integration step per chunk) |
 | V3 | **Kelvin-Photon** | Fast bulk OTP: HKDF→SHAKE256 XOR from upfront simulation (fast as light) |
 | H | **Kelvin-Quantum** | Hybrid V3+V2: bulk speed of Photon + fresh entropy of Chaos |
 
@@ -50,7 +50,7 @@ V3 [Base Seed] ──HKDF→SHAKE256──→ 1MB keystream (fast, ~200ms/GB)
 V2 [Orbital State] ──Verlet(10k steps)──→ Fresh Entropy (~0.5ms per reseed)
 ```
 
-V3 provides **bulk throughput** (SHAKE256 is fast). V2 provides **fresh chaotic entropy** (each Verlet step produces genuinely new dynamics). The hybrid combines them: use V3's fast cache for throughput, but inject V2's fresh orbital chaos at reseed boundaries to prevent seed exhaustion attacks.
+V3 provides **bulk throughput** (SHAKE256 is fast). V2 provides **fresh chaotic entropy** (each integration step produces genuinely new dynamics). The hybrid combines them: use V3's fast cache for throughput, but inject V2's fresh orbital chaos at reseed boundaries to prevent seed exhaustion attacks.
 
 ---
 

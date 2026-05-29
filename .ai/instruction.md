@@ -181,5 +181,6 @@ AI BEHAVIOR RULES
 3. If a crypto decision is uncertain, choose conservative and flag for review.
 4. Remind about the "EXPERIMENTAL" status if production use is suggested.
 5. When suggesting code, follow Rust best practices listed above.
+6. **Documentation-only changes** (README.md, documentation/*.md, proofs/specs/*.md, etc.) do NOT require compilation or test execution. Skip build/test steps and proceed directly to `attempt_completion`.
 
 ===============================================================================

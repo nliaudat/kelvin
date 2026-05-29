@@ -9,7 +9,7 @@
 //! equivalence at the composite level by verifying that the
 //! acceleration computation satisfies physical invariants:
 //!
-//! 1. **Newton's Third Law**: a_ij = -a_ji (action-reaction)
+//! 1. **Newton's Third Law**: F_ij = -F_ji (action-reaction)
 //! 2. **Direction**: Acceleration points toward the attracting body
 //! 3. **Inverse Square**: |a| ∝ 1/r² (approximately, with softening)
 //! 4. **Proportionality**: |a| ∝ m (acceleration proportional to source mass)
@@ -36,10 +36,10 @@ const SOFTENING_RAW: i128 = 1 << 44;
 
 // ── Harness 1: Newton's Third Law (Action-Reaction) ────────────────────
 //
-// Prove: For any two bodies, the acceleration on body i due to body j
-// is equal and opposite to the acceleration on body j due to body i.
+// Prove: For any two bodies, the force on body i due to body j
+// is equal and opposite to the force on body j due to body i.
 //
-// a_ij = -a_ji
+// F_ij = -F_ji  (i.e., m_i * a_ij = -m_j * a_ji)
 //
 // This is a fundamental invariant of the gravitational interaction.
 // If it fails, momentum conservation is broken.
@@ -88,10 +88,16 @@ fn verify_acceleration_action_reaction() {
     let bodies = [body1, body2];
     let accs = compute_accelerations(&bodies, Fixed::from_raw(SOFTENING_RAW), Fixed::from_raw(G_RAW));
 
-    // Newton's third law: a_01 = -a_10
+    // Newton's third law: F_01 = -F_10 => m1 * a_01 = -m2 * a_10
+    let f01_x = accs[0].x * body1.mass;
+    let f01_y = accs[0].y * body1.mass;
+    let f01_z = accs[0].z * body1.mass;
+    let f10_x = accs[1].x * body2.mass;
+    let f10_y = accs[1].y * body2.mass;
+    let f10_z = accs[1].z * body2.mass;
     kani::assert(
-        accs[0].x == -accs[1].x && accs[0].y == -accs[1].y && accs[0].z == -accs[1].z,
-        "acceleration: action-reaction (a_01 == -a_10)",
+        f01_x == -f10_x && f01_y == -f10_y && f01_z == -f10_z,
+        "acceleration: action-reaction (F_01 == -F_10)",
     );
 }
 

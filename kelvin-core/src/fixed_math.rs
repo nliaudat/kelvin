@@ -821,11 +821,16 @@ mod kani_proofs {
 
         // Functional equivalence: inverse property
         // result * den should approximately equal num
+        // The error of (num / den) * den - num is bounded by |den_raw| >> 64 + 2
+        // because the division rounding error (up to 1 ULP of result) gets scaled
+        // by den when multiplied back. Since den_raw can be up to 8,000,000 * AU,
+        // the error can be up to 8,000,000 ULPs.
         let product = result * den;
         let error = (product - num).abs();
+        let max_error = (den.abs().to_raw() >> 64) + 2;
         kani::assert(
-            error.to_raw() <= 2,
-            "div: inverse property (result*den ≈ num, error ≤ 2 ULP)",
+            error.to_raw() <= max_error,
+            "div: inverse property (result*den ≈ num, error within theoretical bound)",
         );
     }
 
@@ -855,8 +860,16 @@ mod kani_proofs {
 
         // Functional equivalence: inverse property
         // sqrt(a)² should approximately equal a
+        // The error of sqrt(val)^2 - val is bounded by (2 * result_raw) >> 64 + 3
+        // because the sqrt rounding error (up to 1 ULP of result) gets amplified
+        // by 2 * sqrt(val) when squared back. Since val can be up to 40,000 * AU,
+        // sqrt(val) can be up to 200 * 2^64, giving up to ~400 ULPs of error.
         let squared = result * result;
         let error = (squared - val).abs();
-        kani::assert(error.to_raw() <= 3, "sqrt: inverse property (sqrt(a)² ≈ a, error ≤ 3 ULP)");
+        let max_error = ((2 * result.to_raw()) >> 64) + 3;
+        kani::assert(
+            error.to_raw() <= max_error,
+            "sqrt: inverse property (sqrt(a)² ≈ a, error within theoretical bound)",
+        );
     }
 }

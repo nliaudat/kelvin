@@ -30,8 +30,8 @@ equivalence against a specification, not just absence of panics.
 - [x] **Apple-Inspired Blueprint**: Document the multi-level proof strategy
     modeled on Apple's corecrypto formal verification pipeline. *(Completed 2026-05-27)*
     - Level 0: Safety (no panics, no overflows)
-    - Level 1: Functional equivalence (ops match spec within 1 ULP)
-    - Level 2: Composite correctness (accelerations match Newtonian gravity)
+    - Level 1: Functional equivalence (ops match spec within dynamically scaled error bounds)
+    - Level 2: Composite correctness (accelerations match Newtonian gravity via force-based assertions)
     - Level 3: Pipeline integrity (full simulate+extract_seed)
     - Level 4: Determinism (bit-identical across platforms)
 
@@ -54,13 +54,14 @@ Security is the primary requirement for production readiness. We must move beyon
     - Addition: prove `Fixed::add(a,b) == a + b` (exact match for bounded inputs)
     - Subtraction: prove `Fixed::sub(a,b) == a - b` (exact match for bounded inputs)
     - Multiplication: prove commutativity (`a*b == b*a`), identity (`a*1 == a`), zero (`a*0 == 0`)
-    - Division: prove inverse property (`(a/b)*b ≈ a` within 2 ULP)
-    - Square root: prove inverse property (`sqrt(a)² ≈ a` within 3 ULP)
+    - Division: prove inverse property (`(a/b)*b ≈ a` with dynamically scaled error bound `|den_raw| >> 64 + 2`)
+    - Square root: prove inverse property (`sqrt(a)² ≈ a` with dynamically scaled error bound `(2 * result_raw) >> 64 + 3`)
     - Template harnesses for Vec3 dot product and length_squared at `proofs/kani/fixed_equivalence.rs`
-- [ ] **Acceleration Composite Proof**: Add Kani harnesses proving `compute_accelerations`
+- [x] **Acceleration Composite Proof**: Add Kani harnesses proving `compute_accelerations`
     satisfies Newton's laws (action-reaction, direction, proportionality to mass).
+    *(Completed 2026-05-28)*
     - Template harnesses at `proofs/kani/acceleration_proofs.rs`
-    - 5 harnesses: action-reaction, direction, single-body zero, three-body symmetry, mass proportionality
+    - 5 harnesses: action-reaction (force-based: `F_01 = -F_10` via `m1*a_01 = -m2*a_10`), direction, single-body zero, three-body symmetry, mass proportionality
 - [ ] **End-to-End Keystream Proof**: Prove the full `simulate_and_extract_seed` pipeline
     produces correct output for a known configuration (golden hash proof).
 - [x] **Determinism Proof**: Verify that the Symplectic Verlet integrator produces bit-identical results across all supported SIMD instructions (SSE, AVX, NEON). *(Completed 2026-05-22)*
@@ -183,6 +184,16 @@ Security is the primary requirement for production readiness. We must move beyon
 - [ ] **Third-Party Engagement**: Schedule a professional security audit by a specialized firm (e.g., Trail of Bits, NCC Group, or Kudelski Security).
     - Two firms, concurrent review recommended
     - Budget for 8-12 weeks of audit + 4-6 weeks remediation + 2-4 weeks re-audit
+
+### 1.8 Documented Security Assumptions
+
+- [ ] **N-body one-way assumption**: Given final state after S steps,
+      infeasible to recover initial configuration (no closed-form solution)
+- [ ] **Fixed-point determinism**: Q32.64 arithmetic produces identical
+      results across all platforms (verified by tests)
+- [ ] **SHAKE256 security**: Standard assumption (NIST FIPS 202)
+- [ ] **Lyapunov horizon**: Configurations with `total_steps < min_chaos_steps`
+      are rejected; simulation beyond horizon may degrade unpredictability
 
 ---
 

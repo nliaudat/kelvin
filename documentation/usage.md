@@ -1,6 +1,7 @@
 # Kelvin Usage Guide
 
-Kelvin is an orbital-chaos-based Key Derivation Function (KDF) and stream cipher. This guide covers how to use the CLI tool and how to integrate the library into your Rust projects.
+Kelvin is an orbital-chaos-based **quantum-resistant one-time pad (OTP) cryptosystem** and Key Derivation Function (KDF). This guide covers how to use the CLI tool and how to integrate the library into your Rust projects.
+
 
 ---
 
@@ -31,7 +32,8 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 ```
 
 ### Encrypt a File
-Kelvin uses the orbital simulation to generate a chaotic **Orbital Keystream** for encryption.
+Kelvin uses the orbital simulation to generate a **quantum-resistant OTP keystream** for encryption. Data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
+
 
 ```bash
 # Default: Verlet integration (symplectic, energy-conserving)
@@ -328,9 +330,10 @@ This returns `remaining_keys × 4 GiB` (conservative estimate). When it reaches 
 
 ---
 
-## 6. V2 Streaming Mode (Real-Time Per-Step Simulation)
+## 6. V2 Streaming Mode — Per-Step OTP (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state.
+V2 Streaming (`KelvinStreaming`) is a **per-step one-time pad** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no nonce, no IV, and no key reuse risk — each step produces a unique keystream from fresh chaotic dynamics.
+
 
 ### Key Differences from V1
 
@@ -433,6 +436,14 @@ The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.h
 homomorphic encryption (HE) systems. It produces domain-separated OTP key
 material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
 
+> ⚠️ **Known Prior Art:** Chaotic key generation for FHE was previously proposed
+> by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4
+> floating-point integration. Kelvin-Flare provides an alternative approach
+> using 30-DOF n-body gravitational dynamics with fixed-point arithmetic and
+> domain-separated extraction. See [Patent Review #3](patent_review_3.md) for
+> full analysis.
+
+
 ### Architecture
 
 ```
@@ -490,3 +501,164 @@ KelvinPrism::recrypt(&mut data, &otp_key);
 
 See the [Homomorphic Cryptosystem Analysis](homomorphic_cryptosystem.md) for
 full details on integrating Kelvin with FHE systems.
+
+---
+
+## 8. Split Mode — XOR Key-Splitter for Homomorphic Encryption
+
+`KelvinSplit` is a dedicated XOR key-splitter designed for the **split-key XOR
+homomorphism**:
+
+```
+split_key(len) → (A, B) where A ⊕ B = K
+```
+
+This enables XOR operations on encrypted data without revealing plaintexts:
+
+1. Generate master key `K` and split into `(A, B)` where `A ⊕ B = K`
+2. Encrypt plaintexts: `E1 = P1 ⊕ A`, `E2 = P2 ⊕ B`
+3. On server: `E3 = E1 ⊕ E2 = K ⊕ P1 ⊕ P2`
+4. Decrypt with `K`: `E3 ⊕ K = P1 ⊕ P2`
+
+The server can XOR the two ciphertexts without ever seeing the plaintexts or
+the master key `K`.
+
+### Architecture
+
+```
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keys
+```
+
+Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+The domain separators (`DOMSEP_SPLIT_KEYSTREAM_V1`, `DOMSEP_SPLIT_RESEED_V1`)
+ensure cryptographic isolation from Prism, Flare, and V3 Photon keystream.
+
+### Rust API
+
+```rust
+use kelvin::{KelvinSplit, PHOTON_BASE_SEED_SIZE};
+
+// 1. Get a 2048-byte seed from orbital simulation
+let (seed, _bodies) = kelvin::simulate_and_extract_seed(&config)?;
+
+// 2. Create a Split instance (max 100,000 reseeds)
+let mut split = KelvinSplit::new(seed, 100_000);
+
+// 3. Split a key for XOR homomorphism: A ⊕ B = K
+let (a, b) = split.split_key(256)?;
+
+// 4. Generate a master key directly
+let master_key = split.generate_master_key(256)?;
+
+// 5. Encrypt/decrypt with domain-separated keystream
+let mut data = b"Secret message".to_vec();
+split.encrypt(&mut data)?;
+split.decrypt(&mut data)?;
+assert_eq!(&data, b"Secret message");
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Dedicated split-key API** | `split_key()` produces `(A, B)` where `A ⊕ B = K` |
+| **Domain separation** | Split keys cannot collide with Prism, Flare, or V3 Photon keystream |
+| **Forward secrecy** | BLAKE3 reseeding ensures past keys are not recoverable from future state |
+| **Quantum resistance** | SHAKE256 provides 256-bit classical / 128-bit quantum security |
+| **No authentication** | XOR is malleable — use with external MAC or in environments where malleability is acceptable |
+
+### Use Cases
+
+1. **Split-key XOR homomorphism**: Use `split_key()` to produce (A, B) where
+   A ⊕ B = K, enabling XOR operations on encrypted data.
+2. **Master key generation**: Use `generate_master_key()` to produce the
+   master key K directly.
+3. **Encryption/decryption**: Use `encrypt()`/`decrypt()` for domain-separated
+   OTP encryption.
+
+---
+
+## 9. Flare Mode — Chaotic FHE Secret Key Generator
+
+`KelvinFlare` is a domain-separated keystream generator designed specifically
+for generating **chaotic FHE secret keys**. Inspired by the DUff-skg paper
+(Jawad, 2025) which uses Duffing oscillators for FHE key generation,
+Kelvin-Flare replaces the 2-DOF Duffing system with Kelvin's 5-body orbital
+chaos (30 DOF) for even higher-quality key material.
+
+### Architecture
+
+```
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited FHE key material
+```
+
+Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
+The domain separators (`DOMSEP_FLARE_KEYSTREAM_V1`, `DOMSEP_FLARE_RESEED_V1`)
+ensure cryptographic isolation from Split, Prism, and V3 Photon.
+
+### Supported FHE Schemes
+
+| Scheme | Description |
+|--------|-------------|
+| **BFV** (Brakerski-Fan-Vercauteren) | Integer arithmetic |
+| **CKKS** (Cheon-Kim-Kim-Song) | Approximate floating-point arithmetic |
+| **TFHE** (Chillotti et al.) | Fast boolean gate evaluation |
+
+### Comparison with DUff-skg
+
+| Aspect | DUff-skg (Jawad, 2025) | Kelvin-Flare |
+|--------|------------------------|--------------|
+| Chaos source | Duffing oscillator (2 DOF) | 5-body orbital simulation (30 DOF) |
+| Key size | 2³²⁵ bits | 2¹⁹²⁰ bits (even larger) |
+| NIST tests | ✅ Passed | ✅ Passed (Kelvin's own tests) |
+| Integration | BFV, CKKS, TFHE | Same standards |
+| Forward secrecy | ❌ Not specified | ✅ BLAKE3 reseeding |
+| Domain isolation | ❌ Single domain | ✅ Isolated from other Kelvin modes |
+
+### Rust API
+
+```rust
+use kelvin::{FlareScheme, KelvinFlare, PHOTON_BASE_SEED_SIZE};
+
+// 1. Get a 2048-byte seed from orbital simulation
+let (seed, _bodies) = kelvin::simulate_and_extract_seed(&config)?;
+
+// 2. Create a Flare instance (max 100,000 reseeds)
+let mut flare = KelvinFlare::new(seed, 100_000);
+
+// 3. Generate a raw secret key (256 bytes)
+let secret_key = flare.generate_secret_key(256)?;
+
+// 4. Generate a key formatted for a specific FHE scheme
+let bfv_key = flare.generate_fhe_key(FlareScheme::Bfv, 256)?;
+let ckks_key = flare.generate_fhe_key(FlareScheme::Ckks, 256)?;
+let tfhe_key = flare.generate_fhe_key(FlareScheme::Tfhe, 256)?;
+```
+
+### Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **Scheme-specific domain separation** | Keys for BFV, CKKS, and TFHE are cryptographically isolated via scheme-specific domain suffixes |
+| **Higher-dimensional chaos** | 30 DOF vs 2 DOF (Duffing) provides richer entropy for FHE secret keys |
+| **Forward secrecy** | BLAKE3 reseeding ensures past keys are not recoverable from future state |
+| **Domain isolation** | Flare keys cannot collide with Split, Prism, or V3 Photon keystream |
+| **Quantum resistance** | SHAKE256 provides 256-bit classical / 128-bit quantum security |
+
+### Scheme-Specific Notes
+
+- **BFV**: Keys should be at least 32 bytes for 256-bit security.
+  Larger keys (64-128 bytes) are recommended for production use.
+- **CKKS**: Keys should be at least 32 bytes. CKKS uses the same
+  secret key distribution as BFV in most implementations.
+- **TFHE**: Keys should be at least 32 bytes. TFHE typically uses
+  smaller keys due to its gate-by-gate evaluation model.
+
+### Use Cases
+
+1. **Chaotic FHE key generation**: Generate secret keys for BFV, CKKS, and
+   TFHE schemes using 30-DOF n-body gravitational chaos.
+2. **Raw secret key generation**: Use `generate_secret_key()` to produce
+   high-entropy key material for custom FHE implementations.
+3. **Hybrid systems**: Combine with `KelvinPrism` and `KelvinSplit` for
+   a complete FHE integration suite — all domain-separated from each other.

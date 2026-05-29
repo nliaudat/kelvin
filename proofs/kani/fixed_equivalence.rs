@@ -194,14 +194,16 @@ fn verify_div_inverse() {
     let result = num / den;
 
     // Check: result * den ≈ num
-    // The error should be at most 1 ULP in Q32.64
+    // The error of (num / den) * den - num is bounded by |den_raw| >> 64 + 2
+    // because the division rounding error (up to 1 ULP of result) gets scaled
+    // by den when multiplied back. Since den_raw can be up to 8,000,000 * AU,
+    // the error can be up to 8,000,000 ULPs.
     let product = result * den;
     let error = (product - num).abs();
-
-    // 1 ULP in Q32.64 = 1 in raw representation
+    let max_error = (den.abs().to_raw() >> 64) + 2;
     kani::assert(
-        error.to_raw() <= 2,  // Allow 2 ULP for rounding
-        "div: inverse property (result*den ≈ num, error ≤ 2 ULP)",
+        error.to_raw() <= max_error,
+        "div: inverse property (result*den ≈ num, error within theoretical bound)",
     );
 }
 
@@ -226,14 +228,16 @@ fn verify_sqrt_inverse() {
     let result = val.sqrt();
 
     // Check: result² ≈ val
+    // The error of sqrt(val)^2 - val is bounded by (2 * result_raw) >> 64 + 3
+    // because the sqrt rounding error (up to 1 ULP of result) gets amplified
+    // by 2 * sqrt(val) when squared back. Since val can be up to 40,000 * AU,
+    // sqrt(val) can be up to 200 * 2^64, giving up to ~400 ULPs of error.
     let squared = result * result;
     let error = (squared - val).abs();
-
-    // For sqrt, the error bound is typically larger due to the
-    // 96-iteration digit-by-digit algorithm. Allow 3 ULP.
+    let max_error = ((2 * result.to_raw()) >> 64) + 3;
     kani::assert(
-        error.to_raw() <= 3,
-        "sqrt: inverse property (sqrt(a)² ≈ a, error ≤ 3 ULP)",
+        error.to_raw() <= max_error,
+        "sqrt: inverse property (sqrt(a)² ≈ a, error within theoretical bound)",
     );
 }
 
