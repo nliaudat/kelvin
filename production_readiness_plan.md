@@ -88,6 +88,7 @@ Security is the primary requirement for production readiness. We must move beyon
         - AVX-512 (`+avx512f`): ⚠️ CPU does not support (STATUS_ILLEGAL_INSTRUCTION)
     - **NEON (aarch64)**: Test is architecture-agnostic; should be run on ARM CI runners
     - **Golden hashes** captured on x86_64 reference platform; any algorithm change requires updating them
+- [x] **PR#59 Fix (2026-05-29)**: Minor adjustments to acceleration proofs (2-U LP action-reaction tolerance adjustment), fixed_equivalence harness, and test fixes for flare/split tests.
 
 ### 1.2 Cryptographic Hardening
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
