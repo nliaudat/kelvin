@@ -24,9 +24,7 @@ pub unsafe extern "C" fn kelvin_split_new(
         return std::ptr::null_mut();
     }
     let mut seed_arr = [0u8; PHOTON_BASE_SEED_SIZE];
-    unsafe {
-        std::ptr::copy_nonoverlapping(seed, seed_arr.as_mut_ptr(), seed_arr.len());
-    }
+    unsafe { std::ptr::copy_nonoverlapping(seed, seed_arr.as_mut_ptr(), seed_arr.len()); }
     let inner = KelvinSplit::new(seed_arr, max_reseeds);
     Box::into_raw(Box::new(SplitCtx { inner }))
 }
@@ -37,9 +35,7 @@ pub unsafe extern "C" fn kelvin_split_generate_master_key(
     key_out: *mut u8,
     key_len: usize,
 ) -> i32 {
-    if key_out.is_null() && key_len > 0 {
-        return -1;
-    }
+    if key_out.is_null() && key_len > 0 { return -1; }
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
@@ -47,9 +43,8 @@ pub unsafe extern "C" fn kelvin_split_generate_master_key(
     match ctx.inner.generate_master_key(key_len) {
         Ok(key) => {
             if key_len > 0 {
-                unsafe {
-                    std::ptr::copy_nonoverlapping(key.as_ptr(), key_out, key.len());
-                }
+                let copy_len = std::cmp::min(key.len(), key_len);
+                unsafe { std::ptr::copy_nonoverlapping(key.as_ptr(), key_out, copy_len); }
             }
             0
         },
@@ -64,9 +59,7 @@ pub unsafe extern "C" fn kelvin_split_key(
     a_out: *mut u8,
     b_out: *mut u8,
 ) -> i32 {
-    if (a_out.is_null() || b_out.is_null()) && key_len > 0 {
-        return -1;
-    }
+    if (a_out.is_null() || b_out.is_null()) && key_len > 0 { return -1; }
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
@@ -74,9 +67,11 @@ pub unsafe extern "C" fn kelvin_split_key(
     match ctx.inner.split_key(key_len) {
         Ok((a, b)) => {
             if key_len > 0 {
+                let copy_len_a = std::cmp::min(a.len(), key_len);
+                let copy_len_b = std::cmp::min(b.len(), key_len);
                 unsafe {
-                    std::ptr::copy_nonoverlapping(a.as_ptr(), a_out, key_len);
-                    std::ptr::copy_nonoverlapping(b.as_ptr(), b_out, key_len);
+                    std::ptr::copy_nonoverlapping(a.as_ptr(), a_out, copy_len_a);
+                    std::ptr::copy_nonoverlapping(b.as_ptr(), b_out, copy_len_b);
                 }
             }
             0
@@ -91,19 +86,10 @@ pub unsafe extern "C" fn kelvin_split_encrypt(
     data: *mut u8,
     len: usize,
 ) -> i32 {
-    if data.is_null() && len > 0 {
-        return -1;
-    }
-    let ctx = match unsafe { ctx.as_mut() } {
-        Some(c) => c,
-        None => return -1,
-    };
-    let slice =
-        if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
-    match ctx.inner.encrypt(slice) {
-        Ok(()) => 0,
-        Err(_) => -1,
-    }
+    if data.is_null() && len > 0 { return -1; }
+    let ctx = match unsafe { ctx.as_mut() } { Some(c) => c, None => return -1 };
+    let slice = if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
+    match ctx.inner.encrypt(slice) { Ok(()) => 0, Err(_) => -1 }
 }
 
 #[no_mangle]
@@ -112,31 +98,18 @@ pub unsafe extern "C" fn kelvin_split_decrypt(
     data: *mut u8,
     len: usize,
 ) -> i32 {
-    if data.is_null() && len > 0 {
-        return -1;
-    }
-    let ctx = match unsafe { ctx.as_mut() } {
-        Some(c) => c,
-        None => return -1,
-    };
-    let slice =
-        if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
-    match ctx.inner.decrypt(slice) {
-        Ok(()) => 0,
-        Err(_) => -1,
-    }
+    if data.is_null() && len > 0 { return -1; }
+    let ctx = match unsafe { ctx.as_mut() } { Some(c) => c, None => return -1 };
+    let slice = if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
+    match ctx.inner.decrypt(slice) { Ok(()) => 0, Err(_) => -1 }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_split_free(ctx: *mut SplitCtx) {
-    if !ctx.is_null() {
-        drop(unsafe { Box::from_raw(ctx) });
-    }
+    if !ctx.is_null() { drop(unsafe { Box::from_raw(ctx) }); }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_split_free_string(s: *mut c_char) {
-    if !s.is_null() {
-        drop(unsafe { CString::from_raw(s) });
-    }
+    if !s.is_null() { drop(unsafe { CString::from_raw(s) }); }
 }
