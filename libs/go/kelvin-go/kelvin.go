@@ -592,6 +592,9 @@ type Prism struct {
 
 // NewPrism creates a new Prism instance from a 2048-byte seed.
 func NewPrism(seed []byte, maxReseeds uint64) (*Prism, error) {
+	if len(seed) != 2048 {
+		return nil, errors.New("seed must be exactly 2048 bytes")
+	}
 	var cError *C.char
 	ctx := C.kelvin_prism_new((*C.uint8_t)(&seed[0]), C.size_t(len(seed)), C.uint64_t(maxReseeds), &cError)
 	if ctx == nil {
@@ -606,6 +609,9 @@ func NewPrism(seed []byte, maxReseeds uint64) (*Prism, error) {
 func (p *Prism) GenerateOTPKey(length int) ([]byte, error) {
 	if p.ctx == nil {
 		return nil, ErrClosed
+	}
+	if length <= 0 {
+		return nil, errors.New("length must be greater than 0")
 	}
 	output := make([]byte, length)
 	res := C.kelvin_prism_generate_otp_key(p.ctx, (*C.uint8_t)(&output[0]), C.size_t(length))

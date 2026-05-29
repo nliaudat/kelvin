@@ -230,7 +230,7 @@ impl KelvinQuantum {
             // from the base seed to restore a healthy N-body chaotic regime.
             if result.is_err() {
                 self.recover_orbital_state();
-                return;
+                break;
             }
         }
 

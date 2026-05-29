@@ -388,6 +388,8 @@ class KelvinPrism:
         return (bytes(a), bytes(b))
 
     def encrypt(self, data: bytearray) -> None:
+        if not data:
+            return
         _lib.kelvin_prism_encrypt.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
         _lib.kelvin_prism_encrypt.restype = ctypes.c_int32
         buf = (ctypes.c_uint8 * len(data)).from_buffer(data)
@@ -396,6 +398,8 @@ class KelvinPrism:
             raise KelvinError("prism encrypt failed")
 
     def decrypt(self, data: bytearray) -> None:
+        if not data:
+            return
         _lib.kelvin_prism_decrypt.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
         _lib.kelvin_prism_decrypt.restype = ctypes.c_int32
         buf = (ctypes.c_uint8 * len(data)).from_buffer(data)
