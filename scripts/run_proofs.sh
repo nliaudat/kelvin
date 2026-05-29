@@ -12,7 +12,10 @@
 # =============================================================================
 set -euo pipefail
 
-KANI_ARGS="--enable-unstable --restrict-vtable"
+# Kani 0.67+ removed --enable-unstable and --restrict-vtable flags.
+# These flags are kept for backward compatibility with older Kani versions.
+# If you get "obsolete option" error, upgrade Kani and remove these flags.
+KANI_ARGS=""
 PROOF_DIR="$(cd "$(dirname "$0")/../proofs/kani" && pwd)"
 
 list_harnesses() {

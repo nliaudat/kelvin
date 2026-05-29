@@ -1,0 +1,45 @@
+# ==============================================================================
+# Kelvin — Kani Formal Verification Docker Compose
+# ==============================================================================
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml build     # Build image
+#   docker compose -f docker/docker-compose.yml run kani  # Run all proofs
+#
+# Fast mode (fixed_equivalence only):
+#   docker compose -f docker/docker-compose.yml run --entrypoint "run-kani --fast" kani
+#
+# List all proof harnesses:
+#   docker compose -f docker/docker-compose.yml run --entrypoint "run-kani --list" kani
+# ==============================================================================
+
+services:
+  kani:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.kani
+    image: kelvin-kani:latest
+    container_name: kelvin-kani
+    working_dir: /kelvin
+    volumes:
+      # Mount the workspace root so all source + proof files are accessible
+      - ..:/kelvin
+      # Mount the entrypoint script from host (no rebuild needed on script changes)
+      - ./run-kani.sh:/usr/local/bin/run-kani
+      # Persist Cargo registry and build cache for faster rebuilds
+      - kani-cargo-cache:/usr/local/cargo
+    entrypoint: ["/usr/local/bin/run-kani"]
+    # Resource limits — auto-detected from host capabilities
+    deploy:
+      resources:
+        limits:
+          memory: 32G
+        reservations:
+          memory: 8G
+    stdin_open: true
+    tty: true
+    # Run all proofs by default
+    command: ["--all"]
+
+volumes:
+  kani-cargo-cache:

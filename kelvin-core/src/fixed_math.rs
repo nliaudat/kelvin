@@ -624,8 +624,6 @@ mod kani_proofs {
     // ── Physical bounds in Q32.64 raw ──────────────────────────────────
     // 1 AU in Q32.64 raw
     const AU: i128 = 1 << 64;
-    // 10⁻⁶ AU in Q32.64 raw (minimum separation before collapse detection)
-    const MIN_AU: i128 = 1 << 44;
     // 100 AU in Q32.64 raw (maximum orbital position)
     const MAX_AU: i128 = 100 * (1 << 64);
     // G ≈ 39.478 AU³/(M☉·yr²) in Q32.64 raw
