@@ -200,7 +200,7 @@ fn verify_div_inverse() {
     // the error can be up to 8,000,000 ULPs.
     let product = result * den;
     let error = (product - num).abs();
-    let max_error = (den.abs().to_raw() >> 64) + 2;
+    let max_error = ((den.to_raw().unsigned_abs() >> 64) as i128) + 2;
     kani::assert(
         error.to_raw() <= max_error,
         "div: inverse property (result*den ≈ num, error within theoretical bound)",

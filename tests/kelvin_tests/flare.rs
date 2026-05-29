@@ -163,23 +163,30 @@ fn test_exhaustion() {
     let mut flare = KelvinFlare::new(test_seed(), 3);
 
     // Each reseed lasts 64 MiB. With max_reseeds=3, we can generate
-    // 3 * 64 MiB before exhaustion. Each 64 MiB chunk triggers a reseed
-    // on the *next* call (bytes_since_reseed >= FLARE_RESEED_INTERVAL_BYTES).
+    // 3 * 64 MiB before exhaustion. Use a small reusable buffer (1 MiB)
+    // in a loop to trigger reseeds without large allocations.
+    let mut buf = vec![0u8; 1024 * 1024]; // 1 MiB buffer
 
-    // Call 1: reader=None -> ensure_reader -> reseed_count=1. Generates 64 MiB.
-    assert!(flare.generate_secret_key(64 * 1024 * 1024).is_ok());
+    // Call 1: Generates 64 MiB to trigger first reseed
+    for _ in 0..64 {
+        flare.generate_keystream_into(&mut buf).unwrap();
+    }
     assert_eq!(flare.reseed_count(), 1);
 
-    // Call 2: bytes_since_reseed >= 64 MiB -> ensure_reader -> reseed_count=2.
-    assert!(flare.generate_secret_key(64 * 1024 * 1024).is_ok());
+    // Call 2: Generates another 64 MiB to trigger second reseed
+    for _ in 0..64 {
+        flare.generate_keystream_into(&mut buf).unwrap();
+    }
     assert_eq!(flare.reseed_count(), 2);
 
-    // Call 3: bytes_since_reseed >= 64 MiB -> ensure_reader -> reseed_count=3.
-    assert!(flare.generate_secret_key(64 * 1024 * 1024).is_ok());
+    // Call 3: Generates another 64 MiB to trigger third reseed
+    for _ in 0..64 {
+        flare.generate_keystream_into(&mut buf).unwrap();
+    }
     assert_eq!(flare.reseed_count(), 3);
 
     // Call 4: reseed_count (3) >= max_reseeds (3) -> SeedExhausted
-    assert!(flare.generate_secret_key(1).is_err());
+    assert!(flare.generate_keystream_into(&mut buf[..1]).is_err());
 }
 
 #[test]
