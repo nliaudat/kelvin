@@ -1,0 +1,19 @@
+# =============================================================================
+# Kani Configuration for kelvin-core
+# =============================================================================
+# 
+# Solver: CaDiCaL handles arithmetic-heavy SAT formulas better than MiniSAT.
+# The u64×u64 splitting in Fixed::mul generates ~10³⁵ propositional variables
+# for 70-bit symbolic inputs. CaDiCaL's conflict-driven clause learning is
+# more efficient for this type of constraint.
+# =============================================================================
+
+[solver]
+# Use CaDiCaL for multiplication/division proofs which involve complex
+# arithmetic constraints. Falls back to MiniSAT if CaDiCaL is unavailable.
+solver = "cadical"
+
+[timeout]
+# Per-harness timeout: 10 minutes. Prevents a single hanging harness
+# from blocking the entire proof suite.
+per_harness_timeout_secs = 600

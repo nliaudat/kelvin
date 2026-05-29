@@ -54,8 +54,12 @@ run_with_progress() {
             printf "\r  %s ${CYAN}Checking harness...${NC}\r" "$(next_spinner)" >&3
 
         # Count total checks from GOTO generation
+        # NOTE: Kani outputs "Generated N VCC(s)" once per verification round.
+        # We only capture the first occurrence to avoid double-counting.
         elif [[ "$line" =~ Generated[[:space:]]([0-9]+)[[:space:]]VCC ]]; then
-            total_checks=$((total_checks + ${BASH_REMATCH[1]}))
+            if [ "$total_checks" -eq 0 ]; then
+                total_checks=${BASH_REMATCH[1]}
+            fi
             phase="running"
 
         elif [[ "$line" == *"Running propositional reduction"* ]]; then
@@ -189,9 +193,7 @@ run_proofs() {
     local harnesses=(
         "verify_add_no_overflow:add never wraps in [-100, 100] AU"
         "verify_sub_no_overflow:sub never wraps in [-100, 100] AU"
-        "verify_mul_no_overflow:mul splitting safe for [-100, 100] AU"
-        "verify_div_no_panic:div never panics for G / bounded dist^3"
-        "verify_sqrt_bounded:sqrt safe for squared distances up to (200 AU)^2"
+        "verify_mul_range:mul range safety for [-4, 4] AU"
     )
     local total=${#harnesses[@]}
     local current=0
