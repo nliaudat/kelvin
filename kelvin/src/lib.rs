@@ -126,18 +126,112 @@ use kelvin_core::{simulate_with_monitoring, simulate_with_monitoring_euler};
 use kelvin_kdf::LyapunovEstimator;
 use zeroize::Zeroize;
 
+/// Result of the shared orbital initialization pipeline.
+///
+/// Contains the simulated bodies, orbital seed, and Lyapunov estimation result.
+/// Used by both [`simulate_and_extract_seed_with_method`] (public API) and
+/// [`Kelvin::init_with_method`] (internal V1 initialization).
+struct SimulationResult {
+    seed: [u8; ORBITAL_SEED_SIZE],
+    bodies: Vec<OrbitalBody>,
+    lyapunov: LyapunovResult,
+}
+
+/// Internal consolidation of `LyapunovEstimator::estimate` output.
+/// Avoids spilling internal type details into `SimulationResult`.
+struct LyapunovResult {
+    min_chaos_steps: u64,
+}
+
+/// Run the full orbital simulation pipeline: config validation, Lyapunov
+/// estimation, orbital simulation with stability monitoring, and SHAKE256
+/// seed extraction.
+///
+/// This is the **single shared implementation** of the initialization pipeline.
+/// Both the public API (`simulate_and_extract_seed_with_method`) and the internal
+/// V1 initialization (`Kelvin::init_with_method`) delegate to this function,
+/// eliminating ~90 lines of duplicated code.
+///
+/// # Arguments
+/// * `bodies` — Orbital bodies to simulate (taken by value, moved in-place).
+/// * `config` — Configuration parameters (dt, softening, G, stability thresholds).
+/// * `steps` — Total simulation steps.
+/// * `method` — Integration method (Verlet or Euler).
+///
+/// # Returns
+/// `SimulationResult` containing the simulated bodies, extracted seed,
+/// and Lyapunov estimation data.
+fn run_simulation_pipeline(
+    mut bodies: Vec<OrbitalBody>,
+    config: &OrbitalConfig,
+    steps: u64,
+    method: IntegrationMethod,
+) -> Result<SimulationResult, KelvinError> {
+    // Estimate Lyapunov time
+    let lyapunov = LyapunovEstimator::new(&bodies, config.dt, config.softening, config.g, method);
+    let result = lyapunov.estimate(LYAPUNOV_SHADOW_STEPS, steps)?;
+
+    if steps < result.min_chaos_steps {
+        return Err(KelvinError::InsufficientChaos {
+            requested: steps,
+            horizon: result.min_chaos_steps,
+        });
+    }
+
+    // Run initial simulation with stability monitoring (Verlet or Euler)
+    match method {
+        IntegrationMethod::Verlet => {
+            simulate_with_monitoring(
+                &mut bodies,
+                steps,
+                config.dt,
+                config.softening,
+                config.g,
+                config.min_separation,
+                config.monitor_interval,
+                config.ejection_energy_threshold,
+            )?;
+        },
+        IntegrationMethod::Euler => {
+            simulate_with_monitoring_euler(
+                &mut bodies,
+                steps,
+                config.dt,
+                config.softening,
+                config.g,
+                config.min_separation,
+                config.monitor_interval,
+                config.ejection_energy_threshold,
+            )?;
+        },
+    }
+
+    // Extract initial orbital seed (using SHAKE256 XOF) directly into
+    // a fixed-size array — avoids an unnecessary Vec allocation.
+    let mut seed = [0u8; ORBITAL_SEED_SIZE];
+    extract_shake256_into(
+        &bodies,
+        steps,
+        config.g,
+        config.softening,
+        DOMSEP_ORBITAL_STATE_V1,
+        &mut seed,
+    );
+
+    Ok(SimulationResult {
+        seed,
+        bodies,
+        lyapunov: LyapunovResult { min_chaos_steps: result.min_chaos_steps },
+    })
+}
+
 /// Run the full orbital simulation pipeline and extract an orbital seed.
 ///
 /// Uses Verlet integration (default). Callers that need Euler integration
-/// should use [`simulate_and_extract_seed_with_method`] with
-/// `IntegrationMethod::Euler`.
+/// should use [`simulate_and_extract_seed_with_method`].
 ///
 /// This is the shared initialization used by V1 (`Kelvin`), V3 (`KelvinPhoton`),
-/// and H (`KelvinQuantum`). It performs:
-/// 1. Config validation
-/// 2. Lyapunov time estimation
-/// 3. Full orbital simulation with stability monitoring
-/// 4. SHAKE256 seed extraction
+/// and H (`KelvinQuantum`).
 ///
 /// Returns the orbital seed and the simulated bodies.
 pub fn simulate_and_extract_seed(
@@ -154,62 +248,13 @@ pub fn simulate_and_extract_seed_with_method(
     // Validate config
     config.validate()?;
 
-    // Estimate Lyapunov time
-    let lyapunov =
-        LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
-    let result = lyapunov.estimate(LYAPUNOV_SHADOW_STEPS, config.total_steps)?;
+    // Clone bodies for simulation (config is &, so we clone here)
+    let bodies = config.bodies.clone();
 
-    if config.total_steps < result.min_chaos_steps {
-        return Err(KelvinError::InsufficientChaos {
-            requested: config.total_steps,
-            horizon: result.min_chaos_steps,
-        });
-    }
+    // Run the shared pipeline
+    let result = run_simulation_pipeline(bodies, config, config.total_steps, method)?;
 
-    // Clone bodies for simulation
-    let mut bodies = config.bodies.clone();
-
-    // Run initial simulation with stability monitoring (Verlet or Euler)
-    match method {
-        IntegrationMethod::Verlet => {
-            simulate_with_monitoring(
-                &mut bodies,
-                config.total_steps,
-                config.dt,
-                config.softening,
-                config.g,
-                config.min_separation,
-                config.monitor_interval,
-                config.ejection_energy_threshold,
-            )?;
-        },
-        IntegrationMethod::Euler => {
-            simulate_with_monitoring_euler(
-                &mut bodies,
-                config.total_steps,
-                config.dt,
-                config.softening,
-                config.g,
-                config.min_separation,
-                config.monitor_interval,
-                config.ejection_energy_threshold,
-            )?;
-        },
-    }
-
-    // Extract initial orbital seed (using SHAKE256 XOF) directly into
-    // a fixed-size array — avoids an unnecessary Vec allocation.
-    let mut seed = [0u8; ORBITAL_SEED_SIZE];
-    extract_shake256_into(
-        &bodies,
-        config.total_steps,
-        config.g,
-        config.softening,
-        DOMSEP_ORBITAL_STATE_V1,
-        &mut seed,
-    );
-
-    Ok((seed, bodies))
+    Ok((result.seed, result.bodies))
 }
 
 /// Main entry point for the Kelvin cryptosystem.
@@ -243,6 +288,9 @@ struct InitState {
 impl Kelvin {
     /// Run the shared initialization pipeline (validation, Lyapunov estimation,
     /// simulation, seed extraction, key schedule creation).
+    ///
+    /// Delegates to [`run_simulation_pipeline`] for the core simulation and
+    /// seed extraction, then creates the key schedule.
     fn init_with_method(
         config: OrbitalConfig,
         method: IntegrationMethod,
@@ -250,74 +298,24 @@ impl Kelvin {
         // Validate config
         config.validate()?;
 
-        // Estimate Lyapunov time
-        let lyapunov =
-            LyapunovEstimator::new(&config.bodies, config.dt, config.softening, config.g, method);
-        let result = lyapunov.estimate(LYAPUNOV_SHADOW_STEPS, config.total_steps)?;
-
-        if config.total_steps < result.min_chaos_steps {
-            return Err(KelvinError::InsufficientChaos {
-                requested: config.total_steps,
-                horizon: result.min_chaos_steps,
-            });
-        }
-
-        // Clone bodies for simulation
-        let mut bodies = config.bodies.clone();
-
-        // Run initial simulation with stability monitoring (Verlet or Euler)
-        match method {
-            IntegrationMethod::Verlet => {
-                simulate_with_monitoring(
-                    &mut bodies,
-                    config.total_steps,
-                    config.dt,
-                    config.softening,
-                    config.g,
-                    config.min_separation,
-                    config.monitor_interval,
-                    config.ejection_energy_threshold,
-                )?;
-            },
-            IntegrationMethod::Euler => {
-                simulate_with_monitoring_euler(
-                    &mut bodies,
-                    config.total_steps,
-                    config.dt,
-                    config.softening,
-                    config.g,
-                    config.min_separation,
-                    config.monitor_interval,
-                    config.ejection_energy_threshold,
-                )?;
-            },
-        }
-
-        // Extract initial orbital seed (using SHAKE256 XOF) directly into
-        // a fixed-size array — avoids an unnecessary Vec allocation.
-        let mut seed = [0u8; ORBITAL_SEED_SIZE];
-        extract_shake256_into(
-            &bodies,
-            config.total_steps,
-            config.g,
-            config.softening,
-            DOMSEP_ORBITAL_STATE_V1,
-            &mut seed,
-        );
+        // Delegate to the shared simulation pipeline
+        let result =
+            run_simulation_pipeline(config.bodies.clone(), &config, config.total_steps, method)?;
 
         // Apply expansion factor to safe_steps
-        let safe_steps = result.min_chaos_steps.saturating_mul(config.expansion_factor.max(1));
+        let safe_steps =
+            result.lyapunov.min_chaos_steps.saturating_mul(config.expansion_factor.max(1));
 
         // Create key schedule with configurable byte limit per key
         let schedule = KeySchedule::with_max_bytes_per_key(
-            seed,
+            result.seed,
             config.total_steps,
             config.reseed_interval,
             safe_steps,
             config.max_bytes_per_key,
         );
 
-        Ok(InitState { config, bodies, schedule, safe_steps })
+        Ok(InitState { config, bodies: result.bodies, schedule, safe_steps })
     }
 
     /// Create a new Kelvin instance from a validated configuration.

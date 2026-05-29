@@ -2,7 +2,8 @@
 Kelvin Cryptosystem — Python bindings via C FFI.
 
 Provides both the V1 AEAD API and the streaming encrypt/decrypt API
-for all 4 modes (Photon, Quantum, Chaos, Secure).
+for all 4 modes (Photon, Quantum, Chaos, Secure), plus Prism, Split,
+and Flare for homomorphic encryption integration.
 """
 
 import ctypes
@@ -18,7 +19,6 @@ else:
     _lib_file = os.path.join(_lib_path, "libkelvin_ffi.so")
 
 _lib = ctypes.CDLL(_lib_file)
-
 
 # ============================================================================
 # Error handling
@@ -57,6 +57,7 @@ class Kelvin:
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to initialize Kelvin")
         self._ctx = ctx
+        self._closed = False
 
     def encrypt(self, data: bytearray) -> None:
         """Encrypt data in-place."""
@@ -88,12 +89,14 @@ class Kelvin:
             _lib.kelvin_free.argtypes = [ctypes.c_void_p]
             _lib.kelvin_free(self._ctx)
             self._ctx = None
+            self._closed = True
 
     def __enter__(self):
         return self
 
     def __exit__(self, *args):
         self.close()
+        return False
 
 
 # ============================================================================
@@ -106,7 +109,6 @@ def _streaming_update(lib_fn, ctx, input_data: bytes) -> bytes:
         return b""
     output = (ctypes.c_uint8 * len(input_data))()
     output_len = ctypes.c_size_t()
-    # Wrap bytes in c_char_p first before casting to avoid ArgumentError
     input_ptr = ctypes.cast(ctypes.c_char_p(input_data), ctypes.POINTER(ctypes.c_uint8))
     res = lib_fn(
         ctx,
@@ -119,7 +121,6 @@ def _streaming_update(lib_fn, ctx, input_data: bytes) -> bytes:
     if res != 0:
         raise KelvinError("streaming update failed")
     return bytes(output[:output_len.value])
-
 
 
 def _streaming_finalize(lib_fn, ctx) -> bytes:
@@ -140,7 +141,6 @@ def _streaming_decrypt_finalize(lib_fn, ctx, tag: bytes) -> None:
         raise KelvinError("streaming decrypt finalize failed (tag mismatch)")
 
 
-
 # ============================================================================
 # Photon (V3) Streaming
 # ============================================================================
@@ -156,10 +156,7 @@ class PhotonEncryptor:
         ]
         error_out = ctypes.c_char_p()
         seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
-        ctx = _lib.kelvin_photon_encryptor_new(
-            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
-        )
-
+        ctx = _lib.kelvin_photon_encryptor_new(seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out))
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create PhotonEncryptor")
         self._ctx = ctx
@@ -191,57 +188,11 @@ class PhotonEncryptor:
 
     def __exit__(self, *args):
         self.close()
-
-
-class PhotonDecryptor:
-    """V3 Photon streaming decryptor."""
-
-    def __init__(self, seed: bytes, max_reseeds: int = 1000):
-        _lib.kelvin_photon_decryptor_new.restype = ctypes.c_void_p
-        _lib.kelvin_photon_decryptor_new.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_uint64,
-            ctypes.POINTER(ctypes.c_char_p),
-        ]
-        error_out = ctypes.c_char_p()
-        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
-        ctx = _lib.kelvin_photon_decryptor_new(
-            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
-        )
-
-        if not ctx:
-            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create PhotonDecryptor")
-        self._ctx = ctx
-
-    def update(self, ciphertext: bytes) -> bytes:
-        _lib.kelvin_photon_decryptor_update.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
-        ]
-        _lib.kelvin_photon_decryptor_update.restype = ctypes.c_int32
-        return _streaming_update(_lib.kelvin_photon_decryptor_update, self._ctx, ciphertext)
-
-    def finalize(self, tag: bytes = b"") -> None:
-        _lib.kelvin_photon_decryptor_finalize.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-        ]
-        _lib.kelvin_photon_decryptor_finalize.restype = ctypes.c_int32
-        _streaming_decrypt_finalize(_lib.kelvin_photon_decryptor_finalize, self._ctx, tag)
-
-    def close(self) -> None:
-        if self._ctx:
-            _lib.kelvin_photon_decryptor_free.argtypes = [ctypes.c_void_p]
-            _lib.kelvin_photon_decryptor_free(self._ctx)
-            self._ctx = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
+        return False
 
 
 # ============================================================================
-# Quantum (H) Streaming
+# H Quantum Streaming
 # ============================================================================
 
 class QuantumEncryptor:
@@ -255,10 +206,7 @@ class QuantumEncryptor:
         ]
         error_out = ctypes.c_char_p()
         seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
-        ctx = _lib.kelvin_quantum_encryptor_new(
-            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
-        )
-
+        ctx = _lib.kelvin_quantum_encryptor_new(seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out))
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create QuantumEncryptor")
         self._ctx = ctx
@@ -290,53 +238,7 @@ class QuantumEncryptor:
 
     def __exit__(self, *args):
         self.close()
-
-
-class QuantumDecryptor:
-    """H Quantum streaming decryptor."""
-
-    def __init__(self, seed: bytes, max_reseeds: int = 1000):
-        _lib.kelvin_quantum_decryptor_new.restype = ctypes.c_void_p
-        _lib.kelvin_quantum_decryptor_new.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_uint64,
-            ctypes.POINTER(ctypes.c_char_p),
-        ]
-        error_out = ctypes.c_char_p()
-        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
-        ctx = _lib.kelvin_quantum_decryptor_new(
-            seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out),
-        )
-
-        if not ctx:
-            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create QuantumDecryptor")
-        self._ctx = ctx
-
-    def update(self, ciphertext: bytes) -> bytes:
-        _lib.kelvin_quantum_decryptor_update.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
-        ]
-        _lib.kelvin_quantum_decryptor_update.restype = ctypes.c_int32
-        return _streaming_update(_lib.kelvin_quantum_decryptor_update, self._ctx, ciphertext)
-
-    def finalize(self, tag: bytes = b"") -> None:
-        _lib.kelvin_quantum_decryptor_finalize.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-        ]
-        _lib.kelvin_quantum_decryptor_finalize.restype = ctypes.c_int32
-        _streaming_decrypt_finalize(_lib.kelvin_quantum_decryptor_finalize, self._ctx, tag)
-
-    def close(self) -> None:
-        if self._ctx:
-            _lib.kelvin_quantum_decryptor_free.argtypes = [ctypes.c_void_p]
-            _lib.kelvin_quantum_decryptor_free(self._ctx)
-            self._ctx = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
+        return False
 
 
 # ============================================================================
@@ -352,9 +254,7 @@ class ChaosEncryptor:
             ctypes.c_char_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
-        ctx = _lib.kelvin_chaos_encryptor_new(
-            config_json.encode("utf-8"), bytes_per_step, ctypes.byref(error_out),
-        )
+        ctx = _lib.kelvin_chaos_encryptor_new(config_json.encode("utf-8"), bytes_per_step, ctypes.byref(error_out))
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create ChaosEncryptor")
         self._ctx = ctx
@@ -386,50 +286,7 @@ class ChaosEncryptor:
 
     def __exit__(self, *args):
         self.close()
-
-
-class ChaosDecryptor:
-    """V2 Chaos streaming decryptor."""
-
-    def __init__(self, config_json: str, bytes_per_step: int = 65536):
-        _lib.kelvin_chaos_decryptor_new.restype = ctypes.c_void_p
-        _lib.kelvin_chaos_decryptor_new.argtypes = [
-            ctypes.c_char_p, ctypes.c_uint64, ctypes.POINTER(ctypes.c_char_p),
-        ]
-        error_out = ctypes.c_char_p()
-        ctx = _lib.kelvin_chaos_decryptor_new(
-            config_json.encode("utf-8"), bytes_per_step, ctypes.byref(error_out),
-        )
-        if not ctx:
-            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create ChaosDecryptor")
-        self._ctx = ctx
-
-    def update(self, ciphertext: bytes) -> bytes:
-        _lib.kelvin_chaos_decryptor_update.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
-        ]
-        _lib.kelvin_chaos_decryptor_update.restype = ctypes.c_int32
-        return _streaming_update(_lib.kelvin_chaos_decryptor_update, self._ctx, ciphertext)
-
-    def finalize(self, tag: bytes = b"") -> None:
-        _lib.kelvin_chaos_decryptor_finalize.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-        ]
-        _lib.kelvin_chaos_decryptor_finalize.restype = ctypes.c_int32
-        _streaming_decrypt_finalize(_lib.kelvin_chaos_decryptor_finalize, self._ctx, tag)
-
-    def close(self) -> None:
-        if self._ctx:
-            _lib.kelvin_chaos_decryptor_free.argtypes = [ctypes.c_void_p]
-            _lib.kelvin_chaos_decryptor_free(self._ctx)
-            self._ctx = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
+        return False
 
 
 # ============================================================================
@@ -453,10 +310,7 @@ class SecureEncryptor:
         error_out = ctypes.c_char_p()
         key_ptr = ctypes.cast(ctypes.c_char_p(key), ctypes.POINTER(ctypes.c_uint8))
         nonce_ptr = ctypes.cast(ctypes.c_char_p(nonce), ctypes.POINTER(ctypes.c_uint8))
-        ctx = _lib.kelvin_secure_encryptor_new(
-            key_ptr, 32, nonce_ptr, 12, ctypes.byref(error_out),
-        )
-
+        ctx = _lib.kelvin_secure_encryptor_new(key_ptr, 32, nonce_ptr, 12, ctypes.byref(error_out))
         if not ctx:
             raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create SecureEncryptor")
         self._ctx = ctx
@@ -488,52 +342,71 @@ class SecureEncryptor:
 
     def __exit__(self, *args):
         self.close()
+        return False
 
 
-class SecureDecryptor:
-    """V1 Secure streaming decryptor."""
+# ============================================================================
+# Prism — OTP Key Generator for Homomorphic Encryption
+# ============================================================================
 
-    def __init__(self, key: bytes, nonce: bytes):
-        if len(key) != 32:
-            raise ValueError("key must be 32 bytes")
-        if len(nonce) != 12:
-            raise ValueError("nonce must be 12 bytes")
-        _lib.kelvin_secure_decryptor_new.restype = ctypes.c_void_p
-        _lib.kelvin_secure_decryptor_new.argtypes = [
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
+class KelvinPrism:
+    """Prism OTP key generator for homomorphic encryption."""
+
+    def __init__(self, seed: bytes, max_reseeds: int = 1000):
+        _lib.kelvin_prism_new.restype = ctypes.c_void_p
+        _lib.kelvin_prism_new.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_uint64,
             ctypes.POINTER(ctypes.c_char_p),
         ]
         error_out = ctypes.c_char_p()
-        key_ptr = ctypes.cast(ctypes.c_char_p(key), ctypes.POINTER(ctypes.c_uint8))
-        nonce_ptr = ctypes.cast(ctypes.c_char_p(nonce), ctypes.POINTER(ctypes.c_uint8))
-        ctx = _lib.kelvin_secure_decryptor_new(
-            key_ptr, 32, nonce_ptr, 12, ctypes.byref(error_out),
-        )
-
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
+        ctx = _lib.kelvin_prism_new(seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out))
         if not ctx:
-            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create SecureDecryptor")
+            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create Prism")
         self._ctx = ctx
 
-    def update(self, ciphertext: bytes) -> bytes:
-        _lib.kelvin_secure_decryptor_update.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
-            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.POINTER(ctypes.c_size_t),
-        ]
-        _lib.kelvin_secure_decryptor_update.restype = ctypes.c_int32
-        return _streaming_update(_lib.kelvin_secure_decryptor_update, self._ctx, ciphertext)
+    def generate_otp_key(self, length: int) -> bytes:
+        _lib.kelvin_prism_generate_otp_key.restype = ctypes.c_int32
+        _lib.kelvin_prism_generate_otp_key.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+        output = (ctypes.c_uint8 * length)()
+        res = _lib.kelvin_prism_generate_otp_key(self._ctx, output, length)
+        if res != 0:
+            raise KelvinError("generate_otp_key failed")
+        return bytes(output)
 
-    def finalize(self, tag: bytes) -> None:
-        _lib.kelvin_secure_decryptor_finalize.argtypes = [
-            ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
+    def split_key(self, length: int) -> Tuple[bytes, bytes]:
+        _lib.kelvin_prism_split_key.restype = ctypes.c_int32
+        _lib.kelvin_prism_split_key.argtypes = [
+            ctypes.c_void_p, ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_uint8), ctypes.POINTER(ctypes.c_uint8),
         ]
-        _lib.kelvin_secure_decryptor_finalize.restype = ctypes.c_int32
-        _streaming_decrypt_finalize(_lib.kelvin_secure_decryptor_finalize, self._ctx, tag)
+        a = (ctypes.c_uint8 * length)()
+        b = (ctypes.c_uint8 * length)()
+        res = _lib.kelvin_prism_split_key(self._ctx, length, a, b)
+        if res != 0:
+            raise KelvinError("split_key failed")
+        return (bytes(a), bytes(b))
+
+    def encrypt(self, data: bytearray) -> None:
+        _lib.kelvin_prism_encrypt.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+        _lib.kelvin_prism_encrypt.restype = ctypes.c_int32
+        buf = (ctypes.c_uint8 * len(data)).from_buffer(data)
+        res = _lib.kelvin_prism_encrypt(self._ctx, buf, len(data))
+        if res != 0:
+            raise KelvinError("prism encrypt failed")
+
+    def decrypt(self, data: bytearray) -> None:
+        _lib.kelvin_prism_decrypt.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+        _lib.kelvin_prism_decrypt.restype = ctypes.c_int32
+        buf = (ctypes.c_uint8 * len(data)).from_buffer(data)
+        res = _lib.kelvin_prism_decrypt(self._ctx, buf, len(data))
+        if res != 0:
+            raise KelvinError("prism decrypt failed")
 
     def close(self) -> None:
         if self._ctx:
-            _lib.kelvin_secure_decryptor_free.argtypes = [ctypes.c_void_p]
-            _lib.kelvin_secure_decryptor_free(self._ctx)
+            _lib.kelvin_prism_free.argtypes = [ctypes.c_void_p]
+            _lib.kelvin_prism_free(self._ctx)
             self._ctx = None
 
     def __enter__(self):
@@ -541,3 +414,120 @@ class SecureDecryptor:
 
     def __exit__(self, *args):
         self.close()
+        return False
+
+
+# ============================================================================
+# Split — XOR Key-Splitter for Homomorphic Encryption
+# ============================================================================
+
+class KelvinSplit:
+    """Split XOR key-splitter for homomorphic encryption."""
+
+    def __init__(self, seed: bytes, max_reseeds: int = 1000):
+        _lib.kelvin_split_new.restype = ctypes.c_void_p
+        _lib.kelvin_split_new.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_uint64,
+            ctypes.POINTER(ctypes.c_char_p),
+        ]
+        error_out = ctypes.c_char_p()
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
+        ctx = _lib.kelvin_split_new(seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out))
+        if not ctx:
+            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create Split")
+        self._ctx = ctx
+
+    def generate_master_key(self, length: int) -> bytes:
+        _lib.kelvin_split_generate_master_key.restype = ctypes.c_int32
+        _lib.kelvin_split_generate_master_key.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+        output = (ctypes.c_uint8 * length)()
+        res = _lib.kelvin_split_generate_master_key(self._ctx, output, length)
+        if res != 0:
+            raise KelvinError("generate_master_key failed")
+        return bytes(output)
+
+    def split_key(self, length: int) -> Tuple[bytes, bytes]:
+        _lib.kelvin_split_key.restype = ctypes.c_int32
+        _lib.kelvin_split_key.argtypes = [
+            ctypes.c_void_p, ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_uint8), ctypes.POINTER(ctypes.c_uint8),
+        ]
+        a = (ctypes.c_uint8 * length)()
+        b = (ctypes.c_uint8 * length)()
+        res = _lib.kelvin_split_key(self._ctx, length, a, b)
+        if res != 0:
+            raise KelvinError("split_key failed")
+        return (bytes(a), bytes(b))
+
+    def close(self) -> None:
+        if self._ctx:
+            _lib.kelvin_split_free.argtypes = [ctypes.c_void_p]
+            _lib.kelvin_split_free(self._ctx)
+            self._ctx = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+        return False
+
+
+# ============================================================================
+# Flare — Chaotic FHE Secret Key Generator
+# ============================================================================
+
+class KelvinFlare:
+    """Flare chaotic FHE secret key generator."""
+
+    def __init__(self, seed: bytes, max_reseeds: int = 1000):
+        _lib.kelvin_flare_new.restype = ctypes.c_void_p
+        _lib.kelvin_flare_new.argtypes = [
+            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t, ctypes.c_uint64,
+            ctypes.POINTER(ctypes.c_char_p),
+        ]
+        error_out = ctypes.c_char_p()
+        seed_ptr = ctypes.cast(ctypes.c_char_p(seed), ctypes.POINTER(ctypes.c_uint8))
+        ctx = _lib.kelvin_flare_new(seed_ptr, len(seed), max_reseeds, ctypes.byref(error_out))
+        if not ctx:
+            raise KelvinError(error_out.value.decode("utf-8") if error_out.value else "failed to create Flare")
+        self._ctx = ctx
+
+    def generate_secret_key(self, length: int) -> bytes:
+        _lib.kelvin_flare_generate_secret_key.restype = ctypes.c_int32
+        _lib.kelvin_flare_generate_secret_key.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
+        output = (ctypes.c_uint8 * length)()
+        res = _lib.kelvin_flare_generate_secret_key(self._ctx, output, length)
+        if res != 0:
+            raise KelvinError("generate_secret_key failed")
+        return bytes(output)
+
+    # Scheme constants
+    SCHEME_BFV = 0
+    SCHEME_CKKS = 1
+    SCHEME_TFHE = 2
+
+    def generate_fhe_key(self, scheme: int, length: int) -> bytes:
+        _lib.kelvin_flare_generate_fhe_key.restype = ctypes.c_int32
+        _lib.kelvin_flare_generate_fhe_key.argtypes = [
+            ctypes.c_void_p, ctypes.c_int32,
+            ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t,
+        ]
+        output = (ctypes.c_uint8 * length)()
+        res = _lib.kelvin_flare_generate_fhe_key(self._ctx, scheme, output, length)
+        if res != 0:
+            raise KelvinError("generate_fhe_key failed")
+        return bytes(output)
+
+    def close(self) -> None:
+        if self._ctx:
+            _lib.kelvin_flare_free.argtypes = [ctypes.c_void_p]
+            _lib.kelvin_flare_free(self._ctx)
+            self._ctx = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+        return False

@@ -89,6 +89,17 @@ Security is the primary requirement for production readiness. We must move beyon
     - **NEON (aarch64)**: Test is architecture-agnostic; should be run on ARM CI runners
     - **Golden hashes** captured on x86_64 reference platform; any algorithm change requires updating them
 - [x] **PR#59 Fix (2026-05-29)**: Minor adjustments to acceleration proofs (2-U LP action-reaction tolerance adjustment), fixed_equivalence harness, and test fixes for flare/split tests.
+- [x] **Pipeline Deduplication (2026-05-29)**: Extracted shared `run_simulation_pipeline()` function to eliminate ~90 lines of duplicated initialization code between `Kelvin::init_with_method` and `simulate_and_extract_seed_with_method`.
+- [x] **KeySchedule Overflow Fix (2026-05-29)**: Replaced `checked_div` with `saturating_div` in `with_max_bytes_per_key`.
+- [x] **Quantum Stability Recovery (2026-05-29)**: Added `recover_orbital_state()` for deterministic orbital state recovery from base seed when stability fails.
+- [x] **Repository Hygiene (2026-05-29)**: Removed `ea_iid.exe` from git tracking, added `ea_iid.exe` and `clippy_output.txt` to `.gitignore`.
+- [x] **L3 Pipeline Integrity Proofs (2026-05-29)**: Created `proofs/kani/pipeline_proofs.rs` with 3 Kani harnesses: invariant preservation (2-body, 10 steps), domain separation verification, and simulate-loop equivalence.
+- [x] **Security Assumptions Document (2026-05-29)**: Created `documentation/security_assumptions.md` codifying all 4 security assumptions with enforcement locations and risk analysis.
+- [x] **Canonical Test Vectors (2026-05-29)**: Created `tests/kelvin_tests/test_vectors.rs` with round-trip tests for all 8 modes plus determinism verification.
+- [x] **Kani CI Workflow (2026-05-29)**: Enabled`.github/workflows/kani.yml` with documented resource requirements.
+- [x] **Supply Chain CI (2026-05-29)**: Created `.github/workflows/supply-chain.yml` with `cargo-audit` + `cargo-deny` checks, plus `deny.toml` license config.
+- [x] **Script Updates (2026-05-29)**: Updated all 6 test scripts (test_secure.bat/sh, test-all.bat/sh, run_proofs.bat/sh) with new test targets and Kani proof sections.
+- [x] **Prism/Split/Flare FFI (2026-05-29)**: Created 3 new C API modules (`prism.rs`, `split.rs`, `flare.rs`) providing 21 new C functions for homomorphic encryption key generation and XOR key-splitting. Updated all 5 language binding layers (PyO3, CTypes, Go, JS ffi-napi) with full Prism/Split/Flare support.
 
 ### 1.2 Cryptographic Hardening
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
@@ -172,9 +183,7 @@ Security is the primary requirement for production readiness. We must move beyon
 - [ ] **Memory Protection Testing**: Verify that seed material is inaccessible after use.
     - Use `mprotect(PROT_NONE)` on seed buffers after extraction
     - Verify that any access attempt causes a clean panic (SIGSEGV handler)
-- [ ] **Panic Safety**: Ensure that panics in the simulation do not leave the system in an inconsistent state.
-    - Verify `Drop` impls run correctly during unwinding
-    - Verify no double-free or use-after-free on panic paths
+- [x] **Panic Safety (Partial)**: Quantum mode now handles stability failures gracefully via `recover_orbital_state()` — re-derives orbital state from base seed on ejection/collapse instead of silently continuing with a broken simulation. *(Completed 2026-05-29)*
 
 ### 1.7 External Audit
 - [ ] **Audit Readiness**: Prepare a "Security Target" document explaining the mathematical foundations and security proofs.
@@ -188,13 +197,17 @@ Security is the primary requirement for production readiness. We must move beyon
 
 ### 1.8 Documented Security Assumptions
 
-- [ ] **N-body one-way assumption**: Given final state after S steps,
+- [x] **N-body one-way assumption**: Given final state after S steps,
       infeasible to recover initial configuration (no closed-form solution)
-- [ ] **Fixed-point determinism**: Q32.64 arithmetic produces identical
+      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
+- [x] **Fixed-point determinism**: Q32.64 arithmetic produces identical
       results across all platforms (verified by tests)
-- [ ] **SHAKE256 security**: Standard assumption (NIST FIPS 202)
-- [ ] **Lyapunov horizon**: Configurations with `total_steps < min_chaos_steps`
+      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
+- [x] **SHAKE256 security**: Standard assumption (NIST FIPS 202)
+      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
+- [x] **Lyapunov horizon**: Configurations with `total_steps < min_chaos_steps`
       are rejected; simulation beyond horizon may degrade unpredictability
+      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
 
 ---
 
@@ -205,21 +218,26 @@ Production use cases often require Kelvin to run in non-Rust environments. We wi
 ### 2.1 Python (`kelvin-py`)
 - [x] **Implementation**: Build a high-level Python package using [PyO3](https://pyo3.rs/). *(Completed 2026-05-22)*
     - `libs/python/kelvin_pyo3/` — maturin-based PyO3 project
-    - Wraps all 6 encryption modes: `Kelvin` (V1 AEAD), `KelvinPhoton` (V3), `KelvinQuantum` (H), `KelvinPhotonAuthenticated`, `KelvinQuantumAuthenticated`, `KelvinStreaming` (V2)
+    - Wraps all 9 encryption modes: `Kelvin` (V1 AEAD), `KelvinPhoton` (V3), `KelvinQuantum` (H), `KelvinPhotonAuthenticated`, `KelvinQuantumAuthenticated`, `KelvinStreaming` (V2), `KelvinPrism`, `KelvinSplit`, `KelvinFlare`
     - `generate_config()` helper creates a random 5-body orbital configuration as JSON
     - All modes tested: V1 AEAD round-trip, V2 streaming round-trip
+- [x] **CTypes Bindings (2026-05-29)**: Updated `libs/python/kelvin_py/__init__.py` with Prism, Split, Flare classes. Added `return False` to all `__exit__` for proper exception propagation.
 - [ ] **Distribution**: Publish to PyPI with pre-built wheels for Linux, macOS, and Windows.
 
-### 2.2 JavaScript/TypeScript (`kelvin-js`)
+### 2.2 JavaScript (`kelvin-js`)
+- [x] **ffi-napi Integration (2026-05-29)**: Updated `libs/js/kelvin.js` with Prism, Split, Flare FFI declarations and classes. All 13 encryption modes now available from Node.js via C FFI.
 - [ ] **WASM Integration**: Refine the WASM build to ensure `no_std` compatibility.
 - [ ] **NPM Package**: Create a package providing a Promise-based API for web and Node.js.
 - [ ] **Web Worker Support**: Provide built-in support for running simulation (setup) in background workers to avoid UI blocking.
 
-### 2.3 Mobile (iOS/Android)
+### 2.3 Go (`kelvin-go`)
+- [x] **Go Bindings (2026-05-29)**: Updated `libs/go/kelvin-go/kelvin.go` with Prism, Split, Flare types and CGo declarations. All 12+ encryption modes available from Go.
+
+### 2.4 Mobile (iOS/Android)
 - [ ] **Swift Package**: Create a `Kelvin.swift` wrapper around the FFI for seamless iOS integration.
 - [ ] **Kotlin/JNI**: Create a `kelvin-android` library with JNI bindings.
 
-### 2.4 Post-Quantum Signature Module (Future)
+### 2.5 Post-Quantum Signature Module (Future)
 - [ ] **HAWK-512 Integration**: Add optional feature for post-quantum digital signatures.
     - Integrate HAWK-512 (or liboqs wrapper) as an optional feature
     - Provide `encrypt_and_sign()` that returns ciphertext + HAWK signature

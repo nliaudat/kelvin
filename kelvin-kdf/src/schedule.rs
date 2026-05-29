@@ -106,11 +106,9 @@ impl KeySchedule {
     ) -> Self {
         // Each reseed produces one key, and each key can encrypt max_bytes_per_key bytes.
         // We limit to safe_steps / reseed_interval keys.
-        let max_keys = if reseed_interval > 0 {
-            safe_steps.checked_div(reseed_interval).map(|v| v.max(1)).unwrap_or(1)
-        } else {
-            1
-        };
+        // Use saturating div to avoid overflow when safe_steps > u64::MAX / reseed_interval.
+        let max_keys =
+            if reseed_interval > 0 { safe_steps.saturating_div(reseed_interval).max(1) } else { 1 };
         KeySchedule {
             seed,
             step: 0,

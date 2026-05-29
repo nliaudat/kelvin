@@ -95,6 +95,28 @@ const lib = ffi.Library(libPath, {
     'kelvin_secure_decryptor_update': [int32, [voidPtr, uint8Array, size_t, uint8Array, size_t, size_tPtr]],
     'kelvin_secure_decryptor_finalize': [int32, [voidPtr, uint8Array, size_t]],
     'kelvin_secure_decryptor_free': [ref.types.void, [voidPtr]],
+
+    // Prism
+    'kelvin_prism_new': [voidPtr, [uint8Array, size_t, uint64, cstringPtr]],
+    'kelvin_prism_generate_otp_key': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_prism_split_key': [int32, [voidPtr, size_t, uint8Array, uint8Array]],
+    'kelvin_prism_encrypt': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_prism_decrypt': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_prism_free': [ref.types.void, [voidPtr]],
+
+    // Split
+    'kelvin_split_new': [voidPtr, [uint8Array, size_t, uint64, cstringPtr]],
+    'kelvin_split_generate_master_key': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_split_key': [int32, [voidPtr, size_t, uint8Array, uint8Array]],
+    'kelvin_split_encrypt': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_split_decrypt': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_split_free': [ref.types.void, [voidPtr]],
+
+    // Flare
+    'kelvin_flare_new': [voidPtr, [uint8Array, size_t, uint64, cstringPtr]],
+    'kelvin_flare_generate_secret_key': [int32, [voidPtr, uint8Array, size_t]],
+    'kelvin_flare_generate_fhe_key': [int32, [voidPtr, int32, uint8Array, size_t]],
+    'kelvin_flare_free': [ref.types.void, [voidPtr]],
 });
 
 // ============================================================================
@@ -443,6 +465,139 @@ class SecureDecryptor {
 }
 
 // ============================================================================
+// Prism — OTP Key Generator for Homomorphic Encryption
+// ============================================================================
+
+class KelvinPrism {
+    constructor(seed, maxReseeds = 1000) {
+        const errorOut = ref.alloc(cstringPtr);
+        const seedBuf = Buffer.from(seed);
+        this._ctx = lib.kelvin_prism_new(seedBuf, seedBuf.length, maxReseeds, errorOut);
+        if (this._ctx.isNull()) {
+            const errStr = errorOut.deref();
+            const msg = errStr ? errStr.readCString() : 'failed to create KelvinPrism';
+            if (errStr) lib.kelvin_free_string(errStr);
+            throw new KelvinError(msg);
+        }
+    }
+
+    generateOtpKey(length) {
+        const buf = Buffer.alloc(length);
+        const res = lib.kelvin_prism_generate_otp_key(this._ctx, buf, buf.length);
+        if (res !== 0) throw new KelvinError('generate_otp_key failed');
+        return buf;
+    }
+
+    splitKey(length) {
+        const a = Buffer.alloc(length);
+        const b = Buffer.alloc(length);
+        const res = lib.kelvin_prism_split_key(this._ctx, length, a, b);
+        if (res !== 0) throw new KelvinError('split_key failed');
+        return [a, b];
+    }
+
+    encrypt(data) {
+        const buf = Buffer.from(data);
+        const res = lib.kelvin_prism_encrypt(this._ctx, buf, buf.length);
+        if (res !== 0) throw new KelvinError('prism encrypt failed');
+        return buf;
+    }
+
+    decrypt(data) {
+        const buf = Buffer.from(data);
+        const res = lib.kelvin_prism_decrypt(this._ctx, buf, buf.length);
+        if (res !== 0) throw new KelvinError('prism decrypt failed');
+        return buf;
+    }
+
+    close() {
+        if (this._ctx) {
+            lib.kelvin_prism_free(this._ctx);
+            this._ctx = null;
+        }
+    }
+}
+
+// ============================================================================
+// Split — XOR Key-Splitter for Homomorphic Encryption
+// ============================================================================
+
+class KelvinSplit {
+    constructor(seed, maxReseeds = 1000) {
+        const errorOut = ref.alloc(cstringPtr);
+        const seedBuf = Buffer.from(seed);
+        this._ctx = lib.kelvin_split_new(seedBuf, seedBuf.length, maxReseeds, errorOut);
+        if (this._ctx.isNull()) {
+            const errStr = errorOut.deref();
+            const msg = errStr ? errStr.readCString() : 'failed to create KelvinSplit';
+            if (errStr) lib.kelvin_free_string(errStr);
+            throw new KelvinError(msg);
+        }
+    }
+
+    generateMasterKey(length) {
+        const buf = Buffer.alloc(length);
+        const res = lib.kelvin_split_generate_master_key(this._ctx, buf, buf.length);
+        if (res !== 0) throw new KelvinError('generate_master_key failed');
+        return buf;
+    }
+
+    splitKey(length) {
+        const a = Buffer.alloc(length);
+        const b = Buffer.alloc(length);
+        const res = lib.kelvin_split_key(this._ctx, length, a, b);
+        if (res !== 0) throw new KelvinError('split_key failed');
+        return [a, b];
+    }
+
+    close() {
+        if (this._ctx) {
+            lib.kelvin_split_free(this._ctx);
+            this._ctx = null;
+        }
+    }
+}
+
+// ============================================================================
+// Flare — Chaotic FHE Secret Key Generator
+// ============================================================================
+
+class KelvinFlare {
+    constructor(seed, maxReseeds = 1000) {
+        const errorOut = ref.alloc(cstringPtr);
+        const seedBuf = Buffer.from(seed);
+        this._ctx = lib.kelvin_flare_new(seedBuf, seedBuf.length, maxReseeds, errorOut);
+        if (this._ctx.isNull()) {
+            const errStr = errorOut.deref();
+            const msg = errStr ? errStr.readCString() : 'failed to create KelvinFlare';
+            if (errStr) lib.kelvin_free_string(errStr);
+            throw new KelvinError(msg);
+        }
+    }
+
+    generateSecretKey(length) {
+        const buf = Buffer.alloc(length);
+        const res = lib.kelvin_flare_generate_secret_key(this._ctx, buf, buf.length);
+        if (res !== 0) throw new KelvinError('generate_secret_key failed');
+        return buf;
+    }
+
+    generateFheKey(scheme, length) {
+        const buf = Buffer.alloc(length);
+        const res = lib.kelvin_flare_generate_fhe_key(this._ctx, scheme, buf, buf.length);
+        if (res !== 0) throw new KelvinError('generate_fhe_key failed');
+        return buf;
+    }
+
+    close() {
+        if (this._ctx) {
+            lib.kelvin_flare_free(this._ctx);
+            this._ctx = null;
+        }
+    }
+}
+
+// ============================================================================
 // Exports
 // ============================================================================
 
@@ -457,4 +612,7 @@ module.exports = {
     ChaosDecryptor,
     SecureEncryptor,
     SecureDecryptor,
+    KelvinPrism,
+    KelvinSplit,
+    KelvinFlare,
 };

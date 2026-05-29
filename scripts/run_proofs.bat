@@ -109,7 +109,17 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ extraction_proofs.rs passed
 echo.
 
-echo [7/7] orbital_state_proofs.rs — OrbitalState safety proofs (8 harnesses)
+echo [7/8] pipeline_proofs.rs — L3 Pipeline Integrity proofs (3 harnesses)
+cargo kani -p kelvin-core --harness verify_pipeline_invariants %KANI_ARGS%
+if errorlevel 1 exit /b %errorlevel%
+cargo kani -p kelvin-core --harness verify_extract_domain_sep_symbolic %KANI_ARGS%
+if errorlevel 1 exit /b %errorlevel%
+cargo kani -p kelvin-core --harness verify_simulate_loop_equivalence %KANI_ARGS%
+if errorlevel 1 exit /b %errorlevel%
+echo   ✓ pipeline_proofs.rs passed
+echo.
+
+echo [8/8] orbital_state_proofs.rs — OrbitalState safety proofs (8 harnesses)
 cargo kani -p kelvin-core --harness verify_chaotic_default_body_count %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_step_counter_type %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_verlet_step_no_panic_single_body %KANI_ARGS%
@@ -123,7 +133,7 @@ echo   ✓ orbital_state_proofs.rs passed
 echo.
 
 echo ===============================================================================
-echo  ALL PROOFS PASSED — 56/56 harnesses verified
+echo  ALL PROOFS PASSED — 59/59 harnesses verified
 echo ===============================================================================
 exit /b 0
 
@@ -216,5 +226,10 @@ echo    verify_lyapunov_minimum_bodies
 echo    verify_lyapunov_positive_steps
 echo    verify_zeroize_clears_state
 echo.
-echo  Total: 56 harnesses
+echo  pipeline_proofs.rs (3) — L3 Pipeline Integrity:
+echo    verify_pipeline_invariants
+echo    verify_extract_domain_sep_symbolic
+echo    verify_simulate_loop_equivalence
+echo.
+echo  Total: 59 harnesses (56 previous + 3 L3 pipeline proofs)
 exit /b 0

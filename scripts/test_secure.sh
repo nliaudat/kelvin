@@ -65,6 +65,7 @@ run "9/9: Integration: Streaming API - Photon, Quantum, Chaos, Secure" cargo tes
 run "Integration: Prism OTP key generator" cargo test --release -p kelvin --test prism
 run "Integration: Flare FHE key generator" cargo test --release -p kelvin --test flare
 run "Integration: Split secret sharing" cargo test --release -p kelvin --test split
+run "Integration: Canonical test vectors (all modes)" cargo test --release -p kelvin --test test_vectors
 run "Integration: Determinism (cross-platform golden hash)" cargo test --release -p kelvin-core --test determinism
 run "Integration: Chaos test (Lyapunov estimation)" cargo test --release -p kelvin-kdf --test chaos_test
 run "Integration: Client/Server self-test - Secure + Chaos Streaming" cargo run --release -p kelvin-test-client
@@ -89,6 +90,17 @@ run "Integration: Constant-time benchmarks (DudeCT)" cargo run --release -p cons
 # 6. Zeroize verification tests
 # ---------------------------------------------------------------------------
 run "Integration: Zeroize verification tests" cargo test --release -p zeroize_verify
+
+# ---------------------------------------------------------------------------
+# 7. L3 Pipeline Integrity Proofs (optional, requires Kani)
+# ---------------------------------------------------------------------------
+echo ""
+echo -e "${CYAN}========================================${NC}"
+echo -e "${CYAN}  Optional: L3 Pipeline Integrity Kani proofs${NC}"
+echo -e "${CYAN}========================================${NC}"
+echo "This step is optional — requires \`cargo kani\` to be installed."
+echo "See scripts/run_proofs.sh for details."
+echo -e "${GREEN}SKIPPED (install Kani to enable)${NC}"
 
 # ---------------------------------------------------------------------------
 # Summary

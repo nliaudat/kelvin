@@ -59,3 +59,6 @@ scripts/chunk_size_compare.py
 /documentation/related_papers
 /tests/test_results
 *.bin
+ea_iid.exe
+clippy_output.txt
+fmt_result.txt
