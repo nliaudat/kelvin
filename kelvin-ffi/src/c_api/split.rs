@@ -1,9 +1,4 @@
 //! Split FFI — Dedicated XOR Key-Splitter for Homomorphic Encryption
-//!
-//! Split operates on a 2048-byte seed and provides key splitting:
-//! - `kelvin_split_new` / `kelvin_split_free` — lifecycle
-//! - `kelvin_split_generate_master_key` — generate master key K
-//! - `kelvin_split_key` — split into (A, B) where A xor B = K
 
 use std::ffi::CString;
 use std::os::raw::c_char;
@@ -12,7 +7,6 @@ use kelvin::{KelvinSplit, PHOTON_BASE_SEED_SIZE};
 
 use crate::c_api::set_error;
 
-/// Opaque handle to a KelvinSplit context.
 #[derive(Debug)]
 pub struct SplitCtx {
     inner: KelvinSplit,
@@ -43,14 +37,19 @@ pub unsafe extern "C" fn kelvin_split_generate_master_key(
     key_out: *mut u8,
     key_len: usize,
 ) -> i32 {
+    if key_out.is_null() && key_len > 0 {
+        return -1;
+    }
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
     };
     match ctx.inner.generate_master_key(key_len) {
         Ok(key) => {
-            unsafe {
-                std::ptr::copy_nonoverlapping(key.as_ptr(), key_out, key.len());
+            if key_len > 0 {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(key.as_ptr(), key_out, key.len());
+                }
             }
             0
         },
@@ -65,15 +64,20 @@ pub unsafe extern "C" fn kelvin_split_key(
     a_out: *mut u8,
     b_out: *mut u8,
 ) -> i32 {
+    if (a_out.is_null() || b_out.is_null()) && key_len > 0 {
+        return -1;
+    }
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
     };
     match ctx.inner.split_key(key_len) {
         Ok((a, b)) => {
-            unsafe {
-                std::ptr::copy_nonoverlapping(a.as_ptr(), a_out, key_len);
-                std::ptr::copy_nonoverlapping(b.as_ptr(), b_out, key_len);
+            if key_len > 0 {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(a.as_ptr(), a_out, key_len);
+                    std::ptr::copy_nonoverlapping(b.as_ptr(), b_out, key_len);
+                }
             }
             0
         },
@@ -87,11 +91,15 @@ pub unsafe extern "C" fn kelvin_split_encrypt(
     data: *mut u8,
     len: usize,
 ) -> i32 {
+    if data.is_null() && len > 0 {
+        return -1;
+    }
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
     };
-    let slice = unsafe { std::slice::from_raw_parts_mut(data, len) };
+    let slice =
+        if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
     match ctx.inner.encrypt(slice) {
         Ok(()) => 0,
         Err(_) => -1,
@@ -104,11 +112,15 @@ pub unsafe extern "C" fn kelvin_split_decrypt(
     data: *mut u8,
     len: usize,
 ) -> i32 {
+    if data.is_null() && len > 0 {
+        return -1;
+    }
     let ctx = match unsafe { ctx.as_mut() } {
         Some(c) => c,
         None => return -1,
     };
-    let slice = unsafe { std::slice::from_raw_parts_mut(data, len) };
+    let slice =
+        if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
     match ctx.inner.decrypt(slice) {
         Ok(()) => 0,
         Err(_) => -1,

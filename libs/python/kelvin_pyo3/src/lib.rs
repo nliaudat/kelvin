@@ -513,13 +513,14 @@ impl KelvinPrism {
         Ok(KelvinPrism { inner: KelvinPrismRust::new(seed_arr, max_reseeds) })
     }
 
-    fn generate_otp_key(&mut self, len: usize) -> Vec<u8> {
-        self.inner.generate_otp_key(len).expect("generate_otp_key").to_vec()
+    fn generate_otp_key(&mut self, len: usize) -> PyResult<Vec<u8>> {
+        let key = self.inner.generate_otp_key(len).map_err(map_error)?;
+        Ok(key.to_vec())
     }
 
-    fn split_key(&mut self, len: usize) -> (Vec<u8>, Vec<u8>) {
-        let (a, b) = self.inner.split_key(len).expect("split_key");
-        (a.to_vec(), b.to_vec())
+    fn split_key(&mut self, len: usize) -> PyResult<(Vec<u8>, Vec<u8>)> {
+        let (a, b) = self.inner.split_key(len).map_err(map_error)?;
+        Ok((a.to_vec(), b.to_vec()))
     }
 
     fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
@@ -565,13 +566,14 @@ impl KelvinSplit {
         Ok(KelvinSplit { inner: KelvinSplitRust::new(seed_arr, max_reseeds) })
     }
 
-    fn generate_master_key(&mut self, len: usize) -> Vec<u8> {
-        self.inner.generate_master_key(len).expect("generate_master_key").to_vec()
+    fn generate_master_key(&mut self, len: usize) -> PyResult<Vec<u8>> {
+        let key = self.inner.generate_master_key(len).map_err(map_error)?;
+        Ok(key.to_vec())
     }
 
-    fn split_key(&mut self, len: usize) -> (Vec<u8>, Vec<u8>) {
-        let (a, b) = self.inner.split_key(len).expect("split_key");
-        (a.to_vec(), b.to_vec())
+    fn split_key_rs(&mut self, len: usize) -> PyResult<(Vec<u8>, Vec<u8>)> {
+        let (a, b) = self.inner.split_key(len).map_err(map_error)?;
+        Ok((a.to_vec(), b.to_vec()))
     }
 
     fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
@@ -617,8 +619,9 @@ impl KelvinFlare {
         Ok(KelvinFlare { inner: KelvinFlareRust::new(seed_arr, max_reseeds) })
     }
 
-    fn generate_secret_key(&mut self, len: usize) -> Vec<u8> {
-        self.inner.generate_secret_key(len).expect("generate_secret_key").to_vec()
+    fn generate_secret_key(&mut self, len: usize) -> PyResult<Vec<u8>> {
+        let key = self.inner.generate_secret_key(len).map_err(map_error)?;
+        Ok(key.to_vec())
     }
 
     fn generate_fhe_key(&mut self, scheme: i32, len: usize) -> PyResult<Vec<u8>> {
@@ -628,7 +631,8 @@ impl KelvinFlare {
             2 => FlareScheme::Tfhe,
             _ => return Err(PyValueError::new_err("invalid scheme (0=BFV, 1=CKKS, 2=TFHE)")),
         };
-        Ok(self.inner.generate_fhe_key(fs, len).expect("generate_fhe_key").key().to_vec())
+        let key = self.inner.generate_fhe_key(fs, len).map_err(map_error)?;
+        Ok(key.key().to_vec())
     }
 
     fn bytes_processed(&self) -> u64 {

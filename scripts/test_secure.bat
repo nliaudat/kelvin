@@ -260,7 +260,7 @@ echo.
 echo %CYAN%========================================%NC%
 echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%C
-echo This step is optional — requires `cargo kani` to be installed.
+echo This step is optional â€” requires `cargo kani` to be installed.
 echo See scripts\run_proofs.bat for details.
 echo %GREEN%SKIPPED (install Kani to enable)%NC%
 
@@ -292,5 +292,5 @@ exit /b 0
 
 REM ==============================================================================
 REM End of scripts\test_secure.bat
-REM Updated: 2026-05-29 — Added test_vectors and L3 proof placeholders
+REM Updated: 2026-05-29 â€” Added test_vectors and L3 proof placeholders
 REM ==============================================================================

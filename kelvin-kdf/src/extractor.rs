@@ -113,6 +113,8 @@ pub fn extract_shake256_into(
     domain_separator: &[u8],
     output: &mut [u8],
 ) {
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("shake256-extract");
     let mut hasher = Shake256::default();
 
     // Feed all orbital state into the XOF hasher
