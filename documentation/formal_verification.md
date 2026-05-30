@@ -356,24 +356,39 @@ it is also *non-invertible* due to the fixed-point discretization.
    [`formal_verification_resolved/C1/gap1_kop_shannon_bound.md`](formal_verification_resolved/C1/gap1_kop_shannon_bound.md)
    for the full proof.
 
+2. **Approximate uniformity of $\text{dist\_cubed}$** — ✅ **JUSTIFIED**
+   The ergodic hypothesis for the N-body problem (N ≥ 3), supported by
+   the positive Lyapunov exponent verified in C2 and the K-S test in
+   `tests/information_loss/`, justifies the approximate uniformity
+   assumption. See
+   [`formal_verification_resolved/C1/gap2_uniform_distribution.md`](formal_verification_resolved/C1/gap2_uniform_distribution.md)
+   for the full justification. Note: a formal ergodicity proof remains
+   an open problem in dynamical systems theory.
+
+3. **Cumulative loss saturation bound $S \times k_{\text{step}}$** — ✅ **RESOLVED**
+   The preimage saturation argument using the finite state space
+   pigeonhole principle is complete. The saturation occurs at
+   $S^* = H_{\max} / k_{\text{step}} \approx 96$ steps for N=5 Verlet.
+   Beyond this point, chaotic divergence (C2) dominates. See
+   [`formal_verification_resolved/C1/gap3_saturation_bound.md`](formal_verification_resolved/C1/gap3_saturation_bound.md)
+   for the full proof.
+
 ### Open Formalization Tasks
 
 For C1 to be a complete rigorous proof, the following remain:
 
-1. **Uniform distribution proof** — Show (via chaotic mixing or
-   numerical evidence) that intermediate $\text{dist\_sq}$ and
-   $\text{dist\_cubed}$ values are approximately uniformly distributed
-   over their physical ranges after a few steps, justifying the
-   $\sim 1$ bit per-operation loss.
-
-2. **Explicit $\varepsilon$-bound on $k_{\text{op}}$** — Derive
+1. **Explicit $\varepsilon$-bound on $k_{\text{op}}$** — Derive
    $k_{\text{op}} \ge 1 - \varepsilon$ with explicit $\varepsilon$
    bounded in terms of the minimum-to-maximum ratio of physical
    distances in the chaotic regime.
 
-3. **Attractor dimension computation** — Compute the full Lyapunov
-   spectrum for the standard 5-body configuration to determine $D_{KY}$
-   and bound $\log_2(A)$. This connects C1 directly to C2.
+2. **Rounding error independence across pairs (Lemma A3)** — Prove
+   that per-pair division and square root errors are statistically
+   independent under chaotic mixing.
+
+3. **Hartley vs Shannon entropy relationship for $\Phi$** — Formalize
+   the relationship between min-entropy per step and Hartley entropy
+   loss for the many-to-one map $\Phi$.
 
 ## L2': Lyapunov Exponent Certification — Chaotic Divergence (Conjecture C2)
 
