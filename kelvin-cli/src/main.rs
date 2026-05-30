@@ -23,6 +23,7 @@
 //! for numerically unstable integration (faster chaos amplification).
 
 #![deny(unsafe_code)]
+#![forbid(unsafe_code)]
 
 mod bench;
 mod file_crypto;
