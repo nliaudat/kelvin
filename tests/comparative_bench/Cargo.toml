@@ -1,0 +1,44 @@
+[package]
+name = "comparative-bench"
+version = "0.1.0"
+edition = "2021"
+description = "Comparative criterion benchmarks: Kelvin vs industry-standard crypto (ring, dalek)"
+
+[lib]
+name = "comparative_bench"
+path = "src/lib.rs"
+
+[[bench]]
+name = "throughput_quantum"
+path = "benches/throughput_quantum.rs"
+harness = false
+
+[[bench]]
+name = "throughput_streaming"
+path = "benches/throughput_streaming.rs"
+harness = false
+
+[[bench]]
+name = "keygen"
+path = "benches/keygen.rs"
+harness = false
+
+[[bench]]
+name = "signature"
+path = "benches/signature.rs"
+harness = false
+
+[dependencies]
+kelvin = { path = "../../kelvin" }
+kelvin-core = { path = "../../kelvin-core" }
+kelvin-kdf = { path = "../../kelvin-kdf" }
+criterion = "0.5"
+ring = "0.17"
+aes = "0.8"
+ctr = "0.9"
+cipher = "0.4"
+x25519-dalek = "2"
+ed25519-dalek = "2"
+rand = "0.8"
+sha3 = { version = "0.10", default-features = false }
+blake3 = "1.5"
