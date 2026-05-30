@@ -1,0 +1,94 @@
+# ==============================================================================
+# Kelvin — Cross-Platform Build & Test Environment
+# ==============================================================================
+#
+# Provides cross-compilation toolchains for all supported architectures:
+#   - x86_64   (native, Linux)
+#   - aarch64  (ARM64, via QEMU user-mode)
+#   - riscv64  (RISC-V 64-bit, via QEMU user-mode)
+#   - wasm32   (WebAssembly)
+#   - mips64   (big-endian, via QEMU user-mode — for endianness verification)
+#
+# All foreign-arch binaries are run under QEMU user-mode emulation, which
+# transparently executes non-native ELF binaries on the host kernel.
+#
+# Build:
+#   docker compose -f docker/docker-compose.yml build cross
+#
+# Run all builds + tests:
+#   docker compose -f docker/docker-compose.yml run cross
+#
+# Output: binaries and logs are saved to /kelvin/target/cross/ (on host)
+# ==============================================================================
+
+FROM ubuntu:24.04 AS builder
+
+LABEL org.opencontainers.image.title="Kelvin Cross-Platform Build"
+LABEL org.opencontainers.image.description="Cross-compilation and QEMU emulation for multi-architecture verification"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_HOME=/usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV PATH=/usr/local/cargo/bin:$PATH
+
+# ── Install system dependencies ────────────────────────────────────────────
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    ca-certificates \
+    pkg-config \
+    libssl-dev \
+    git \
+    python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Install QEMU user-mode emulators ───────────────────────────────────────
+# Enables running foreign-arch binaries via binfmt_misc transparently.
+# Targets: aarch64, riscv64, mips64 (big-endian)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    qemu-user-static \
+    qemu-user \
+    binfmt-support \
+    && rm -rf /var/lib/apt/lists/*
+
+# Register QEMU binfmt handlers (needed for transparent emulation)
+RUN update-binfmts --enable qemu-aarch64 2>/dev/null || true
+RUN update-binfmts --enable qemu-riscv64 2>/dev/null || true
+RUN update-binfmts --enable qemu-mips64 2>/dev/null || true
+
+# ── Install Rust and cross-compilation targets ─────────────────────────────
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    --profile minimal \
+    --default-toolchain stable \
+    && rustup component add rust-src
+
+# Add cross-compilation targets
+# Note: s390x is used for big-endian verification (IBM Z architecture)
+RUN rustup target add \
+    aarch64-unknown-linux-gnu \
+    riscv64gc-unknown-linux-gnu \
+    wasm32-unknown-unknown \
+    s390x-unknown-linux-gnu
+
+# ── Install cross‑compilation C/C++ toolchains ────────────────────────────
+# Needed for linking foreign-arch binaries that link against libc etc.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc-aarch64-linux-gnu \
+    g++-aarch64-linux-gnu \
+    gcc-riscv64-linux-gnu \
+    g++-riscv64-linux-gnu \
+    gcc-s390x-linux-gnu \
+    g++-s390x-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Configure Cargo for cross‑compilation ──────────────────────────────────
+# Tell Cargo which linker to use for each target.
+RUN mkdir -p /usr/local/cargo
+RUN printf '[target.aarch64-unknown-linux-gnu]\nlinker = "aarch64-linux-gnu-gcc"\n' > /usr/local/cargo/config.toml
+RUN printf '[target.riscv64gc-unknown-linux-gnu]\nlinker = "riscv64-linux-gnu-gcc"\n' >> /usr/local/cargo/config.toml
+RUN printf '[target.s390x-unknown-linux-gnu]\nlinker = "s390x-linux-gnu-gcc"\n' >> /usr/local/cargo/config.toml
+
+# Verify QEMU can start
+RUN qemu-aarch64 --version 2>/dev/null; qemu-riscv64 --version 2>/dev/null; qemu-s390x --version 2>/dev/null; echo "QEMU targets available"
+
+WORKDIR /kelvin

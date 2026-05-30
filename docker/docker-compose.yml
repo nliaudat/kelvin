@@ -1,0 +1,63 @@
+# ==============================================================================
+# Kelvin — Docker Compose
+# ==============================================================================
+#
+# Services:
+#   kani   — Run Kani formal verification proofs (5 L0 safety harnesses)
+#   cross  — Cross-compile & test on x86_64, aarch64, riscv64, wasm32, mips64
+#
+# Usage:
+#   docker compose -f docker/docker-compose.yml build kani
+#   docker compose -f docker/docker-compose.yml run kani
+#   docker compose -f docker/docker-compose.yml build cross
+#   docker compose -f docker/docker-compose.yml run cross
+# ==============================================================================
+
+services:
+  kani:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.kani
+    image: kelvin-kani:latest
+    container_name: kelvin-kani
+    working_dir: /kelvin
+    volumes:
+      - ..:/kelvin
+      - ./run-kani.sh:/usr/local/bin/run-kani
+      - kani-cargo-cache:/usr/local/cargo
+    entrypoint: ["/usr/local/bin/run-kani"]
+    deploy:
+      resources:
+        limits:
+          memory: 32G
+        reservations:
+          memory: 8G
+    stdin_open: true
+    tty: true
+    command: ["--all"]
+
+  cross:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cross
+    image: kelvin-cross:latest
+    container_name: kelvin-cross
+    working_dir: /kelvin
+    volumes:
+      - ..:/kelvin
+      - ./build-multiarch.sh:/usr/local/bin/build-multiarch
+      - cargo-cache:/usr/local/cargo
+    entrypoint: ["/usr/local/bin/build-multiarch"]
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 4G
+    stdin_open: true
+    tty: true
+    command: []
+
+volumes:
+  kani-cargo-cache:
+  cargo-cache:

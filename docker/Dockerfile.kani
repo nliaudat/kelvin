@@ -1,0 +1,68 @@
+# ==============================================================================
+# Kani Formal Verification Docker Image — Kelvin Cryptosystem
+# ==============================================================================
+#
+# Provides a reproducible environment for running all 59 Kani model-checking
+# proof harnesses across 8 proof files in the Kelvin workspace.
+#
+# The entrypoint script is NOT baked into the image — it's mounted from the
+# host via docker-compose.yml volume. This allows script changes without
+# rebuilding the image.
+#
+# Base Image:   ubuntu:24.04 (matches GitHub Actions ubuntu-24.04 runner)
+# Dependencies: Rust stable, Kani model checker, system build tools
+# Proof Files:  fixed_equivalence, acceleration, vec3, integrator,
+#               stability, extraction, orbital_state, pipeline
+# Total:        59 harnesses
+#
+# Build:
+#   docker compose -f docker/docker-compose.yml build
+#
+# Run all proofs:
+#   docker compose -f docker/docker-compose.yml run kani
+#
+# Resource requirements:
+#   - RAM: ~8 GB per proof harness (16 GB recommended for 2 concurrent)
+#   - Disk: ~15 GB for Rust toolchain + dependencies
+#   - Time: ~45 minutes for full suite
+# ==============================================================================
+
+FROM ubuntu:24.04 AS builder
+
+LABEL org.opencontainers.image.title="Kelvin Kani Formal Verification"
+LABEL org.opencontainers.image.description="Kani model checker environment for the Kelvin cryptosystem"
+LABEL org.opencontainers.image.source="https://github.com/nliaudat/kelvin"
+
+# Prevent interactive prompts during apt install
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CARGO_HOME=/usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV PATH=/usr/local/cargo/bin:$PATH
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    ca-certificates \
+    pkg-config \
+    libssl-dev \
+    git \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust stable
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    --profile minimal \
+    --default-toolchain stable \
+    && rustup component add rust-src rustfmt
+
+# Install Kani model checker via cargo
+# Using --locked for reproducible builds
+RUN cargo install kani-verifier --locked
+
+# Verify Kani installation
+RUN cargo kani --version
+
+# Set working directory (mounted from host via docker-compose)
+WORKDIR /kelvin
