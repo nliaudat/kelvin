@@ -2,8 +2,13 @@
 # Kani Formal Verification Docker Image — Kelvin Cryptosystem
 # ==============================================================================
 #
-# Provides a reproducible environment for running all 59 Kani model-checking
-# proof harnesses across 8 proof files in the Kelvin workspace.
+# Provides a reproducible Docker environment for running Kani model-checking
+# proof harnesses in the Kelvin workspace.
+#
+# The active proof suite covers 3 L0 safety harnesses in
+# kelvin-core/src/fixed_math.rs. Additional template harnesses are available
+# in proofs/kani/ for future proof levels (L1–L4) but require integration
+# into workspace crates before they can be compiled.
 #
 # The entrypoint script is NOT baked into the image — it's mounted from the
 # host via docker-compose.yml volume. This allows script changes without
@@ -11,9 +16,8 @@
 #
 # Base Image:   ubuntu:24.04 (matches GitHub Actions ubuntu-24.04 runner)
 # Dependencies: Rust stable, Kani model checker, system build tools
-# Proof Files:  fixed_equivalence, acceleration, vec3, integrator,
-#               stability, extraction, orbital_state, pipeline
-# Total:        59 harnesses
+# Active Proofs: 3 L0 safety harnesses in fixed_math.rs
+# Template Proofs: L1–L4 harnesses in proofs/kani/
 #
 # Build:
 #   docker compose -f docker/docker-compose.yml build
@@ -59,7 +63,8 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 
 # Install Kani model checker via cargo
 # Using --locked for reproducible builds
-RUN cargo install kani-verifier --locked
+# cargo kani setup downloads CBMC and solvers required for verification
+RUN cargo install kani-verifier --locked && cargo kani setup
 
 # Verify Kani installation
 RUN cargo kani --version

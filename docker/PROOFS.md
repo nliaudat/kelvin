@@ -15,7 +15,7 @@ L4: Determinism     ──  Bit-identical results across platforms
 
 ## Proof Harness Details
 
-### L0: Safety (`kelvin-core/src/fixed_math.rs` — 5 harnesses)
+### L0: Safety (`kelvin-core/src/fixed_math.rs` — 3 harnesses)
 
 These harnesses confirm that Q32.64 fixed-point arithmetic never panics
 or overflows under physically-realistic orbital bounds.
@@ -24,9 +24,7 @@ or overflows under physically-realistic orbital bounds.
 |:---|:---|---:|
 | `verify_add_no_overflow` | add in [-100, 100] AU | [-200, 200] AU |
 | `verify_sub_no_overflow` | sub in [-100, 100] AU | [-200, 200] AU |
-| `verify_mul_no_overflow` | mul in [-100, 100] AU | [-10000, 10000] AU² |
-| `verify_div_no_panic` | div: G / bounded dist³ | denominator ≥ 2⁻⁶⁰ AU³ |
-| `verify_sqrt_bounded` | sqrt for [0, (200 AU)²] | non-negative result |
+| `verify_mul_range` | mul in [-4, 4] AU | [-16, 16] AU² |
 
 ### L1: Fixed-Point Equivalence (`proofs/kani/fixed_equivalence.rs` — 5 harnesses)
 
@@ -61,7 +59,7 @@ or overflows under physically-realistic orbital bounds.
 ## Running Proofs in Docker
 
 ```bash
-# Full suite — all 59 harnesses (~45 min)
+# Full suite — all active harnesses (~45 min)
 docker compose -f docker/docker-compose.yml run kani
 
 # Fast mode — L0 + L1 only (~5 min)
