@@ -88,7 +88,7 @@ Output: 2048-byte entropy pool → keystream via SHAKE256 XOF
 
 | Conjecture | Code Infrastructure | Mathematical Proof | What's Missing |
 |------------|-------------------|-------------------|----------------|
-| **C1**: Information Loss | ✅ 3 Kani harnesses + empirical | ⚠️ 7 gaps | Shannon derivation, ε-bound, independence |
+| **C1**: Information Loss | ✅ 3 Kani harnesses + empirical | ⚠️ 6 gaps | Uniformity, ε-bound, independence |
 | **C2**: Lyapunov Certification | ✅ 3 Kani harnesses + empirical | ⚠️ 6 gaps | C·ε·S bound, Q32.64 QR, Kaplan-Yorke formalization |
 | **C3**: Quantum Hardness | ✅ 2 Kani harnesses + empirical | ⚠️ 3 gaps (open research) | Quantum query lower bound |
 | **C4**: Keystream Indistinguishability | ✅ 2 Kani harnesses + empirical | ⚠️ 3 gaps | Game-based reduction proof |
@@ -105,17 +105,16 @@ Output: 2048-byte entropy pool → keystream via SHAKE256 XOF
 2. `verify_c1_epsilon_bound` — Global preimage ≤ 8,000,000 worst-case
 3. `verify_c1_division_remainder` — Division remainder 0 ≤ r < den
 
-**Remaining gaps (7):**
+**Remaining gaps (6 — 1 resolved):**
 
 | # | Gap | Type | How to Fill |
 |---|-----|------|------------|
-| 1 | `k_op ≥ 1` bit derivation from Shannon entropy | Analytical | Quantization channel capacity: `I(X; round(X)) = H(round(X))` for uniform X |
+| 1 | `k_op ≥ 1` bit derivation from Shannon entropy | Analytical | ✅ **RESOLVED** — see [`formal_verification_resolved/C1/gap1_kop_shannon_bound.md`](formal_verification_resolved/C1/gap1_kop_shannon_bound.md) |
 | 2 | Uniform distribution of `dist_cubed` over physical range | Proof | Chaotic mixing + ergodicity → approximately uniform |
 | 3 | Cumulative loss `S × k_step` saturation bound | Bound | Monotonic contraction of preimage set under repeated Φ |
 | 4 | ε-bound `k_op ≥ 1 − ε` from first principles | Derivation | Express ε in terms of `log₂(max_dist_cubed / min_dist_cubed)` |
 | 5 | Rounding error independence across pairs (Lemma A3) | Proof | Per-pair division/sqrt errors independent under chaotic mixing |
 | 6 | Hartley vs Shannon entropy relationship for Φ | Formalization | Min-entropy per step ≥ Hartley entropy loss |
-| 7 | Verlet double-computation effect | Verified in code | Trivially satisfied by code inspection + Kani counting |
 
 ---
 

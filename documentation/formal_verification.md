@@ -349,6 +349,13 @@ This complements the existing L0–L4 proofs: while those prove the
 simulation is *correct and faithful to Newtonian physics*, C1 proves
 it is also *non-invertible* due to the fixed-point discretization.
 
+### Resolved Formal Tasks
+
+1. **Per-operation information loss $k_{op} \ge 1$ bit** — ✅ **RESOLVED**
+   The derivation via division remainder analysis is complete. See
+   [`formal_verification_resolved/C1/gap1_kop_shannon_bound.md`](formal_verification_resolved/C1/gap1_kop_shannon_bound.md)
+   for the full proof.
+
 ### Open Formalization Tasks
 
 For C1 to be a complete rigorous proof, the following remain:
