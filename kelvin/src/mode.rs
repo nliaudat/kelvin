@@ -88,7 +88,7 @@ pub trait Mode: Sized + Send + Sync {
     ///
     /// This is the mode-level initialization method. It validates the config,
     /// runs the orbital simulation (or delegates to the mode's own init),
-    /// and produces a boxed stream cipher ready for encryption/decryption.
+    /// and produces a stream cipher ready for encryption/decryption.
     fn init(config: OrbitalConfig, method: IntegrationMethod) -> Result<Self::Cipher, KelvinError>;
 }
 

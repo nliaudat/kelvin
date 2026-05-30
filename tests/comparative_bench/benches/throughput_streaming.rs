@@ -85,12 +85,12 @@ fn bench_kelvin_streaming_encrypt(c: &mut Criterion) {
     let mut group = c.benchmark_group("KelvinStreaming (V2)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
+        let mut data = test_buffer();
         b.iter(|| {
             // Re-initialize KelvinStreaming inside the loop to prevent state
             // exhaustion (each iteration consumes one 1 MiB step).
             // KelvinStreaming::new is cheap: it only validates the config and
             // clones the body vectors — no simulation is run upfront.
-            let mut data = test_buffer();
             let mut streaming = kelvin::KelvinStreaming::new(config.clone(), BUFFER_SIZE as u64)
                 .expect("KelvinStreaming::new");
             streaming.encrypt(black_box(&mut data)).expect("streaming encrypt");

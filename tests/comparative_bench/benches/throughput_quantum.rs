@@ -39,8 +39,8 @@ fn bench_kelvin_quantum_encrypt(c: &mut Criterion) {
     let mut group = c.benchmark_group("KelvinQuantum (H)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
+        let mut buf = test_buffer();
         b.iter(|| {
-            let mut buf = test_buffer();
             let mut quantum = kelvin::KelvinQuantum::new(seed, 100_000);
             quantum.encrypt(black_box(&mut buf)).expect("quantum encrypt");
         })
