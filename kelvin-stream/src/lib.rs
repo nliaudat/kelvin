@@ -6,6 +6,15 @@
 //! - `StreamCipher` trait — authenticated encryption/decryption
 //! - `ChaChaStream` — ChaCha20Poly1305 AEAD wrapper
 //!
+//! ## What This Crate Is Not For
+//!
+//! This crate does **not** provide the orbital simulation KDF or the
+//! top-level encryption API. It is a low-level stream cipher adapter.
+//! If you need to encrypt data using Kelvin's n-body KDF, use the
+//! [`kelvin`] crate instead. This crate is only useful if you are
+//! building a custom cryptosystem that uses ChaCha20Poly1305 or
+//! AES-256-GCM with Kelvin's key schedule format.
+//!
 //! ## Security
 //!
 //! **EXPERIMENTAL — NOT FOR PRODUCTION USE.**

@@ -388,6 +388,23 @@ impl Neg for Fixed {
 
 // Comparison
 
+// ============================================================================
+// Constant-time equality (feature-gated on `subtle-ct`)
+// ============================================================================
+
+#[cfg(feature = "subtle-ct")]
+impl subtle::ConstantTimeEq for Fixed {
+    /// Check constant-time equality of two `Fixed` values.
+    ///
+    /// Compares the raw underlying `i128` values using `subtle`'s
+    /// `ct_eq`, which ensures the comparison takes the same amount
+    /// of time regardless of the values being compared.
+    #[inline]
+    fn ct_eq(&self, other: &Self) -> subtle::Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
 impl PartialEq for Fixed {
     #[inline]
     fn eq(&self, other: &Self) -> bool {

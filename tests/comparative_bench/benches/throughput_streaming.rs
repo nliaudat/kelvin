@@ -14,8 +14,8 @@ use std::time::Duration;
 
 use comparative_bench::{aes_ctr_key, ctr_nonce, test_buffer, BUFFER_SIZE};
 
-use cipher::{KeyIvInit, StreamCipher};
 use aes::Aes256;
+use cipher::{KeyIvInit, StreamCipher};
 use ctr::Ctr128BE;
 
 use kelvin::OrbitalConfig;
@@ -35,29 +35,56 @@ fn small_orbital_config() -> OrbitalConfig {
         kelvin::OrbitalBody::new(
             kelvin::Fixed::from_raw(1 << 53),
             kelvin::Vec3::new(kelvin::Fixed::ZERO, kelvin::Fixed::from_int(2), kelvin::Fixed::ZERO),
-            kelvin::Vec3::new(kelvin::Fixed::from_int(-4), kelvin::Fixed::ZERO, kelvin::Fixed::ZERO),
+            kelvin::Vec3::new(
+                kelvin::Fixed::from_int(-4),
+                kelvin::Fixed::ZERO,
+                kelvin::Fixed::ZERO,
+            ),
         ),
         kelvin::OrbitalBody::new(
             kelvin::Fixed::from_raw(1 << 52),
-            kelvin::Vec3::new(kelvin::Fixed::from_int(-1), kelvin::Fixed::from_int(-1), kelvin::Fixed::ZERO),
-            kelvin::Vec3::new(kelvin::Fixed::from_int(3), kelvin::Fixed::from_int(-2), kelvin::Fixed::ZERO),
+            kelvin::Vec3::new(
+                kelvin::Fixed::from_int(-1),
+                kelvin::Fixed::from_int(-1),
+                kelvin::Fixed::ZERO,
+            ),
+            kelvin::Vec3::new(
+                kelvin::Fixed::from_int(3),
+                kelvin::Fixed::from_int(-2),
+                kelvin::Fixed::ZERO,
+            ),
         ),
         kelvin::OrbitalBody::new(
             kelvin::Fixed::from_raw(1 << 51),
-            kelvin::Vec3::new(kelvin::Fixed::from_int(2), kelvin::Fixed::from_int(-1), kelvin::Fixed::from_int(1)),
-            kelvin::Vec3::new(kelvin::Fixed::from_int(-2), kelvin::Fixed::from_int(3), kelvin::Fixed::ZERO),
+            kelvin::Vec3::new(
+                kelvin::Fixed::from_int(2),
+                kelvin::Fixed::from_int(-1),
+                kelvin::Fixed::from_int(1),
+            ),
+            kelvin::Vec3::new(
+                kelvin::Fixed::from_int(-2),
+                kelvin::Fixed::from_int(3),
+                kelvin::Fixed::ZERO,
+            ),
         ),
     ];
-    OrbitalConfig::new(bodies, 5000, 500, kelvin::DEFAULT_DT, kelvin::SOFTENING_FACTOR, kelvin::DEFAULT_G)
-        .expect("valid config")
+    OrbitalConfig::new(
+        bodies,
+        5000,
+        500,
+        kelvin::DEFAULT_DT,
+        kelvin::SOFTENING_FACTOR,
+        kelvin::DEFAULT_G,
+    )
+    .expect("valid config")
 }
 
 fn bench_kelvin_streaming_encrypt(c: &mut Criterion) {
     let config = small_orbital_config();
     let mut data = test_buffer();
 
-    let mut streaming = kelvin::KelvinStreaming::new(config, BUFFER_SIZE as u64)
-        .expect("KelvinStreaming::new");
+    let mut streaming =
+        kelvin::KelvinStreaming::new(config, BUFFER_SIZE as u64).expect("KelvinStreaming::new");
 
     let mut group = c.benchmark_group("KelvinStreaming (V2)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
@@ -77,8 +104,8 @@ fn bench_aes256_ctr_encrypt(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
         b.iter(|| {
-            let mut cipher = Ctr128BE::<Aes256>::new_from_slices(&key, &nonce)
-                .expect("AES-256-CTR key/nonce");
+            let mut cipher =
+                Ctr128BE::<Aes256>::new_from_slices(&key, &nonce).expect("AES-256-CTR key/nonce");
             let mut buf = test_buffer();
             cipher.apply_keystream(black_box(&mut buf));
         })

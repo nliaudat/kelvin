@@ -22,6 +22,22 @@
 //! - `FlareKey` struct — FHE secret key with scheme metadata
 //! - `KelvinError` — error types
 //!
+//! ## What This Crate Is Not For
+//!
+//! This crate is **not** a general-purpose encryption library. It is a
+//! research cryptosystem based on n-body simulation. It is **not**
+//! suitable for production use without a formal cryptographic audit.
+//!
+//! This crate does **not** provide:
+//! * Key exchange or transport (OrbitalConfig must be shared out-of-band)
+//! * Memory-hard KDF (not GPU/ASIC resistant)
+//! * Formal cryptanalysis (no reduction to a hard problem)
+//! * Information-theoretic OTP (XOR modes are computational OTPs)
+//!
+//! If you need production-grade encryption, use established libraries
+//! like [`aes-gcm`](https://crates.io/crates/aes-gcm) or
+//! [`chacha20poly1305`](https://crates.io/crates/chacha20poly1305).
+//!
 //! ## V2 Streaming Mode
 //!
 //! `KelvinStreaming` replaces the virtual-time key schedule with a true
@@ -73,6 +89,7 @@ mod decrypt;
 mod encrypt;
 mod error;
 mod flare;
+pub mod mode;
 mod parameters;
 mod photon;
 mod prism;
