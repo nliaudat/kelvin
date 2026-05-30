@@ -830,3 +830,53 @@ pub enum ConfigError {
         body_index: usize,
     },
 }
+
+// ============================================================================
+// Kani formal verification harnesses for C5: Configuration Space
+// ============================================================================
+//
+// These harnesses verify that the OrbitalConfig::validate() method correctly
+// rejects invalid configurations. This ensures the valid configuration set
+// is well-formed.
+//
+// Run with: cargo kani -p kelvin-kdf
+#[cfg(kani)]
+mod kani_proofs {
+    use crate::{ConfigError, OrbitalConfig};
+    use kelvin_core::{Fixed, OrbitalBody, Vec3};
+
+    // ── Harness 1: Non-positive mass rejected ────────────────────────
+    #[kani::proof]
+    fn verify_c5_non_positive_mass() {
+        let body = OrbitalBody::new(Fixed::ZERO, Vec3::ZERO, Vec3::ZERO);
+        let result = create_config(vec![body]);
+        assert!(result.is_err());
+    }
+
+    // ── Harness 2: Identical positions rejected ──────────────────────
+    #[kani::proof]
+    fn verify_c5_identical_positions() {
+        let b1 = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let b2 = OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO);
+        let result = create_config(vec![b1, b2]);
+        assert!(result.is_err());
+    }
+
+    // ── Harness 3: Too few bodies rejected (N < min_bodies) ─────────
+    #[kani::proof]
+    fn verify_c5_too_few_bodies() {
+        let result = create_config(vec![]);
+        assert!(result.is_err());
+    }
+
+    fn create_config(bodies: Vec<OrbitalBody>) -> Result<OrbitalConfig, ConfigError> {
+        OrbitalConfig::new(
+            bodies,
+            1000,
+            100,
+            Fixed::from_raw(1 << 54),
+            Fixed::from_raw(1 << 44),
+            Fixed::from_raw(0x277A79937C8BBC0000),
+        )
+    }
+}

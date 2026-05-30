@@ -15,6 +15,11 @@ members = [
     "tests/nist_800_90b",
     "tests/shake256_bench",
     "tests/zeroize_verify",
+    "tests/information_loss",
+    "tests/lyapunov_certification",
+    "tests/quantum_hardness",
+    "tests/keystream_indistinguishability",
+    "tests/configuration_space",
     "fuzz",
     "libs/python/kelvin_pyo3",
 ]

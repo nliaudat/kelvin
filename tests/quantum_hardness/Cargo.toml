@@ -1,0 +1,8 @@
+[package]
+name = "quantum_hardness"
+version = "0.1.0"
+edition = "2021"
+description = "Empirical validation of C3: sequential simulation hardness against quantum adversaries"
+
+[dependencies]
+kelvin-core = { path = "../../kelvin-core" }

@@ -5,10 +5,9 @@
 # Provides a reproducible Docker environment for running Kani model-checking
 # proof harnesses in the Kelvin workspace.
 #
-# The active proof suite covers 3 L0 safety harnesses in
-# kelvin-core/src/fixed_math.rs. Additional template harnesses are available
-# in proofs/kani/ for future proof levels (L1–L4) but require integration
-# into workspace crates before they can be compiled.
+# The active proof suite covers 63 harnesses across 9 proof files in
+# proofs/kani/. All harnesses are compiled and verified via kelvin-core
+# under #[cfg(kani)].
 #
 # The entrypoint script is NOT baked into the image — it's mounted from the
 # host via docker-compose.yml volume. This allows script changes without
@@ -16,8 +15,7 @@
 #
 # Base Image:   ubuntu:24.04 (matches GitHub Actions ubuntu-24.04 runner)
 # Dependencies: Rust stable, Kani model checker, system build tools
-# Active Proofs: 3 L0 safety harnesses in fixed_math.rs
-# Template Proofs: L1–L4 harnesses in proofs/kani/
+# Active Proofs: 63 harnesses across 9 proof files
 #
 # Build:
 #   docker compose -f docker/docker-compose.yml build

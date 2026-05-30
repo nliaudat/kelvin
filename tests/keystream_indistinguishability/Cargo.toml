@@ -1,0 +1,9 @@
+[package]
+name = "keystream_indistinguishability"
+version = "0.1.0"
+edition = "2021"
+description = "Empirical validation of C4: keystream indistinguishability for the Kelvin cryptosystem"
+
+[dependencies]
+kelvin-core = { path = "../../kelvin-core" }
+kelvin-kdf = { path = "../../kelvin-kdf" }

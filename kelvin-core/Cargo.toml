@@ -24,6 +24,9 @@ hex = "0.4"
 name = "determinism"
 path = "../tests/kelvin_tests/determinism.rs"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
 [features]
 default = ["zeroize"]
 serde = ["dep:serde", "dep:serde_json"]
