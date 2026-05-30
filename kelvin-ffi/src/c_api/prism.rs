@@ -48,7 +48,9 @@ pub unsafe extern "C" fn kelvin_prism_generate_otp_key(
         Ok(key) => {
             if key_len > 0 {
                 let copy_len = std::cmp::min(key.len(), key_len);
-                unsafe { std::ptr::copy_nonoverlapping(key.as_ptr(), key_out, copy_len); }
+                unsafe {
+                    std::ptr::copy_nonoverlapping(key.as_ptr(), key_out, copy_len);
+                }
             }
             0
         },
@@ -92,10 +94,19 @@ pub unsafe extern "C" fn kelvin_prism_encrypt(
     data: *mut u8,
     len: usize,
 ) -> i32 {
-    if data.is_null() && len > 0 { return -1; }
-    let ctx = match unsafe { ctx.as_mut() } { Some(c) => c, None => return -1 };
-    let slice = if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
-    match ctx.inner.encrypt(slice) { Ok(()) => 0, Err(_) => -1 }
+    if data.is_null() && len > 0 {
+        return -1;
+    }
+    let ctx = match unsafe { ctx.as_mut() } {
+        Some(c) => c,
+        None => return -1,
+    };
+    let slice =
+        if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
+    match ctx.inner.encrypt(slice) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
 }
 
 #[no_mangle]
@@ -104,18 +115,31 @@ pub unsafe extern "C" fn kelvin_prism_decrypt(
     data: *mut u8,
     len: usize,
 ) -> i32 {
-    if data.is_null() && len > 0 { return -1; }
-    let ctx = match unsafe { ctx.as_mut() } { Some(c) => c, None => return -1 };
-    let slice = if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
-    match ctx.inner.decrypt(slice) { Ok(()) => 0, Err(_) => -1 }
+    if data.is_null() && len > 0 {
+        return -1;
+    }
+    let ctx = match unsafe { ctx.as_mut() } {
+        Some(c) => c,
+        None => return -1,
+    };
+    let slice =
+        if len > 0 { unsafe { std::slice::from_raw_parts_mut(data, len) } } else { &mut [] };
+    match ctx.inner.decrypt(slice) {
+        Ok(()) => 0,
+        Err(_) => -1,
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_prism_free(ctx: *mut PrismCtx) {
-    if !ctx.is_null() { drop(unsafe { Box::from_raw(ctx) }); }
+    if !ctx.is_null() {
+        drop(unsafe { Box::from_raw(ctx) });
+    }
 }
 
 #[no_mangle]
 pub unsafe extern "C" fn kelvin_prism_free_string(s: *mut c_char) {
-    if !s.is_null() { drop(unsafe { CString::from_raw(s) }); }
+    if !s.is_null() {
+        drop(unsafe { CString::from_raw(s) });
+    }
 }

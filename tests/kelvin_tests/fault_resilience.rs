@@ -7,9 +7,7 @@
 //! Requires the `failpoints` feature to be enabled:
 //!   cargo test -p kelvin --test fault_resilience --features failpoints
 
-use kelvin::{
-    Kelvin, KelvinError, KelvinStreaming, OrbitalConfig,
-};
+use kelvin::{Kelvin, KelvinError, KelvinStreaming, OrbitalConfig};
 use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 
 /// Helper: create a stable 5-body orbital configuration for V1 tests.
@@ -92,7 +90,10 @@ fn test_fault_shake256_extract_propagates_error() {
     let config = test_config();
     let result = Kelvin::new(config);
 
-    assert!(result.is_err(), "Expected Kelvin::new to fail when shake256-extract fail point is active");
+    assert!(
+        result.is_err(),
+        "Expected Kelvin::new to fail when shake256-extract fail point is active"
+    );
 
     let _ = fail::remove("shake256-extract");
 }
@@ -111,7 +112,10 @@ fn test_fault_key_schedule_exhausted() {
     let config = test_config();
     let result = Kelvin::new(config);
 
-    assert!(result.is_err(), "Expected Kelvin::new to fail when key-schedule-exhaust fail point is active");
+    assert!(
+        result.is_err(),
+        "Expected Kelvin::new to fail when key-schedule-exhaust fail point is active"
+    );
 
     let _ = fail::remove("key-schedule-exhaust");
     let _ = fail::remove("verlet-step");
@@ -133,7 +137,10 @@ fn test_fault_verlet_step_streaming() {
     let mut data = b"Hello, Kelvin Streaming Fault!".to_vec();
     let result = stream.encrypt(&mut data);
 
-    assert!(result.is_err(), "Expected encrypt to fail when verlet-step fail point is active during streaming");
+    assert!(
+        result.is_err(),
+        "Expected encrypt to fail when verlet-step fail point is active during streaming"
+    );
 
     let _ = fail::remove("verlet-step");
 }

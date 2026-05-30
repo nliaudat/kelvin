@@ -3,7 +3,7 @@
 # run-kani.sh — Run Kani proofs inside Docker container
 #
 # Usage:
-#   run-kani           — Run all 5 proofs with progress bar
+#   run-kani           — Run all 3 proofs with progress bar
 #   run-kani --version — Print Kani version info
 # =============================================================================
 set -euo pipefail
@@ -38,14 +38,21 @@ run_with_progress() {
     local phase="compiling"
     local bar_len=30
     local last_line=""
+    local kani_exit_code=0
 
-    # Write full log in background, parse progress from stdout
+    # Write full log via process substitution, parse progress from stdout
+    # NOTE: Using process substitution (<(...)) instead of a pipe so the
+    # while loop runs in the parent shell and variable modifications persist.
     exec 3>&1  # save stdout
-    cargo kani -p kelvin-core --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file" | while IFS= read -r line; do
+    while IFS= read -r line; do
         last_line="$line"
 
+        # Capture exit status sentinel appended by process substitution
+        if [[ "$line" =~ ^EXIT_STATUS:([0-9]+) ]]; then
+            kani_exit_code=${BASH_REMATCH[1]}
+
         # Detect compilation phase
-        if [[ "$line" == *"Compiling"* ]]; then
+        elif [[ "$line" == *"Compiling"* ]]; then
             phase="compiling"
             printf "\r  %s ${CYAN}Compiling...${NC}    \r" "$(next_spinner)" >&3
 
@@ -94,7 +101,7 @@ run_with_progress() {
         elif [[ "$line" == "VERIFICATION:- FAILED" ]]; then
             printf "\n  ${RED}✗ VERIFICATION: FAILED${NC}\n" >&3
         fi
-    done
+    done < <(cargo kani -p kelvin-core --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
 
     # If no checks were parsed (e.g. compile error), show final spinner
     if [ "$total_checks" -eq 0 ]; then
@@ -105,7 +112,7 @@ run_with_progress() {
         fi
     fi
 
-    return 0
+    return "$kani_exit_code"
 }
 
 # ── Draw progress bar ──────────────────────────────────────────────────────

@@ -3,7 +3,7 @@
 # ==============================================================================
 #
 # Services:
-#   kani   — Run Kani formal verification proofs (5 L0 safety harnesses)
+#   kani   — Run Kani formal verification proofs (3 L0 safety harnesses)
 #   cross  — Cross-compile & test on x86_64, aarch64, riscv64, wasm32, mips64
 #
 # Usage:
@@ -25,7 +25,7 @@ services:
       - ..:/kelvin
       - ./run-kani.sh:/usr/local/bin/run-kani
       - kani-cargo-cache:/usr/local/cargo
-    entrypoint: ["/usr/local/bin/run-kani"]
+    entrypoint: ["bash", "/usr/local/bin/run-kani"]
     deploy:
       resources:
         limits:
@@ -47,7 +47,7 @@ services:
       - ..:/kelvin
       - ./build-multiarch.sh:/usr/local/bin/build-multiarch
       - cargo-cache:/usr/local/cargo
-    entrypoint: ["/usr/local/bin/build-multiarch"]
+    entrypoint: ["bash", "/usr/local/bin/build-multiarch"]
     deploy:
       resources:
         limits:
