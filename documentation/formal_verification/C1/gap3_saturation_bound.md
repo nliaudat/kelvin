@@ -139,8 +139,8 @@ The empirical measurement confirms that entropy does not drop below zero (it sat
 ## 6. References
 
 1. `kelvin-core/src/fixed_math.rs` lines 838–891 (C1 Kani harnesses)
-2. `documentation/formal_verification_resolved/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
-3. `documentation/formal_verification_resolved/C1/gap2_uniform_distribution.md` (uniformity)
+2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+3. `documentation/formal_verification/C1/gap2_uniform_distribution.md` (uniformity)
 4. `documentation/formal_verification.md` §L1' (saturation model) and §L2' (Kaplan-Yorke attractor bound)
 5. Shannon, C. E. (1949). "Communication Theory of Secrecy Systems."
    — Information entropy and its relation to finite discrete state spaces.

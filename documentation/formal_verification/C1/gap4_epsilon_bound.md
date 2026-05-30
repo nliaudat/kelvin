@@ -125,8 +125,8 @@ The empirical validation in `tests/information_loss/` reports:
 ## 5. References
 
 1. `kelvin-core/src/fixed_math.rs` lines 823–838 (`verify_c1_epsilon_bound`)
-2. `documentation/formal_verification_resolved/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
-3. `documentation/formal_verification_resolved/C1/gap2_uniform_distribution.md` (uniformity)
+2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+3. `documentation/formal_verification/C1/gap2_uniform_distribution.md` (uniformity)
 4. `tests/information_loss/src/main.rs` (ε-bound in output, empirical k_op estimate)
 5. Cover, T. M., & Thomas, J. A. (2006). *Elements of Information Theory* (2nd ed.). Wiley.
    — Quantization and entropy bounds.

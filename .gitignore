@@ -70,4 +70,3 @@ target/cross/
 proofs/kani/results/
 golden_hash_output.txt
 golden_hash_stderr.txt
-documentation/formal_verification_open_gaps_prompts.md

@@ -125,9 +125,9 @@ All 6 C1 gaps are now resolved:
 
 ## 5. References
 
-1. `documentation/formal_verification_resolved/C1/gap1_kop_shannon_bound.md` (Shannon derivation)
-2. `documentation/formal_verification_resolved/C1/gap2_uniform_distribution.md` (uniformity)
-3. `documentation/formal_verification_resolved/C1/gap3_saturation_bound.md` (saturation)
-4. `documentation/formal_verification_resolved/C1/gap4_epsilon_bound.md` (ε-bound)
-5. `documentation/formal_verification_resolved/C1/gap5_error_independence.md` (independence)
+1. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (Shannon derivation)
+2. `documentation/formal_verification/C1/gap2_uniform_distribution.md` (uniformity)
+3. `documentation/formal_verification/C1/gap3_saturation_bound.md` (saturation)
+4. `documentation/formal_verification/C1/gap4_epsilon_bound.md` (ε-bound)
+5. `documentation/formal_verification/C1/gap5_error_independence.md` (independence)
 6. Renyi, A. (1961). "On Measures of Entropy and Information." *Proc. 4th Berkeley Symp. Math. Stat. Prob.*, 1, 547–561. — Hartley and min-entropy definitions.

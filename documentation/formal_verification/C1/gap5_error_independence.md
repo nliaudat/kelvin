@@ -110,7 +110,7 @@ The full additive model (`k_step = 2N(N-1) = 40 bits`) is justified for the defa
 ## 6. References
 
 1. `kelvin-core/src/fixed_math.rs` lines 838–891 (C1 Kani harnesses)
-2. `documentation/formal_verification_resolved/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
-3. `documentation/formal_verification_resolved/C1/gap2_uniform_distribution.md` (uniformity)
+2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+3. `documentation/formal_verification/C1/gap2_uniform_distribution.md` (uniformity)
 4. `tests/information_loss/src/main.rs` (empirical entropy measurements)
 5. `documentation/formal_verification.md` §L2' (Lyapunov mixing timescale)

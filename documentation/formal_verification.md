@@ -1,6 +1,6 @@
 # Formal Verification — Kelvin Cryptosystem
 
-> **Status:** ✅ **All 23 gaps resolved.** See [`formal_verification_resolved/`](formal_verification_resolved/) for complete proof documents.
+> **Status:** ✅ **All 23 gaps resolved.** See [`formal_verification/`](formal_verification/) for complete proof documents.
 > **Last Updated:** 2026-05-31
 
 ## Proof Architecture
@@ -25,7 +25,7 @@ End-to-End Keystream Output
 
 The L1 (Functional Equivalence) and L2 (Composite Correctness) proofs use the
 **Apple-inspired** dynamic error bound strategy detailed in
-[`formal_verification_resolved/code_verification.md`](formal_verification_resolved/code_verification.md).
+[`formal_verification/code_verification.md`](formal_verification/code_verification.md).
 
 ---
 
@@ -55,11 +55,11 @@ C1 (k_step ≥ 40 bits/step)
 | **L2: Composite** | `compute_accelerations` satisfies Newton's laws | `proofs/kani/acceleration_proofs.rs` |
 | **L3: Pipeline** | Verlet loop correctness, domain separation | `proofs/kani/pipeline_proofs.rs` |
 | **L4: Determinism** | Bit-identical across platforms (SSE2/AVX/AVX2) | `tests/kelvin_tests/determinism.rs` |
-| **L1': Information Loss** | Per-step fixed-point rounding irreversibility | [`formal_verification_resolved/C1/`](formal_verification_resolved/C1/) |
-| **L2': Lyapunov** | Shadow orbit error budget + Kaplan-Yorke bound | [`formal_verification_resolved/C2/`](formal_verification_resolved/C2/) |
-| **L3': Quantum** | Grover search bound over configuration space Θ | [`formal_verification_resolved/C3/`](formal_verification_resolved/C3/) |
-| **L4': Keystream** | Deterministic extraction, domain separation | [`formal_verification_resolved/C4/`](formal_verification_resolved/C4/) |
-| **C5: Config** | Configuration validation + $\ge 2^{1920}$ cardinality | [`formal_verification_resolved/C5/`](formal_verification_resolved/C5/) |
+| **L1': Information Loss** | Per-step fixed-point rounding irreversibility | [`formal_verification/C1/`](formal_verification/C1/) |
+| **L2': Lyapunov** | Shadow orbit error budget + Kaplan-Yorke bound | [`formal_verification/C2/`](formal_verification/C2/) |
+| **L3': Quantum** | Grover search bound over configuration space Θ | [`formal_verification/C3/`](formal_verification/C3/) |
+| **L4': Keystream** | Deterministic extraction, domain separation | [`formal_verification/C4/`](formal_verification/C4/) |
+| **C5: Config** | Configuration validation + $\ge 2^{1920}$ cardinality | [`formal_verification/C5/`](formal_verification/C5/) |
 
 ---
 
@@ -129,7 +129,7 @@ cargo run -p configuration_space       # writes c5_validation.log
 ## Directory Structure
 
 ```
-documentation/formal_verification_resolved/
+documentation/formal_verification/
 ├── README.md
 ├── code_verification.md              L1/L2 code proofs with Rust snippets
 ├── C1/

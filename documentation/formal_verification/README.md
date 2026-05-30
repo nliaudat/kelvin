@@ -3,7 +3,7 @@
 This directory contains formal mathematical proofs that close the gaps identified in `documentation/formal_verification_TODO.md`. Each subdirectory corresponds to a resolved conjecture gap.
 
 ```
-formal_verification_resolved/
+formal_verification/
 ├── README.md
 ├── C1/     (7 gaps — fully resolved)       ← Fixed-point information loss
 ├── C2/     (6 gaps — fully resolved)       ← Lyapunov exponent certification

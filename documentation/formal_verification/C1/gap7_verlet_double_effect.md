@@ -114,4 +114,4 @@ Each rounding operation contributes at least `k_op ≥ 1` bit of information los
 1. `kelvin-core/src/integrator.rs` lines 124–147 (Verlet step implementation)
 2. `kelvin-core/src/integrator.rs` lines 98–116 (Euler step implementation for comparison)
 3. `proofs/kani/information_loss.rs` lines 207–244 (`verify_c1_rounding_op_count` harness)
-4. `documentation/formal_verification_resolved/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+4. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
