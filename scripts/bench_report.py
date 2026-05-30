@@ -12,14 +12,14 @@ Usage:
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 def read_json(dirpath, filename):
     path = Path(dirpath) / filename
     if path.exists():
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding="utf-8"))
     return None
 
 
@@ -63,7 +63,7 @@ def generate_report():
     lines = []
     lines.append("# Kelvin — Comparative Benchmark Report")
     lines.append("")
-    lines.append(f"Generated `{datetime.now():%Y-%m-%d %H:%M:%S}` from criterion benchmarks.")
+    lines.append(f"Generated `{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S} UTC` from criterion benchmarks.")
     lines.append("")
     lines.append("## System")
     lines.append("")

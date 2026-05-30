@@ -8,6 +8,15 @@
 //! - `extract_seed` — SHA3-512 entropy extraction from orbital state
 //! - `KeySchedule` — reseeding, step counting, and exhaustion detection
 //!
+//! ## What This Crate Is Not For
+//!
+//! This crate does **not** provide the orbital simulation engine itself
+//! (see [`kelvin-core`]) or the top-level encryption API (see [`kelvin`]).
+//! It is the intermediate key derivation layer. If you only need key
+//! derivation from orbital seeds without running simulations, this is
+//! the right crate. If you need fixed-point math or n-body integration,
+//! use `kelvin-core` directly.
+//!
 //! ## Security
 //!
 //! **EXPERIMENTAL — NOT FOR PRODUCTION USE.**

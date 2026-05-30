@@ -13,6 +13,7 @@ The core insight: the n-body problem has no closed-form solution for N ≥ 3. An
 
 Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant OTP keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). There is no nonce, no IV, no algebraic round function. The only attack is brute force — and the search space is astronomical.
 
+![Orbital simulation demo](documentation/demo_video/orbital_demo.gif)
 
 ## Quick Start
 
@@ -29,18 +30,18 @@ cargo run -p kelvin-cli -- decrypt -c key.json -i ciphertext.bin -o decrypted.tx
 
 ## Mode Comparison
 
-| Mode | Name | OTP Type | Auth | Keystream | Speed | Use Case |
-|------|------|----------|:----:|-----------|:-----:|----------|
-| **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🐢 500 MB/s | General purpose with authentication |
-| **V2** | Kelvin-Chaos | **Per-Step OTP** (SHAKE256 XOR) | ❌ | Unlimited | 🐌 3 MB/s | Streaming, real-time |
-| **V3** | Kelvin-Photon | **Batch OTP** (HKDF→SHAKE256 XOR) | ❌ | Finite | 🚀 5 GB/s | Bulk encryption |
-| **H** | Kelvin-Quantum | **Hybrid OTP** (V3+V2 XOR) | ❌ | ≈Unlimited | 🚀 5 GB/s | Best all-around |
-| **—** | Kelvin-Prism | **HE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 5 GB/s | OTP key generation for HE |
-| **—** | Kelvin-Split | **Split OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 5 GB/s | XOR key splitting for HE |
-| **—** | Kelvin-Flare | **FHE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 5 GB/s | FHE secret key generation |
+| Mode | Name | OTP Type | Auth | Keystream | Speed (in-memory) | Use Case |
+|------|------|----------|:----:|-----------|:-----------------:|----------|
+| **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🚀 1,644 MB/s | General purpose with authentication |
+| **V2** | Kelvin-Chaos | **Per-Step OTP** (SHAKE256 XOR) | ✅ Optional | Unlimited | 🐌 34 MB/s | Streaming, real-time |
+| **V3** | Kelvin-Photon | **Batch OTP** (HKDF→SHAKE256 XOR) | ✅ Optional | Finite | 🚀 542 MB/s | Bulk encryption |
+| **H** | Kelvin-Quantum | **Hybrid OTP** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
+| **—** | Kelvin-Prism | **HE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | OTP key generation for HE |
+| **—** | Kelvin-Split | **Split OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | XOR key splitting for HE |
+| **—** | Kelvin-Flare | **FHE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | FHE secret key generation |
 
 
-> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC authentication via `KelvinQuantumAuthenticated` if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
+> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC128 authentication via `KelvinQuantumAuthenticated` (or `KelvinPhotonAuthenticated` / `KelvinStreamingAuthenticated` for V3 / V2 respectively) if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
 
 ## What Makes Kelvin Novel
 
@@ -174,15 +175,28 @@ See the [OTP Bulletproof Analysis](documentation/otp_bulletproof.md) for the ful
 
 ## Architecture
 
-Kelvin is organized as a Rust workspace with 14 crates:
+Kelvin is organized as a Rust workspace with 17 crates:
 
 ```
 kelvin-core/     — Fixed-point Q32.64 arithmetic, n-body simulation, entropy extraction
 kelvin-kdf/      — Key schedule, HKDF-SHA512 derivation, BLAKE3 reseeding
 kelvin-stream/   — Streaming cipher modes (ChaCha20Poly1305, SHAKE256 XOR)
-kelvin/          — Top-level API (Kelvin, KelvinPhoton, KelvinQuantum, etc.)
+kelvin/          — Top-level API (Kelvin, KelvinPhoton, KelvinQuantum, etc., + mode trait)
 kelvin-cli/      — Command-line interface (encrypt, decrypt, generate, analyze)
 kelvin-ffi/      — C FFI bindings for language interop
+fuzz/            — Differential fuzzing vs Python mpmath reference
+tests/
+├── kelvin-test-server/  — Integration test server
+├── kelvin-test-client/  — Integration test client
+├── constant_time_bench/ — dudect-bencher side-channel analysis
+├── nist_tests/          — SP 800-90B IID health tests
+├── nist_800_90b/        — SP 800-90B keystream generation tooling
+├── entropy_analysis/    — Statistical entropy analysis harness
+├── shake256_bench/      — SHAKE256 throughput benchmarking
+├── comparative_bench/   — Criterion benchmarks vs AES-256-CTR
+└── zeroize_verify/      — Memory zeroization verification
+libs/
+└── python/kelvin_pyo3/  — PyO3 language bindings
 ```
 
 ## Installation
@@ -257,12 +271,16 @@ kelvin-test-client
 
 ## Performance
 
-| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
-|-----------|:-----------------------------:|:------------------------------:|
-| Setup + Keygen | ~1.1s | ~12.5s |
-| Encrypt 1 GB (V3/H) | ~200ms | ~200ms |
-| Encrypt 1 GB (V1) | ~500ms | ~500ms |
-| Encrypt 1 GB (V2) | ~33 min | ~5.5 hours |
+| Operation | Throughput (in-memory) | File I/O Bound (1 GB) |
+|-----------|:----------------------:|:---------------------:|
+| V1 Secure (ChaCha20Poly1305) | **1,644 MB/s** | ~48 MB/s |
+| V2 Chaos (per-step SHAKE256 XOR) | **34 MB/s** | ~48 MB/s |
+| V3 Photon (HKDF→SHAKE256 XOR) | **542 MB/s** | ~48 MB/s |
+| H Quantum (hybrid V3+V2 XOR) | **512 MB/s** | ~48 MB/s |
+| Setup + Keygen (5 bodies, 1M steps) | ~1.1s | — |
+| Setup + Keygen (5 bodies, 10M steps) | ~12.5s | — |
+
+> **Note:** All crypto throughput is measured on an AMD Ryzen 5 5600 with 1 GB buffers (in-memory, no file I/O). File-based benchmarks are bottlenecked by disk I/O (~48 MB/s) regardless of mode. See the [SHAKE256 Benchmark Analysis](documentation/shake256_benchmark_analysis.md) for details.
 
 ## Formal Verification
 
@@ -273,22 +291,53 @@ Kelvin follows Apple's corecrypto blueprint for formal verification using the Ka
 | L0: Safety | No panics, no overflows under bounded inputs | ✅ Done |
 | L1: Functional Equivalence | Arithmetic ops match mathematical spec within dynamically scaled error bounds | ✅ Done |
 | L2: Composite Correctness | `compute_accelerations` matches Newtonian gravity via force-based assertions | ✅ Done |
-| L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ⏳ Pending |
+| L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ✅ Done |
 | L4: Determinism | Bit-identical results across platforms | ✅ Done |
 
 See [formal_verification.md](documentation/formal_verification.md) for details.
 
 ## Documentation
 
+### Architecture & Design
 - [Usage Guide](documentation/usage.md) — Detailed API documentation
 - [OTP Bulletproof Analysis](documentation/otp_bulletproof.md) — Why Kelvin's OTP is quantum-resistant and computationally unbreakable
-- [Formal Verification](documentation/formal_verification.md) — Kani proof strategy
+- [OTP Mode Study](documentation/Kelvin_OTP_Study.md) — Mode comparison and hybrid architecture
+- [Mode Flowcharts](documentation/mode_flowcharts.md) — Visual pipeline diagrams for each mode
+- [Homomorphic Cryptosystem](documentation/homomorphic_cryptosystem.md) — HE integration with Prism/Split/Flare
+- [Security Assumptions](documentation/security_assumptions.md) — Codified security assumptions with enforcement locations
+
+### Formal Verification & Security
+- [Formal Verification](documentation/formal_verification.md) — Kani proof strategy (L0–L4)
+- [Security Analysis](documentation/otp_bulletproof.md) — Quantum-resistant OTP security argument
+- [Patent Landscape #1](documentation/patent_review_1.md) — Prior art analysis (overview)
+- [Patent Landscape #2](documentation/patent_review_2.md) — Prior art analysis (in-depth)
+- [Patent Landscape #3](documentation/patent_review_3.md) — Prior art analysis (conclusion)
+- [Project History](documentation/project_history.md) — Development timeline and milestones
+
+### Performance & Benchmarks
+- [SHAKE256 Benchmark Analysis](documentation/shake256_benchmark_analysis.md) — Detailed throughput breakdown (in-memory vs I/O-bound)
+- [Comparative Benchmarks](documentation/bench_comparative.md) — Kelvin vs AES-256-GCM vs ChaCha20-Poly1305
+- [1 GB Benchmark Report](documentation/bench_1gb.md) — File-based 1 GB encryption tests
+- [Entropy Analysis Report](documentation/entropy_report.md) — NIST SP 800-90B statistical results
+- [NIST SP 800-90B Report](documentation/nist_800_90b_report.md) — Formal NIST validation tooling
+- [NIST Test Anomalies](documentation/nist_test_anomalies.md) — Edge cases and known limitations
+
+### Research & Theory
 - [Proof of Concept](documentation/proof_of_concept.md) — Test results and benchmarks
-- [Patent Landscape](documentation/patent_review_3.md) — Prior art analysis
-- [Quantum Resistance](documentation/quantum_analysis.md) — Post-quantum security analysis
-- [Homomorphic Integration](documentation/homomorphic_cryptosystem.md) — HE use cases
-- [OTP Study](documentation/Kelvin_OTP_Study.md) — Mode comparison and hybrid architecture
-- [Production Readiness](production_readiness_plan.md) — Roadmap to 1.0
+- [Quantum Resistance Analysis](documentation/quantum_analysis.md) — Post-quantum security analysis
+- [Keyspace Analysis](documentation/keyspace_analysis.md) — Brute-force resistance bounds
+- [Seed Extraction](documentation/seed_extraction.md) — Entropy extraction methodology
+- [Sun Mass Randomization](documentation/sun_mass_randomization.md) — Initial condition entropy
+- [Euler vs Verlet](documentation/Euler_vs_Verlet.md) — Integration method comparison
+- [Citations](documentation/citations.md) — Academic references and bibliography
+
+### Integration & Platform
+- [rustcrypto Integration Plan](documentation/rustcrypto_integration_plan.md) — Roadmap for upstream RustCrypto compatibility
+- [NIST PQ Signatures](documentation/nist_pq_signatures.md) — ML-DSA-65 and ML-KEM-768 integration
+- [Windows DLL Tool Fix](documentation/windows_dlltool_fix.md) — Cross-compilation workaround
+
+### Operations
+- [Production Readiness Plan](production_readiness_plan.md) — Roadmap to 1.0
 
 
 ## Academic Context

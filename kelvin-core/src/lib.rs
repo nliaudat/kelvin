@@ -14,6 +14,19 @@
 //! **EXPERIMENTAL — NOT FOR PRODUCTION USE.** This is an experimental
 //! cryptosystem that has not undergone formal cryptanalysis.
 //!
+//! ## What This Crate Is Not For
+//!
+//! This crate is **not** a cryptographic protocol implementation. It provides
+//! only the core mathematical primitives (fixed-point arithmetic, n-body
+//! simulation, physical constants). If you need to encrypt or decrypt data,
+//! use the [`kelvin`] crate which builds protocol-level encryption on top
+//! of these primitives.
+//!
+//! This crate is also **not** a general-purpose simulation library. While it
+//! provides Verlet and Euler integrators, these are tuned specifically for
+//! the Kelvin cryptosystem's security requirements, not for astrophysical
+//! accuracy.
+//!
 //! ## no-std support
 //!
 //! This crate is `no_std` compatible. It has no runtime dependencies.

@@ -132,6 +132,13 @@ Security is the primary requirement for production readiness. We must move beyon
         - Unix: `mlock` / `munlock`
     - Runtime volatile read-back test verifies zeroization actually occurs after `drop()`
     - Assembly-level audit confirms compiler optimizations do not elide zeroization calls
+- [x] **subtle Crate Integration**: Added `subtle` (v2.5) as an optional feature-gated
+    dependency (`subtle-ct`) to `kelvin-core`. Implemented `subtle::ConstantTimeEq for
+    Fixed` providing side-channel-resistant equality comparison on the underlying `i128`
+    representation. *(Completed 2026-05-30)*
+    - Feature-gated behind `subtle-ct`: zero overhead in default builds
+    - Follows dalek cryptography's model of using `subtle` for constant-time operations
+    - File: `kelvin-core/Cargo.toml`, `kelvin-core/src/fixed_math.rs`
 
 ### 1.4 Statistical Testing
 - [x] **NIST SP 800-90B Health Tests**: Implement statistical test suite for keystream quality validation. *(Completed 2026-05-22)*
@@ -207,6 +214,25 @@ Security is the primary requirement for production readiness. We must move beyon
 - [ ] **Third-Party Engagement**: Schedule a professional security audit by a specialized firm (e.g., Trail of Bits, NCC Group, or Kudelski Security).
     - Two firms, concurrent review recommended
     - Budget for 8-12 weeks of audit + 4-6 weeks remediation + 2-4 weeks re-audit
+
+### 1.7.5 Dalek-Inspired Architecture & Documentation
+- [x] **Cipher Mode Trait & Marker Types**: Created `kelvin::mode` module with the
+    `Mode` trait (defining `Cipher`, `AUTHENTICATED`, `UNLIMITED_KEYSTREAM`, `DESCRIPTION`,
+    and `init()`) plus 7 zero-sized marker types (`Secure`, `Chaos`, `Photon`, `Quantum`,
+    `Prism`, `Split`, `Flare`). Inspired by dalek cryptography's type-level protocol
+    encoding (e.g., `ed25519-dalek`'s `SigningKey`/`VerifyingKey`, `bulletproofs`'
+    parameterized types). Provides the foundation for a future `Kelvin<M: Mode>` refactor.
+    *(Completed 2026-05-30)*
+    - File: `kelvin/src/mode.rs`
+- [x] **"What This Crate Is Not For" Documentation**: Added explicit scope-limiting
+    documentation sections to all 4 core crates (`kelvin-core`, `kelvin-kdf`,
+    `kelvin-stream`, `kelvin`), following dalek's practice of clearly stating what
+    each crate does NOT do. *(Completed 2026-05-30)*
+    - `kelvin-core`: not a cryptographic protocol, not a general-purpose simulation library
+    - `kelvin-kdf`: intermediate layer, not the simulation engine or top-level API
+    - `kelvin-stream`: low-level cipher adapter, not a full encryption system
+    - `kelvin`: research cryptosystem, explicitly lists what it does NOT provide
+      (key exchange, memory-hard KDF, formal cryptanalysis, information-theoretic OTP)
 
 ### 1.8 Documented Security Assumptions
 
