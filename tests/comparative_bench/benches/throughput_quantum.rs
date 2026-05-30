@@ -31,14 +31,17 @@ fn nonce_12() -> [u8; 12] {
 
 fn bench_kelvin_quantum_encrypt(c: &mut Criterion) {
     let seed = dummy_seed_2048();
-    let mut buf = test_buffer();
-
-    let mut quantum = kelvin::KelvinQuantum::new(seed, 100_000);
+    // Re-initialize KelvinQuantum inside the loop to prevent state exhaustion
+    // and ensure every iteration starts from the same initial state.
+    // KelvinQuantum::new is cheap: it only sets up the internal state from
+    // the pre-computed seed without running any orbital simulation.
 
     let mut group = c.benchmark_group("KelvinQuantum (H)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
         b.iter(|| {
+            let mut buf = test_buffer();
+            let mut quantum = kelvin::KelvinQuantum::new(seed, 100_000);
             quantum.encrypt(black_box(&mut buf)).expect("quantum encrypt");
         })
     });
@@ -51,21 +54,27 @@ fn bench_kelvin_quantum_encrypt(c: &mut Criterion) {
 
 fn bench_aes256_gcm_encrypt(c: &mut Criterion) {
     let key_bytes = aes_key();
-    let buf = test_buffer();
     let nonce_bytes = nonce_12();
 
     let mut group = c.benchmark_group("AES-256-GCM (ring)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
+        // LessSafeKey is cloned cheaply inside the loop; UnboundKey creation
+        // is kept outside to avoid per-iteration key schedule computation.
+        let key = ring::aead::UnboundKey::new(&ring::aead::AES_256_GCM, &key_bytes)
+            .expect("valid AES-256-GCM key");
+        let sealing_key = ring::aead::LessSafeKey::new(key);
+
         b.iter(|| {
-            let key = ring::aead::UnboundKey::new(&ring::aead::AES_256_GCM, &key_bytes)
-                .expect("valid AES-256-GCM key");
+            // Allocate one 1 MiB buffer per iteration — this is necessary because
+            // seal_in_place_separate_tag mutates the buffer in-place, and we need
+            // a fresh plaintext each time to prevent OTP-like issues where
+            // encrypting the same ciphertext twice would consume the AEAD nonce.
+            // A single `buf.clone()` is negligible (< 0.3 ms) compared to the
+            // actual encryption time for 1 MiB (~0.5-1 ms for AES-256-GCM).
+            let mut in_out = test_buffer();
+
             let nonce = ring::aead::Nonce::assume_unique_for_key(nonce_bytes);
-            let sealing_key = ring::aead::LessSafeKey::new(key);
-
-            let mut in_out = buf.clone();
-            in_out.extend_from_slice(&[0u8; 16]); // tag space
-
             let _ = sealing_key.seal_in_place_separate_tag(
                 nonce,
                 ring::aead::Aad::empty(),
@@ -82,21 +91,22 @@ fn bench_aes256_gcm_encrypt(c: &mut Criterion) {
 
 fn bench_chacha20_poly1305_encrypt(c: &mut Criterion) {
     let key_bytes = aes_key();
-    let buf = test_buffer();
     let nonce_bytes = nonce_12();
 
     let mut group = c.benchmark_group("ChaCha20-Poly1305 (ring)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
+        let key = ring::aead::UnboundKey::new(&ring::aead::CHACHA20_POLY1305, &key_bytes)
+            .expect("valid ChaCha20-Poly1305 key");
+        let sealing_key = ring::aead::LessSafeKey::new(key);
+
         b.iter(|| {
-            let key = ring::aead::UnboundKey::new(&ring::aead::CHACHA20_POLY1305, &key_bytes)
-                .expect("valid ChaCha20-Poly1305 key");
+            // Same reasoning as AES-256-GCM: fresh buffer per iteration to
+            // ensure the ciphertext always differs (AEAD nonce is fixed per
+            // LessSafeKey, so the message must vary).
+            let mut in_out = test_buffer();
+
             let nonce = ring::aead::Nonce::assume_unique_for_key(nonce_bytes);
-            let sealing_key = ring::aead::LessSafeKey::new(key);
-
-            let mut in_out = buf.clone();
-            in_out.extend_from_slice(&[0u8; 16]); // tag space
-
             let _ = sealing_key.seal_in_place_separate_tag(
                 nonce,
                 ring::aead::Aad::empty(),

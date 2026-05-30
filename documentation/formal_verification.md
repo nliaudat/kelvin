@@ -35,7 +35,7 @@ End-to-End Keystream Output
 | **L0: Safety** | No panics, no overflows under bounded inputs | Kani model checking | `fixed_math.rs` (existing) |
 | **L1: Functional Equivalence** | Arithmetic ops match mathematical spec within dynamically scaled error bounds | Kani with reference computation | `proofs/kani/fixed_equivalence.rs` |
 | **L2: Composite Correctness** | `compute_accelerations` satisfies Newton's laws via force-based assertions | Kani with Newtonian invariants | `proofs/kani/acceleration_proofs.rs` |
-| **L3: Pipeline Integrity** | Full `simulate_and_extract_seed` produces correct output | Kani + golden hash | `proofs/kani/` |
+| **L3: Pipeline Integrity** | Full `simulate_and_extract_seed` produces correct output | Kani + golden hash | `proofs/kani/pipeline_proofs.rs` |
 | **L4: Determinism** | Bit-identical results across platforms | Integration tests | `tests/kelvin_tests/determinism.rs` |
 
 ## Proof Strategy (Apple-Inspired)

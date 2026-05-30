@@ -29,18 +29,18 @@ cargo run -p kelvin-cli -- decrypt -c key.json -i ciphertext.bin -o decrypted.tx
 
 ## Mode Comparison
 
-| Mode | Name | OTP Type | Auth | Keystream | Speed | Use Case |
-|------|------|----------|:----:|-----------|:-----:|----------|
-| **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🐢 500 MB/s | General purpose with authentication |
-| **V2** | Kelvin-Chaos | **Per-Step OTP** (SHAKE256 XOR) | ❌ | Unlimited | 🐌 3 MB/s | Streaming, real-time |
-| **V3** | Kelvin-Photon | **Batch OTP** (HKDF→SHAKE256 XOR) | ❌ | Finite | 🚀 5 GB/s | Bulk encryption |
-| **H** | Kelvin-Quantum | **Hybrid OTP** (V3+V2 XOR) | ❌ | ≈Unlimited | 🚀 5 GB/s | Best all-around |
-| **—** | Kelvin-Prism | **HE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 5 GB/s | OTP key generation for HE |
-| **—** | Kelvin-Split | **Split OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 5 GB/s | XOR key splitting for HE |
-| **—** | Kelvin-Flare | **FHE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 5 GB/s | FHE secret key generation |
+| Mode | Name | OTP Type | Auth | Keystream | Speed (in-memory) | Use Case |
+|------|------|----------|:----:|-----------|:-----------------:|----------|
+| **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🚀 1,644 MB/s | General purpose with authentication |
+| **V2** | Kelvin-Chaos | **Per-Step OTP** (SHAKE256 XOR) | ✅ Optional | Unlimited | 🐌 34 MB/s | Streaming, real-time |
+| **V3** | Kelvin-Photon | **Batch OTP** (HKDF→SHAKE256 XOR) | ✅ Optional | Finite | 🚀 542 MB/s | Bulk encryption |
+| **H** | Kelvin-Quantum | **Hybrid OTP** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
+| **—** | Kelvin-Prism | **HE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | OTP key generation for HE |
+| **—** | Kelvin-Split | **Split OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | XOR key splitting for HE |
+| **—** | Kelvin-Flare | **FHE OTP** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | FHE secret key generation |
 
 
-> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC authentication via `KelvinQuantumAuthenticated` if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
+> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC128 authentication via `KelvinQuantumAuthenticated` (or `KelvinPhotonAuthenticated` / `KelvinStreamingAuthenticated` for V3 / V2 respectively) if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
 
 ## What Makes Kelvin Novel
 
@@ -174,15 +174,28 @@ See the [OTP Bulletproof Analysis](documentation/otp_bulletproof.md) for the ful
 
 ## Architecture
 
-Kelvin is organized as a Rust workspace with 14 crates:
+Kelvin is organized as a Rust workspace with 17 crates:
 
 ```
 kelvin-core/     — Fixed-point Q32.64 arithmetic, n-body simulation, entropy extraction
 kelvin-kdf/      — Key schedule, HKDF-SHA512 derivation, BLAKE3 reseeding
 kelvin-stream/   — Streaming cipher modes (ChaCha20Poly1305, SHAKE256 XOR)
-kelvin/          — Top-level API (Kelvin, KelvinPhoton, KelvinQuantum, etc.)
+kelvin/          — Top-level API (Kelvin, KelvinPhoton, KelvinQuantum, etc., + mode trait)
 kelvin-cli/      — Command-line interface (encrypt, decrypt, generate, analyze)
 kelvin-ffi/      — C FFI bindings for language interop
+fuzz/            — Differential fuzzing vs Python mpmath reference
+tests/
+├── kelvin-test-server/  — Integration test server
+├── kelvin-test-client/  — Integration test client
+├── constant_time_bench/ — dudect-bencher side-channel analysis
+├── nist_tests/          — SP 800-90B IID health tests
+├── nist_800_90b/        — SP 800-90B keystream generation tooling
+├── entropy_analysis/    — Statistical entropy analysis harness
+├── shake256_bench/      — SHAKE256 throughput benchmarking
+├── comparative_bench/   — Criterion benchmarks vs AES-256-CTR
+└── zeroize_verify/      — Memory zeroization verification
+libs/
+└── python/kelvin_pyo3/  — PyO3 language bindings
 ```
 
 ## Installation
@@ -257,12 +270,16 @@ kelvin-test-client
 
 ## Performance
 
-| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) |
-|-----------|:-----------------------------:|:------------------------------:|
-| Setup + Keygen | ~1.1s | ~12.5s |
-| Encrypt 1 GB (V3/H) | ~200ms | ~200ms |
-| Encrypt 1 GB (V1) | ~500ms | ~500ms |
-| Encrypt 1 GB (V2) | ~33 min | ~5.5 hours |
+| Operation | Throughput (in-memory) | File I/O Bound (1 GB) |
+|-----------|:----------------------:|:---------------------:|
+| V1 Secure (ChaCha20Poly1305) | **1,644 MB/s** | ~48 MB/s |
+| V2 Chaos (per-step SHAKE256 XOR) | **34 MB/s** | ~48 MB/s |
+| V3 Photon (HKDF→SHAKE256 XOR) | **542 MB/s** | ~48 MB/s |
+| H Quantum (hybrid V3+V2 XOR) | **512 MB/s** | ~48 MB/s |
+| Setup + Keygen (5 bodies, 1M steps) | ~1.1s | — |
+| Setup + Keygen (5 bodies, 10M steps) | ~12.5s | — |
+
+> **Note:** All crypto throughput is measured on an AMD Ryzen 5 5600 with 1 GB buffers (in-memory, no file I/O). File-based benchmarks are bottlenecked by disk I/O (~48 MB/s) regardless of mode. See the [SHAKE256 Benchmark Analysis](documentation/shake256_benchmark_analysis.md) for details.
 
 ## Formal Verification
 
@@ -273,7 +290,7 @@ Kelvin follows Apple's corecrypto blueprint for formal verification using the Ka
 | L0: Safety | No panics, no overflows under bounded inputs | ✅ Done |
 | L1: Functional Equivalence | Arithmetic ops match mathematical spec within dynamically scaled error bounds | ✅ Done |
 | L2: Composite Correctness | `compute_accelerations` matches Newtonian gravity via force-based assertions | ✅ Done |
-| L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ⏳ Pending |
+| L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ✅ Done |
 | L4: Determinism | Bit-identical results across platforms | ✅ Done |
 
 See [formal_verification.md](documentation/formal_verification.md) for details.

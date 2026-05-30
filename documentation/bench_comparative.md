@@ -1,6 +1,6 @@
 # Kelvin — Comparative Benchmark Report
 
-Generated `2026-05-30 12:05:37` from criterion benchmarks.
+Generated `2026-05-30 10:38:25 UTC` from criterion benchmarks.
 
 ## System
 
@@ -16,9 +16,9 @@ Throughput comparison for 1 MiB encryption buffers. All in MB/s (higher is bette
 
 | Implementation | Metric | Latency | MB/s |
 |----------------|--------|--------:|-----:|
-| KelvinQuantum (H) | encrypt 1 MiB | 2.2274 ms | 448.96 |
-| AES-256-GCM (ring) | encrypt 1 MiB | 533.3482 µs | 1874.95 |
-| ChaCha20-Poly1305 (ring) | encrypt 1 MiB | 796.8568 µs | 1254.93 |
+| KelvinQuantum (H) | encrypt 1 MiB | 2.2828 ms | 438.06 |
+| AES-256-GCM (ring) | encrypt 1 MiB | 553.4761 µs | 1806.76 |
+| ChaCha20-Poly1305 (ring) | encrypt 1 MiB | 715.7276 µs | 1397.18 |
 
 ---
 
@@ -28,8 +28,8 @@ Streaming throughput for 1 MiB buffers. KelvinStreaming advances n-body simulati
 
 | Implementation | Metric | Latency | MB/s |
 |----------------|--------|--------:|-----:|
-| KelvinStreaming (V2) | encrypt 1 MiB | 1.9645 ms | 509.04 |
-| AES-256-CTR | encrypt 1 MiB | 598.7785 µs | 1670.07 |
+| KelvinStreaming (V2) | encrypt 1 MiB | 1.7855 ms | 560.07 |
+| AES-256-CTR | encrypt 1 MiB | 535.0048 µs | 1869.14 |
 
 ---
 
@@ -39,8 +39,8 @@ Key generation latency. Kelvin = full pipeline (config+simulate+extract). X25519
 
 | Implementation | Metric | Latency | MB/s |
 |----------------|--------|--------:|-----:|
-| Kelvin orbital keygen | full pipeline (config + simulate + extract) | 6.7808 s | - |
-| X25519 (dalek) keygen | static secret + public key | 14.9224 µs | - |
+| Kelvin orbital keygen | full pipeline (config + simulate + extract) | 6.5262 s | - |
+| X25519 (dalek) keygen | static secret + public key | 14.4379 µs | - |
 
 ---
 
@@ -50,8 +50,8 @@ Sign and verify 1 MiB message. HAWK unavailable — no production Rust implement
 
 | Implementation | Metric | Latency | MB/s |
 |----------------|--------|--------:|-----:|
-| ED25519 (dalek) sign | sign 1 MiB | 2.6351 ms | 379.50 |
-| ED25519 (dalek) verify | verify 1 MiB | 1.3459 ms | 743.02 |
+| ED25519 (dalek) sign | sign 1 MiB | 2.5662 ms | 389.68 |
+| ED25519 (dalek) verify | verify 1 MiB | 1.3007 ms | 768.82 |
 
 ---
 

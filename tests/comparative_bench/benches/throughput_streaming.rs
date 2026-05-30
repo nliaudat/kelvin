@@ -81,15 +81,18 @@ fn small_orbital_config() -> OrbitalConfig {
 
 fn bench_kelvin_streaming_encrypt(c: &mut Criterion) {
     let config = small_orbital_config();
-    let mut data = test_buffer();
-
-    let mut streaming =
-        kelvin::KelvinStreaming::new(config, BUFFER_SIZE as u64).expect("KelvinStreaming::new");
 
     let mut group = c.benchmark_group("KelvinStreaming (V2)");
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
         b.iter(|| {
+            // Re-initialize KelvinStreaming inside the loop to prevent state
+            // exhaustion (each iteration consumes one 1 MiB step).
+            // KelvinStreaming::new is cheap: it only validates the config and
+            // clones the body vectors — no simulation is run upfront.
+            let mut data = test_buffer();
+            let mut streaming = kelvin::KelvinStreaming::new(config.clone(), BUFFER_SIZE as u64)
+                .expect("KelvinStreaming::new");
             streaming.encrypt(black_box(&mut data)).expect("streaming encrypt");
         })
     });
@@ -104,6 +107,9 @@ fn bench_aes256_ctr_encrypt(c: &mut Criterion) {
     group.throughput(Throughput::Bytes(BUFFER_SIZE as u64));
     group.bench_function("encrypt 1 MiB", |b| {
         b.iter(|| {
+            // Fresh cipher and buffer each iteration: AES-CTR is a stream cipher
+            // and the same keystream would XOR to the same result on repeated
+            // calls with the same key+nonce.
             let mut cipher =
                 Ctr128BE::<Aes256>::new_from_slices(&key, &nonce).expect("AES-256-CTR key/nonce");
             let mut buf = test_buffer();
