@@ -2,6 +2,7 @@
 name = "kelvin-kdf"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.80"
 description = "Key derivation layer for Kelvin cryptosystem"
 license = "CC-BY-NC-SA-4.0"
 
@@ -29,6 +30,9 @@ fail = { version = "0.5", optional = true }
 [[test]]
 name = "chaos_test"
 path = "../tests/kelvin_tests/chaos_test.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 
 [features]
 default = []

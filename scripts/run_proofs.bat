@@ -21,11 +21,11 @@ if "%1"=="--fast" goto :fast
 :full
 echo ===============================================================================
 echo  KELVIN FORMAL VERIFICATION — Full Proof Suite
-echo  56 harnesses across 7 files
+echo  62 harnesses across 9 files
 echo ===============================================================================
 echo.
 
-echo [1/7] fixed_equivalence.rs — Q32.64 arithmetic functional equivalence
+echo [1/9] fixed_equivalence.rs — Q32.64 arithmetic functional equivalence
 cargo kani -p kelvin-core --harness verify_fixed_add_commutative %KANI_ARGS%
 if errorlevel 1 exit /b %errorlevel%
 cargo kani -p kelvin-core --harness verify_fixed_add_associative %KANI_ARGS%
@@ -39,7 +39,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ fixed_equivalence.rs passed
 echo.
 
-echo [2/7] acceleration_proofs.rs — compute_accelerations composite proofs
+echo [2/9] acceleration_proofs.rs — compute_accelerations composite proofs
 cargo kani -p kelvin-core --harness verify_acceleration_single_body %KANI_ARGS%
 if errorlevel 1 exit /b %errorlevel%
 cargo kani -p kelvin-core --harness verify_acceleration_two_body %KANI_ARGS%
@@ -49,7 +49,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ acceleration_proofs.rs passed
 echo.
 
-echo [3/7] vec3_proofs.rs — Vec3 vector operation proofs (18 harnesses)
+echo [3/9] vec3_proofs.rs — Vec3 vector operation proofs (18 harnesses)
 cargo kani -p kelvin-core --harness verify_vec3_add_commutative %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_vec3_add_associative %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_vec3_add_identity %KANI_ARGS%
@@ -72,7 +72,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ vec3_proofs.rs passed
 echo.
 
-echo [4/7] integrator_proofs.rs — Verlet + Euler integrator proofs (9 harnesses)
+echo [4/9] integrator_proofs.rs — Verlet + Euler integrator proofs (9 harnesses)
 cargo kani -p kelvin-core --harness verify_compute_accelerations_single_body_zero %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_compute_accelerations_two_body_equal_mass %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_compute_accelerations_newton_third_law %KANI_ARGS%
@@ -86,7 +86,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ integrator_proofs.rs passed
 echo.
 
-echo [5/7] stability_proofs.rs — Ejection + collapse detection proofs (6 harnesses)
+echo [5/9] stability_proofs.rs — Ejection + collapse detection proofs (6 harnesses)
 cargo kani -p kelvin-core --harness verify_gravitational_potential_negative %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_gravitational_potential_zero_for_single_body %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_is_body_ejected_no_false_positive_for_bound %KANI_ARGS%
@@ -97,7 +97,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ stability_proofs.rs passed
 echo.
 
-echo [6/7] extraction_proofs.rs — Entropy extraction safety proofs (7 harnesses)
+echo [6/9] extraction_proofs.rs — Entropy extraction safety proofs (7 harnesses)
 cargo kani -p kelvin-core --harness verify_feed_orbital_state_empty_bodies %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_feed_orbital_state_single_body %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_feed_orbital_state_buffer_size %KANI_ARGS%
@@ -109,7 +109,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ extraction_proofs.rs passed
 echo.
 
-echo [7/8] pipeline_proofs.rs — L3 Pipeline Integrity proofs (3 harnesses)
+echo [7/9] pipeline_proofs.rs — L3 Pipeline Integrity proofs (3 harnesses)
 cargo kani -p kelvin-core --harness verify_pipeline_invariants %KANI_ARGS%
 if errorlevel 1 exit /b %errorlevel%
 cargo kani -p kelvin-core --harness verify_extract_domain_sep_symbolic %KANI_ARGS%
@@ -119,7 +119,7 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ pipeline_proofs.rs passed
 echo.
 
-echo [8/8] orbital_state_proofs.rs — OrbitalState safety proofs (8 harnesses)
+echo [8/9] orbital_state_proofs.rs — OrbitalState safety proofs (8 harnesses)
 cargo kani -p kelvin-core --harness verify_chaotic_default_body_count %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_step_counter_type %KANI_ARGS%
 cargo kani -p kelvin-core --harness verify_verlet_step_no_panic_single_body %KANI_ARGS%
@@ -132,8 +132,18 @@ if errorlevel 1 exit /b %errorlevel%
 echo   ✓ orbital_state_proofs.rs passed
 echo.
 
+echo [9/9] information_loss.rs — C1 information loss proofs (3 harnesses)
+cargo kani -p kelvin-core --harness verify_c1_preimage_bound %KANI_ARGS%
+if errorlevel 1 exit /b %errorlevel%
+cargo kani -p kelvin-core --harness verify_c1_epsilon_bound %KANI_ARGS%
+if errorlevel 1 exit /b %errorlevel%
+cargo kani -p kelvin-core --harness verify_c1_division_remainder %KANI_ARGS%
+if errorlevel 1 exit /b %errorlevel%
+echo   ✓ information_loss.rs passed
+echo.
+
 echo ===============================================================================
-echo  ALL PROOFS PASSED — 59/59 harnesses verified
+echo  ALL PROOFS PASSED — 62/62 harnesses verified
 echo ===============================================================================
 exit /b 0
 
@@ -231,5 +241,10 @@ echo    verify_pipeline_invariants
 echo    verify_extract_domain_sep_symbolic
 echo    verify_simulate_loop_equivalence
 echo.
-echo  Total: 59 harnesses (56 previous + 3 L3 pipeline proofs)
+echo  information_loss.rs (3) — C1 Information Loss:
+echo    verify_c1_preimage_bound
+echo    verify_c1_epsilon_bound
+echo    verify_c1_division_remainder
+echo.
+echo  Total: 62 harnesses (59 previous + 3 C1 information loss proofs)
 exit /b 0

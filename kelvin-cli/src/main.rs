@@ -22,7 +22,6 @@
 //! Integration defaults to Verlet (energy-conserving). Use `--euler`
 //! for numerically unstable integration (faster chaos amplification).
 
-#![deny(unsafe_code)]
 #![forbid(unsafe_code)]
 
 mod bench;
