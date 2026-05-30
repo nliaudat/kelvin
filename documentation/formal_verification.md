@@ -168,6 +168,8 @@ Five proof harnesses are implemented in `proofs/kani/acceleration_proofs.rs`:
 
 ## L1': Information Loss Analysis — Per-Step Irreversibility (Conjecture C1)
 
+> **Results:** `proofs/kani/results/c1_validation.log`
+
 ### Motivation
 
 The existing L1 and L2 proofs verify that each fixed-point operation
@@ -368,6 +370,8 @@ For C1 to be a complete rigorous proof, the following remain:
 
 ## L2': Lyapunov Exponent Certification — Chaotic Divergence (Conjecture C2)
 
+> **Results:** `proofs/kani/results/c2_validation.log`
+
 ### Motivation
 
 The C1 information loss analysis proves deterministic inversion is
@@ -513,6 +517,8 @@ evidence for $D_{KY}$ but does not constitute a formal proof.
 
 ## L3': Sequential Quantum Hardness — Preimage Analysis (Conjecture C3)
 
+> **Results:** `proofs/kani/results/c3_validation.log`
+
 ### Motivation
 
 C1 and C2 establish that the fixed-point Verlet map $\Phi: X \to X$
@@ -578,6 +584,8 @@ the quantum query lower bound exponent $k$ from empirical data.
 | 3. Relate $k$ to C1's per-operation $\varepsilon$-bound | $\leftarrow$ Needs formal connection | Links C3 to C1's proven preimage bounds |
 
 ## L4': Keystream Indistinguishability — Cryptographic Reduction (Conjecture C4)
+
+> **Results:** `proofs/kani/results/c4_validation.log`
 
 ### Motivation
 
@@ -660,6 +668,8 @@ keystream, measures avalanche effect (target: 50% bit flips for
 | 3. Domain separation collision resistance | $\leftarrow$ Verified for 2 separators | Extend to all modes (Chaos, Photon, etc.) |
 
 ## C5: Configuration Space Cardinality — Brute-Force Resistance (Conjecture C5)
+
+> **Results:** `proofs/kani/results/c5_validation.log`
 
 ### Motivation
 
