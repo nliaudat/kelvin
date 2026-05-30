@@ -22,7 +22,9 @@ fn main() {
         std::process::exit(1);
     }
 
-    unsafe { std::ptr::write_bytes(ptr, 0xAB, page_size); }
+    unsafe {
+        std::ptr::write_bytes(ptr, 0xAB, page_size);
+    }
 
     let verify = unsafe { std::ptr::read(ptr) };
     if verify != 0xAB {
@@ -77,10 +79,15 @@ fn allocate_unix(size: usize) -> *mut u8 {
             size,
             libc::PROT_READ | libc::PROT_WRITE,
             libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-            -1, 0,
+            -1,
+            0,
         )
     };
-    if raw == libc::MAP_FAILED { std::ptr::null_mut() } else { raw as *mut u8 }
+    if raw == libc::MAP_FAILED {
+        std::ptr::null_mut()
+    } else {
+        raw as *mut u8
+    }
 }
 
 #[cfg(not(target_os = "windows"))]
