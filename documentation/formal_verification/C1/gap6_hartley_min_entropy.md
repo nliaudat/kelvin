@@ -18,7 +18,7 @@ where:
 - `H₀(P_S) = log₂(supp(P_S))` is the Hartley entropy (log of support size)
 - `H∞(P_S) = −log₂(max_y p_S(y))` is the min-entropy
 - `δ = log₂( max_y p_S(y) · |X| / |Φ^(−S)({y})| )` is the uniformity deviation
-- The deviation `δ` is bounded by `δ ≤ ε_pop · log₂(MAX/MIN) ≤ 1 / log₂(MAX/MIN)`
+- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≤ 1 / log₂(MAX/MIN)` where `ε = 1 / log₂(MAX/MIN)`
 
 For the standard 5-body Verlet configuration, **δ ≤ 0.0197**, giving:
 

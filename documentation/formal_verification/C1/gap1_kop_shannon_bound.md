@@ -20,7 +20,7 @@ For a Q32.64 fixed-point division `q = g / dist_cubed` where:
 
 Then the per-operation information loss `k_op` satisfies:
 
-$$\boxed{k_op \geq 1 \text{ bit}}$$
+$$\boxed{k_{\text{op}} \geq 1 \text{ bit}}$$
 
 Equivalently: each fixed-point division irreversibly discards at least 1 bit of Shannon
 entropy about the system state.
@@ -128,7 +128,7 @@ The Verlet integrator (default) computes `N(N−1)/2` pairwise accelerations per
 to `compute_accelerations`, each involving 1 division and 1 square root (both
 rounding operations). The acceleration is computed **twice** per step (kick-drift-kick).
 
-$$k_{\text{step}} = 2 \times N(N-1) \times (k_{div} + k_{sqrt}) \geq 2N(N-1) \text{ bits}$$
+$$k_{\text{step}} = N(N-1) \times (k_{\text{div}} + k_{\text{sqrt}}) \geq 2N(N-1) \text{ bits}$$
 
 For the square root operation, an analogous argument applies: the binary digit-by-digit
 algorithm discards a remainder that depends on the LSB of the input, contributing an

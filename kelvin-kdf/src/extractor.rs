@@ -195,10 +195,7 @@ mod kani_proofs {
         kani::assert(out1 == out2, "C4-extract: deterministic (same input → same output)");
 
         // Both outputs must be non-zero (not uninitialized memory)
-        kani::cover(
-            out1 != [0u8; 32],
-            "C4-cover: extraction produces non-zero output",
-        );
+        kani::cover(out1 != [0u8; 32], "C4-cover: extraction produces non-zero output");
     }
 
     // ── Harness 2: Domain Separation ─────────────────────────────────
@@ -231,20 +228,11 @@ mod kani_proofs {
         // for the same orbital state. If this fails, the domain
         // separation is ineffective and different modes would produce
         // the same keystream.
-        kani::assert(
-            out_a != out_b,
-            "C4-domain: different separators produce different outputs",
-        );
+        kani::assert(out_a != out_b, "C4-domain: different separators produce different outputs");
 
         // Both outputs must be non-zero
-        kani::cover(
-            out_a != [0u8; 32],
-            "C4-cover: domain A produces non-zero output",
-        );
-        kani::cover(
-            out_b != [0u8; 32],
-            "C4-cover: domain B produces non-zero output",
-        );
+        kani::cover(out_a != [0u8; 32], "C4-cover: domain A produces non-zero output");
+        kani::cover(out_b != [0u8; 32], "C4-cover: domain B produces non-zero output");
     }
 }
 

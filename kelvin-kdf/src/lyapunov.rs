@@ -345,8 +345,8 @@ impl fmt::Display for LyapunovError {
 // Run with: cargo kani -p kelvin-kdf
 #[cfg(kani)]
 mod kani_proofs {
-    use kelvin_core::{Fixed, OrbitalBody, Vec3, verlet_step};
-    use kelvin_core::constants::{SOFTENING_FACTOR, DEFAULT_DT, DEFAULT_G};
+    use kelvin_core::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
+    use kelvin_core::{verlet_step, Fixed, OrbitalBody, Vec3};
 
     // ── Harness 1: Padé ln numerical behavior ─────────────────────────
     //
@@ -366,13 +366,10 @@ mod kani_proofs {
         let pade = two * num / den;
 
         kani::assert(pade >= Fixed::ZERO, "C2-Pade: non-negative for x ≥ 1");
-        kani::assert(
-            x == Fixed::ONE || pade > Fixed::ZERO,
-            "C2-Pade: positive for x > 1",
-        );
+        kani::assert(x == Fixed::ONE || pade > Fixed::ZERO, "C2-Pade: positive for x > 1");
 
-        let pade_at_10 = two * (Fixed::from_int(10) - Fixed::ONE)
-            / (Fixed::from_int(10) + Fixed::ONE);
+        let pade_at_10 =
+            two * (Fixed::from_int(10) - Fixed::ONE) / (Fixed::from_int(10) + Fixed::ONE);
         let ln_10 = Fixed::from_parts(2, 0x26E978D4FDF3B646);
         kani::assert(
             pade_at_10 < ln_10,
@@ -398,14 +395,8 @@ mod kani_proofs {
         let time = Fixed::from_raw(time_raw);
         let lyapunov = ln_ratio / time;
 
-        kani::assert(
-            lyapunov >= Fixed::ZERO,
-            "C2-div: Lyapunov exponent is non-negative",
-        );
-        kani::assert(
-            lyapunov.to_raw() < i128::MAX / 2,
-            "C2-div: Lyapunov exponent is finite",
-        );
+        kani::assert(lyapunov >= Fixed::ZERO, "C2-div: Lyapunov exponent is non-negative");
+        kani::assert(lyapunov.to_raw() < i128::MAX / 2, "C2-div: Lyapunov exponent is finite");
     }
 
     // ── Harness 3: Perturbation linear regime ──────────────────────────
@@ -450,10 +441,7 @@ mod kani_proofs {
 
         kani::assert(divergence >= Fixed::ZERO, "C2-pert: divergence non-negative");
         kani::assert(divergence > Fixed::ZERO, "C2-pert: divergence non-zero");
-        kani::assert(
-            divergence < ref_motion * Fixed::from_int(100),
-            "C2-pert: divergence bounded",
-        );
+        kani::assert(divergence < ref_motion * Fixed::from_int(100), "C2-pert: divergence bounded");
     }
 }
 

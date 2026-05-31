@@ -12,8 +12,7 @@
 //! Usage: cargo run -p quantum_hardness
 
 use kelvin_core::{
-    simulate, Fixed, OrbitalBody, Vec3,
-    DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
+    simulate, Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
 };
 use std::fs;
 use std::path::Path;
@@ -78,27 +77,39 @@ fn create_config(n: usize) -> Vec<OrbitalBody> {
     match n {
         3 => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(-3), Fixed::from_int(4), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO)),
+                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO),
+            ),
         ],
         _ => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(5000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(5000),
                 Vec3::new(Fixed::from_int(-4), Fixed::from_int(3), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(0), Fixed::from_int(-6), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(20000),
+                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(20000),
                 Vec3::new(Fixed::from_int(7), Fixed::from_int(2), Fixed::from_int(1)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0))),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0)),
+            ),
         ],
     }
 }
@@ -126,13 +137,24 @@ fn measure_collision_rate(steps: u64, trials: usize) -> (f64, f64) {
 
         let mut max_diff = 0u64;
         for i in 0..N_BODIES.min(ref_bodies.len()) {
-            let dx = (ref_bodies[i].position.x - pert_bodies[i].position.x).abs().to_raw().unsigned_abs() as u64;
-            let dy = (ref_bodies[i].position.y - pert_bodies[i].position.y).abs().to_raw().unsigned_abs() as u64;
-            let dz = (ref_bodies[i].position.z - pert_bodies[i].position.z).abs().to_raw().unsigned_abs() as u64;
+            let dx = (ref_bodies[i].position.x - pert_bodies[i].position.x)
+                .abs()
+                .to_raw()
+                .unsigned_abs() as u64;
+            let dy = (ref_bodies[i].position.y - pert_bodies[i].position.y)
+                .abs()
+                .to_raw()
+                .unsigned_abs() as u64;
+            let dz = (ref_bodies[i].position.z - pert_bodies[i].position.z)
+                .abs()
+                .to_raw()
+                .unsigned_abs() as u64;
             max_diff = max_diff.max(dx).max(dy).max(dz);
         }
         total_diff += max_diff as f64;
-        if max_diff <= 2 { collisions += 1; }
+        if max_diff <= 2 {
+            collisions += 1;
+        }
     }
     (collisions as f64 / trials as f64, total_diff / trials as f64)
 }
@@ -150,7 +172,11 @@ fn measure_preimage_cardinalities(trials: usize) -> Vec<usize> {
         for delta in 0..10 {
             let mut pert = bodies.clone();
             let pert_x = base_x + Fixed::from_raw(delta);
-            pert[0] = OrbitalBody::new(pert[0].mass, Vec3::new(pert_x, pert[0].position.y, pert[0].position.z), pert[0].velocity);
+            pert[0] = OrbitalBody::new(
+                pert[0].mass,
+                Vec3::new(pert_x, pert[0].position.y, pert[0].position.z),
+                pert[0].velocity,
+            );
             simulate(&mut pert, 3, dt, softening, g);
             outputs.push(pert);
         }
@@ -158,10 +184,21 @@ fn measure_preimage_cardinalities(trials: usize) -> Vec<usize> {
         let mut collision_count = 0;
         for i in 0..outputs.len() {
             for j in (i + 1)..outputs.len() {
-                let dx = (outputs[i][0].position.x - outputs[j][0].position.x).abs().to_raw().unsigned_abs() as u64;
-                let dy = (outputs[i][0].position.y - outputs[j][0].position.y).abs().to_raw().unsigned_abs() as u64;
-                let dz = (outputs[i][0].position.z - outputs[j][0].position.z).abs().to_raw().unsigned_abs() as u64;
-                if dx.max(dy).max(dz) <= 2 { collision_count += 1; }
+                let dx = (outputs[i][0].position.x - outputs[j][0].position.x)
+                    .abs()
+                    .to_raw()
+                    .unsigned_abs() as u64;
+                let dy = (outputs[i][0].position.y - outputs[j][0].position.y)
+                    .abs()
+                    .to_raw()
+                    .unsigned_abs() as u64;
+                let dz = (outputs[i][0].position.z - outputs[j][0].position.z)
+                    .abs()
+                    .to_raw()
+                    .unsigned_abs() as u64;
+                if dx.max(dy).max(dz) <= 2 {
+                    collision_count += 1;
+                }
             }
         }
         cardinalities.push(collision_count);

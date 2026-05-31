@@ -817,10 +817,7 @@ mod kani_proofs {
             }
         }
 
-        kani::assert(
-            preimage_count <= 9,
-            "C1: local preimage count at softening limit ≤ 9",
-        );
+        kani::assert(preimage_count <= 9, "C1: local preimage count at softening limit ≤ 9");
 
         kani::cover(
             preimage_count == 0,
@@ -901,8 +898,8 @@ mod kani_proofs {
     // a small rounding tolerance, not by the full ULP difference.
     #[kani::proof]
     fn verify_c3_step_non_injective() {
-        use crate::{OrbitalBody, Vec3, verlet_step};
-        use crate::constants::{SOFTENING_FACTOR, DEFAULT_DT, DEFAULT_G};
+        use crate::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
+        use crate::{verlet_step, OrbitalBody, Vec3};
 
         // Base symbolic position for body 1
         let bx_raw: i128 = kani::any();
@@ -964,10 +961,7 @@ mod kani_proofs {
 
         // Cover: the two outputs are exactly equal (true collision)
         if diff_x == Fixed::ZERO && diff_y == Fixed::ZERO && diff_z == Fixed::ZERO {
-            kani::cover(
-                true,
-                "C3-cover: exact collision (1-ULP difference vanishes after 1 step)",
-            );
+            kani::cover(true, "C3-cover: exact collision (1-ULP difference vanishes after 1 step)");
         }
     }
 
@@ -984,8 +978,8 @@ mod kani_proofs {
     // of the 4 outputs converge to within 2 ULPs.
     #[kani::proof]
     fn verify_c3_two_step_preimage_growth() {
-        use crate::{OrbitalBody, Vec3, verlet_step};
-        use crate::constants::{SOFTENING_FACTOR, DEFAULT_DT, DEFAULT_G};
+        use crate::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
+        use crate::{verlet_step, OrbitalBody, Vec3};
 
         let mass_sun = Fixed::ONE;
         let mass_planet = Fixed::from_raw(1 << 50);
@@ -1005,40 +999,47 @@ mod kani_proofs {
             // S0: base
             [
                 OrbitalBody::new(mass_sun, base_pos, Vec3::ZERO),
-                OrbitalBody::new(mass_planet,
+                OrbitalBody::new(
+                    mass_planet,
                     Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
                     Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
                 ),
             ],
             // S1: +1 ULP in x
             [
-                OrbitalBody::new(mass_sun,
+                OrbitalBody::new(
+                    mass_sun,
                     Vec3::new(Fixed::from_raw(bx_raw + 1), Fixed::ZERO, Fixed::ZERO),
                     Vec3::ZERO,
                 ),
-                OrbitalBody::new(mass_planet,
+                OrbitalBody::new(
+                    mass_planet,
                     Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
                     Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
                 ),
             ],
             // S2: +1 ULP in y
             [
-                OrbitalBody::new(mass_sun,
+                OrbitalBody::new(
+                    mass_sun,
                     Vec3::new(Fixed::from_raw(bx_raw), Fixed::from_raw(1), Fixed::ZERO),
                     Vec3::ZERO,
                 ),
-                OrbitalBody::new(mass_planet,
+                OrbitalBody::new(
+                    mass_planet,
                     Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
                     Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
                 ),
             ],
             // S3: +1 ULP in z
             [
-                OrbitalBody::new(mass_sun,
+                OrbitalBody::new(
+                    mass_sun,
                     Vec3::new(Fixed::from_raw(bx_raw), Fixed::ZERO, Fixed::from_raw(1)),
                     Vec3::ZERO,
                 ),
-                OrbitalBody::new(mass_planet,
+                OrbitalBody::new(
+                    mass_planet,
                     Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
                     Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
                 ),

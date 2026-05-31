@@ -3,8 +3,7 @@
 //! Usage: cargo run -p information_loss
 
 use kelvin_core::{
-    compute_accelerations, simulate, Fixed, OrbitalBody, Vec3,
-    DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
+    simulate, Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -71,27 +70,39 @@ fn create_standard_config(n: usize) -> Vec<OrbitalBody> {
     match n {
         3 => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(-3), Fixed::from_int(4), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO)),
+                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO),
+            ),
         ],
         _ => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(5000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(5000),
                 Vec3::new(Fixed::from_int(-4), Fixed::from_int(3), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(0), Fixed::from_int(-6), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(20000),
+                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(20000),
                 Vec3::new(Fixed::from_int(7), Fixed::from_int(2), Fixed::from_int(1)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0))),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0)),
+            ),
         ],
     }
 }
@@ -103,7 +114,11 @@ struct InstrumentedResults {
 }
 
 fn run_instrumented_simulation(
-    mut bodies: Vec<OrbitalBody>, steps: u64, dt: Fixed, softening: Fixed, g: Fixed,
+    mut bodies: Vec<OrbitalBody>,
+    steps: u64,
+    dt: Fixed,
+    softening: Fixed,
+    g: Fixed,
 ) -> InstrumentedResults {
     let n = bodies.len();
     let softening_sq = softening * softening;
@@ -112,7 +127,6 @@ fn run_instrumented_simulation(
     let mut factor_values = Vec::new();
     for step in 0..steps {
         let sample = step % SAMPLE_INTERVAL == 0;
-        let _accs = compute_accelerations(&bodies, softening, g);
         if sample {
             for i in 0..n {
                 for j in (i + 1)..n {
@@ -133,51 +147,78 @@ fn run_instrumented_simulation(
 }
 
 fn estimate_shannon_entropy(values: &[i128], bucket: u32) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     let mut freq: HashMap<i128, usize> = HashMap::new();
-    for &v in values { *freq.entry(v >> bucket).or_insert(0) += 1; }
+    for &v in values {
+        *freq.entry(v >> bucket).or_insert(0) += 1;
+    }
     let total = values.len() as f64;
     let mut h = 0.0_f64;
-    for &c in freq.values() { let p = c as f64 / total; if p > 0.0 { h -= p * p.log2(); } }
+    for &c in freq.values() {
+        let p = c as f64 / total;
+        if p > 0.0 {
+            h -= p * p.log2();
+        }
+    }
     h
 }
 
 fn estimate_max_preimage(values: &[i128]) -> usize {
-    if values.is_empty() { return 0; }
+    if values.is_empty() {
+        return 0;
+    }
     let mut freq: HashMap<i128, usize> = HashMap::new();
-    for &v in values { *freq.entry(v).or_insert(0) += 1; }
+    for &v in values {
+        *freq.entry(v).or_insert(0) += 1;
+    }
     freq.values().copied().max().unwrap_or(0)
 }
 
 fn kolmogorov_smirnov_uniform(values: &[i128]) -> (f64, f64) {
-    if values.len() < 5 { return (1.0, 0.0); }
+    if values.len() < 5 {
+        return (1.0, 0.0);
+    }
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
     let n = sorted.len() as f64;
     let min_val = sorted[0];
     let max_val = sorted[sorted.len() - 1];
     let range = (max_val - min_val) as f64;
-    if range <= 0.0 { return (1.0, 0.0); }
+    if range <= 0.0 {
+        return (1.0, 0.0);
+    }
     let mut d_max = 0.0_f64;
     for (i, &val) in sorted.iter().enumerate() {
         let d = ((i + 1) as f64 / n - (val - min_val) as f64 / range).abs();
-        if d > d_max { d_max = d; }
+        if d > d_max {
+            d_max = d;
+        }
     }
     let sqrt_n = (n as f64).sqrt();
     let lambda = (sqrt_n + 0.12 + 0.11 / sqrt_n) * d_max;
-    (d_max, 2.0 * (1.0 - kolmogorov_cdf(lambda)))
+    (d_max, 1.0 - kolmogorov_cdf(lambda))
 }
 
 fn kolmogorov_cdf(lambda: f64) -> f64 {
-    if lambda <= 0.0 { return 0.0; }
+    if lambda <= 0.0 {
+        return 0.0;
+    }
     if lambda > 2.0 {
         let mut sum = 0.0_f64;
         for k in 1..=50 {
             let term = (-2.0 * (k as f64).powi(2) * lambda * lambda).exp();
-            if term < 1e-15 { break; }
-            if k % 2 == 1 { sum += term; } else { sum -= term; }
+            if term < 1e-15 {
+                break;
+            }
+            if k % 2 == 1 {
+                sum += term;
+            } else {
+                sum -= term;
+            }
         }
-        2.0 * sum
+        1.0 - 2.0 * sum
     } else {
         let mut sum = 0.0_f64;
         let sqrt_2pi = (2.0 * std::f64::consts::PI).sqrt();
@@ -185,7 +226,9 @@ fn kolmogorov_cdf(lambda: f64) -> f64 {
             let exponent = -(2.0 * k as f64 - 1.0).powi(2) * std::f64::consts::PI.powi(2)
                 / (8.0 * lambda * lambda);
             let term = exponent.exp();
-            if term < 1e-15 { break; }
+            if term < 1e-15 {
+                break;
+            }
             sum += term;
         }
         sqrt_2pi / lambda * sum
