@@ -45,23 +45,27 @@ The Lyapunov exponent measures how fast nearby trajectories diverge. Euler's num
 | Steps for 256-bit entropy | ~2,560 steps | ~25,600 steps |
 | Energy drift | 1% per 1000 steps | 0.0001% per 1000 steps |
 
-### 3. Harder to Reverse = One-Way Function Property
+### 3. Harder to Reverse = Numerical Irreversibility
 
-Verlet integration is symplectic — it preserves phase-space volume and is theoretically reversible. Given the full state, you can run Verlet backwards to recover previous states. Euler's numerical dissipation makes this practically impossible: information is lost at each step through energy drift, creating a natural one-way function.
+Verlet integration is symplectic — it preserves phase-space volume and is theoretically reversible. Given the full state, you can run Verlet backwards to recover previous states. Euler's numerical dissipation makes this practically impossible for a backward integrator: information is lost at each step through energy drift.
 
-### 4. Faster Divergence = More Entropy Per CPU Cycle
+> ⚠️ **Important caveat**: Numerical irreversibility is **not** the same as a cryptographic one-way function. An attacker does not need to run the integrator backwards. The attacker runs the integrator **forwards** over candidate initial conditions — exactly the same operation as the legitimate party. Numerical dissipation makes the integrator non-invertible as a mathematical map, but this does **not** make the forward search problem any harder. The "one-way function" property Kelvin needs is that recovering initial conditions from observed output is computationally hard — this is a conjecture about forward search, not a consequence of backward irreversibility.
 
-Euler uses a smaller timestep (dt=0.001 vs Verlet's dt=0.01) for stability, but the per-step cost is ~20% lower (one acceleration computation vs two). Combined with the 10x faster chaos amplification, Euler produces usable entropy ~13x faster than Verlet.
+### 4. Faster Divergence = More Trajectory Divergence Per CPU Cycle
+
+Euler uses a smaller timestep (dt=0.001 vs Verlet's dt=0.01) for stability, but the per-step cost is ~20% lower (one acceleration computation vs two). Combined with the 10x faster chaos amplification, Euler produces usable trajectory divergence ~13x faster than Verlet.
+
+> ⚠️ **Important caveat**: The metrics below measure **trajectory divergence** (how fast nearby trajectories separate), not cryptographic entropy. A deterministic computation, no matter how divergent, has zero bits of min-entropy — the output is fully determined by the input. Trajectory divergence complicates search but does not add entropy to the system. The "Steps for 256-bit security" figures are estimates of how many simulation steps are needed before small initial differences produce completely different states — they are NOT bits of cryptographic min-entropy.
 
 | Metric¹ | Euler (dt=0.001) | Verlet (dt=0.01) | Winner |
 |---|---|---|---|
-| Steps for 256-bit entropy | ~2,560 | ~25,600 | Euler (10x faster) |
+| Steps for trajectory decorrelation | ~2,560 (estimate) | ~25,600 (estimate) | Euler (10x faster) |
 | Time per step | ~80ns | ~100ns | Euler (20% faster) |
-| Time to 256-bit entropy | ~0.2ms | ~2.6ms | Euler (13x faster) |
-| Numerical reversibility | ❌ Impossible | ⚠️ Possible | Euler (more secure) |
+| Time to trajectory decorrelation | ~0.2ms | ~2.6ms | Euler (13x faster) |
+| Numerical reversibility | ❌ Impossible | ⚠️ Possible | Euler |
 | Determinism | ✅ Yes | ✅ Yes | Draw |
 
-> ¹ Note: Euler uses a 10× smaller timestep than Verlet for numerical stability. When comparing at equal physical simulation time, Euler requires 10× more steps than Verlet. The per-step comparisons above reflect cost per step, not per unit of simulated physical time.
+> ¹ Note: Euler uses a 10× smaller timestep than Verlet for numerical stability. When comparing at equal physical simulation time, Euler requires 10× more steps than Verlet. The per-step comparisons above reflect cost per step, not per unit of simulated physical time. "Trajectory decorrelation" means initial-condition divergence reaches a threshold where the state is decorrelated from initial values — this is a physical chaos property, not cryptographic entropy.
 
 ## Implementation
 

@@ -4,10 +4,14 @@
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](licence.md)
 [![Crates.io](https://img.shields.io/crates/v/kelvin.svg)](https://crates.io/crates/kelvin)
 
+> **Project Name:** kelvin — **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
+> *A chaotic 3D n-body gravitational key derivation system*
+> *Three bodies. Infinite chaos.*
+
 > **⚠️ EXPERIMENTAL — Not for production use.** This is a research cryptosystem.
 > It has not undergone formal cryptanalysis. See [Security](#security) for details.
 
-Kelvin is a **quantum-resistant stream cipher** and **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**. It transforms a shared orbital configuration (masses, positions, velocities) into a cryptographic keystream by simulating chaotic gravitational dynamics and extracting entropy via SHAKE256. The XOR-based modes produce a keystream with OTP-like properties (no nonce, no IV, key length = plaintext length) but are computational stream ciphers, not information-theoretic one-time pads.
+Kelvin is a **quantum-resistant stream cipher** and **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**. It transforms a shared orbital configuration (masses, positions, velocities) into a cryptographic keystream by simulating chaotic gravitational dynamics and extracting entropy via SHAKE256. The XOR-based modes are computational stream ciphers: no nonce, no IV, keystream length = plaintext length.
 
 The core insight: the n-body problem has no closed-form solution for N ≥ 3. Under the assumption that the n-body simulation is a one-way function (an unproven conjecture, see [Security Assumptions](documentation/security_assumptions.md)), an attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
@@ -95,22 +99,15 @@ The resulting keystream is used as a **quantum-resistant stream cipher**: data i
 
 Kelvin's V2 (Chaos), V3 (Photon), H (Quantum), Prism, Split, and Flare modes are all **XOR-based stream ciphers**. Unlike traditional stream ciphers (ChaCha20, AES-CTR) that require a nonce/IV, Kelvin derives its keystream entirely from the orbital configuration — there is no nonce to manage, rotate, or accidentally reuse.
 
-This is structurally similar to a one-time pad (OTP) in its XOR mechanics and nonce-less design, but it is **not** an information-theoretic OTP. Per the [Wikipedia definition](https://en.wikipedia.org/wiki/One-time_pad), a true OTP requires four conditions — and Kelvin satisfies three of them:
+In a standard nonce-based stream cipher, encrypting the same data twice under the same key with different nonces produces different ciphertexts. Kelvin achieves this differently: the orbital configuration acts as both key and context — each instance consumes its keystream sequentially through key schedule reseeding, so two different messages encrypted with the same config at different step counts produce different keystream segments.
 
-| # | Condition | Kelvin's Approach | Status |
-|---|-----------|-------------------|--------|
-| 1 | **Key ≥ plaintext** | SHAKE256 XOF produces unlimited keystream — always exactly as long as the plaintext | ✅ **Satisfied** |
-| 2 | **Truly random** | SHAKE256 is computationally indistinguishable from random (NIST PQC standard); n-body chaos provides physical entropy input | ⚠️ **Computationally random** (not information-theoretically random, but indistinguishable by any known polynomial-time adversary) |
-| 3 | **Never reused** | Key schedule enforces forward secrecy via BLAKE3 reseeding — each key is unique | ✅ **Satisfied** |
-| 4 | **Kept secret** | Orbital config (~2 KB) is the shared secret — protect it like any symmetric key | ✅ **Satisfied** |
-
-Condition 2 is the key distinction: Kelvin's keystream is **computationally** indistinguishable from random via SHAKE256, not **information-theoretically** random. This makes Kelvin a stream cipher with OTP-like properties — not a true OTP. For any real-world adversary, computational indistinguishability via SHAKE256 (NIST FIPS 202) is cryptographically equivalent.
+> ⚠️ **Important caveat**: The absence of a nonce means there is no built-in defense against config reuse between instances. Loading the same orbital configuration into two separate `Kelvin` instances and encrypting different data with each produces identical keystream prefixes — this is the two-time pad problem. Users MUST ensure each orbital configuration is used by at most one `Kelvin` instance.
 
 Unlike block ciphers (AES) or nonce-based stream ciphers (ChaCha20), Kelvin modes have:
 
-- **No nonce to manage** — no catastrophic nonce reuse vulnerability
+- **No nonce to manage** — uniqueness is achieved through per-instance key schedule consumption (see caveat above)
 - **No padding or IV** — ciphertext length = plaintext length
-- **No algebraic structure** — nothing for Shor's algorithm to factor or lattice reduction to exploit
+- **No algebraic structure** — nothing for Shor's algorithm to factor or lattice reduction to exploit (this is true of all symmetric stream ciphers, not unique to Kelvin)
 - **Quantum-resistant foundation** — SHAKE256 (NIST PQC) has no known quantum shortcut beyond Grover's (128-bit effective)
 - **Malleability is the only attack** — use `--auth` (KMAC128) to defeat it
 
@@ -133,10 +130,13 @@ See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.m
 - **NIST SP 800-90B compliance**: Built-in health tests (repetition, adaptive proportion, runs, longest run, Shannon entropy, chi-square, correlation)
 - **NIST SP 800-22 compliance**: All 15 statistical tests pass on orbital keystream
 - **Post-quantum identity**: ML-DSA-65 (FIPS 204) signatures + ML-KEM-768 (FIPS 203) key encapsulation
+- **⚠️ Reseeding note**: The SHAKE256 reseeding is a deterministic transformation — it cannot break finite-precision periodicity in the orbital simulation. See [Finite Precision Analysis](documentation/proof_of_concept.md#48-finite-precision-periodicity-analysis-cang-et-al-2021--unsolved-concern).
 
 ### What Kelvin Does NOT Provide
 
 - **Reduction to a standard hard problem**: No reduction to lattices, discrete log, or similar. Security estimates (C1–C5: information loss, Lyapunov certification, quantum hardness Ω(2⁹⁶⁰), keystream indistinguishability, configuration space ≥ 2¹⁹²⁰) are derived from physical chaos assumptions rather than algebraic hardness. These are plausibility arguments based on chaotic dynamics and SHAKE256 indistinguishability — not formal security reductions.
+  - The ≥ 2¹⁹²⁰ config space figure is an estimate (≈ 40 effective bits × ~48 independent fields). See [Stream Cipher Security Analysis](documentation/stream_cipher_security.md) for the full derivation context.
+- **Effective security bound**: All security levels (Standard/Paranoid/Maximum) are bounded by SHAKE256's 128-bit post-quantum effective security. Additional simulation steps increase setup cost but do not raise this bound.
 - **Key exchange**: OrbitalConfig must be established out-of-band
 - **Memory hardness**: Not a memory-hard KDF (no large memory requirements). The n-body simulation is inherently sequential (each step depends on prior state), preventing GPU/ASIC speedup within a single run. Brute-force parallelism across independent guesses is possible, but the computational asymmetry and ≥ 2¹⁹²⁰ keyspace bound make this infeasible.
 - **Information-theoretic security**: Kelvin's XOR modes are computational stream ciphers — keystream indistinguishability is bounded by C4 (Adv(A) ≤ negl(n) + 2⁻⁹⁶⁰). True information-theoretic security requires statistically perfect key randomness equal to message length, which no practical cryptosystem provides. For any real-world adversary, computational indistinguishability via SHAKE256 (NIST FIPS 202) is cryptographically equivalent. See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.md) for the full argument.

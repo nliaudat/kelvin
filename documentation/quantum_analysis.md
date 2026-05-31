@@ -64,11 +64,13 @@ The core of Kelvin is the high-dimensional chaotic state space of the n-body pro
 
 #### 2.3.1 Deep Physical Binding
 
-The entropy extraction process has been hardened with **Deep Physical Binding** — the hash chain now includes not only the orbital state (positions, velocities, masses) but also:
+The entropy extraction process includes **Deep Physical Binding** — the hash chain includes not only the orbital state (positions, velocities, masses) but also additional components for domain separation and consistency:
 
-- **Physical Constants**: The gravitational constant $G$ and softening factor $\varepsilon$ are hashed into every seed. This prevents quantum "shortcut" attacks that might attempt to model the orbital evolution using a different set of physical laws.
-- **Instantaneous Force Vectors**: The acceleration vector $\mathbf{a}_i$ acting on each body at the extraction step is computed via `compute_accelerations()` and hashed alongside the body data. This binds the seed to the *interactions* between bodies, not just their positions.
+- **Physical Constants**: The gravitational constant $G$ and softening factor $\varepsilon$ are hashed into every seed. This ensures the seed is bound to the specific physical parameters used in the simulation, preventing accidental collisions between different parameter choices.
+- **Instantaneous Force Vectors**: The acceleration vector $\mathbf{a}_i$ acting on each body at the extraction step is computed via `compute_accelerations()` and hashed alongside the body data. This is a redundant inclusion (accelerations are computed from positions and masses) but ensures full state representation.
 - **Domain Separation**: A personalization string ensures that seeds derived for different purposes (e.g., encryption vs. signing) are cryptographically independent.
+
+> ⚠️ **Honest assessment**: These measures provide **domain separation and reproducibility guarantees**, not additional cryptographic security. The physical constants and force vectors are derived from the same orbital state that is already hashed — they contain no independent entropy. An attacker who knows the orbital state knows all of these values. The primary purpose of Deep Physical Binding is to ensure that different modes and parameter sets produce distinct, independent keystreams, which is standard practice in hash-based key derivation.
 
 These measures ensure that even if a quantum adversary could somehow compute the orbital state at a given step, they would still need to invert the SHAKE256 hash to recover the seed — a problem with no known quantum speedup beyond Grover's.
 

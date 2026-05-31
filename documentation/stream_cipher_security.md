@@ -69,15 +69,15 @@ In practice, this distinction is irrelevant for any real adversary:
 
 | Attack | Effort Required | Feasibility | Why |
 |--------|----------------|-------------|-----|
-| **Brute-force orbital config** | 2^1920 (40 bits × 48 fields) | ❌ Infeasible | Configuration space dwarfs AES-256 by orders of magnitude |
+| **Brute-force orbital config** | ~2^1920 (estimate: ~40 effective bits × ~48 fields) | ❌ Infeasible | Estimated config space; effective security bounded by SHAKE256's 128-bit quantum resistance |
 | **Shortcut simulation (classical)** | Unknown — provably no closed form | ❌ Infeasible | N-body has no algebraic shortcut (Poincaré, 1899) |
 | **Shortcut simulation (quantum)** | Unknown — no known quantum algorithm | ❌ No known speedup | Sequential chaos cannot be superposed; each step depends on the previous |
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
 | **Invert SHAKE256 (classical preimage)** | 2^256 | ❌ Infeasible | 256-bit preimage resistance (SHAKE256 capacity) |
-| **Nonce reuse / IV collision** | N/A | ✅ **No nonce exists** | Stream cipher has no nonce — only config reuse matters, which the key schedule prevents |
+| **Nonce reuse / IV collision** | N/A | ⚠️ **No nonce means no guard against config reuse** | Two instances loaded with the same config produce identical keystreams — users must enforce single-instance-per-config |
 | **Malleability (bit-flip)** | Trivial | ⚠️ Mitigated by `--auth` | XOR is malleable; KMAC128 (NIST SP 800-185) defeats this |
 | **Key reuse across messages** | Catastrophic | ❌ Prevented by schedule | Key schedule enforces forward secrecy; each key is derived from a unique reseeded state |
-| **Reverse engineer keystream from ciphertext** | Requires known plaintext | ⚠️ Doesn't reveal other messages | Keystream = ciphertext ⊕ known plaintext, but does not leak other messages or future keys |
+| **Reverse engineer keystream from ciphertext** | Requires known plaintext | ⚠️ Bypasses n-body layer — reduces to SHAKE256 preimage (128-bit quantum) | Keystream = ciphertext ⊕ known plaintext; attacker attacks SHAKE256 directly, n-body simulation provides zero additional protection |
 | **Grover's on ChaCha20 (V1 only)** | 2^128 | ❌ Infeasible | V1 uses ChaCha20; all other modes use SHAKE256 directly |
 
 ---
@@ -146,7 +146,7 @@ Critics may compare Kelvin's modes to stream ciphers like ChaCha20 or AES-CTR. W
 | **Key schedule** | Fixed key stretched via PRF | Chaotic entropy pool with forward-secret reseeding |
 | **Entropy source** | Single seed → deterministic PRF | Continuous fresh entropy from orbital dynamics (V2, H) |
 | **Quantum resistance** | 128-bit (Grover on 256-bit key) | 128-bit (Grover on SHAKE256) — same bound |
-| **Algebraic structure** | ARX construction (add-rotate-xor) | **No algebraic structure** — XOR + hash-based extraction |
+| **Algebraic structure** | ARX construction (add-rotate-xor) | XOR + hash-based extraction (note: this property is common to all symmetric stream ciphers, not unique to Kelvin) |
 
 Kelvin's stream cipher modes are **structurally different** from traditional stream ciphers: they have no nonce, no IV, no algebraic round function, and their entropy is continuously renewed from a physical system with no closed-form solution.
 

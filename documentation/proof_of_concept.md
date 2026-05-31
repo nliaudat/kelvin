@@ -209,12 +209,12 @@ Kelvin already addresses finite precision degradation through several architectu
 | Mitigation | Sprott-A (FPPC) | Kelvin |
 |-----------|-----------------|--------|
 | Period detection | Explicit FPPC algorithm | Not yet implemented |
-| State refresh | Scrambling post-processing | Continuous reseeding via SHAKE256 XOF |
+| State refresh | Scrambling post-processing | Reseeding via SHAKE256 (see caveat below) |
 | Entropy extraction | Binary quantization | 2048-byte domain-separated hash of full orbital state |
 | Forward secrecy | None | BLAKE3 reseed per key |
 | State space | 3 variables × f64 | 30 variables × Q32.64 fixed-point |
 
-**Continuous reseeding** is Kelvin's primary defense. The key schedule refreshes the entropy pool via SHAKE256 at configurable intervals (default: every 10 virtual steps). Even if the orbital state were to enter a short cycle, the reseeding operation mixes in fresh entropy from the hash function's sponge state, breaking any periodicity.
+> ⚠️ **Important caveat on reseeding**: The reseeding operation is a deterministic transformation of deterministic state. SHAKE256 is a function, not an entropy source — it produces the same output from the same input every time. If the orbital state becomes periodic (repeats), the SHAKE256 input repeats, and the reseeding output repeats. **Reseeding cannot break deterministic periodicity** — it only makes cycle detection harder, not the cycle shorter. The actual period of the Q32.64 n-body simulation remains a genuine unsolved concern regardless of reseeding. The primary defense against periodicity is the large state space (~2^64 states per variable), not the reseeding mechanism.
 
 **Lyapunov horizon enforcement** provides a secondary defense. Kelvin rejects configurations where the simulation runs beyond the Lyapunov time (~1,000 steps for standard configurations). This ensures that key material is extracted only from the chaotic regime, before any finite-precision periodicity could manifest.
 
