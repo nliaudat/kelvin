@@ -18,7 +18,7 @@ where:
 - `H₀(P_S) = log₂(supp(P_S))` is the Hartley entropy (log of support size)
 - `H∞(P_S) = −log₂(max_y p_S(y))` is the min-entropy
 - `δ = log₂( max_y p_S(y) · |X| / |Φ^(−S)({y})| )` is the uniformity deviation
-- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≤ 1 / log₂(MAX/MIN)` where `ε = 1 / log₂(MAX/MIN)`
+- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≈ 0.0197` where `ε = 1 / log₂(MAX/MIN)`
 
 For the standard 5-body Verlet configuration, **δ ≤ 0.0197**, giving:
 
@@ -96,7 +96,7 @@ Gap 6 proves that these two measures are nearly identical:
 |---------|-------|-------------|
 | Hartley `H₀` (per-step loss) | `k_step = 40 bits` | Used in analysis |
 | Min-entropy `H∞` (per-step loss) | `k_step − δ ≈ 39.98 bits` | Used in security bounds |
-| Relative difference | `δ / ``k_step`` ≈ 0.05%` | Negligible |
+| Relative difference | `δ / k_step ≈ 0.05%` | Negligible |
 
 ### 3.2 The reduction is:
 
