@@ -1,6 +1,6 @@
 # Euler vs Verlet: Why Numerical Instability Is a Feature for Cryptographic Entropy
 
-> **CLI Usage:** The `--verlet` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--verlet` to select Verlet integration; omit it for the default Euler. The integration method must match between encryption and decryption.
+> **CLI Usage:** The `--euler` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--euler` to select Euler integration; omit it for the default Verlet. The integration method must match between encryption and decryption.
 
 ## The Critical Insight
 
@@ -53,13 +53,15 @@ Verlet integration is symplectic — it preserves phase-space volume and is theo
 
 Euler uses a smaller timestep (dt=0.001 vs Verlet's dt=0.01) for stability, but the per-step cost is ~20% lower (one acceleration computation vs two). Combined with the 10x faster chaos amplification, Euler produces usable entropy ~13x faster than Verlet.
 
-| Metric | Euler (dt=0.001) | Verlet (dt=0.01) | Winner |
+| Metric¹ | Euler (dt=0.001) | Verlet (dt=0.01) | Winner |
 |---|---|---|---|
 | Steps for 256-bit entropy | ~2,560 | ~25,600 | Euler (10x faster) |
 | Time per step | ~80ns | ~100ns | Euler (20% faster) |
 | Time to 256-bit entropy | ~0.2ms | ~2.6ms | Euler (13x faster) |
 | Numerical reversibility | ❌ Impossible | ⚠️ Possible | Euler (more secure) |
 | Determinism | ✅ Yes | ✅ Yes | Draw |
+
+> ¹ Note: Euler uses a 10× smaller timestep than Verlet for numerical stability. When comparing at equal physical simulation time, Euler requires 10× more steps than Verlet. The per-step comparisons above reflect cost per step, not per unit of simulated physical time.
 
 ## Implementation
 
@@ -70,6 +72,10 @@ Euler uses a smaller timestep (dt=0.001 vs Verlet's dt=0.01) for stability, but 
 ///
 /// Uses dt=0.001 (10x smaller than Verlet) for stability,
 /// but energy drift still creates ~10x more trajectory divergence.
+///
+/// NOTE: This is pseudocode for illustrative purposes. The production
+/// implementation uses Q32.64 fixed-point arithmetic (i128-based)
+/// in kelvin-core/src/fixed_math.rs.
 pub fn euler_step(&mut self) -> Result<(), OrbitalError> {
     const DT: f64 = 0.001;
     const G: f64 = 1.0;

@@ -39,7 +39,7 @@ The n-body gravitational simulation amplifies small differences in initial condi
 
 When the key schedule reseeds, the new key is derived from the original seed via BLAKE3. We assume BLAKE3 is a secure PRF, ensuring that compromise of a single session key does not reveal past or future keys.
 
-- **Standard**: BLAKE3 (Baish et al., 2020)
+- **Standard**: BLAKE3 (O'Connor, Aumasson, Neves, & Wilcox-O'Hearn, 2021)
 - **Status**: Fast, well-analyzed hash function
 - **Risk**: A cryptanalytic break of BLAKE3 would compromise forward secrecy guarantees
 
@@ -54,10 +54,7 @@ The Q32.64 fixed-point arithmetic used in the n-body simulation is implemented w
 
 ### No post-quantum authentication (without optional module)
 
-The standard authenticated modes (V1 AEAD, V3/H with BLAKE3-keyed MAC) use classical cryptography for authentication. They are **not** post-quantum secure for authentication purposes. An adversary with a quantum computer could forge MAC tags.
-
-- **Mitigation**: The optional HAWK-512 module (Phase V) provides post-quantum digital signatures
-- **Timeline**: Planned for future release, dependent on NIST PQC standardization
+The V1 (ChaCha20Poly1305) mode uses Poly1305 with a 256-bit ChaCha20-derived key — a quantum adversary gains only Grover's speedup (2^128) to forge tags. The V3/H KMAC128 modes use SHAKE256 (NIST PQC standard), providing 128-bit post-quantum MAC security.
 
 ### No key encapsulation (KEM)
 

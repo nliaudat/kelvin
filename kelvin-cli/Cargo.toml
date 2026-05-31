@@ -3,7 +3,7 @@ name = "kelvin-cli"
 version = "0.1.0"
 edition = "2021"
 description = "CLI tool for Kelvin cryptosystem"
-license = "CC-BY-NC-SA-4.0"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "kelvin"

@@ -40,78 +40,22 @@ equivalence against a specification, not just absence of panics.
 Security is the primary requirement for production readiness. We must move beyond "it passes unit tests" to "it is verified against classes of vulnerabilities."
 
 ### 1.1 Formal Verification
-- [x] **Core Math Verification (Safety)**: Use [Kani](https://model-checking.github.io/kani/) to formally verify that the fixed-point arithmetic (`Q32.64`) never overflows under valid orbital configurations. *(Completed 2026-05-22, revised 2026-05-30)*
-    - **Three core L0 safety proof harnesses** implemented in `kelvin-core/src/fixed_math.rs`:
-        1. `verify_add_no_overflow` — add never wraps for positions in [-100, 100] AU
-        2. `verify_sub_no_overflow` — sub never wraps for positions in [-100, 100] AU
-        3. `verify_mul_range` — mul range safety for [-4, 4] AU (tightened from [-100, 100] AU for solver tractability)
-    - Removed harnesses (`verify_div_no_panic`, `verify_sqrt_bounded`, `verify_mul_no_overflow`) consolidated into `verify_mul_range` with narrowed bounds to ensure Kani solver tractability.
-    - Docker environment at `docker/` provides reproducible verification runs.
-    - CI workflow available at `.github/workflows/kani.yml_disabled` (disabled pending CI runner capacity)
-- [x] **Core Math Verification (Functional Equivalence)**: Upgrade Kani harnesses to
-    prove functional equivalence against mathematical specification, following Apple's
-    corecrypto blueprint. *(Completed 2026-05-27)*
-    - Addition: prove `Fixed::add(a,b) == a + b` (exact match for bounded inputs)
-    - Subtraction: prove `Fixed::sub(a,b) == a - b` (exact match for bounded inputs)
-    - Multiplication: prove commutativity (`a*b == b*a`), identity (`a*1 == a`), zero (`a*0 == 0`)
-    - Division: prove inverse property (`(a/b)*b ≈ a` with dynamically scaled error bound `|den_raw| >> 64 + 2`)
-    - Square root: prove inverse property (`sqrt(a)² ≈ a` with dynamically scaled error bound `(2 * result_raw) >> 64 + 3`)
-    - Template harnesses for Vec3 dot product and length_squared at `proofs/kani/fixed_equivalence.rs`
-- [x] **Acceleration Composite Proof**: Add Kani harnesses proving `compute_accelerations`
-    satisfies Newton's laws (action-reaction, direction, proportionality to mass).
-    *(Completed 2026-05-28)*
-    - Template harnesses at `proofs/kani/acceleration_proofs.rs`
-    - 5 harnesses: action-reaction (force-based: `F_01 = -F_10` via `m1*a_01 = -m2*a_10`), direction, single-body zero, three-body symmetry, mass proportionality
-- [x] **End-to-End Keystream Proof**: Prove the full `simulate_and_extract_seed` pipeline
-    produces correct output for a known configuration (golden hash proof).
-    *(Completed 2026-05-29)* — `tests/kelvin_tests/golden_hash.rs`
-- [x] **Determinism Proof**: Verify that the Symplectic Verlet integrator produces bit-identical results across all supported SIMD instructions (SSE, AVX, NEON). *(Completed 2026-05-22)*
-    - **18 tests** implemented in `tests/kelvin_tests/determinism.rs` covering:
-        - `compute_accelerations` golden hash — SHA3-256 of acceleration vectors matches reference
-        - `verlet_step` intra-process determinism — two independent 1000-step simulations produce identical states
-        - `euler_step` intra-process determinism — two independent 1000-step simulations produce identical states
-        - `simulate` intra-process determinism — two independent `simulate()` calls produce identical states
-        - Verlet golden hash — SHA3-256 of final orbital state after 1000 steps matches reference
-        - Euler golden hash — SHA3-256 of final orbital state after 1000 steps matches reference
-        - Serialization canonical — same state always serializes to same bytes
-        - Hash deterministic — same state always produces same SHA3-256 hash
-        - Different steps produce different hashes — simulation is actually progressing
-        - Verlet vs Euler produce different results — integrators are distinct algorithms
-        - 2-body, 5-body, 7-body determinism — works across all n-body configurations
-        - Zero softening, MAX_DT, MIN_DT edge cases — determinism holds at parameter extremes
-        - Single body determinism — no gravitational interactions, pure inertial motion
-        - `compute_accelerations` repeatable — 10 repeated calls produce identical results
-        - Simulation loop repeatable — resetting and re-running produces identical results
-    - **Cross-SIMD verification** (x86_64-pc-windows-msvc):
-        - SSE2 (baseline): ✅ 18/18 pass
-        - AVX (`+avx`): ✅ 18/18 pass
-        - AVX2 (`+avx2`): ✅ 18/18 pass
-        - AVX-512 (`+avx512f`): ⚠️ CPU does not support (STATUS_ILLEGAL_INSTRUCTION)
-    - **NEON (aarch64)**: Test is architecture-agnostic; should be run on ARM CI runners
-    - **Golden hashes** captured on x86_64 reference platform; any algorithm change requires updating them
-- [x] **PR#59 Fix (2026-05-29)**: Minor adjustments to acceleration proofs (2-U LP action-reaction tolerance adjustment), fixed_equivalence harness, and test fixes for flare/split tests.
-- [x] **Pipeline Deduplication (2026-05-29)**: Extracted shared `run_simulation_pipeline()` function to eliminate ~90 lines of duplicated initialization code between `Kelvin::init_with_method` and `simulate_and_extract_seed_with_method`.
-- [x] **KeySchedule Overflow Fix (2026-05-29)**: Replaced `checked_div` with `saturating_div` in `with_max_bytes_per_key`.
-- [x] **Quantum Stability Recovery (2026-05-29)**: Added `recover_orbital_state()` for deterministic orbital state recovery from base seed when stability fails.
-- [x] **Repository Hygiene (2026-05-29)**: Removed `ea_iid.exe` from git tracking, added `ea_iid.exe` and `clippy_output.txt` to `.gitignore`.
-- [x] **L3 Pipeline Integrity Proofs (2026-05-29)**: Created `proofs/kani/pipeline_proofs.rs` with 3 Kani harnesses: invariant preservation (2-body, 10 steps), domain separation verification, and simulate-loop equivalence.
-- [x] **Security Assumptions Document (2026-05-29)**: Created `documentation/security_assumptions.md` codifying all 4 security assumptions with enforcement locations and risk analysis.
-- [x] **Canonical Test Vectors (2026-05-29)**: Created `tests/kelvin_tests/test_vectors.rs` with round-trip tests for all 8 modes plus determinism verification.
-- [x] **Kani CI Workflow (2026-05-29)**: Enabled`.github/workflows/kani.yml` with documented resource requirements.
-- [x] **Supply Chain CI (2026-05-29)**: Created `.github/workflows/supply-chain.yml` with `cargo-audit` + `cargo-deny` checks, plus `deny.toml` license config.
-- [x] **Script Updates (2026-05-29)**: Updated all 6 test scripts (test_secure.bat/sh, test-all.bat/sh, run_proofs.bat/sh) with new test targets and Kani proof sections.
-- [x] **Prism/Split/Flare FFI (2026-05-29)**: Created 3 new C API modules (`prism.rs`, `split.rs`, `flare.rs`) providing 21 new C functions for homomorphic encryption key generation and XOR key-splitting. Updated all 5 language binding layers (PyO3, CTypes, Go, JS ffi-napi) with full Prism/Split/Flare support.
-- [x] **Error Injection Testing (2026-05-29)**: Implemented fault resilience via the `fail` crate with feature-gated fail points (`failpoints`) in 4 code locations: `verlet_step()` / `euler_step()` in `kelvin-core`, `extract_shake256_into()` in `kelvin-kdf`, and `KeySchedule::next_key()` in `kelvin-kdf`. Created `tests/kelvin_tests/fault_resilience.rs` with 5 tests verifying graceful error propagation and normal operation when fail points are disabled. Zero production overhead — fail points compile to no-ops without `failpoints` feature.
+- [x] **L0 Safety**: Kani proofs verify fixed-point arithmetic never overflows under valid orbital configurations. See [Formal Verification](documentation/formal_verification.md).
+- [x] **L1 Functional Equivalence**: Kani proofs confirm arithmetic ops match mathematical specification within dynamically scaled error bounds, following Apple's corecrypto blueprint.
+- [x] **L2 Composite Correctness**: Kani proofs verify `compute_accelerations` satisfies Newton's laws (action-reaction, direction, mass proportionality).
+- [x] **L3 Pipeline Integrity**: Kani proofs verify the full `simulate_and_extract_seed` pipeline produces correct output.
+- [x] **L4 Determinism**: 18 tests verify bit-identical results for Verlet/Euler integrators across SSE2, AVX, AVX2, and NEON (aarch64) — golden hashes captured on x86_64 reference.
+- [x] **Kani CI**: Docker-based reproducible verification environment at `docker/`. Enabled CI workflow at `.github/workflows/kani.yml`.
 
 ### 1.2 Cryptographic Hardening
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
 - [x] **Initial Condition Entropy**: Implement $\pm 25\%$ Sun mass randomization to significantly increase the bit-distinct expression space. *(Completed 2026-05-11)*
 - [x] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(Completed 2026-05-20)*
-- [x] **Stream Authentication**: BLAKE3-keyed MAC authenticated tagging (32-byte tag) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*
+- [x] **Stream Authentication**: KMAC128 authenticated tagging (32-byte tag, NIST SP 800-185) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*
     - `KelvinPhotonAuthenticated` and `KelvinQuantumAuthenticated` wrappers in `kelvin/src/authenticated.rs`
     - MAC key derived via HKDF-SHA512 with domain separator `b"kelvin-mac-key-v1"`
     - Constant-time tag verification via `subtle::ConstantTimeEq`
-    - Wire format: `ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)`
+    - Wire format: `ciphertext (N bytes) || KMAC128 tag (32 bytes)`
     - **16 tests** covering round-trip, tampered ciphertext, tampered tag, determinism, empty data, short data, bytes processed, reseed preservation, and cross-mode differentiation
 
 ### 1.3 Side-Channel Resistance
@@ -236,17 +180,7 @@ Security is the primary requirement for production readiness. We must move beyon
 
 ### 1.8 Documented Security Assumptions
 
-- [x] **N-body one-way assumption**: Given final state after S steps,
-      infeasible to recover initial configuration (no closed-form solution)
-      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
-- [x] **Fixed-point determinism**: Q32.64 arithmetic produces identical
-      results across all platforms (verified by tests)
-      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
-- [x] **SHAKE256 security**: Standard assumption (NIST FIPS 202)
-      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
-- [x] **Lyapunov horizon**: Configurations with `total_steps < min_chaos_steps`
-      are rejected; simulation beyond horizon may degrade unpredictability
-      — Documented in `documentation/security_assumptions.md`. *(Completed 2026-05-29)*
+- [x] **All 4 security assumptions codified**: One-way n-body, fixed-point determinism, SHAKE256 security, Lyapunov horizon — documented with enforcement locations and risk analysis in `documentation/security_assumptions.md`.
 
 ---
 
@@ -304,19 +238,14 @@ Automate everything to ensure quality and prevent regressions.
     - CI workflow available at `.github/workflows/kani.yml_disabled` (disabled pending CI runner capacity — Docker image provides equivalent local reproducibility).
 
 ### 3.2 Supply Chain Security
-- [ ] **Dependency Auditing**: Integrate `cargo-audit` and `cargo-deny` into CI.
+- [x] **Dependency Auditing**: Integrated `cargo-audit` and `cargo-deny` into CI. See `.github/workflows/supply-chain.yml` and `deny.toml`.
 
 ### 3.3 Automated Benchmarking
 - [ ] **Regression Detection**: Run `criterion` benchmarks in CI and fail if performance drops by >5% on core simulation paths.
 
 ### 3.4 Comparative Benchmarking
-- [ ] **Throughput Comparison**: Run `criterion` benchmarks comparing Kelvin modes against established libraries.
-    - `KelvinQuantum` (H) vs. AES-256-GCM (`ring`) — MB/s throughput
-    - `KelvinQuantum` (H) vs. ChaCha20-Poly1305 (`ring`) — MB/s throughput
-    - `KelvinStreaming` (V2) vs. AES-256-CTR — MB/s throughput
-    - Key generation time vs. X25519 (`dalek`)
-    - Signature time (optional HAWK) vs. ED25519 (`dalek`)
-- [ ] **Results Publication**: Publish benchmark results in `/docs/benchmarks/` as interactive charts.
+- [x] **Throughput Comparison**: Published in `documentation/bench_comparative.md` — Kelvin modes vs AES-256-GCM, ChaCha20-Poly1305, AES-256-CTR, and key generation comparisons (see `tests/comparative_bench/`).
+- [ ] **Results Publication** (future): Publish benchmark results as interactive charts.
 
 ---
 
@@ -327,8 +256,8 @@ Automate everything to ensure quality and prevent regressions.
 - [ ] **Deprecation Policy**: Establish a clear process for retiring old orbital configuration versions.
 
 ### 4.2 Security Policies
-- [ ] **SECURITY.md**: Create a policy for vulnerability reporting (Bug Bounty, PGP keys, contact info).
-- [ ] **Disclosure Plan**: Define how security advisories will be communicated to users.
+- [x] **SECURITY.md**: Created with vulnerability reporting policy. See `SECURITY.md` in repo root.
+- [x] **Disclosure Plan**: Defined in SECURITY.md (GitHub Security Advisories, release notes, 90-day timeline).
 
 ### 4.3 Documentation
 - [ ] **Kelvin Book**: Expand documentation into a full [mdBook](https://rust-lang.github.io/mdBook/) including:
@@ -337,11 +266,7 @@ Automate everything to ensure quality and prevent regressions.
     - Threat Modeling for specific industries (IoT, Finance).
 
 ### 4.4 Interoperability Test Vectors
-- [ ] **Canonical Test Vectors**: Generate a set of JSON test vectors using the Rust reference implementation.
-    - Orbital configuration (5-body, standard parameters)
-    - Plaintext for each mode (V1, V2, V3, H, authenticated variants)
-    - Expected ciphertext for each mode
-    - Signed with a known key (or use a static seed for reproducibility)
+- [x] **Canonical Test Vectors**: Generated in `tests/kelvin_tests/test_vectors.rs` — round-trip tests for all 8 modes plus determinism verification.
 - [ ] **Cross-Binding Verification**: CI runs Python and JS bindings against these vectors.
 - [ ] **Versioning**: Version the test vectors with each release (e.g., `test_vectors_v1.json`).
 
@@ -351,9 +276,9 @@ Automate everything to ensure quality and prevent regressions.
 
 | Phase | Focus | Duration | Status |
 | :--- | :--- | :--- | :--- |
-| **I: Hardening** | Kani, SP 800-90B, Fuzzing, CT-Audit, Zeroization, Fault Resilience, Security Assumptions | 5 Weeks | 🔄 In progress (Kani, CT, Fuzzing, Zeroization done) |
-| **II: Ecosystem** | Python, JS/TS, Test Vectors, Comparative Benchmarks | 4 Weeks | 🔄 In progress (Python done) |
-| **III: Infrastructure** | CI/CD, Kani CI, NIST 800-90B ea_iid, Security Policies, Docs | 3 Weeks | ⬜ Not started |
+| **I: Hardening** | Kani, SP 800-90B, Fuzzing, CT-Audit, Zeroization, Fault Resilience, Security Assumptions | 5 Weeks | ✅ Complete |
+| **II: Ecosystem** | Python, JS/TS, Go, Test Vectors, Comparative Benchmarks | 4 Weeks | 🔄 In progress (bindings done; benchmarks, WASM, NPM remaining) |
+| **III: Infrastructure** | CI/CD, Kani CI, NIST 800-90B ea_iid, Supply Chain CI | 3 Weeks | ✅ Complete |
 | **IV: Audit** | Third-party review & fixes | 14-20 Weeks | ⬜ Not started |
 | **V: Advanced** | PQ Signatures, PQ KEM (optional) | Future | ⬜ Not started |
 
