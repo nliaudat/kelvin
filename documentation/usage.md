@@ -1,6 +1,6 @@
 # Kelvin Usage Guide
 
-Kelvin is an orbital-chaos-based **quantum-resistant one-time pad (OTP) cryptosystem** and Key Derivation Function (KDF). This guide covers how to use the CLI tool and how to integrate the library into your Rust projects.
+Kelvin is an orbital-chaos-based **quantum-resistant stream cipher** and Key Derivation Function (KDF). This guide covers how to use the CLI tool and how to integrate the library into your Rust projects.
 
 
 ---
@@ -32,7 +32,7 @@ kelvin keygen --level standard --output my_secret.json
 ```
 
 ### Encrypt a File
-Kelvin uses the orbital simulation to generate a **quantum-resistant OTP keystream** for encryption. Data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
+Kelvin uses the orbital simulation to generate a **quantum-resistant stream cipher keystream** for encryption. Data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
 
 
 ```bash
@@ -327,11 +327,11 @@ Key Schedule:
 let remaining = k.remaining_safe_bytes();  // bytes before exhaustion
 ```
 
-This returns `remaining_keys × 4 GiB` (conservative estimate for V1 ChaCha20Poly1305 mode). For OTP modes (V3/H), the limit is the key schedule's virtual step budget — each key can encrypt well beyond 4 GiB. When the safe bytes counter reaches 0, the `Kelvin` instance can no longer encrypt or decrypt — you must create a new instance with a different configuration.
+This returns `remaining_keys × 4 GiB` (conservative estimate for V1 ChaCha20Poly1305 mode). For stream cipher modes (V3/H), the limit is the key schedule's virtual step budget — each key can encrypt well beyond 4 GiB. When the safe bytes counter reaches 0, the `Kelvin` instance can no longer encrypt or decrypt — you must create a new instance with a different configuration.
 
 ---
 
-## 6. V2 Streaming Mode — Per-Step OTP (Real-Time Per-Step Simulation)
+## 6. V2 Streaming Mode — Per-Step Stream Cipher (Real-Time Per-Step Simulation)
 
 V2 Streaming (`KelvinStreaming`) is a **per-step one-time pad** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no nonce, no IV, and no key reuse risk — each step produces a unique keystream from fresh chaotic dynamics.
 
@@ -431,10 +431,10 @@ The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.h
 
 ---
 
-## 7. Prism Mode — OTP Key Generator for Homomorphic Encryption
+## 7. Prism Mode — Stream Key Generator for Homomorphic Encryption
 
-`KelvinPrism` is a standalone OTP key generator designed for integration with
-homomorphic encryption (HE) systems. It produces domain-separated OTP key
+`KelvinPrism` is a standalone stream key generator designed for integration with
+homomorphic encryption (HE) systems. It produces domain-separated stream key
 material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
 
 > ⚠️ **Known Prior Art:** Chaotic key generation for FHE was previously proposed
@@ -448,7 +448,7 @@ material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
 ### Architecture
 
 ```
-2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keys
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited keystream keys
 ```
 
 Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.

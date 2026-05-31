@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-23  
 **Status:** NIST Round 3 (May 2026) — Additional Digital Signature Schemes  
-**Cross-references:** [Quantum Resistance Analysis](quantum_analysis.md), [V3 OTP Study](v3_otp_study.md), [RustCrypto Integration Plan](rustcrypto_integration_plan.md)
+**Cross-references:** [Quantum Resistance Analysis](quantum_analysis.md), [Stream Cipher Mode Study](Kelvin_Stream_Cipher_Study.md), [RustCrypto Integration Plan](rustcrypto_integration_plan.md)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1. Executive Summary
 
-In May 2026, NIST advanced nine candidates to the third round of its post-quantum digital signature standardization process. This announcement concerns **digital signature algorithms** — not general-purpose encryption or key establishment. For Kelvin's core OTP keystream, which relies on SHAKE256 (already NIST-standardized for post-quantum use), this announcement has **no direct impact**. However, it is highly relevant to Kelvin's optional authentication layer and provides strong validation that the project's post-quantum direction aligns with global cryptographic standards.
+In May 2026, NIST advanced nine candidates to the third round of its post-quantum digital signature standardization process. This announcement concerns **digital signature algorithms** — not general-purpose encryption or key establishment. For Kelvin's core stream cipher keystream, which relies on SHAKE256 (already NIST-standardized for post-quantum use), this announcement has **no direct impact**. However, it is highly relevant to Kelvin's optional authentication layer and provides strong validation that the project's post-quantum direction aligns with global cryptographic standards.
 
 ### 2. The Nine Candidates
 
@@ -25,9 +25,9 @@ All nine are digital signature schemes. None are encryption or key-establishment
 
 ### 3. Relevance to Kelvin
 
-#### 3.1 OTP Keystream (Symmetric Encryption) — Not Directly Relevant
+#### 3.1 Stream Cipher Keystream (Symmetric Encryption) — Not Directly Relevant
 
-Kelvin's core cipher is a symmetric OTP deriving its keystream from an entropy source (n-body chaos) and a KDF (SHAKE256). Its post-quantum security depends on:
+Kelvin's core cipher is a symmetric stream cipher deriving its keystream from an entropy source (n-body chaos) and a KDF (SHAKE256). Its post-quantum security depends on:
 
 - **SHAKE256** — Already standardized by NIST (FIPS 202) for post-quantum use
 - **ChaCha20** — 256-bit key provides 128-bit post-quantum security against Grover's algorithm (see [Quantum Resistance Analysis](quantum_analysis.md))
@@ -39,7 +39,7 @@ No replacement of the core cipher is needed or warranted by this announcement.
 Kelvin's architecture includes an optional KMAC module for symmetric authentication. A digital signature provides a **stronger form of authentication** (non-repudiation). Integrating one of these NIST finalists (e.g., HAWK or SNOVA) as an optional post-quantum signature layer would enable:
 
 - **Non-repudiation** of encrypted data — proof of origin that a symmetric MAC cannot provide
-- **Post-quantum authenticated encryption** — combining PQ confidentiality (OTP) with PQ authenticity (signature)
+- **Post-quantum authenticated encryption** — combining PQ confidentiality (stream cipher) with PQ authenticity (signature)
 - **Identity binding** — signatures can be linked to a public key infrastructure
 
 #### 3.3 Academic Validation
@@ -50,13 +50,13 @@ The existence of this NIST process strongly reinforces the central argument of K
 
 | Area | Action |
 |------|--------|
-| **OTP Core** | No change needed. SHAKE256 is already NIST-standardized for PQ use. |
+| **Stream Cipher Core** | No change needed. SHAKE256 is already NIST-standardized for PQ use. |
 | **Future Work / Related Work** | Add a paragraph noting NIST's PQ signature standardization and the potential for integration. |
 | **Your Research** | Study HAWK as a candidate for optional PQ signature integration. |
 
 ### 5. Draft Paragraph for Study
 
-> *"Concurrent with this research, NIST is advancing nine candidates to the third round of its post-quantum digital signature standardization process, including lattice-based schemes like HAWK and SNOVA. While Kelvin-Quantum's core OTP keystream relies on the already-standardized SHAKE256, its optional authentication layer currently uses symmetric KMAC. For applications requiring non-repudiation, integrating a NIST-standardized post-quantum signature scheme like HAWK would be a natural extension, creating a cryptosystem with post-quantum confidentiality (via OTP) and post-quantum authenticity (via signature)."*
+> *"Concurrent with this research, NIST is advancing nine candidates to the third round of its post-quantum digital signature standardization process, including lattice-based schemes like HAWK and SNOVA. While Kelvin-Quantum's core stream cipher keystream relies on the already-standardized SHAKE256, its optional authentication layer currently uses symmetric KMAC. For applications requiring non-repudiation, integrating a NIST-standardized post-quantum signature scheme like HAWK would be a natural extension, creating a cryptosystem with post-quantum confidentiality (via stream cipher) and post-quantum authenticity (via signature)."*
 
 ---
 
@@ -274,11 +274,11 @@ pq-signatures = ["dep:hawk"]  # hypothetical HAWK crate
 ```rust
 /// Kelvin-Quantum with HAWK signatures (post-quantum non-repudiation)
 /// 
-/// This combines Kelvin's OTP confidentiality with HAWK's post-quantum
+/// This combines Kelvin's stream cipher confidentiality with HAWK's post-quantum
 /// digital signatures for authenticated encryption with non-repudiation.
 #[cfg(feature = "pq-signatures")]
 pub struct KelvinQuantumAuthenticated {
-    cipher: KelvinQuantum,      // OTP core (SHAKE256 + ChaCha20)
+    cipher: KelvinQuantum,      // Stream cipher core (SHAKE256 + ChaCha20)
     hawk_signer: HawkSigner,    // HAWK for post-quantum signatures
 }
 
@@ -286,12 +286,12 @@ pub struct KelvinQuantumAuthenticated {
 impl KelvinQuantumAuthenticated {
     /// Encrypt and sign with post-quantum security.
     ///
-    /// 1. OTP encryption using Kelvin's chaotic KDF + SHAKE256 keystream
+    /// 1. Stream cipher encryption using Kelvin's chaotic KDF + SHAKE256 keystream
     /// 2. HAWK signature over the ciphertext (555 bytes for HAWK-512)
     ///
     /// Returns the HAWK signature for separate transmission or storage.
     pub fn encrypt_and_sign(&mut self, data: &mut [u8]) -> Result<Vec<u8>> {
-        // Phase 1: OTP encryption (Kelvin core)
+        // Phase 1: Stream cipher encryption (Kelvin core)
         let keystream = self.cipher.keystream(data.len())?;
         xor_in_place(data, &keystream);
         
@@ -327,7 +327,7 @@ impl KelvinQuantumAuthenticated {
 
 | Property | Mechanism |
 |----------|-----------|
-| **Confidentiality** | OTP keystream (SHAKE256 + ChaCha20, 256-bit key) |
+| **Confidentiality** | Stream cipher keystream (SHAKE256 + ChaCha20, 256-bit key) |
 | **Non-repudiation** | HAWK digital signature (Module-LIP, 128-bit PQ security) |
 | **Authentication** | Signature verification before decryption |
 | **Integrity** | Signature covers ciphertext; tampering detected before decryption |
@@ -351,4 +351,4 @@ impl KelvinQuantumAuthenticated {
 ---
 
 *This document is part of the Kelvin Cryptosystem documentation suite.  
-See also: [Quantum Resistance Analysis](quantum_analysis.md), [V3 OTP Study](v3_otp_study.md), [RustCrypto Integration Plan](rustcrypto_integration_plan.md)*
+See also: [Quantum Resistance Analysis](quantum_analysis.md), [Stream Cipher Mode Study](Kelvin_Stream_Cipher_Study.md), [RustCrypto Integration Plan](rustcrypto_integration_plan.md)*

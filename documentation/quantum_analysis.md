@@ -131,16 +131,16 @@ These tests ensure that any configuration that could lead to a low-entropy regim
 |---------------|----------------|-----------|
 | **Grover's (key search)** | 256-bit ChaCha20 key (V1) or SHAKE256 (V2/V3/H) | 128-bit effective security |
 | **Shor's (factorization)** | ML-DSA-65 / ML-KEM-768 | NIST Level 3 |
-| **Quantum shortcut (simulation)** | Sequential chaos + Deep Physical Binding | No known speedup |
-| **Quantum shortcut (OTP keystream)** | SHAKE256 XOR — no algebraic structure for Shor's | No known speedup |
+| **Quantum shortcut (simulation)** | Sequential chaos + Deep Physical Binding | No known speedup (unproven — active research area) |
+| **Quantum shortcut (keystream)** | SHAKE256 XOR — no algebraic structure for Shor's | No known speedup |
 | **Degenerate initial conditions** | Bodyguard validation | Prevented at creation |
 | **Orbital state inversion** | SHAKE256 + 2048-byte pool | Grover-limited |
 
-Kelvin's architecture combines multiple layers of post-quantum protection: standardized lattice-based cryptography for identity, a chaotic classical simulation for key derivation, and SHAKE256 for entropy extraction. The XOR-based OTP modes (V2/V3/H/Prism/Split/Flare) have **no algebraic structure** — there is nothing for Shor's algorithm to factor or for lattice reduction to exploit. The only quantum attack is Grover's search on the SHAKE256 output, reducing 256-bit classical security to 128-bit quantum security.
+Kelvin's architecture combines multiple layers of post-quantum protection: standardized lattice-based cryptography for identity, a chaotic classical simulation for key derivation, and SHAKE256 for entropy extraction. The XOR-based stream cipher modes (V2/V3/H/Prism/Split/Flare) have **no algebraic structure** — there is nothing for Shor's algorithm to factor or for lattice reduction to exploit. The only quantum attack is Grover's search on the SHAKE256 output, reducing 256-bit classical security to 128-bit quantum security.
 
 The Deep Physical Binding and Bodyguard checks ensure that the system remains in a high-entropy regime, closing potential attack vectors that could arise from degenerate orbital configurations.
 
-See the [OTP Bulletproof Analysis](otp_bulletproof.md) for the full quantum resistance argument for Kelvin's OTP modes.
+See the [Stream Cipher Security Analysis](stream_cipher_security.md) for the full quantum resistance argument for Kelvin's stream cipher keystream.
 
 ---
 

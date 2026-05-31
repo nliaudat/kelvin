@@ -4,11 +4,13 @@
 
 ---
 
-## 1. CRITICAL: The "OTP" Label Is Terminologically Indefensible
+## 1. [RESOLVED] The "OTP" Label Is Terminologically Indefensible
 
-**Source documents:** `README.md`, `otp_bulletproof.md`, `usage.md`, throughout
+**Status: RESOLVED** — Documentation updated 2026-05-31. All "OTP" terminology replaced with "stream cipher" throughout the project. See the full change set: `README.md`, `documentation/stream_cipher_security.md`, `documentation/Kelvin_Stream_Cipher_Study.md`, `documentation/usage.md`, and other affected files.
 
-### The Criticism
+**Source documents:** `README.md`, `stream_cipher_security.md`, `usage.md`, throughout
+
+### The Original Criticism
 
 Shannon (1949) proved that a one-time pad achieves *perfect secrecy* — meaning the ciphertext is statistically independent of the plaintext. This holds if and only if the key is drawn uniformly at random and is at least as long as the plaintext. Shannon's proof is information-theoretic: it is unconditional, requiring no computational assumptions whatsoever.
 
@@ -23,17 +25,19 @@ Yet the project continues to use "OTP" everywhere — in the project title, all 
 
 The practical difference matters: a true OTP provides *unconditional* security even against adversaries who break SHAKE256. Kelvin does not. If SHAKE256 is broken, Kelvin is broken. This is exactly the situation for any stream cipher — not for an OTP.
 
-### What to Do
+### Resolution (2026-05-31)
 
-Replace "OTP" with **"stream cipher"** or **"PRNG-based stream cipher"** throughout. The claim should be: *"Kelvin uses SHAKE256 XOR as its stream cipher, providing computational security equivalent to 256-bit symmetric encryption."* That is defensible. The OTP framing is not.
+Replaced "OTP" with **"stream cipher"** throughout the project. `otp_bulletproof.md` renamed to `stream_cipher_security.md`, `Kelvin_OTP_Study.md` renamed to `Kelvin_Stream_Cipher_Study.md`. The claim is now: *"Kelvin uses SHAKE256 XOR as its stream cipher, providing computational security equivalent to 256-bit symmetric encryption."* That is defensible. The OTP framing is eliminated.
 
 ---
 
-## 2. CRITICAL: Chaos ≠ Cryptographic One-Way Function — No Formal Reduction Exists
+## 2. [PARTIALLY ADDRESSED] Chaos ≠ Cryptographic One-Way Function — No Formal Reduction Exists
 
-**Source documents:** `README.md`, `security_assumptions.md`, `formal_verification.md`, `otp_bulletproof.md`
+**Status: PARTIALLY ADDRESSED** — Documentation updated 2026-05-31. The "No-Shortcut Guarantee" is now the "No-Shortcut Assumption" throughout. The `security_assumptions.md` §1 now includes an explicit warning: "This assumption has NOT been formally reduced to any known hard problem." The `stream_cipher_security.md` title no longer claims "Computationally Unbreakable" and the §8 summary includes a clear "No" answer for formal reduction. However, this critique cannot be fully resolved without a mathematical proof that n-body inversion is hard — the fix is honest framing, not a formal proof.
 
-### The Criticism
+**Source documents:** `README.md`, `security_assumptions.md`, `formal_verification.md`, `stream_cipher_security.md`
+
+### The Original Criticism
 
 The entire security argument rests on a conflation of two different mathematical concepts:
 
@@ -64,11 +68,13 @@ This argument proves only that an attacker cannot skip ahead *to compute the tra
 
 ---
 
-## 3. CRITICAL: The Security Bounds Are Not Bounds — They Are Guesses
+## 3. [PARTIALLY ADDRESSED] The Security Bounds Are Not Bounds — They Are Estimates
+
+**Status: PARTIALLY ADDRESSED** — `README.md` now refers to "Security estimates (C1–C5)" rather than "Security bounds." The `stream_cipher_security.md` §1 caveats section explicitly states they are "plausibility arguments based on physical chaos and computational indistinguishability of SHAKE256 — not formal security reductions." Full resolution would require formal security reductions, which remain an open research goal.
 
 **Source documents:** `formal_verification.md`, `README.md`, `THREAT_MODEL.md`
 
-### The Criticism
+### The Original Criticism
 
 The documentation presents specific numerical security claims:
 - "≥ 2¹⁹²⁰ configuration space"
@@ -87,11 +93,13 @@ These numbers are presented in the table as "resolved conjectures." Let's examin
 
 ---
 
-## 4. CRITICAL: "Quantum Resistant" Is Overclaimed for the Simulation Layer
+## 4. [ADDRESSED] "Quantum Resistant" Is Overclaimed for the Simulation Layer
 
-**Source documents:** `README.md`, `quantum_analysis.md`, `THREAT_MODEL.md`, `otp_bulletproof.md`
+**Status: ADDRESSED** — All "no quantum algorithm can" claims replaced with "no known quantum algorithm." `README.md` now correctly states "no known quantum algorithm can shortcut the simulation." `stream_cipher_security.md` §8 summary now clarifies effective security is 128-bit (SHAKE256 Grover bound). See changes to `README.md`, `stream_cipher_security.md`, `quantum_analysis.md`.
 
-### The Criticism
+**Source documents:** `README.md`, `quantum_analysis.md`, `THREAT_MODEL.md`, `stream_cipher_security.md`
+
+### The Original Criticism
 
 The documentation repeatedly states:
 > "No quantum algorithm can shortcut the simulation."
@@ -112,11 +120,11 @@ Furthermore, the **effective security** of the entire system is bounded by SHAKE
 
 ---
 
-## 5. MAJOR: The "Computational Asymmetry" Argument Has a Fatal Flaw
+## 5. [ADDRESSED] The "Computational Asymmetry" Argument Has a Fatal Flaw
 
-**Source documents:** `README.md`, `proof_of_concept.md`, `otp_bulletproof.md`
+**Status: ADDRESSED** — `README.md` now includes an explicit caveat: "Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance." `stream_cipher_security.md` §5.3 now explicitly states: "proves only that an attacker cannot skip ahead given valid initial conditions — it does NOT prove they cannot recover those initial conditions from observed output." The security anchor is correctly identified as SHAKE256.
 
-### The Criticism
+**Source documents:** `README.md`, `proof_of_concept.md`, `stream_cipher_security.md`
 
 A recurring argument is:
 > "An attacker cannot shortcut the simulation — they must run the same deterministic integration step-by-step to reproduce the keystream."
@@ -132,11 +140,11 @@ But this downplays the real risk: if an attacker gets any known plaintext, the s
 
 ---
 
-## 6. MAJOR: Finite Precision Periodicity Is Acknowledged but Unresolved
+## 6. [PARTIALLY ADDRESSED] Finite Precision Periodicity Is Acknowledged but Unresolved
+
+**Status: PARTIALLY ADDRESSED** — `proof_of_concept.md` §4.8 now opens with an explicit warning: "This is a genuine unsolved concern, not a future enhancement. No concrete lower bound on the period length currently exists." Full resolution would require implementing FPPC-style period detection and establishing a concrete lower bound.
 
 **Source documents:** `proof_of_concept.md` (§4.8), `documentation/formal_verification.md`
-
-### The Criticism
 
 The documentation correctly identifies the problem (citing Cang et al. 2021):
 > "When chaotic systems are implemented on digital computers with finite precision, *dynamical degradation* occurs — the system's trajectory becomes periodic."
@@ -152,11 +160,11 @@ The system relies on SHAKE256 reseeding to "break" periodicity, but this argumen
 
 ---
 
-## 7. MAJOR: The Lyapunov Exponent Does Not Measure Cryptographic Entropy
+## 7. [ADDRESSED] The Lyapunov Exponent Does Not Measure Cryptographic Entropy
+
+**Status: ADDRESSED** — `security_assumptions.md` Assumption 4 now includes an explicit caveat: "A positive Lyapunov exponent (λ > 0) is a **qualitative** property. It does **not** directly measure or bound the cryptographic entropy of the output. The Kaplan-Yorke dimension is a geometric quantity, not bits of min-entropy."
 
 **Source documents:** `README.md`, `security_assumptions.md`, `SECURITY.md`, throughout
-
-### The Criticism
 
 The documentation states:
 > "Chaotic divergence: Lyapunov exponent λ ≈ 0.693 (positive → chaotic regime)"
@@ -172,11 +180,11 @@ Furthermore, the Lyapunov exponent is measured for *real-valued* (floating-point
 
 ---
 
-## 8. MAJOR: The Key Schedule "Forward Secrecy" Claim Is Weak
+## 8. [ADDRESSED] The Key Schedule "Forward Secrecy" Claim Is Weak
 
-**Source documents:** `README.md`, `usage.md`, `otp_bulletproof.md`, `security_assumptions.md`
+**Status: ADDRESSED** — `README.md` security section now labels this "Key derivation chaining (labeled 'forward secrecy')" with the explicit caveat: "This is NOT Perfect Forward Secrecy — if the orbital config is compromised, all past and future keys can be recomputed."
 
-### The Criticism
+**Source documents:** `README.md`, `usage.md`, `stream_cipher_security.md`, `security_assumptions.md`
 
 The documentation claims "forward secrecy" from BLAKE3 reseeding:
 > "HKDF-SHA512 + BLAKE3 reseeding ensures forward secrecy — compromising the current keystream reveals neither past nor future keys."
@@ -190,11 +198,11 @@ Kelvin's "forward secrecy" is something different: it means that given the curre
 
 ---
 
-## 9. MAJOR: Comparisons with AES and ChaCha20 Are Misleading
+## 9. [ACKNOWLEDGED] Comparisons with AES and ChaCha20 Are Misleading
+
+**Status: ACKNOWLEDGED** — The comparative benchmarks compare unauth XOR modes against authenticated AEAD, and exclude Kelvin's upfront key generation cost (1–60s). A footnote in `bench_comparative.md` notes the AES comparison uses hardware AES-NI acceleration not available to Kelvin's fixed-point arithmetic. Full resolution would require a separate benchmark comparing Kelvin authenticated modes (Quantum + KMAC128) against AES-256-GCM with keygen cost included.
 
 **Source documents:** `bench_comparative.md`, `README.md`, `THREAT_MODEL.md`
-
-### The Criticism
 
 The throughput comparison table (THREAT_MODEL.md, §4) shows:
 > KelvinQuantum throughput: ~200–500 MB/s
@@ -254,11 +262,11 @@ A critic would say: **This is a novel construction with no formal security model
 
 ---
 
-## 12. MODERATE: The Dual-Use of "min_chaos_steps" Creates a Problematic Guarantee
+## 12. [PARTIALLY ADDRESSED] The Dual-Use of "min_chaos_steps" Creates a Problematic Guarantee
+
+**Status: PARTIALLY ADDRESSED** — The tension is inherent to the architecture: V2 mode runs indefinite simulation per-step (each step injects fresh chaos), while V3/H use a one-time simulation with a virtual key schedule where `min_chaos_steps` bounds key derivation. The V2 design avoids this tension because the chaotic state continuously evolves. Full resolution would require a formal analysis of the V2 simulation's long-term chaotic properties beyond `min_chaos_steps`.
 
 **Source documents:** `usage.md` (§5.3), `proof_of_concept.md` (§4.6)
-
-### The Criticism
 
 The documentation states that `min_chaos_steps` serves as both:
 1. A **lower bound**: the simulation must run at least this many steps to enter chaos.
@@ -274,11 +282,11 @@ In V2 mode, there is no such horizon — the simulation runs indefinitely. A cri
 
 ---
 
-## 13. MODERATE: The NIST Statistical Tests Prove Nothing About Cryptographic Security
+## 13. [ADDRESSED] The NIST Statistical Tests Prove Nothing About Cryptographic Security
+
+**Status: ADDRESSED** — `proof_of_concept.md` §9 now includes a caveat: "NIST SP 800-22 and SP 800-90B statistical tests are **necessary but not sufficient** for cryptographic security. A linear congruential generator or RC4 (both cryptographically broken) can pass these tests. They validate randomness quality at a surface level, not resistance against cryptanalysis."
 
 **Source documents:** `proof_of_concept.md` (§9), `nist_800_90b_report.md`
-
-### The Criticism
 
 The documentation presents NIST SP 800-22 and SP 800-90B test results (all 15/15 tests passing) as evidence of security. This is a common misconception that deserves direct rebuttal:
 
@@ -290,11 +298,11 @@ The real test of a stream cipher is **cryptanalysis** — can an adversary disti
 
 ---
 
-## 14. MODERATE: The Constant-Time Audit Methodology Has Limitations
+## 14. [ADDRESSED] The Constant-Time Audit Methodology Has Limitations
+
+**Status: ADDRESSED** — `proof_of_concept.md` §8 now includes a "Limitations of the Methodology" section covering: dudect is probabilistic (pass ≠ proof), scope limited to arithmetic primitives (not full pipeline), and the verlet_step |t| ≈ 75 variation is acknowledged as a potential side-channel requiring further investigation.
 
 **Source documents:** `proof_of_concept.md` (§8), `THREAT_MODEL.md`, `production_readiness_plan.md` (§1.3)
-
-### The Criticism
 
 The dudect-bencher (Welch's t-test) methodology for constant-time verification has known limitations:
 
@@ -306,7 +314,9 @@ The dudect-bencher (Welch's t-test) methodology for constant-time verification h
 
 ---
 
-## 15. MODERATE: Prior Art Disclosure Is Incomplete
+## 15. [ACKNOWLEDGED] Prior Art Disclosure Is Incomplete
+
+**Status: ACKNOWLEDGED** — The patent reviews document known prior art (Apple '559, Weng 2009, Song 2012, Chai 2025, DUff-skg 2025, etc.) but a systematic literature review of the broader chaos-cryptography field (1990s onward) remains incomplete. This is research-level work beyond the scope of documentation fixes.
 
 **Source documents:** `README.md`, `usage.md`, `patent_review_*.md`
 
@@ -325,7 +335,9 @@ The documentation claims novelty based on three differentiators (full gravitatio
 
 ---
 
-## 16. MODERATE: The Homomorphic Cryptosystem Document Over-Reaches
+## 16. [ACKNOWLEDGED] The Homomorphic Cryptosystem Document Over-Reaches
+
+**Status: ACKNOWLEDGED** — The document correctly states that Kelvin is not homomorphic. The XOR split-key scheme (A ⊕ B = K) is a well-known application of XOR independent of Kelvin's orbital chaos. A full rewrite would require careful technical review and is noted for future improvement.
 
 **Source document:** `homomorphic_cryptosystem.md`
 

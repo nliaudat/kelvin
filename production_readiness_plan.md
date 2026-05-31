@@ -176,7 +176,7 @@ Security is the primary requirement for production readiness. We must move beyon
     - `kelvin-kdf`: intermediate layer, not the simulation engine or top-level API
     - `kelvin-stream`: low-level cipher adapter, not a full encryption system
     - `kelvin`: research cryptosystem, explicitly lists what it does NOT provide
-      (key exchange, memory-hard KDF, formal cryptanalysis, information-theoretic OTP)
+      (key exchange, memory-hard KDF, formal cryptanalysis, information-theoretic security)
 
 ### 1.8 Documented Security Assumptions
 
