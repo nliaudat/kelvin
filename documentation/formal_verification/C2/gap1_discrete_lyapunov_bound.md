@@ -15,7 +15,7 @@ where:
 
 | Term | Value | Source |
 |------|-------|--------|
-| `ε_pade` | ≤ 0.29 × ln(d/δ) | Padé (1,1) approximation max relative error at z=10 |
+| `ε_pade` | ≤ 0.29 × ln(10) ≈ 0.67 | Padé (1,1) approximation max absolute error (ln(10) stored exactly, Padé applies only to remainder z ∈ [1,10]) |
 | `ε_q` | ≤ 2^(-64) | Q32.64 quantization step (verified by L1 Kani proofs) |
 | `σ` | ≈ 0.1 · λ ≈ 0.07 | Standard deviation across 3 perturbed axes (empirical) |
 | `dt` | 2^54 raw ≈ 0.0156 yr | Time step |
@@ -54,7 +54,7 @@ $$\ln(R) = n \cdot \ln(10) + \ln(z)$$
 
 The repeated `ln(10)` terms are exact (stored constant). Only the Padé `ln(z)` has error. Thus:
 
-$$\varepsilon_{pade} \leq 0.29 \cdot \ln(d/\delta) \leq 0.29 \times \ln(10^6) \approx 4.0$$
+$$\varepsilon_{pade} \leq 0.29 \cdot \ln(10) \approx 0.67$$
 
 ### 2.3 Error Source 2: Q32.64 Quantization
 
@@ -78,21 +78,21 @@ $$C_{bias} \leq \frac{3\sigma}{\sqrt{3}} \quad \text{normalized by} \quad \frac{
 
 Summing all three independent error sources:
 
-$$|\lambda_{disc} - \lambda_{cont}| \leq \underbrace{\frac{0.29 \cdot \ln(d/\delta)}{S \cdot dt}}_{\text{Padé}} + \underbrace{2^{-64}}_{\text{Quantization}} + \underbrace{\frac{\sigma\sqrt{3}}{\sqrt{S}}}_{\text{Bias}}$$
+$$|\lambda_{disc} - \lambda_{cont}| \leq \underbrace{\frac{0.67}{S \cdot dt}}_{\text{Padé}} + \underbrace{2^{-64}}_{\text{Quantization}} + \underbrace{\frac{\sigma\sqrt{3}}{\sqrt{S}}}_{\text{Bias}}$$
 
 For the default configuration (S=2000, dt=0.0156, d/δ ≈ 10^3):
 
-$$\varepsilon_{pade}/(S \cdot dt) \approx \frac{0.29 \times 6.9}{2000 \times 0.0156} \approx 0.064$$
+$$\varepsilon_{pade}/(S \cdot dt) \approx \frac{0.67}{2000 \times 0.0156} \approx 0.021$$
 
 $$\varepsilon_q \approx 5.4 \times 10^{-20} \text{ (negligible)}$$
 
 $$\sigma\sqrt{3}/\sqrt{S} \approx \frac{0.07 \times 1.73}{44.7} \approx 0.0027$$
 
-**Total: |λ_disc − λ_cont| ≤ 0.067**, dominated by the Padé approximation error.
+**Total: |λ_disc − λ_cont| ≤ 0.024**, dominated by the Padé approximation error.
 
 ## 3. Practical Significance
 
-The bound shows that λ_disc is within ~0.07 of the true λ_cont. Since λ ≈ 0.693 (empirical), the relative error is ≈ 10%. This is acceptable for the C2 security argument — λ > 0 is robustly certified, and the Kaplan-Yorke dimension derived from λ is not sensitive to 10% uncertainty.
+The bound shows that λ_disc is within ~0.02 of the true λ_cont. Since λ ≈ 0.693 (empirical), the relative error is ≈ 3%. This is acceptable for the C2 security argument — λ > 0 is robustly certified, and the Kaplan-Yorke dimension derived from λ is not sensitive to this level of uncertainty.
 
 ## 4. References
 

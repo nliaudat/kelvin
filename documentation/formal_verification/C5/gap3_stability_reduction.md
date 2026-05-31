@@ -36,7 +36,7 @@ The velocity component of the phase space is bounded by |v| ≤ 100 AU/yr. The f
 
 $$\frac{V(|v| \geq 1)}{V(|v| \leq 100)} = \frac{4\pi(100^3 - 1^3)/3}{4\pi(100^3)/3} = 1 - \left(\frac{1}{100}\right)^3 = 1 - 10^{-6}$$
 
-So at most 1 - 10^{-6} ≈ 2^{-20} of the velocity space is in the "possibly ejected" region (one body). For 5 bodies, the union bound gives at most 5 × 2^{-20} ≈ 2^{-17.6}.
+So the stable region (where |v| < 1) is at most 10^{-6} ≈ 2^{-20} of the velocity space (one body). For 5 bodies, the probability of all being stable is (2^{-20})^5 = 2^{-100}.
 
 ### 2.4 Conservative Correction
 

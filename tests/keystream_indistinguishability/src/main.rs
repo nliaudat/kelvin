@@ -13,8 +13,7 @@
 //! Usage: cargo run -p keystream_indistinguishability
 
 use kelvin_core::{
-    simulate, Fixed, OrbitalBody, Vec3,
-    DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
+    simulate, Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
 };
 use kelvin_kdf::extract_shake256;
 use std::fs;
@@ -75,8 +74,8 @@ fn main() {
     bodies_pert[0].position.x += Fixed::from_raw(1);
     let perturbed = generate_keystream(&bodies_pert, N_STEPS, 64);
 
-    let bit_flips: u32 = original.iter().zip(perturbed.iter())
-        .map(|(a, b)| (a ^ b).count_ones()).sum();
+    let bit_flips: u32 =
+        original.iter().zip(perturbed.iter()).map(|(a, b)| (a ^ b).count_ones()).sum();
     let total_bits = (original.len() * 8) as f64;
     let flip_ratio = bit_flips as f64 / total_bits;
 
@@ -136,27 +135,39 @@ fn create_standard_config(n: usize) -> Vec<OrbitalBody> {
     match n {
         3 => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(-3), Fixed::from_int(4), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO)),
+                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO),
+            ),
         ],
         _ => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(5000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(5000),
                 Vec3::new(Fixed::from_int(-4), Fixed::from_int(3), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(0), Fixed::from_int(-6), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(20000),
+                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(20000),
                 Vec3::new(Fixed::from_int(7), Fixed::from_int(2), Fixed::from_int(1)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0))),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0)),
+            ),
         ],
     }
 }
@@ -167,14 +178,7 @@ fn generate_keystream(bodies: &[OrbitalBody], steps: u64, len: usize) -> Vec<u8>
     simulate(&mut state, steps, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G);
 
     // Extract SHAKE256 keystream from the final orbital state
-    extract_shake256(
-        &state,
-        steps,
-        DEFAULT_G,
-        SOFTENING_FACTOR,
-        b"kelvin-validation-v1",
-        len,
-    )
+    extract_shake256(&state, steps, DEFAULT_G, SOFTENING_FACTOR, b"kelvin-validation-v1", len)
 }
 
 /// NIST SP 800-22 Frequency (Monobit) Test.
@@ -216,6 +220,13 @@ fn runs_test(data: &[u8]) -> f64 {
     // Count runs
     let mut runs = 1u64;
     let mut prev_bit = (data[0] & 1) != 0;
+    for bit in 1..8 {
+        let current_bit = ((data[0] >> bit) & 1) != 0;
+        if current_bit != prev_bit {
+            runs += 1;
+        }
+        prev_bit = current_bit;
+    }
     for &byte in &data[1..] {
         for bit in 0..8 {
             let current_bit = ((byte >> bit) & 1) != 0;
@@ -238,20 +249,9 @@ fn runs_test(data: &[u8]) -> f64 {
 /// NIST SP 800-22 Discrete Fourier Transform (Spectral) Test.
 /// Tests for periodic features in the bit sequence.
 fn dft_test(data: &[u8]) -> f64 {
-    // Use byte-level approximate DFT: count byte values
-    let mut obs: f64 = 0.0;
-    let expected: f64 = data.len() as f64 / 256.0; // uniform expectation per byte value
-
-    for val in 0..=255 {
-        let count = data.iter().filter(|&&b| b == val).count() as f64;
-        obs += (count - expected).powi(2) / expected;
-    }
-
-    // χ² with 255 degrees of freedom → approximate p-value
-    // Using the approximation that √(2*χ²) - √(2*df-1) ~ N(0,1)
-    let df = 255.0_f64;
-    let z = f64::sqrt(2.0 * obs) - f64::sqrt(2.0 * df - 1.0);
-    1.0 - normal_cdf(z)
+    // TODO: Implement a proper FFT-based spectral test.
+    // The current implementation is a placeholder duplicate of the chi-squared test.
+    chi_squared_test(data)
 }
 
 /// χ² goodness-of-fit test against uniform byte distribution.

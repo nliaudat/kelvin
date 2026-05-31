@@ -14,8 +14,8 @@
 //! Usage: cargo run -p lyapunov_certification
 
 use kelvin_core::{
-    simulate, Fixed, IntegrationMethod, OrbitalBody, Vec3,
-    DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR, SOLAR_MASS,
+    simulate, Fixed, IntegrationMethod, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR,
+    SOLAR_MASS,
 };
 use kelvin_kdf::LyapunovEstimator;
 use std::fs;
@@ -75,9 +75,15 @@ fn main() {
          Entropy decay: {decay_text}\n\n\
          D_KY estimate: {dky_text}\n\n\
          RESULTS: C2 validation complete (λ_disc > 0: {positive})\n",
-        result_short.lyapunov_steps, result_short.confidence,
-        result_medium.lyapunov_steps, result_medium.confidence,
-        positive = if result_medium.lyapunov_steps < u64::MAX { "YES (positive)" } else { "COULD NOT DETECT" },
+        result_short.lyapunov_steps,
+        result_short.confidence,
+        result_medium.lyapunov_steps,
+        result_medium.confidence,
+        positive = if result_medium.lyapunov_steps < u64::MAX {
+            "YES (positive)"
+        } else {
+            "COULD NOT DETECT"
+        },
     );
 
     let _ = fs::write(&results_path, &output);
@@ -90,27 +96,39 @@ fn create_standard_config(n: usize) -> Vec<OrbitalBody> {
     match n {
         3 => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(-3), Fixed::from_int(4), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO)),
+                Vec3::new(Fixed::from_int(-2), Fixed::from_int(-1), Fixed::ZERO),
+            ),
         ],
         _ => vec![
             OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(1047),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(1047),
                 Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(5000),
+                Vec3::new(Fixed::ZERO, Fixed::from_int(3), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(5000),
                 Vec3::new(Fixed::from_int(-4), Fixed::from_int(3), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(10000),
+                Vec3::new(Fixed::from_int(-1), Fixed::from_int(-2), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(10000),
                 Vec3::new(Fixed::from_int(0), Fixed::from_int(-6), Fixed::ZERO),
-                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO)),
-            OrbitalBody::new(SOLAR_MASS / Fixed::from_int(20000),
+                Vec3::new(Fixed::from_int(2), Fixed::from_int(0), Fixed::ZERO),
+            ),
+            OrbitalBody::new(
+                SOLAR_MASS / Fixed::from_int(20000),
                 Vec3::new(Fixed::from_int(7), Fixed::from_int(2), Fixed::from_int(1)),
-                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0))),
+                Vec3::new(Fixed::from_int(0), Fixed::from_int(1), Fixed::from_int(0)),
+            ),
         ],
     }
 }
@@ -120,7 +138,11 @@ struct TrajectoryResults {
 }
 
 fn run_trajectory_analysis(
-    mut bodies: Vec<OrbitalBody>, steps: u64, dt: Fixed, softening: Fixed, g: Fixed,
+    mut bodies: Vec<OrbitalBody>,
+    steps: u64,
+    dt: Fixed,
+    softening: Fixed,
+    g: Fixed,
 ) -> TrajectoryResults {
     let mut step_entropy = Vec::new();
     for step in 0..steps {
@@ -140,13 +162,19 @@ fn estimate_state_entropy(bodies: &[OrbitalBody]) -> f64 {
         let by = body.position.y.to_raw() >> 32;
         let bz = body.position.z.to_raw() >> 32;
         let mask = (bx.abs() + by.abs() + bz.abs()) as u64;
-        if mask > 0 { entropy += mask.trailing_zeros() as f64; }
+        if mask > 0 {
+            entropy += mask.trailing_zeros() as f64;
+        }
     }
     entropy
 }
 
 fn estimate_kaplan_yorke(
-    bodies: &[OrbitalBody], steps: u64, dt: Fixed, softening: Fixed, g: Fixed,
+    bodies: &[OrbitalBody],
+    steps: u64,
+    dt: Fixed,
+    softening: Fixed,
+    g: Fixed,
 ) -> f64 {
     let n = bodies.len();
     let dim = 6 * n;
@@ -166,19 +194,23 @@ fn estimate_kaplan_yorke(
     };
 
     let step_f64 = |state: &[f64], masses: &[f64]| -> Vec<f64> {
-        let bods: Vec<OrbitalBody> = state.chunks(6).zip(masses.chunks(1)).map(|(c, m)| {
-            let pos = Vec3::new(
-                Fixed::from_raw((c[0] * 2.0f64.powi(64)) as i128),
-                Fixed::from_raw((c[1] * 2.0f64.powi(64)) as i128),
-                Fixed::from_raw((c[2] * 2.0f64.powi(64)) as i128),
-            );
-            let vel = Vec3::new(
-                Fixed::from_raw((c[3] * 2.0f64.powi(64)) as i128),
-                Fixed::from_raw((c[4] * 2.0f64.powi(64)) as i128),
-                Fixed::from_raw((c[5] * 2.0f64.powi(64)) as i128),
-            );
-            OrbitalBody::new(Fixed::from_raw((m[0] * 2.0f64.powi(64)) as i128), pos, vel)
-        }).collect();
+        let bods: Vec<OrbitalBody> = state
+            .chunks(6)
+            .zip(masses.chunks(1))
+            .map(|(c, m)| {
+                let pos = Vec3::new(
+                    Fixed::from_raw((c[0] * 2.0f64.powi(64)) as i128),
+                    Fixed::from_raw((c[1] * 2.0f64.powi(64)) as i128),
+                    Fixed::from_raw((c[2] * 2.0f64.powi(64)) as i128),
+                );
+                let vel = Vec3::new(
+                    Fixed::from_raw((c[3] * 2.0f64.powi(64)) as i128),
+                    Fixed::from_raw((c[4] * 2.0f64.powi(64)) as i128),
+                    Fixed::from_raw((c[5] * 2.0f64.powi(64)) as i128),
+                );
+                OrbitalBody::new(Fixed::from_raw((m[0] * 2.0f64.powi(64)) as i128), pos, vel)
+            })
+            .collect();
         let mut mut_bodies = bods;
         simulate(&mut mut_bodies, 1, dt, softening, g);
         state_to_vec(&mut_bodies)
@@ -187,9 +219,13 @@ fn estimate_kaplan_yorke(
     let masses: Vec<f64> = bodies.iter().map(|b| b.mass.to_f64()).collect();
     let mut traj = bodies.to_vec();
     let mut lyapunov_exponents = vec![0.0_f64; dim];
-    let mut q: Vec<Vec<f64>> = (0..dim).map(|i| {
-        let mut v = vec![0.0; dim]; v[i] = 1.0; v
-    }).collect();
+    let mut q: Vec<Vec<f64>> = (0..dim)
+        .map(|i| {
+            let mut v = vec![0.0; dim];
+            v[i] = 1.0;
+            v
+        })
+        .collect();
 
     let n_spectrum_steps = 50.min(steps as usize);
     for _ in 0..n_spectrum_steps {
@@ -201,25 +237,33 @@ fn estimate_kaplan_yorke(
             let mut state_pert = state.clone();
             state_pert[j] += eps;
             let f_pert = step_f64(&state_pert, &masses);
-            for i in 0..dim { jacobian[i][j] = (f_pert[i] - step_map[i]) / eps; }
+            for i in 0..dim {
+                jacobian[i][j] = (f_pert[i] - step_map[i]) / eps;
+            }
         }
 
         let mut q_new: Vec<Vec<f64>> = vec![vec![0.0; dim]; dim];
         for i in 0..dim {
             for k in 0..dim {
-                for j in 0..dim { q_new[i][j] += q[i][k] * jacobian[k][j]; }
+                for j in 0..dim {
+                    q_new[i][j] += q[i][k] * jacobian[k][j];
+                }
             }
         }
 
         for i in 0..dim {
             for j in 0..i {
                 let dot: f64 = (0..dim).map(|k| q_new[i][k] * q_new[j][k]).sum();
-                for k in 0..dim { q_new[i][k] -= dot * q_new[j][k]; }
+                for k in 0..dim {
+                    q_new[i][k] -= dot * q_new[j][k];
+                }
             }
             let norm: f64 = (0..dim).map(|k| q_new[i][k] * q_new[i][k]).sum::<f64>().sqrt();
             if norm > 1e-15 {
                 lyapunov_exponents[i] += norm.ln();
-                for k in 0..dim { q_new[i][k] /= norm; }
+                for k in 0..dim {
+                    q_new[i][k] /= norm;
+                }
             }
         }
         q = q_new;
@@ -227,7 +271,11 @@ fn estimate_kaplan_yorke(
     }
 
     let total_time = n_spectrum_steps as f64 * dt.to_f64();
-    if total_time > 0.0 { for le in &mut lyapunov_exponents { *le /= total_time; } }
+    if total_time > 0.0 {
+        for le in &mut lyapunov_exponents {
+            *le /= total_time;
+        }
+    }
     lyapunov_exponents.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
 
     let mut cumulative = 0.0;
@@ -255,7 +303,13 @@ mod tests {
     #[test]
     fn test_lyapunov_estimator_runs() {
         let bodies = create_standard_config(5);
-        let estimator = LyapunovEstimator::new(&bodies, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G, IntegrationMethod::Verlet);
+        let estimator = LyapunovEstimator::new(
+            &bodies,
+            DEFAULT_DT,
+            SOFTENING_FACTOR,
+            DEFAULT_G,
+            IntegrationMethod::Verlet,
+        );
         let result = estimator.estimate(100, 10000).unwrap();
         assert!(result.lyapunov_steps > 0);
     }

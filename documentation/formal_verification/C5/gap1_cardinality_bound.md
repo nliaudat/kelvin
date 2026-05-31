@@ -25,7 +25,7 @@ Each body contributes 7 bounded Q32.64 values:
 |------------|-----------------|--------|
 | Non-collision (r_i ≠ r_j) | ≤ 0.1 bits | Inclusion-exclusion; negligible for large space |
 | Min separation | ≤ 5 bits | Phase-space volume ratio: `V_sep / V_total` |
-| Bound orbit (E < threshold) | ≤ 100 bits | Empirically ≤ 2^{-100} fraction rejected |
+| Bound orbit (E < threshold) | ≤ 100 bits | Empirically ≥ 2^{-100} fraction kept |
 
 $$H ≥ 2469.5 - 0.1 - 5 - 100 ≈ 2364.4 \text{ bits} ≥ 1920$$
 
