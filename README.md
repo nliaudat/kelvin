@@ -75,7 +75,7 @@ OrbitalConfig (masses, positions, velocities, G, ε)
 ┌──────────────────────────────────────────────────────────────┐
 │  Phase 2: Entropy Extraction (SHAKE256)                       │
 │  • Hash final orbital state + physical constants + forces     │
-│  • Produce 2048-byte entropy pool                              │
+│  • Produce 2048-byte entropy pool                             │
 │  • Domain-separated: V2/V3/H/Prism/Split/Flare are isolated  │
 └──────────────────────────┬───────────────────────────────────┘
                            │

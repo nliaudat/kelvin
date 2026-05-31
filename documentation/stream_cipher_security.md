@@ -14,7 +14,7 @@ Kelvin's XOR-based modes (Chaos V2, Photon V3, Quantum H, Prism, Split, Flare) p
 
 ### Important Caveats
 
-This document describes security properties under specific assumptions. Unlike standard cryptosystems (AES, ChaCha20), Kelvin's security model has **no formal reduction to a known hard problem** (lattice, discrete log, factoring, or similar). The security bounds C1–C5 are plausibility arguments based on physical chaos and computational indistinguishability of SHAKE256 — not formal security reductions. The system's effective post-quantum security is bounded by SHAKE256's Grover resistance: **128 bits**.
+This document describes security properties under specific assumptions. Unlike standard cryptosystems (AES, ChaCha20), Kelvin's security model has **no formal reduction to a known hard problem** (lattice, discrete log, factoring, or similar). The security estimates C1–C5 are plausibility arguments based on physical chaos and computational indistinguishability of SHAKE256 — not formal security reductions. The system's effective post-quantum security is bounded by SHAKE256's Grover resistance: **128 bits**.
 
 ---
 
@@ -69,7 +69,7 @@ In practice, this distinction is irrelevant for any real adversary:
 
 | Attack | Effort Required | Feasibility | Why |
 |--------|----------------|-------------|-----|
-| **Brute-force orbital config** | ~2^1920 (estimate: ~40 effective bits × ~48 fields) | ❌ Infeasible | Estimated config space; effective security bounded by SHAKE256's 128-bit quantum resistance |
+| **Brute-force orbital config** | ~2¹⁹²⁰ (estimate: ~40 effective bits × ~48 fields) | ❌ Infeasible | Estimated config space; effective security bounded by SHAKE256's 128-bit quantum resistance |
 | **Shortcut simulation (classical)** | Unknown — provably no closed form | ❌ Infeasible | N-body has no algebraic shortcut (Poincaré, 1899) |
 | **Shortcut simulation (quantum)** | Unknown — no known quantum algorithm | ❌ No known speedup | Sequential chaos cannot be superposed; each step depends on the previous |
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
