@@ -96,7 +96,7 @@ Gap 6 proves that these two measures are nearly identical:
 |---------|-------|-------------|
 | Hartley `H₀` (per-step loss) | `k_step = 40 bits` | Used in analysis |
 | Min-entropy `H∞` (per-step loss) | `k_step − δ ≈ 39.98 bits` | Used in security bounds |
-| Relative difference | `δ / `k_step` ≈ 0.05%` | Negligible |
+| Relative difference | `δ / ``k_step`` ≈ 0.05%` | Negligible |
 
 ### 3.2 The reduction is:
 

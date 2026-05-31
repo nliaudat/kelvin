@@ -102,7 +102,7 @@ This piecewise function captures both regimes:
 | Regime | Steps | Loss Behavior | Mechanism |
 |--------|-------|---------------|-----------|
 | **Pre-saturation** | `S < S*` | `L = S × k_step` linear growth | C1: fixed-point rounding |
-| **Post-saturation** | `S ≥ S*` | `L = `H_max` − log₂(A)` constant | C2: chaotic divergence |
+| **Post-saturation** | `S ≥ S*` | `L = ``H_max`` − log₂(A)` constant | C2: chaotic divergence |
 
 For N=5 Verlet with `S = 1,000,000` (default):
 

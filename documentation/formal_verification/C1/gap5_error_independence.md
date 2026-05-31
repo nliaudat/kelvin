@@ -31,7 +31,7 @@ Within a single Verlet step, the `dist_cubed` values for all `N(N−1)/2` pairs 
 
 - 10 pairwise `dist_cubed` values from 15 position coordinates
 - Pairs (i,j) and (i,k) share body i → their `dist_cubed` values are structurally dependent
-- Triangle inequality constrains the relationship between |r_ij|, |r_ik|, |r_jk|
+- Triangle inequality constrains the relationship between |`r_ij`|, |`r_ik`|, |`r_jk`|
 
 ### 2.2 Concrete Example of Correlation
 
@@ -119,4 +119,4 @@ The full additive model (`k_step = 2N(N-1) = 40 bits`) is justified for the defa
 
 ## See Also
 
-- [C1 Proof Sketch](C1/proof_sketch.md)
+- [C1 Proof Sketch](C1/`proof_sketch`.md)

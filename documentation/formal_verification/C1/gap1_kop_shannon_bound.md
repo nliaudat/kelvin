@@ -57,7 +57,7 @@ $$\left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{\text{den}} \right\rceil = q_{
 This is equivalent to all `den` in the interval:
 
 $$\text{den} \in \left( \frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}} + 0.5},\;
-\frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}} - 0.5} \right]$$
+\`frac{g_{`\text{raw}} \cdot 2^`{64}}{q_{`\text{raw}} - 0.5} \right]$$
 
 The size of this preimage set in raw units is bounded by:
 
@@ -178,4 +178,4 @@ For N=5 Verlet:
 
 ## See Also
 
-- [C1 Proof Sketch](C1/proof_sketch.md)
+- [C1 Proof Sketch](C1/`proof_sketch`.md)

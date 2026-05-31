@@ -36,4 +36,4 @@ $$H ≥ 2469.5 - 0.1 - 5 - 100 ≈ 2364.4 \text{ bits} ≥ 1920$$
 
 ## See Also
 
-- [C5 Proof Sketch](C5/proof_sketch.md)
+- [C5 Proof Sketch](C5/`proof_sketch`.md)

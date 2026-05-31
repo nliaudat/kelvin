@@ -42,7 +42,7 @@ This is the **quantization step size** for `dist_cubed_raw` as seen through the 
 
 ### 2.3 The LSB Leakage Fraction
 
-When the quotient `q` is zero or near-zero (which occurs when `dist_cubed_raw > `g_raw` · 2^64 / 0.5 ≈ 2 · `g_raw` · 2^64`), the quotient carries no information about the LSB of `dist_cubed` — the information loss is exactly 1 bit.
+When the quotient `q` is zero or near-zero (which occurs when `dist_cubed_raw > ``g_raw`` · 2^64 / 0.5 ≈ 2 · ``g_raw`` · 2^64`), the quotient carries no information about the LSB of `dist_cubed` — the information loss is exactly 1 bit.
 
 When `q` is large (which occurs when `dist_cubed_raw` is near MIN), the quotient **resolves** the LSB of `dist_cubed` — the division acts more like a one-to-one mapping and the information loss is less than 1 bit.
 
@@ -135,4 +135,4 @@ The empirical validation in `tests/information_loss/` reports:
 
 ## See Also
 
-- [C1 Proof Sketch](C1/proof_sketch.md)
+- [C1 Proof Sketch](C1/`proof_sketch`.md)

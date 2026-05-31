@@ -10,7 +10,7 @@
 ## 1. Conditional Theorem Statement
 
 **Theorem (Conditional on Ergodicity):**
-If the discrete-time Verlet map `Φ: X → X` for the N-body gravitational system (N ≥ 3) is ergodic on its invariant set with respect to the natural phase-space measure, then for any bounded observation function `f(`dist_cubed`)`, the time average equals the ensemble average:
+If the discrete-time Verlet map `Φ: X → X` for the N-body gravitational system (N ≥ 3) is ergodic on its invariant set with respect to the natural phase-space measure, then for any bounded observation function `f(``dist_cubed``)`, the time average equals the ensemble average:
 
 $$\lim_{S \to \infty} \frac{1}{S} \sum_{t=1}^{S} f(\text{dist\_cubed}_t) = \int f(x) \, \mu(dx)$$
 

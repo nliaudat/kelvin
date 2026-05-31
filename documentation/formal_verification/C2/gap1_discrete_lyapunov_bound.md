@@ -88,11 +88,11 @@ $$\varepsilon_q \approx 5.4 \times 10^{-20} \text{ (negligible)}$$
 
 $$\sigma\sqrt{3}/\sqrt{S} \approx \frac{0.07 \times 1.73}{44.7} \approx 0.0027$$
 
-**Total: |λ_disc − λ_cont| ≤ 0.024**, dominated by the Padé approximation error.
+**Total: |`λ_disc` − `λ_cont`| ≤ 0.024**, dominated by the Padé approximation error.
 
 ## 3. Practical Significance
 
-The bound shows that λ_disc is within ~0.02 of the true λ_cont. Since λ ≈ 0.693 (empirical), the relative error is ≈ 3%. This is acceptable for the C2 security argument — λ > 0 is robustly certified, and the Kaplan-Yorke dimension derived from λ is not sensitive to this level of uncertainty.
+The bound shows that `λ_disc` is within ~0.02 of the true `λ_cont`. Since λ ≈ 0.693 (empirical), the relative error is ≈ 3%. This is acceptable for the C2 security argument — λ > 0 is robustly certified, and the Kaplan-Yorke dimension derived from λ is not sensitive to this level of uncertainty.
 
 ## 4. References
 
@@ -105,4 +105,4 @@ The bound shows that λ_disc is within ~0.02 of the true λ_cont. Since λ ≈ 0
 
 ## See Also
 
-- [C2 Proof Sketch](C2/proof_sketch.md)
+- [C2 Proof Sketch](C2/`proof_sketch`.md)
