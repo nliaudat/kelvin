@@ -8,7 +8,7 @@ This document evaluates the security of Kelvin in the context of a Post-Quantum 
 |-----------|-----------|----------------|--------------------|
 | **Symmetric Cipher** | ChaCha20 | **Quantum-Resistant** | 128-bit (Grover) |
 | **Entropy Extractor (SHA3-512)** | SHA3-512 | **Quantum-Resistant** | 256-bit (Grover) |
-| **Entropy Extractor (SHAKE256)** | SHAKE256 (XOF) | **Quantum-Resistant** | 256-bit (Grover) |
+| **Entropy Extractor (SHAKE256)** | SHAKE256 (XOF) | **Quantum-Resistant** | 128-bit (Grover) |
 | **Entropy Pool** | 2048-byte SHAKE256 pool | **Quantum-Resistant** | 256-bit (Grover) |
 | **Asymmetric Identity** | **ML-DSA-65** | **Quantum-Resistant** | NIST Level 3 (Lattice) |
 | **Chaos Generator** | N-Body Simulation | **Likely PQ-Safe** | Unquantified |

@@ -29,4 +29,4 @@ Please be respectful and professional in all communications. We follow the stand
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's current license (CC-BY-NC-SA-4.0).
+By contributing, you agree that your contributions will be licensed under the Apache-2.0 / MIT dual license.

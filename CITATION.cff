@@ -7,9 +7,9 @@ authors:
     orcid: ""
     affiliation: ""
 version: 0.1.0
-date-released: 2026
+date-released: 2026-05-01
 repository-code: "https://github.com/nliaudat/kelvin"
-license: "CC-BY-NC-SA-4.0"
+license: "MIT OR Apache-2.0"
 keywords:
   - cryptography
   - key-derivation-function
@@ -17,7 +17,7 @@ keywords:
   - chaos-theory
   - post-quantum
   - rust
-abstract: "Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines Q32.64 fixed-point arithmetic, a symplectic Verlet integrator, Lyapunov time estimation, SHA3-512 entropy extraction, and a ChaCha20 stream cipher."
+abstract: "Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines Q32.64 fixed-point arithmetic, symplectic Verlet and Euler integrators, Lyapunov time estimation, SHAKE256 entropy extraction, and multiple encryption modes including ChaCha20Poly1305 (V1), SHAKE256 XOR streaming (V2), HKDF-SHA512 batch OTP (V3), and hybrid quantum streaming (H)."
 references:
   - type: article
     authors:
@@ -75,6 +75,11 @@ references:
     year: 2015
   - type: misc
     authors:
-      - name: "Harvard University"
+      - family-names: Song
+        given-names: C.
+      - family-names: Wang
+        given-names: Y.
+      - family-names: Li
+        given-names: X.
     title: "CryptoChaos: A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications"
     year: 2025

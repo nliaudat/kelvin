@@ -41,7 +41,7 @@ Condition 2 is where Kelvin differs from a true information-theoretic OTP. A cla
 > **C4 security bound**: Keystream indistinguishability is bounded by `Adv(A) ≤ negl(n) + 2⁻⁹⁶⁰`. For any real-world adversary, computational indistinguishability via SHAKE256 (NIST FIPS 202) is cryptographically equivalent to a true OTP.
 
 In practice, this distinction is irrelevant for any real adversary:
-- Distinguishing SHAKE256 output from random requires breaking the Keccak sponge — a problem with no known solution better than brute force (2^512 preimage resistance).
+- Distinguishing SHAKE256 output from random requires breaking the Keccak sponge — a problem with no known solution better than brute force (2^256 preimage resistance, 2^128 quantum).
 - A quantum computer gains only Grover's speedup (2^128).
 - The n-body simulation adds a physical entropy layer that no purely mathematical PRNG can replicate.
 - The configuration space is bounded below by |Θ₅| ≥ 2¹⁹²⁰ configurations, and the quantum search complexity is Ω(2⁹⁶⁰) via C3 bound.
@@ -52,7 +52,6 @@ In practice, this distinction is irrelevant for any real adversary:
 
 ## 3. The Four Pillars of the OTP Claim
 
-
 | Pillar | Description | Proof |
 |--------|-------------|-------|
 | **Pillar 1: Chaotic Irreversibility** | The n-body problem (N ≥ 3) has no closed-form solution. An attacker cannot shortcut the simulation — they must brute-force the orbital configuration. | Poincaré non-integrability theorem; validated Lyapunov exponent λ ≈ 0.693 |
@@ -62,7 +61,7 @@ In practice, this distinction is irrelevant for any real adversary:
 
 ---
 
-## 3. Attack Vector Analysis
+## 4. Attack Vector Analysis
 
 | Attack | Effort Required | Feasibility | Why |
 |--------|----------------|-------------|-----|
@@ -70,7 +69,7 @@ In practice, this distinction is irrelevant for any real adversary:
 | **Shortcut simulation (classical)** | Unknown — provably no closed form | ❌ Infeasible | N-body has no algebraic shortcut (Poincaré, 1899) |
 | **Shortcut simulation (quantum)** | Unknown — no known quantum algorithm | ❌ No known speedup | Sequential chaos cannot be superposed; each step depends on the previous |
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
-| **Invert SHAKE256 (classical preimage)** | 2^512 | ❌ Infeasible | 512-bit preimage resistance |
+| **Invert SHAKE256 (classical preimage)** | 2^256 | ❌ Infeasible | 256-bit preimage resistance (SHAKE256 capacity) |
 | **Nonce reuse / IV collision** | N/A | ✅ **No nonce exists** | OTP has no nonce — only config reuse matters, which the key schedule prevents |
 | **Malleability (bit-flip)** | Trivial | ⚠️ Mitigated by `--auth` | XOR is malleable; KMAC128 (NIST SP 800-185) defeats this |
 | **Key reuse across messages** | Catastrophic | ❌ Prevented by schedule | Key schedule enforces forward secrecy; each key is derived from a unique reseeded state |
@@ -79,9 +78,9 @@ In practice, this distinction is irrelevant for any real adversary:
 
 ---
 
-## 4. Formal Argument: Why This Is a "Bulletproof" OTP
+## 5. Formal Argument: Why This Is a "Bulletproof" OTP
 
-### 4.1 Shannon Perfect Secrecy
+### 5.1 Shannon Perfect Secrecy
 
 Shannon (1949) proved that a cipher achieves **perfect secrecy** if and only if:
 
@@ -95,7 +94,7 @@ This holds when the keystream is truly random and never reused. Kelvin's keystre
 2. **Extraction from chaotic dynamics** — the n-body simulation produces orbital states that are exponentially sensitive to initial conditions (validated Lyapunov exponent λ ≈ 0.693). After sufficient steps, the state is fully decorrelated from the initial configuration.
 3. **Domain-separated hashing** — each mode (Chaos, Photon, Quantum, Prism, Split, Flare) uses a unique domain separator, preventing cross-mode keystream collisions.
 
-### 4.2 Computational Perfect Secrecy
+### 5.2 Computational Perfect Secrecy
 
 For any polynomial-time adversary **A**:
 
@@ -105,7 +104,7 @@ For any polynomial-time adversary **A**:
 
 where λ is the security parameter (256-bit classical, 128-bit quantum). This means the ciphertext reveals **nothing** about the plaintext unless **A** can distinguish SHAKE256 output from random — a problem with no known solution better than brute force.
 
-### 4.3 The No-Shortcut Guarantee
+### 5.3 The No-Shortcut Guarantee
 
 The n-body problem (N ≥ 3) is **non-integrable** (Poincaré, 1899). This means:
 
@@ -117,7 +116,7 @@ This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-
 
 ---
 
-## 5. Comparison with Classical OTP
+## 6. Comparison with Classical OTP
 
 | Property | Classical OTP (paper pad) | Kelvin OTP |
 |----------|--------------------------|------------|
@@ -131,7 +130,7 @@ This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-
 
 ---
 
-## 6. Why "OTP" Is the Right Framing
+## 7. Why "OTP" Is the Right Framing
 
 Critics may argue that Kelvin's modes are "just stream ciphers, not true OTPs." This is technically correct but misses the point:
 
@@ -147,9 +146,9 @@ Kelvin's OTP modes are **structurally different** from traditional stream cipher
 
 ---
 
-## 7. Summary: The Bulletproof Claim
+## 8. Summary: The Bulletproof Claim
 
-> Kelvin's OTP architecture provides **quantum-resistant computational perfect secrecy**. An attacker with unlimited classical resources cannot distinguish the keystream from random without inverting SHAKE256 (2^512 preimage resistance). An attacker with a quantum computer gains only Grover's square-root speedup (2^128). And no attacker — classical or quantum — can shortcut the n-body simulation that seeds the entropy.
+> Kelvin's OTP architecture provides **quantum-resistant computational perfect secrecy**. An attacker with unlimited classical resources cannot distinguish the keystream from random without inverting SHAKE256 (2^256 preimage resistance, 2^128 quantum). An attacker with a quantum computer gains only Grover's square-root speedup (2^128). And no attacker — classical or quantum — can shortcut the n-body simulation that seeds the entropy.
 
 > **The only attack is brute force — and the search space is astronomical.**
 
@@ -165,7 +164,7 @@ Kelvin's OTP modes are **structurally different** from traditional stream cipher
 
 ---
 
-## 8. References
+## 9. References
 
 - Shannon, C. E. (1949). "Communication Theory of Secrecy Systems." *Bell System Technical Journal*, 28(4), 656–715.
 - Bertoni, G., Daemen, J., Peeters, M., & Van Assche, G. (2013). "Keccak." *EUROCRYPT 2013*, 313–314.
@@ -175,4 +174,5 @@ Kelvin's OTP modes are **structurally different** from traditional stream cipher
 - NIST FIPS 203 (2024). "Module-Lattice-Based Key-Encapsulation Mechanism Standard (ML-KEM)."
 - NIST FIPS 204 (2024). "Module-Lattice-Based Digital Signature Standard (ML-DSA)."
 - Aumasson, J. P., et al. (2013). "BLAKE2: simpler, smaller, fast as MD5." *ACNS 2013*.
+- O'Connor, J., Aumasson, J. P., Neves, S., & Wilcox-O'Hearn, Z. (2021). "BLAKE3: one function, fast everywhere." *USENIX Security 2021*.
 - NIST SP 800-185 (2016). "SHA-3 Derived Functions: cSHAKE, KMAC, TupleHash, and ParallelHash."

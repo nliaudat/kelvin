@@ -3,7 +3,7 @@ name = "kelvin-test-server"
 version = "0.1.0"
 edition = "2021"
 description = "Test vector server for Kelvin cryptosystem — generates golden files for cross-platform determinism verification"
-license = "CC-BY-NC-SA-4.0"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "kelvin-test-server"

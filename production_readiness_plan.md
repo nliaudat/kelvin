@@ -51,11 +51,11 @@ Security is the primary requirement for production readiness. We must move beyon
 - [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
 - [x] **Initial Condition Entropy**: Implement $\pm 25\%$ Sun mass randomization to significantly increase the bit-distinct expression space. *(Completed 2026-05-11)*
 - [x] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(Completed 2026-05-20)*
-- [x] **Stream Authentication**: BLAKE3-keyed MAC authenticated tagging (32-byte tag) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*
+- [x] **Stream Authentication**: KMAC128 authenticated tagging (32-byte tag, NIST SP 800-185) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*
     - `KelvinPhotonAuthenticated` and `KelvinQuantumAuthenticated` wrappers in `kelvin/src/authenticated.rs`
     - MAC key derived via HKDF-SHA512 with domain separator `b"kelvin-mac-key-v1"`
     - Constant-time tag verification via `subtle::ConstantTimeEq`
-    - Wire format: `ciphertext (N bytes) || BLAKE3-keyed MAC tag (32 bytes)`
+    - Wire format: `ciphertext (N bytes) || KMAC128 tag (32 bytes)`
     - **16 tests** covering round-trip, tampered ciphertext, tampered tag, determinism, empty data, short data, bytes processed, reseed preservation, and cross-mode differentiation
 
 ### 1.3 Side-Channel Resistance
@@ -244,13 +244,8 @@ Automate everything to ensure quality and prevent regressions.
 - [ ] **Regression Detection**: Run `criterion` benchmarks in CI and fail if performance drops by >5% on core simulation paths.
 
 ### 3.4 Comparative Benchmarking
-- [ ] **Throughput Comparison**: Run `criterion` benchmarks comparing Kelvin modes against established libraries.
-    - `KelvinQuantum` (H) vs. AES-256-GCM (`ring`) — MB/s throughput
-    - `KelvinQuantum` (H) vs. ChaCha20-Poly1305 (`ring`) — MB/s throughput
-    - `KelvinStreaming` (V2) vs. AES-256-CTR — MB/s throughput
-    - Key generation time vs. X25519 (`dalek`)
-    - Signature time (optional HAWK) vs. ED25519 (`dalek`)
-- [ ] **Results Publication**: Publish benchmark results in `/docs/benchmarks/` as interactive charts.
+- [x] **Throughput Comparison**: Published in `documentation/bench_comparative.md` — Kelvin modes vs AES-256-GCM, ChaCha20-Poly1305, AES-256-CTR, and key generation comparisons (see `tests/comparative_bench/`).
+- [ ] **Results Publication** (future): Publish benchmark results as interactive charts.
 
 ---
 
@@ -262,7 +257,7 @@ Automate everything to ensure quality and prevent regressions.
 
 ### 4.2 Security Policies
 - [x] **SECURITY.md**: Created with vulnerability reporting policy. See `SECURITY.md` in repo root.
-- [ ] **Disclosure Plan**: Define how security advisories will be communicated to users.
+- [x] **Disclosure Plan**: Defined in SECURITY.md (GitHub Security Advisories, release notes, 90-day timeline).
 
 ### 4.3 Documentation
 - [ ] **Kelvin Book**: Expand documentation into a full [mdBook](https://rust-lang.github.io/mdBook/) including:

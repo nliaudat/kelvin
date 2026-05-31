@@ -1,6 +1,6 @@
 # Euler vs Verlet: Why Numerical Instability Is a Feature for Cryptographic Entropy
 
-> **CLI Usage:** The `--verlet` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--verlet` to select Verlet integration; omit it for the default Euler. The integration method must match between encryption and decryption.
+> **CLI Usage:** The `--euler` flag is available on both `encrypt` and `decrypt` subcommands for all modes (secure, chaos, photon, quantum). Use `--euler` to select Euler integration; omit it for the default Verlet. The integration method must match between encryption and decryption.
 
 ## The Critical Insight
 
@@ -70,6 +70,10 @@ Euler uses a smaller timestep (dt=0.001 vs Verlet's dt=0.01) for stability, but 
 ///
 /// Uses dt=0.001 (10x smaller than Verlet) for stability,
 /// but energy drift still creates ~10x more trajectory divergence.
+///
+/// NOTE: This is pseudocode for illustrative purposes. The production
+/// implementation uses Q32.64 fixed-point arithmetic (i128-based)
+/// in kelvin-core/src/fixed_math.rs.
 pub fn euler_step(&mut self) -> Result<(), OrbitalError> {
     const DT: f64 = 0.001;
     const G: f64 = 1.0;

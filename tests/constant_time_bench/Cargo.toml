@@ -3,7 +3,7 @@ name = "constant_time_bench"
 version = "0.1.0"
 edition = "2021"
 description = "DudeCT constant-time benchmarking for Kelvin cryptosystem fixed-point operations"
-license = "CC-BY-NC-SA-4.0"
+license = "MIT OR Apache-2.0"
 
 [[bin]]
 name = "constant_time_bench"

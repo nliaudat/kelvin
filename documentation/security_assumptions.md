@@ -23,7 +23,7 @@ velocities) within useful precision.
 ### Rationale
 
 The N-body problem (N ≥ 3) has no closed-form analytical solution (Poincaré,
-1889). Numerical integration is the only path forward. There is no known
+1899). Numerical integration is the only path forward. There is no known
 algorithm to invert the Verlet or Euler integrator for a general N-body
 configuration — an attacker would need to simulate forward from every possible
 initial condition to find one matching the final state.

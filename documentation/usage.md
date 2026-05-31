@@ -66,6 +66,7 @@ kelvin identify --config my_secret.json --all
 
 # Show specific identities
 kelvin identify --config my_secret.json --ecc --kem
+```
 
 ### Authenticated Encryption (`--auth`)
 V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability.

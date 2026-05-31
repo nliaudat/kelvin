@@ -3,7 +3,7 @@ name = "kelvin-pyo3"
 version = "0.1.0"
 edition = "2021"
 description = "Python bindings for the Kelvin Orbital Chaos KDF Cryptosystem (PyO3)"
-license = "CC-BY-NC-SA-4.0"
+license = "MIT OR Apache-2.0"
 
 [lib]
 name = "kelvin_pyo3"
