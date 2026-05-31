@@ -40,7 +40,7 @@ Per-step rounding operation count:
 
 ## Per-Operation Information Loss
 
-The division discards the remainder $r = (g_{\text{raw}} \cdot 2^{64}) \bmod \text{dist\_cubed}_{\text{raw}}$, which depends on the LSB of $\text{dist\_cubed}$. For a uniformly distributed input, this LSB carries 1 bit of Shannon entropy, giving $k_{op} \ge 1$ bit per operation (with $\varepsilon$-bound $k_{op} \ge 0.98$).
+The division discards the remainder $r = (g_{\text{raw}} \cdot 2^{64}) \bmod d^3_{\text{raw}}$, which depends on the LSB of $d^3$. For a uniformly distributed input, this LSB carries 1 bit of Shannon entropy, giving $k_{op} \ge 1$ bit per operation (with $\varepsilon$-bound $k_{op} \ge 0.98$).
 
 ## Per-Step Cumulative Loss
 
@@ -62,13 +62,13 @@ $$\log_2(A) \le D_{KY} = j + \frac{\sum_{i=1}^{j} \lambda_i}{|\lambda_{j+1}|}$$
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | $k_{op} \ge 1$ bit | [`gap1_kop_shannon_bound`](C1/gap1_kop_shannon_bound.md) | ✅ RESOLVED |
-| 2 | Uniformity of $\text{dist\_cubed}$ | [`gap2_uniform_distribution`](C1/gap2_uniform_distribution.md) | ✅ JUSTIFIED |
-| 3 | Cumulative loss saturation | [`gap3_saturation_bound`](C1/gap3_saturation_bound.md) | ✅ RESOLVED |
-| 4 | $\varepsilon$-bound $k_{op} \ge 1 - \varepsilon$ | [`gap4_epsilon_bound`](C1/gap4_epsilon_bound.md) | ✅ RESOLVED |
-| 5 | Rounding error independence (Lemma A3) | [`gap5_error_independence`](C1/gap5_error_independence.md) | ✅ JUSTIFIED |
-| 6 | Hartley vs min-entropy | [`gap6_hartley_min_entropy`](C1/gap6_hartley_min_entropy.md) | ✅ RESOLVED |
-| 7 | Verlet double-computation | [`gap7_verlet_double_effect`](C1/gap7_verlet_double_effect.md) | ✅ VERIFIED |
+| 1 | $k_{op} \ge 1$ bit | [`gap1_kop_shannon_bound`](gap1_kop_shannon_bound.md) | ✅ RESOLVED |
+| 2 | Uniformity of $d^3$ | [`gap2_uniform_distribution`](gap2_uniform_distribution.md) | ✅ JUSTIFIED |
+| 3 | Cumulative loss saturation | [`gap3_saturation_bound`](gap3_saturation_bound.md) | ✅ RESOLVED |
+| 4 | $\varepsilon$-bound $k_{op} \ge 1 - \varepsilon$ | [`gap4_epsilon_bound`](gap4_epsilon_bound.md) | ✅ RESOLVED |
+| 5 | Rounding error independence (Lemma A3) | [`gap5_error_independence`](gap5_error_independence.md) | ✅ JUSTIFIED |
+| 6 | Hartley vs min-entropy | [`gap6_hartley_min_entropy`](gap6_hartley_min_entropy.md) | ✅ RESOLVED |
+| 7 | Verlet double-computation | [`gap7_verlet_double_effect`](gap7_verlet_double_effect.md) | ✅ VERIFIED |
 
 ## Kani-Verified Harnesses
 

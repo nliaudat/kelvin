@@ -1,0 +1,13 @@
+import os
+
+base = r"c:\Users\nl\Dropbox\kelvin\documentation\formal_verification\C1"
+fn = os.path.join(base, "gap1_kop_shannon_bound.md")
+
+with open(fn, "r", encoding="utf-8") as f:
+    lines = f.readlines()
+
+for i in [36, 40, 44, 63, 74, 81, 88, 93, 98, 103]:
+    if i < len(lines):
+        line = lines[i]
+        if "text" in line:
+            print(f"L{i+1}: {repr(line.rstrip())}")

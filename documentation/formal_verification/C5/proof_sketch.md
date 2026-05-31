@@ -20,8 +20,8 @@ For $N = 5$ bodies:
 3. **Velocity**: $v_i \in [-100, 100]^3$ AU/yr → $(201 \times 2^{64})^3$ values
 4. **Non-collision**: $r_i \neq r_j$ for $i \neq j$
 5. **Minimum separation**: $|r_i - r_j| \ge \text{min\_separation}$
-6. **Bound orbit**: Specific energy $< ejection\_threshold$
-7. **Chaos horizon**: $total\_steps \ge min\_chaos\_steps$
+6. **Bound orbit**: Specific energy $< \text{ejection\_threshold}$
+7. **Chaos horizon**: $\text{total\_steps} \ge \text{min\_chaos\_steps}$
 
 ## Analytical Bound Derivation
 

@@ -119,4 +119,4 @@ The full additive model (`k_step = 2N(N-1) = 40 bits`) is justified for the defa
 
 ## See Also
 
-- [C1 Proof Sketch](C1/`proof_sketch`.md)
+- [C1 Proof Sketch](proof_sketch.md)

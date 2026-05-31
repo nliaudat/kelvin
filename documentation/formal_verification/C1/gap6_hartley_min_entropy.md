@@ -64,7 +64,7 @@ $$\frac{\max_y p_S(y)}{\bar{p}} = \frac{\max_y |Φ^{-S}(\{y\})|}{\text{avg}_y |�
 
 From the finite-state pigeonhole argument (Gap 3), the preimage sizes are bounded by:
 
-$$1 \leq |Φ^{-1}(\{z\})| \leq \left\lfloor \frac{\text{dist\_cubed}_{\text{raw}}}{2^{64}} \right\rfloor \leq 8,000,000$$
+$$1 \leq |Φ^{-1}(\{z\})| \leq \left\lfloor \frac{d^3_{\text{raw}}}{2^{64}} \right\rfloor \leq 8,000,000$$
 
 The ratio of maximum to average preimage is bounded by the fraction of inputs in the "resolving" regime of the division (Gap 4):
 
@@ -136,4 +136,4 @@ All 6 C1 gaps are now resolved:
 
 ## See Also
 
-- [C1 Proof Sketch](C1/proof_sketch.md)
+- [C1 Proof Sketch](proof_sketch.md)
