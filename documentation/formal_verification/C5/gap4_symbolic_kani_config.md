@@ -33,3 +33,8 @@ The current concrete-input harnesses are sufficient. The validation function use
 
 - `kelvin-kdf/src/config.rs` (validation logic, all comparison-based)
 - Existing L0 harnesses in `fixed_math.rs` (same pattern: concrete boundary conditions)
+---
+
+## See Also
+
+- [C5 Proof Sketch](C5/proof_sketch.md)

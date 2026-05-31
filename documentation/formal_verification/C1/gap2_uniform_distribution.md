@@ -138,3 +138,8 @@ These Kani harnesses from C2 provide a computational foundation: the system is p
 4. Benettin, G., et al. (1980). "Lyapunov Characteristic Exponents." *Meccanica*, 15, 9–20.
 5. Kolmogorov, A. N. (1933). "Sulla determinazione empirica di una legge di distribuzione."
    — Kolmogorov-Smirnov test foundation.
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

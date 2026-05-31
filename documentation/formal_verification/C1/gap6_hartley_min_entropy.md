@@ -18,7 +18,7 @@ where:
 - `H₀(P_S) = log₂(supp(P_S))` is the Hartley entropy (log of support size)
 - `H∞(P_S) = −log₂(max_y p_S(y))` is the min-entropy
 - `δ = log₂( max_y p_S(y) · |X| / |Φ^(−S)({y})| )` is the uniformity deviation
-- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≤ 1 / log₂(MAX/MIN)` where `ε = 1 / log₂(MAX/MIN)`
+- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≈ 0.0197` where `ε = 1 / log₂(MAX/MIN)`
 
 For the standard 5-body Verlet configuration, **δ ≤ 0.0197**, giving:
 
@@ -88,7 +88,7 @@ The min-entropy is within 0.02 bits of the Hartley entropy — the preimage dist
 
 ### 3.1 Information Loss in Meaningful Units
 
-The C1 claim that "the simulation loses k_step bits of information per step" uses Hartley entropy (`log₂` of preimage size). The security implications (quantum adversary advantage bounds) use **min-entropy** because security is defined against the worst-case preimage, not the average.
+The C1 claim that "the simulation loses `k_step` bits of information per step" uses Hartley entropy (`log₂` of preimage size). The security implications (quantum adversary advantage bounds) use **min-entropy** because security is defined against the worst-case preimage, not the average.
 
 Gap 6 proves that these two measures are nearly identical:
 
@@ -131,3 +131,9 @@ All 6 C1 gaps are now resolved:
 4. `documentation/formal_verification/C1/gap4_epsilon_bound.md` (ε-bound)
 5. `documentation/formal_verification/C1/gap5_error_independence.md` (independence)
 6. Renyi, A. (1961). "On Measures of Entropy and Information." *Proc. 4th Berkeley Symp. Math. Stat. Prob.*, 1, 547–561. — Hartley and min-entropy definitions.
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

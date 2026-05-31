@@ -28,3 +28,8 @@ $$C_{bias} \le \frac{3 \times 0.1 \times 0.693}{\sqrt{3} \times 2000 \times 0.01
 
 - `kelvin-kdf/src/lyapunov.rs` (3-axis perturbation loop)
 - Wolf, A., et al. (1985). "Determining Lyapunov Exponents from a Time Series." *Physica D*, 16(3), 285–317.
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

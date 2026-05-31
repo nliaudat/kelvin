@@ -62,13 +62,13 @@ $$\log_2(A) \le D_{KY} = j + \frac{\sum_{i=1}^{j} \lambda_i}{|\lambda_{j+1}|}$$
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | $k_{op} \ge 1$ bit | `gap1_kop_shannon_bound.md` | ✅ RESOLVED |
-| 2 | Uniformity of $\text{dist\_cubed}$ | `gap2_uniform_distribution.md` | ✅ JUSTIFIED |
-| 3 | Cumulative loss saturation | `gap3_saturation_bound.md` | ✅ RESOLVED |
-| 4 | $\varepsilon$-bound $k_{op} \ge 1 - \varepsilon$ | `gap4_epsilon_bound.md` | ✅ RESOLVED |
-| 5 | Rounding error independence (Lemma A3) | `gap5_error_independence.md` | ✅ JUSTIFIED |
-| 6 | Hartley vs min-entropy | `gap6_hartley_min_entropy.md` | ✅ RESOLVED |
-| 7 | Verlet double-computation | `gap7_verlet_double_effect.md` | ✅ VERIFIED |
+| 1 | $k_{op} \ge 1$ bit | [`gap1_kop_shannon_bound`](C1/gap1_kop_shannon_bound.md) | ✅ RESOLVED |
+| 2 | Uniformity of $\text{dist\_cubed}$ | [`gap2_uniform_distribution`](C1/gap2_uniform_distribution.md) | ✅ JUSTIFIED |
+| 3 | Cumulative loss saturation | [`gap3_saturation_bound`](C1/gap3_saturation_bound.md) | ✅ RESOLVED |
+| 4 | $\varepsilon$-bound $k_{op} \ge 1 - \varepsilon$ | [`gap4_epsilon_bound`](C1/gap4_epsilon_bound.md) | ✅ RESOLVED |
+| 5 | Rounding error independence (Lemma A3) | [`gap5_error_independence`](C1/gap5_error_independence.md) | ✅ JUSTIFIED |
+| 6 | Hartley vs min-entropy | [`gap6_hartley_min_entropy`](C1/gap6_hartley_min_entropy.md) | ✅ RESOLVED |
+| 7 | Verlet double-computation | [`gap7_verlet_double_effect`](C1/gap7_verlet_double_effect.md) | ✅ VERIFIED |
 
 ## Kani-Verified Harnesses
 

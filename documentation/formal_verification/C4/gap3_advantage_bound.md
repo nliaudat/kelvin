@@ -24,3 +24,8 @@ For N=5 Verlet, S=1,000,000: `S·k = 40,000,000` → advantage bound is `negl(n)
 - C1 (information loss per step)
 - `formal_verification.md` §L4' (reduction proof sketch)
 - `kelvin-kdf/src/extractor.rs` (extraction pipeline: determinism + domain separation)
+---
+
+## See Also
+
+- [C4 Proof Sketch](C4/proof_sketch.md)

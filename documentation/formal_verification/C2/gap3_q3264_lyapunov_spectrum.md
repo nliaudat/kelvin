@@ -28,3 +28,8 @@ The f64 Lyapunov spectrum computed in `tests/lyapunov_certification/` is effecti
 
 - Wedin, P. Å. (1972). "Perturbation bounds in connection with singular value decomposition." *BIT Numerical Mathematics*, 12(1), 99–111.
 - `tests/lyapunov_certification/src/main.rs` (f64 spectrum implementation)
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

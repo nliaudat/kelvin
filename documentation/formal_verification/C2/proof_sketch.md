@@ -27,12 +27,12 @@ The f64 QR decomposition spectrum deviates from Q32.64 by at most $\kappa(J) \cd
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | $|\lambda_{disc} - \lambda_{cont}|$ error bound | `gap1_discrete_lyapunov_bound.md` | ✅ RESOLVED |
-| 2 | Positive $\lambda$ lower bound | `gap2_positive_lambda_certification.md` | ✅ RESOLVED |
-| 3 | Full Lyapunov spectrum in Q32.64 | `gap3_q3264_lyapunov_spectrum.md` | ✅ RESOLVED |
-| 4 | Kaplan-Yorke entropy bound | `gap4_kaplan_yorke_entropy.md` | ✅ RESOLVED |
-| 5 | Shadow orbit bias constant | `gap5_shadow_orbit_bias.md` | ✅ RESOLVED |
-| 6 | Lipschitz constant of $\lambda$ | `gap6_lipschitz_lambda.md` | ✅ RESOLVED |
+| 1 | $|\lambda_{disc} - \lambda_{cont}|$ error bound | [`gap1_discrete_lyapunov_bound`](C2/gap1_discrete_lyapunov_bound.md) | ✅ RESOLVED |
+| 2 | Positive $\lambda$ lower bound | [`gap2_positive_lambda_certification`](C2/gap2_positive_lambda_certification.md) | ✅ RESOLVED |
+| 3 | Full Lyapunov spectrum in Q32.64 | [`gap3_q3264_lyapunov_spectrum`](C2/gap3_q3264_lyapunov_spectrum.md) | ✅ RESOLVED |
+| 4 | Kaplan-Yorke entropy bound | [`gap4_kaplan_yorke_entropy`](C2/gap4_kaplan_yorke_entropy.md) | ✅ RESOLVED |
+| 5 | Shadow orbit bias constant | [`gap5_shadow_orbit_bias`](C2/gap5_shadow_orbit_bias.md) | ✅ RESOLVED |
+| 6 | Lipschitz constant of $\lambda$ | [`gap6_lipschitz_lambda`](C2/gap6_lipschitz_lambda.md) | ✅ RESOLVED |
 
 ## Kani-Verified Harnesses
 

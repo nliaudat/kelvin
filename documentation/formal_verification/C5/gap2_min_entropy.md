@@ -24,3 +24,8 @@ The uniform distribution over the valid space `Θ_5` assigns each valid configur
 ## 3. References
 
 - `tests/configuration_space/` (Monte Carlo: sampled configurations are approximately uniform)
+---
+
+## See Also
+
+- [C5 Proof Sketch](C5/proof_sketch.md)

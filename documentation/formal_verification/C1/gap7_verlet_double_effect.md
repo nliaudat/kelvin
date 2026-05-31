@@ -72,7 +72,7 @@ pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fi
 }
 ```
 
-| Integrator | Accelerations/Step | Rounding Ops/Step | k_step (N=5) |
+| Integrator | Accelerations/Step | Rounding Ops/Step | `k_step` (N=5) |
 |------------|-------------------|-------------------|--------------|
 | Verlet | 2 | `4 × N(N−1)/2 = 2N(N−1)` | 40 bits |
 | Euler | 1 | `2 × N(N−1)/2 = N(N−1)` | 20 bits |
@@ -85,7 +85,7 @@ The Verlet double-computation does not introduce any new **stochastic error sour
 
 | Operation | Nature | Counted? |
 |-----------|--------|----------|
-| `dt / 2` (division) | Fixed-point division | ✅ Counted in k_step (1 div per step) |
+| `dt / 2` (division) | Fixed-point division | ✅ Counted in `k_step` (1 div per step) |
 | `acc.scale(half_dt)` | Exact multiplication | Not rounding (exact) |
 | `velocity += acc * half_dt` | Exact addition | Not rounding (exact) |
 | `position += velocity * dt` | Exact multiplication + addition | Not rounding (exact) |
@@ -115,3 +115,9 @@ Each rounding operation contributes at least `k_op ≥ 1` bit of information los
 2. `kelvin-core/src/integrator.rs` lines 98–116 (Euler step implementation for comparison)
 3. `proofs/kani/information_loss.rs` lines 207–244 (`verify_c1_rounding_op_count` harness)
 4. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

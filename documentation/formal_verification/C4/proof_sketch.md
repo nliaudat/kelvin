@@ -30,9 +30,9 @@ $$|\Pr[\mathcal{A}(K(C)) = 1] - \Pr[\mathcal{A}(U_L) = 1]| \le \text{negl}(n) + 
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | Game-based cryptographic reduction proof | `gap1_game_based_reduction.md` | ✅ RESOLVED |
-| 2 | Domain separation across all 6 modes | `gap2_domain_separation_all_modes.md` | ✅ RESOLVED |
-| 3 | Advantage bound derivation | `gap3_advantage_bound.md` | ✅ RESOLVED |
+| 1 | Game-based cryptographic reduction proof | [`gap1_game_based_reduction`](C4/gap1_game_based_reduction.md) | ✅ RESOLVED |
+| 2 | Domain separation across all 6 modes | [`gap2_domain_separation_all_modes`](C4/gap2_domain_separation_all_modes.md) | ✅ RESOLVED |
+| 3 | Advantage bound derivation | [`gap3_advantage_bound`](C4/gap3_advantage_bound.md) | ✅ RESOLVED |
 
 **Security bound:** $\boxed{Adv(A) \le \text{negl}(n) + 2^{-960}}$
 

@@ -34,3 +34,8 @@ For N=5 Verlet, S=1,000,000: `S·k = 40,000,000 bits` → `2^{-20,000,000}` — 
 - `formal_verification.md` §L4' (full reduction sketch)
 - C3 (quantum query lower bound for Φ^S inversion)
 - NIST FIPS PUB 202 (2015). "SHA-3 Standard."
+---
+
+## See Also
+
+- [C4 Proof Sketch](C4/proof_sketch.md)

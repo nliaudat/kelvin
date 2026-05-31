@@ -32,12 +32,17 @@ The divergence d is Lipschitz with respect to all parameters because:
 ## 3. Numerical Bound
 
 For standard configuration:
-L_λ ≤ (1/31.2) · (2 + 0.1) ≈ 0.067
+`L_λ` ≤ (1/31.2) · (2 + 0.1) ≈ 0.067
 
-This means a 1% change in any parameter changes λ by at most 0.067%. This is consistent with the observed robustness of λ ≈ 0.693 across different random configurations.
+This means a 1% change in any parameter changes `λ` by at most 0.067%. This is consistent with the observed robustness of `λ` ≈ 0.693 across different random configurations.
 
 ## 4. References
 
 - verify_pade_ln_bound (Kani: Padé monotonicity)
 - verify_perturbation_linear_regime (Kani: O(δ) divergence)
 - kelvin-kdf/src/lyapunov.rs (λ computation)
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

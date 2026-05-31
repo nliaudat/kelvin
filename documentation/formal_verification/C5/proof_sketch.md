@@ -43,10 +43,10 @@ Stability constraints reduce by at most $2^{-100}$, giving $H \ge 2370$ bits —
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | Cardinality $|\Theta_5| \ge 2^{1920}$ | `gap1_cardinality_bound.md` | ✅ RESOLVED |
-| 2 | Min-entropy $H_{\min} \ge 1800$ bits | `gap2_min_entropy.md` | ✅ RESOLVED |
-| 3 | Stability reduction $\le 2^{-100}$ | `gap3_stability_reduction.md` | ✅ RESOLVED |
-| 4 | Symbolic Kani config validation | `gap4_symbolic_kani_config.md` | ✅ RESOLVED |
+| 1 | Cardinality $|\Theta_5| \ge 2^{1920}$ | [`gap1_cardinality_bound`](C5/gap1_cardinality_bound.md) | ✅ RESOLVED |
+| 2 | Min-entropy $H_{\min} \ge 1800$ bits | [`gap2_min_entropy`](C5/gap2_min_entropy.md) | ✅ RESOLVED |
+| 3 | Stability reduction $\le 2^{-100}$ | [`gap3_stability_reduction`](C5/gap3_stability_reduction.md) | ✅ RESOLVED |
+| 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config`](C5/gap4_symbolic_kani_config.md) | ✅ RESOLVED |
 
 ## Kani-Verified Harnesses
 

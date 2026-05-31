@@ -102,7 +102,7 @@ This piecewise function captures both regimes:
 | Regime | Steps | Loss Behavior | Mechanism |
 |--------|-------|---------------|-----------|
 | **Pre-saturation** | `S < S*` | `L = S × k_step` linear growth | C1: fixed-point rounding |
-| **Post-saturation** | `S ≥ S*` | `L = H_max − log₂(A)` constant | C2: chaotic divergence |
+| **Post-saturation** | `S ≥ S*` | `L = ``H_max`` − log₂(A)` constant | C2: chaotic divergence |
 
 For N=5 Verlet with `S = 1,000,000` (default):
 
@@ -144,3 +144,9 @@ The empirical measurement confirms that entropy does not drop below zero (it sat
 4. `documentation/formal_verification.md` §L1' (saturation model) and §L2' (Kaplan-Yorke attractor bound)
 5. Shannon, C. E. (1949). "Communication Theory of Secrecy Systems."
    — Information entropy and its relation to finite discrete state spaces.
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)
