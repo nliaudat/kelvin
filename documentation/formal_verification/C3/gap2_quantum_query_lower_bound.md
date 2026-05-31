@@ -39,4 +39,4 @@ C5: |Θ| ≥ 2^{1920}  [configuration space cardinality, proven]
 
 ## See Also
 
-- [C3 Proof Sketch](C3/proof_sketch.md)
+- [C3 Proof Sketch](proof_sketch.md)

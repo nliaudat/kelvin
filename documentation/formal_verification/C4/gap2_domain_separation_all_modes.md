@@ -32,4 +32,4 @@ All 6 pairs produce distinct SHAKE256 outputs. The Kani harness `verify_domain_s
 
 ## See Also
 
-- [C4 Proof Sketch](C4/proof_sketch.md)
+- [C4 Proof Sketch](proof_sketch.md)

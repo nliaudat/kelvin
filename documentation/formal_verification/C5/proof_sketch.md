@@ -15,13 +15,13 @@ A large configuration space ensures that even a quantum adversary using Grover's
 
 For $N = 5$ bodies:
 
-1. **Mass**: $m_i \in (0, 1]$ M☉ → $2^{64} - 1$ values each
-2. **Position**: $r_i \in [-100, 100]^3$ AU → $(201 \times 2^{64})^3$ values
-3. **Velocity**: $v_i \in [-100, 100]^3$ AU/yr → $(201 \times 2^{64})^3$ values
-4. **Non-collision**: $r_i \neq r_j$ for $i \neq j$
-5. **Minimum separation**: $|r_i - r_j| \ge \text{min\_separation}$
-6. **Bound orbit**: Specific energy $< \text{ejection\_threshold}$
-7. **Chaos horizon**: $\text{total\_steps} \ge \text{min\_chaos\_steps}$
+1. **Mass**: $m\_i \in (0, 1]$ M☉ → $2^{64} - 1$ values each
+2. **Position**: $r\_i \in [-100, 100]^3$ AU → $(201 \times 2^{64})^3$ values
+3. **Velocity**: $v\_i \in [-100, 100]^3$ AU/yr → $(201 \times 2^{64})^3$ values
+4. **Non-collision**: $r\_i \neq r\_j$ for $i \neq j$
+5. **Minimum separation**: $|r\_i - r\_j| \ge \text{min-separation}$
+6. **Bound orbit**: Specific energy $< \text{ejection-threshold}$
+7. **Chaos horizon**: $\text{total-steps} \ge \text{min-chaos-steps}$
 
 ## Analytical Bound Derivation
 
@@ -43,10 +43,10 @@ Stability constraints reduce by at most $2^{-100}$, giving $H \ge 2370$ bits —
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | Cardinality $|\Theta_5| \ge 2^{1920}$ | [`gap1_cardinality_bound`](C5/gap1_cardinality_bound.md) | ✅ RESOLVED |
-| 2 | Min-entropy $H_{\min} \ge 1800$ bits | [`gap2_min_entropy`](C5/gap2_min_entropy.md) | ✅ RESOLVED |
-| 3 | Stability reduction $\le 2^{-100}$ | [`gap3_stability_reduction`](C5/gap3_stability_reduction.md) | ✅ RESOLVED |
-| 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config`](C5/gap4_symbolic_kani_config.md) | ✅ RESOLVED |
+| 1 | Cardinality $|\Theta\_5| \ge 2^{1920}$ | [`gap1_cardinality_bound`](gap1_cardinality_bound.md) | ✅ RESOLVED |
+| 2 | Min-entropy $H\_{\min} \ge 1800$ bits | [`gap2_min_entropy`](gap2_min_entropy.md) | ✅ RESOLVED |
+| 3 | Stability reduction $\le 2^{-100}$ | [`gap3_stability_reduction`](gap3_stability_reduction.md) | ✅ RESOLVED |
+| 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config`](gap4_symbolic_kani_config.md) | ✅ RESOLVED |
 
 ## Kani-Verified Harnesses
 

@@ -104,4 +104,4 @@ $$Q \ge \Omega(\sqrt{|\Theta|}) = \Omega(2^{960}) \quad \text{quantum oracle que
 
 ## See Also
 
-- [C3 Proof Sketch](C3/`proof_sketch`.md)
+- [C3 Proof Sketch](proof_sketch.md)

@@ -58,4 +58,4 @@ Reports λ ≈ 0.693 for the standard configuration. The estimate has been robus
 
 ## See Also
 
-- [C2 Proof Sketch](C2/proof_sketch.md)
+- [C2 Proof Sketch](proof_sketch.md)
