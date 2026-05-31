@@ -34,15 +34,15 @@ entropy about the system state.
 The Q32.64 division `q = g / dist_cubed` is implemented as integer division of
 `g_raw · 2^64` by `dist_cubed_raw`:
 
-$$q_{\text{raw}} = \left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{\text{dist\_cubed}_{\text{raw}}} \right\rceil$$
+$$q_{\text{raw}} = \left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{d^3_{\text{raw}}} \right\rceil$$
 
 This produces a remainder:
 
-$$r = (g_{\text{raw}} \cdot 2^{64}) \bmod \text{dist\_cubed}_{\text{raw}}$$
+$$r = (g_{\text{raw}} \cdot 2^{64}) \bmod d^3_{\text{raw}}$$
 
 **Kani-verified property** (`verify_c1_division_remainder`):
 
-$$0 \leq r < \text{dist\_cubed}_{\text{raw}}$$
+$$0 \leq r < d^3_{\text{raw}}$$
 
 The remainder `r` is **discarded** — it does not appear in the output `q`. It is
 irretrievably lost.
@@ -61,7 +61,7 @@ $$\text{den} \in \left( \frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}} + 0.5}
 
 The size of this preimage set in raw units is bounded by:
 
-$$\text{preimage size} \leq \left\lfloor \frac{\text{dist\_cubed}_{\text{raw}}}{2^{64}} \right\rfloor$$
+$$\text{preimage size} \leq \left\lfloor \frac{d^3_{\text{raw}}}{2^{64}} \right\rfloor$$
 
 This bound is **verified by Kani** (`verify_c1_epsilon_bound`) for the full physical
 range: at maximum denominator, up to 8,000,000 distinct input values map to the same
@@ -72,36 +72,36 @@ output; at the softening limit, at most 1–2 values.
 The key insight is that the discarded remainder `r` depends on the **least significant
 bit (LSB)** of `dist_cubed_raw`. Specifically:
 
-$$r \equiv g_{\text{raw}} \cdot 2^{64} \pmod{\text{dist\_cubed}_{\text{raw}}}$$
+$$r \equiv g_{\text{raw}} \cdot 2^{64} \pmod{d^3_{\text{raw}}}$$
 
 For a uniformly distributed `dist_cubed_raw` over a range that spans at least one
 power of two (verified empirically by the K-S test in `tests/information_loss/`),
 the LSB of `dist_cubed_raw` is also uniformly distributed and carries exactly 1 bit
 of Shannon entropy:
 
-$$H(\text{LSB}(\text{dist\_cubed})) = 1 \text{ bit}$$
+$$H(\text{LSB}(d^3)) = 1 \text{ bit}$$
 
 ### 2.4 Information Loss Per Operation
 
 The information loss per operation is defined as the mutual information between the
 input `dist_cubed` and the discarded remainder `r`, conditioned on the output `q`:
 
-$$k_{op} = I(\text{dist\_cubed};\; r \mid q)$$
+$$k_{op} = I(d^3;\; r \mid q)$$
 
 Since `r` is a deterministic function of `dist_cubed` (the division remainder), and
 `q` is also a deterministic function of `dist_cubed`, we have:
 
-$$I(\text{dist\_cubed};\; r \mid q) = H(r \mid q)$$
+$$I(d^3;\; r \mid q) = H(r \mid q)$$
 
 The remainder `r` takes values in `[0, dist_cubed_raw)`. Under the uniform input
 distribution, `r` is approximately uniform over this range, and:
 
-$$H(r \mid q) \geq H(\text{LSB}(\text{dist\_cubed}) \mid q)$$
+$$H(r \mid q) \geq H(\text{LSB}(d^3) \mid q)$$
 
 But the quotient `q` reveals **nothing** about the LSB of `dist_cubed`, because
 the mapping `dist_cubed → q` discards the remainder information. Therefore:
 
-$$H(\text{LSB}(\text{dist\_cubed}) \mid q) = H(\text{LSB}(\text{dist\_cubed})) = 1 \text{ bit}$$
+$$H(\text{LSB}(d^3) \mid q) = H(\text{LSB}(d^3)) = 1 \text{ bit}$$
 
 Thus:
 
@@ -178,4 +178,4 @@ For N=5 Verlet:
 
 ## See Also
 
-- [C1 Proof Sketch](C1/proof_sketch.md)
+- [C1 Proof Sketch](proof_sketch.md)

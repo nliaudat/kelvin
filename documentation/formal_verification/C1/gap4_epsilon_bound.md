@@ -36,7 +36,7 @@ The ε correction quantifies this "leakage" fraction.
 
 For `q = g / dist_cubed`, the quotient `q_raw` is a step function of `dist_cubed_raw`. The quotient increments by 1 when:
 
-$$\text{dist\_cubed}_{\text{raw}} \text{ changes by approximately } \frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}}^2}$$
+$$d^3_{\text{raw}} \text{ changes by approximately } \frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}}^2}$$
 
 This is the **quantization step size** for `dist_cubed_raw` as seen through the division.
 
@@ -135,4 +135,4 @@ The empirical validation in `tests/information_loss/` reports:
 
 ## See Also
 
-- [C1 Proof Sketch](C1/`proof_sketch`.md)
+- [C1 Proof Sketch](proof_sketch.md)

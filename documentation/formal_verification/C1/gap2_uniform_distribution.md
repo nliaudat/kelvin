@@ -12,7 +12,7 @@
 **Theorem (Conditional on Ergodicity):**
 If the discrete-time Verlet map `Φ: X → X` for the N-body gravitational system (N ≥ 3) is ergodic on its invariant set with respect to the natural phase-space measure, then for any bounded observation function `f(dist_cubed)`, the time average equals the ensemble average:
 
-$$\lim_{S \to \infty} \frac{1}{S} \sum_{t=1}^{S} f(\text{dist\_cubed}_t) = \int f(x) \, \mu(dx)$$
+$$\lim_{S \to \infty} \frac{1}{S} \sum_{t=1}^{S} f(d^3_t) = \int f(x) \, \mu(dx)$$
 
 where `μ` is the invariant measure. Under the additional mixing property, the distribution of `dist_cubed` approaches the stationary distribution `μ` at an exponential rate controlled by the Lyapunov exponent `λ > 0`.
 
@@ -142,4 +142,4 @@ These Kani harnesses from C2 provide a computational foundation: the system is p
 
 ## See Also
 
-- [C1 Proof Sketch](C1/proof_sketch.md)
+- [C1 Proof Sketch](proof_sketch.md)
