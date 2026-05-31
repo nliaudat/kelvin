@@ -28,7 +28,7 @@ The configuration is your **Shared Secret**. It contains the planetary parameter
 
 ```bash
 # Security Levels: standard, paranoid, maximum
-./kelvin keygen --level standard --output my_secret.json
+kelvin keygen --level standard --output my_secret.json
 ```
 
 ### Encrypt a File
@@ -37,10 +37,10 @@ Kelvin uses the orbital simulation to generate a **quantum-resistant OTP keystre
 
 ```bash
 # Default: Verlet integration (symplectic, energy-conserving)
-./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
+kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc
 
 # Euler integration: numerically unstable, faster chaos amplification
-./kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --euler
+kelvin encrypt --config my_secret.json --input database.tar --output database.tar.enc --euler
 ```
 
 ### Decrypt a File
@@ -48,10 +48,10 @@ Decryption is the exact inverse of encryption, using the same **Orbital Keystrea
 
 ```bash
 # Default: Verlet integration (symplectic, energy-conserving)
-./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar
+kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar
 
 # Euler integration (must match encryption)
-./kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --euler
+kelvin decrypt --config my_secret.json --input database.tar.enc --output database_restored.tar --euler
 ```
 
 ### Identity (Asymmetric Keys)
@@ -59,29 +59,29 @@ Kelvin derives multiple Post-Quantum (PQ) and classical asymmetric identities fr
 
 ```bash
 # Default: Show ML-DSA-65 (Post-Quantum Signature Identity)
-./kelvin identify --config my_secret.json
+kelvin identify --config my_secret.json
 
 # Show all identities (ML-DSA-65, ML-KEM-768, and Curve25519)
-./kelvin identify --config my_secret.json --all
+kelvin identify --config my_secret.json --all
 
 # Show specific identities
-./kelvin identify --config my_secret.json --ecc --kem
+kelvin identify --config my_secret.json --ecc --kem
 
 ### Authenticated Encryption (`--auth`)
 V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability.
 
 ```bash
 # Chaos mode with authentication
-./kelvin encrypt --mode chaos --config my_secret.json --input file.txt --output file.enc --auth
-./kelvin decrypt --mode chaos --config my_secret.json --input file.enc --output file.txt --auth
+kelvin encrypt --mode chaos --config my_secret.json --input file.txt --output file.enc --auth
+kelvin decrypt --mode chaos --config my_secret.json --input file.enc --output file.txt --auth
 
 # Photon mode with authentication
-./kelvin encrypt --mode photon --config my_secret.json --input file.txt --output file.enc --auth
-./kelvin decrypt --mode photon --config my_secret.json --input file.enc --output file.txt --auth
+kelvin encrypt --mode photon --config my_secret.json --input file.txt --output file.enc --auth
+kelvin decrypt --mode photon --config my_secret.json --input file.enc --output file.txt --auth
 
 # Quantum mode with authentication
-./kelvin encrypt --mode quantum --config my_secret.json --input file.txt --output file.enc --auth
-./kelvin decrypt --mode quantum --config my_secret.json --input file.enc --output file.txt --auth
+kelvin encrypt --mode quantum --config my_secret.json --input file.txt --output file.enc --auth
+kelvin decrypt --mode quantum --config my_secret.json --input file.enc --output file.txt --auth
 ```
 
 > **Note:** The `--auth` flag is ignored in `secure` mode (V1 ChaCha20Poly1305 AEAD has built-in authentication).
@@ -89,7 +89,7 @@ V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with 
 ### Analyze Configuration Quality
 Verify that a configuration has sufficient chaos and sensitivity to initial conditions.
 ```bash
-./kelvin analyze --config my_secret.json
+kelvin analyze --config my_secret.json
 ```
 This performs a bit-flip on the Sun mass and measures the **Avalanche Effect** on the resulting cryptographic identity.
 ```

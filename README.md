@@ -19,13 +19,13 @@ Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) p
 
 ```bash
 # Generate a random orbital configuration
-cargo run -p kelvin-cli -- generate -o key.json
+cargo run -p kelvin-cli -- keygen --output key.json
 
 # Encrypt a file
-cargo run -p kelvin-cli -- encrypt -c key.json -i plaintext.txt -o ciphertext.bin
+cargo run -p kelvin-cli -- encrypt --config key.json --input plaintext.txt --output ciphertext.bin
 
 # Decrypt a file
-cargo run -p kelvin-cli -- decrypt -c key.json -i ciphertext.bin -o decrypted.txt
+cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --output decrypted.txt
 ```
 
 ## Mode Comparison
@@ -231,19 +231,16 @@ stream.encrypt(&mut data).unwrap();
 
 ```bash
 # Generate a random configuration
-kelvin generate -o my-key.json
+kelvin keygen --output my-key.json
 
 # Encrypt a file
-kelvin encrypt -c my-key.json -i secret.txt -o secret.enc
+kelvin encrypt --config my-key.json --input secret.txt --output secret.enc
 
 # Decrypt a file
-kelvin decrypt -c my-key.json -i secret.enc -o secret.txt
+kelvin decrypt --config my-key.json --input secret.enc --output secret.txt
 
 # Analyze chaos quality
-kelvin analyze -c my-key.json
-
-# Run built-in self-test
-kelvin-test-client
+kelvin analyze --config my-key.json
 ```
 
 ## Performance
