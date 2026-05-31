@@ -1,4 +1,4 @@
-# Kelvin OTP Bulletproof: Why This Architecture Is Quantum-Resistant and Computationally Unbreakable
+# Kelvin Stream Cipher Security: Security Analysis and Assumptions
 
 **Status:** Active Documentation  
 **Date:** 2026-05-28  
@@ -8,13 +8,17 @@
 
 ## 1. Executive Claim
 
-Kelvin's XOR-based modes (Chaos V2, Photon V3, Quantum H, Prism, Split, Flare) produce a **quantum-resistant one-time pad keystream** that is computationally indistinguishable from random. The keystream derives from SHAKE256 extraction of chaotic n-body dynamics — a system with no closed-form solution. No quantum algorithm can shortcut the simulation, and no classical attack can distinguish the keystream from random without inverting SHAKE256.
+Kelvin's XOR-based modes (Chaos V2, Photon V3, Quantum H, Prism, Split, Flare) produce a **quantum-resistant stream cipher keystream** that is computationally indistinguishable from random. The keystream derives from SHAKE256 extraction of chaotic n-body dynamics — a system with no closed-form solution. No known quantum algorithm can shortcut the simulation, and no classical attack can distinguish the keystream from random without inverting SHAKE256.
 
-> **There is no "break" here. There is only brute force — and the search space is astronomical.**
+> **No known attack is faster than brute force on SHAKE256 — and the search space is astronomical.**
+
+### Important Caveats
+
+This document describes security properties under specific assumptions. Unlike standard cryptosystems (AES, ChaCha20), Kelvin's security model has **no formal reduction to a known hard problem** (lattice, discrete log, factoring, or similar). The security bounds C1–C5 are plausibility arguments based on physical chaos and computational indistinguishability of SHAKE256 — not formal security reductions. The system's effective post-quantum security is bounded by SHAKE256's Grover resistance: **128 bits**.
 
 ---
 
-## 2. The Four Canonical OTP Conditions (Wikipedia)
+## 2. Why This Is a Stream Cipher (Not an OTP)
 
 Per the [Wikipedia article on one-time pads](https://en.wikipedia.org/wiki/One-time_pad), a true OTP requires four conditions:
 
@@ -23,9 +27,9 @@ Per the [Wikipedia article on one-time pads](https://en.wikipedia.org/wiki/One-t
 > 3. **The key must never be reused in whole or in part.**
 > 4. **The key must be kept completely secret by the communicating parties.**
 
-These requirements make the OTP the only encryption system that is **mathematically proven to be unbreakable** under the principles of information theory (Shannon, 1949).
+Kelvin satisfies conditions 1, 3, and 4 — but **not** condition 2. The keystream is produced deterministically from the orbital configuration via SHAKE256, making it computationally indistinguishable from random rather than information-theoretically random. This is the definition of a stream cipher, not a true OTP.
 
-### How Kelvin Satisfies Each Condition
+### How Kelvin Compares to Each Condition
 
 | # | OTP Condition | Kelvin's Approach | Status |
 |---|---------------|-------------------|--------|
@@ -50,11 +54,11 @@ In practice, this distinction is irrelevant for any real adversary:
 
 ---
 
-## 3. The Four Pillars of the OTP Claim
+## 3. The Four Pillars of Kelvin's Security
 
-| Pillar | Description | Proof |
-|--------|-------------|-------|
-| **Pillar 1: Chaotic Irreversibility** | The n-body problem (N ≥ 3) has no closed-form solution. An attacker cannot shortcut the simulation — they must brute-force the orbital configuration. | Poincaré non-integrability theorem; validated Lyapunov exponent λ ≈ 0.693 |
+| Pillar | Description | Rationale / Status |
+|--------|-------------|--------------------|
+| **Pillar 1: Chaotic Irreversibility (Assumption)** | The n-body problem (N ≥ 3) has no closed-form solution. Under the assumption that recovering initial conditions from the final state is computationally hard, an attacker must brute-force the orbital configuration. | Poincaré non-integrability theorem proves no analytic solution exists — but this does NOT constitute a cryptographic hardness proof. Validated Lyapunov exponent λ ≈ 0.693 confirms chaotic regime. |
 | **Pillar 2: Deterministic Extraction** | SHAKE256 is a NIST-standardized extendable-output function (XOF) with no known preimage attack better than brute force. | NIST FIPS 202; 2048-byte entropy pool = 2^16384 search space |
 | **Pillar 3: One-Way Key Schedule** | HKDF-SHA512 + BLAKE3 reseeding ensures forward secrecy — compromising the current keystream reveals neither past nor future keys. | HKDF RFC 5869; BLAKE3 security proof |
 | **Pillar 4: Quantum Resistance** | No known quantum speedup exists for: (a) sequential chaotic classical simulation, (b) SHAKE256 inversion beyond Grover's square-root reduction. | Grover's → 128-bit effective security; Shor's algorithm does not apply |
@@ -65,20 +69,20 @@ In practice, this distinction is irrelevant for any real adversary:
 
 | Attack | Effort Required | Feasibility | Why |
 |--------|----------------|-------------|-----|
-| **Brute-force orbital config** | 2^1920 (40 bits × 48 fields) | ❌ Infeasible | Configuration space dwarfs AES-256 by orders of magnitude |
+| **Brute-force orbital config** | ~2^1920 (estimate: ~40 effective bits × ~48 fields) | ❌ Infeasible | Estimated config space; effective security bounded by SHAKE256's 128-bit quantum resistance |
 | **Shortcut simulation (classical)** | Unknown — provably no closed form | ❌ Infeasible | N-body has no algebraic shortcut (Poincaré, 1899) |
 | **Shortcut simulation (quantum)** | Unknown — no known quantum algorithm | ❌ No known speedup | Sequential chaos cannot be superposed; each step depends on the previous |
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
 | **Invert SHAKE256 (classical preimage)** | 2^256 | ❌ Infeasible | 256-bit preimage resistance (SHAKE256 capacity) |
-| **Nonce reuse / IV collision** | N/A | ✅ **No nonce exists** | OTP has no nonce — only config reuse matters, which the key schedule prevents |
+| **Nonce reuse / IV collision** | N/A | ⚠️ **No nonce means no guard against config reuse** | Two instances loaded with the same config produce identical keystreams — users must enforce single-instance-per-config |
 | **Malleability (bit-flip)** | Trivial | ⚠️ Mitigated by `--auth` | XOR is malleable; KMAC128 (NIST SP 800-185) defeats this |
 | **Key reuse across messages** | Catastrophic | ❌ Prevented by schedule | Key schedule enforces forward secrecy; each key is derived from a unique reseeded state |
-| **Reverse engineer keystream from ciphertext** | Requires known plaintext | ⚠️ Doesn't reveal other messages | Keystream = ciphertext ⊕ known plaintext, but does not leak other messages or future keys |
+| **Reverse engineer keystream from ciphertext** | Requires known plaintext | ⚠️ Bypasses n-body layer — reduces to SHAKE256 preimage (128-bit quantum) | Keystream = ciphertext ⊕ known plaintext; attacker attacks SHAKE256 directly, n-body simulation provides zero additional protection |
 | **Grover's on ChaCha20 (V1 only)** | 2^128 | ❌ Infeasible | V1 uses ChaCha20; all other modes use SHAKE256 directly |
 
 ---
 
-## 5. Formal Argument: Why This Is a "Bulletproof" OTP
+## 5. Formal Security Argument
 
 ### 5.1 Shannon Perfect Secrecy
 
@@ -94,7 +98,7 @@ This holds when the keystream is truly random and never reused. Kelvin's keystre
 2. **Extraction from chaotic dynamics** — the n-body simulation produces orbital states that are exponentially sensitive to initial conditions (validated Lyapunov exponent λ ≈ 0.693). After sufficient steps, the state is fully decorrelated from the initial configuration.
 3. **Domain-separated hashing** — each mode (Chaos, Photon, Quantum, Prism, Split, Flare) uses a unique domain separator, preventing cross-mode keystream collisions.
 
-### 5.2 Computational Perfect Secrecy
+### 5.2 Computational Security
 
 For any polynomial-time adversary **A**:
 
@@ -104,7 +108,7 @@ For any polynomial-time adversary **A**:
 
 where λ is the security parameter (256-bit classical, 128-bit quantum). This means the ciphertext reveals **nothing** about the plaintext unless **A** can distinguish SHAKE256 output from random — a problem with no known solution better than brute force.
 
-### 5.3 The No-Shortcut Guarantee
+### 5.3 The No-Shortcut Assumption
 
 The n-body problem (N ≥ 3) is **non-integrable** (Poincaré, 1899). This means:
 
@@ -112,14 +116,16 @@ The n-body problem (N ≥ 3) is **non-integrable** (Poincaré, 1899). This means
 - The only way to compute the state at step S is to simulate steps 1 through S sequentially.
 - An attacker cannot "skip ahead" — they must pay the same simulation cost as the legitimate party.
 
-This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-based) where the security rests on a specific hard problem (factoring, discrete log, LWE) that could theoretically be solved by a future algorithm. Kelvin's security rests on the **physical impossibility of shortcutting chaotic dynamics** — a property that is independent of computational model.
+> ⚠️ **Important caveat**: The above proves only that an attacker cannot skip ahead *given valid initial conditions*. It does **not** prove they cannot recover those initial conditions from observed output by other means (e.g., SHAKE256 preimage attacks, statistical analysis, or mathematical properties of the fixed-point arithmetic). The security of the KDF layer rests on the **unproven assumption** that recovering the orbital configuration from the SHAKE256-extracted keystream is computationally infeasible — not on a formal reduction to a known hard problem.
+
+This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-based) where the security rests on a specific hard problem (factoring, discrete log, LWE) that could theoretically be solved by a future algorithm. Kelvin's KDF security rests on the **assumed computational hardness** of inverting a chaotic simulation — an assumption that is physically plausible but mathematically unproven. The cipher's security, however, rests on SHAKE256 (NIST-standardized, well-analyzed) — this is the correct security anchor.
 
 ---
 
 ## 6. Comparison with Classical OTP
 
-| Property | Classical OTP (paper pad) | Kelvin OTP |
-|----------|--------------------------|------------|
+| Property | Classical OTP (paper pad) | Kelvin Stream Cipher |
+|----------|---------------------------|----------------------|
 | **Key source** | True physical randomness (e.g., radioactive decay) | SHAKE256 XOF from chaotic n-body simulation |
 | **Key distribution** | Same-length pad must be pre-shared (impractical for large data) | Compact orbital config (~2 KB) shared once, generates unlimited keystream |
 | **Key reuse risk** | Catastrophic — two-time pad is trivially breakable | Prevented by key schedule — each key is derived from a unique reseeded state |
@@ -130,25 +136,25 @@ This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-
 
 ---
 
-## 7. Why "OTP" Is the Right Framing
+## 7. Why This Stream Cipher Is Structurally Novel
 
-Critics may argue that Kelvin's modes are "just stream ciphers, not true OTPs." This is technically correct but misses the point:
+Critics may compare Kelvin's modes to stream ciphers like ChaCha20 or AES-CTR. While the XOR-based encryption is structurally similar, Kelvin differs in several important ways:
 
-| Aspect | Traditional Stream Cipher (e.g., ChaCha20) | Kelvin OTP Modes |
-|--------|---------------------------------------------|-------------------|
+| Aspect | Traditional Stream Cipher (e.g., ChaCha20) | Kelvin Stream Cipher Modes |
+|--------|---------------------------------------------|----------------------------|
 | **Nonce/IV** | Required — nonce reuse is catastrophic | **No nonce** — the only secret is the orbital config |
 | **Key schedule** | Fixed key stretched via PRF | Chaotic entropy pool with forward-secret reseeding |
 | **Entropy source** | Single seed → deterministic PRF | Continuous fresh entropy from orbital dynamics (V2, H) |
 | **Quantum resistance** | 128-bit (Grover on 256-bit key) | 128-bit (Grover on SHAKE256) — same bound |
-| **Algebraic structure** | ARX construction (add-rotate-xor) | **No algebraic structure** — XOR + hash-based extraction |
+| **Algebraic structure** | ARX construction (add-rotate-xor) | XOR + hash-based extraction (note: this property is common to all symmetric stream ciphers, not unique to Kelvin) |
 
-Kelvin's OTP modes are **structurally different** from traditional stream ciphers: they have no nonce, no IV, no algebraic round function, and their entropy is continuously renewed from a physical system with no closed-form solution. The "OTP" label accurately captures these properties.
+Kelvin's stream cipher modes are **structurally different** from traditional stream ciphers: they have no nonce, no IV, no algebraic round function, and their entropy is continuously renewed from a physical system with no closed-form solution.
 
 ---
 
-## 8. Summary: The Bulletproof Claim
+## 8. Summary: The Security Claim
 
-> Kelvin's OTP architecture provides **quantum-resistant computational perfect secrecy**. An attacker with unlimited classical resources cannot distinguish the keystream from random without inverting SHAKE256 (2^256 preimage resistance, 2^128 quantum). An attacker with a quantum computer gains only Grover's square-root speedup (2^128). And no attacker — classical or quantum — can shortcut the n-body simulation that seeds the entropy.
+> Kelvin's stream cipher architecture provides **quantum-resistant computational security**. An attacker with unlimited classical resources cannot distinguish the keystream from random without inverting SHAKE256 (2^256 preimage resistance, 2^128 quantum). An attacker with a quantum computer gains only Grover's square-root speedup (2^128). And no attacker — classical or quantum — can shortcut the n-body simulation that seeds the entropy.
 
 > **The only attack is brute force — and the search space is astronomical.**
 
@@ -156,10 +162,13 @@ Kelvin's OTP modes are **structurally different** from traditional stream cipher
 
 | Question | Answer |
 |----------|--------|
-| Is this a true information-theoretic OTP? | No — the keystream is computationally, not physically, random. But it is computationally indistinguishable from random. |
-| Is it quantum-resistant? | **Yes** — SHAKE256 is a NIST PQC standard; no quantum shortcut for chaotic simulation exists. |
+| Is this a true information-theoretic OTP? | **No** — the keystream is computationally, not physically, random. It is a stream cipher, not an OTP. |
+| Is there a formal security reduction? | **No** — C1–C5 are plausibility arguments based on physical chaos assumptions, not formal reductions. |
+| Is it quantum-resistant? | **128-bit effective** — SHAKE256 is a NIST PQC standard; no **known** quantum shortcut for chaotic simulation exists. |
 | Can the keystream be distinguished from random? | Not by any known polynomial-time adversary — SHAKE256 is indifferentiable from a random oracle. |
+| What anchors the security? | **SHAKE256** — the n-body simulation adds computational cost for key derivation, but the cipher's security is bounded by SHAKE256's resistance (256-bit classical, 128-bit quantum). |
 | What's the weakest link? | The orbital configuration itself — if an attacker learns the config, they can reproduce the keystream. Protect it like any symmetric key. |
+| What about known plaintext? | Standard stream cipher property: known plaintext reveals keystream for that session. The attacker then faces SHAKE256 preimage resistance (256-bit classical) to recover the config — the n-body layer is bypassed. |
 | What about malleability? | XOR is malleable — use `--auth` (KMAC128) for integrity. |
 
 ---

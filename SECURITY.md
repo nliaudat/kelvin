@@ -60,7 +60,7 @@ The V1 (ChaCha20Poly1305) mode uses Poly1305 with a 256-bit ChaCha20-derived key
 
 Kelvin is a symmetric-only cryptosystem. It does not provide public-key encryption or key exchange. To establish a shared secret between two parties, you must use an external KEM (e.g., ML-KEM/FIPS 203, X25519).
 
-- **Mitigation**: A hybrid PQ + OTP KEM wrapper is planned for Phase V
+- **Mitigation**: A hybrid PQ + stream cipher KEM wrapper is planned for Phase V
 - **Alternative**: Use the `OrbitalKeyPair` asymmetric key derivation for identity-based key agreement
 
 ## Disclosure Plan

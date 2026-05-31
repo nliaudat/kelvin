@@ -212,7 +212,7 @@ This table maps each identified patent's claims to specific Kelvin modes, showin
 | **Chaos (V2)** — Per-step SHAKE256 XOR | 🔴 Direct overlap | 🔴 Direct overlap | ❌ No perturbation | 🔴 Direct overlap | **HIGH** |
 | **Photon (V3)** — HKDF→SHAKE256 XOR | ⚠️ Seed uses n-body | ⚠️ Chaotic sequence → XOR | ❌ No perturbation | ⚠️ Key generation | **Moderate** |
 | **Quantum (H)** — Hybrid cache + orbital reseed | ⚠️ Seed uses n-body | ⚠️ Chaotic sequence → XOR | ⚠️ Orbit perturbation reseed | ⚠️ Key generation | **Moderate** (but novel combination) |
-| **Prism** — HE OTP key generator | ⚠️ Seed uses n-body | ❌ Not a stream cipher | ❌ No perturbation | ❌ Key generation for HE | **Low** (novel application) |
+| **Prism** — HE stream key generator | ⚠️ Seed uses n-body | ❌ Not a stream cipher | ❌ No perturbation | ❌ Key generation for HE | **Low** (novel application) |
 | **Split** — XOR key-splitter | ⚠️ Seed uses n-body | ❌ Not a stream cipher | ❌ No perturbation | ❌ Key generation for HE | **Low** (novel application) |
 | **Flare** — FHE secret key generator | ⚠️ Seed uses n-body | ❌ Not a stream cipher | ❌ No perturbation | ❌ Key generation for HE | **Low** (novel application) |
 
@@ -274,10 +274,10 @@ The **Chaos (V2)** mode is the most exposed — it directly implements all four 
 
 | Aspect | Assessment |
 |--------|------------|
-| **OTP key generation for FHE recryption** | ✅ **Strong novelty** — no prior art found |
+| **Stream key generation for FHE recryption** | ✅ **Strong novelty** — no prior art found |
 | **Domain-separated key isolation** | ✅ Novel — prevents cross-mode key reuse |
 | **Chaotic FHE key generation (Flare)** | ✅ Novel extension of DUff-skg (Jawad, 2025) — 30 DOF vs 2 DOF |
-| **XOR key-splitter (Split)** | ✅ Novel application of OTP split-key concept |
+| **XOR key-splitter (Split)** | ✅ Novel application of split-key concept |
 | **Verdict** | **Strongest patent candidates.** The HE integration modes represent a novel application of chaotic KDF to homomorphic encryption — an area with minimal prior art. |
 
 ---
@@ -321,12 +321,12 @@ Based on the analysis above, the following inventions have the strongest novelty
 
 **Title:** *System and Method for Generating Homomorphic Encryption Keys Using Chaotic N-Body Simulation*
 
-**Novelty:** Using a high-dimensional (30 DOF) chaotic n-body simulation to generate keys for homomorphic encryption systems, including OTP keys for recryption (Prism), split keys for XOR homomorphism (Split), and FHE secret keys (Flare).
+**Novelty:** Using a high-dimensional (30 DOF) chaotic n-body simulation to generate keys for homomorphic encryption systems, including stream keys for recryption (Prism), split keys for XOR homomorphism (Split), and FHE secret keys (Flare).
 
 **Key Claims:**
 - Generating FHE recryption keys from chaotic orbital state
 - Domain-separated key generation for different FHE schemes (BFV, CKKS, TFHE)
-- Split-key XOR homomorphism using chaotic OTP
+- Split-key XOR homomorphism using chaotic stream keys
 - Higher-dimensional chaos (30 DOF) vs. prior art (2 DOF Duffing)
 
 **Prior Art Gap:** The DUff-skg paper (Jawad, 2025) uses a 2-DOF Duffing oscillator for FHE key generation. Kelvin's 30-DOF n-body approach is a significant extension. No patent covers n-body chaotic key generation for FHE.

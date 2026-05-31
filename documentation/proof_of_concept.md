@@ -30,7 +30,7 @@ Test 5: Large data (10KB round-trip, two instances)...
 **What this proves:**
 - **Determinism**: Two independent `Kelvin` instances with the same `OrbitalConfig` produce identical ciphertext. This is the fundamental requirement for a KDF — the same key material must be derived from the same configuration.
 - **Round-trip**: Encryption followed by decryption (using separate instances) returns the original plaintext. This proves the ChaCha20 XOR stream cipher works correctly.
-- **Idempotency**: Double encryption returns the original plaintext (XOR is its own inverse). This is a mathematical property of OTP stream ciphers.
+- **Idempotency**: Double encryption returns the original plaintext (XOR is its own inverse). This is a mathematical property of stream ciphers.
 - **Empty data**: Edge case handling works correctly.
 - **Large data**: The system handles 10KB of data efficiently (~26ms).
 
@@ -192,7 +192,9 @@ All crates use `#![forbid(unsafe_code)]`, guaranteeing no undefined behavior at 
 
 ---
 
-## 4.8 Finite Precision Periodicity Analysis (Cang et al. 2021)
+## 4.8 Finite Precision Periodicity Analysis (Cang et al. 2021) — Unsolved Concern
+
+> ⚠️ **This is a genuine unsolved concern, not a future enhancement.** No concrete lower bound on the period length of the Q32.64 n-body simulation currently exists. The security of all modes depends on the assumption that period lengths are cryptographically large — an assumption that is physically plausible but unproven. If the simulation entered a cycle before `total_steps`, the keystream would be periodic, which is catastrophic for any stream cipher.
 
 Cang, Kang & Wang (2021) identified a critical problem for chaos-based cryptography: when chaotic systems are implemented on digital computers with finite precision, *dynamical degradation* occurs — the system's trajectory becomes periodic rather than truly chaotic, compromising security. They proposed a Finite Precision Period Calculation (FPPC) algorithm to detect and quantify this degradation.
 
@@ -207,12 +209,12 @@ Kelvin already addresses finite precision degradation through several architectu
 | Mitigation | Sprott-A (FPPC) | Kelvin |
 |-----------|-----------------|--------|
 | Period detection | Explicit FPPC algorithm | Not yet implemented |
-| State refresh | Scrambling post-processing | Continuous reseeding via SHAKE256 XOF |
+| State refresh | Scrambling post-processing | Reseeding via SHAKE256 (see caveat below) |
 | Entropy extraction | Binary quantization | 2048-byte domain-separated hash of full orbital state |
 | Forward secrecy | None | BLAKE3 reseed per key |
 | State space | 3 variables × f64 | 30 variables × Q32.64 fixed-point |
 
-**Continuous reseeding** is Kelvin's primary defense. The key schedule refreshes the entropy pool via SHAKE256 at configurable intervals (default: every 10 virtual steps). Even if the orbital state were to enter a short cycle, the reseeding operation mixes in fresh entropy from the hash function's sponge state, breaking any periodicity.
+> ⚠️ **Important caveat on reseeding**: The reseeding operation is a deterministic transformation of deterministic state. SHAKE256 is a function, not an entropy source — it produces the same output from the same input every time. If the orbital state becomes periodic (repeats), the SHAKE256 input repeats, and the reseeding output repeats. **Reseeding cannot break deterministic periodicity** — it only makes cycle detection harder, not the cycle shorter. The actual period of the Q32.64 n-body simulation remains a genuine unsolved concern regardless of reseeding. The primary defense against periodicity is the large state space (~2^64 states per variable), not the reseeding mechanism.
 
 **Lyapunov horizon enforcement** provides a secondary defense. Kelvin rejects configurations where the simulation runs beyond the Lyapunov time (~1,000 steps for standard configurations). This ensures that key material is extracted only from the chaotic regime, before any finite-precision periodicity could manifest.
 
@@ -221,6 +223,7 @@ Kelvin already addresses finite precision degradation through several architectu
 Following the Cang et al. methodology, Kelvin should adopt:
 
 1. **NIST SP 800-22 Statistical Test Suite** — Validate the orbital keystream against all 15 NIST tests (frequency, block frequency, runs, longest run, rank, FFT, linear complexity, etc.) to provide independent verification of randomness quality.
+   - ⚠️ **Important caveat**: NIST SP 800-22 and SP 800-90B statistical tests are **necessary but not sufficient** for cryptographic security. A linear congruential generator or RC4 (both cryptographically broken) can pass these tests. They validate randomness quality at a surface level, not resistance against cryptanalysis. Passing these tests is the **floor**, not the **ceiling**, of cryptographic validation.
 
 2. **Approximate Entropy (ApEn)** — Measure the complexity of the orbital keystream against the theoretical maximum, using the same metric as the Sprott-A paper.
 
@@ -408,6 +411,15 @@ operations ensure that the composite computation has no measurable timing variat
 2. ✅ **Done — division constant-time fix:** Replaced hybrid hardware/software division with fully constant-time 192-iteration restoring division. Eliminated timing variation from `__udivti3`.
 3. ✅ **Done — acceleration benchmark redesign:** Redesigned test classes to use same position magnitudes for both classes, isolating mass variation as the only difference.
 4. ✅ **All 7 benchmarks pass:** The entire fixed-point arithmetic stack is now verified constant-time.
+
+### Limitations of the Methodology
+
+⚠️ The dudect-bencher methodology has known limitations:
+- **Probabilistic**: A |t| < 5 result means "no timing difference was detected in this run" — it does not prove constant-time behavior under all conditions or on all hardware.
+- **Scope-limited**: These benchmarks cover arithmetic primitives and `compute_accelerations`. They do NOT cover the full encrypt/decrypt pipeline, which includes mode selection branching, error handling, or authentication tag comparison. Those higher-level operations may introduce timing leaks not captured here.
+- **verlet_step variation (|t| ≈ 75)**: The timing variation observed in the full Verlet integrator with mass variation is attributed to `vec![]` allocation inside the timed closure. However, if the allocation timing correlates with secret orbital state, this IS a side-channel regardless of the root cause. Further investigation is needed to rule out input-dependent allocation patterns.
+
+These results demonstrate that the fundamental arithmetic operations are constant-time — a necessary foundation — but do not constitute a complete side-channel security guarantee.
 
 ### How to Run
 

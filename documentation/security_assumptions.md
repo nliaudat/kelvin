@@ -20,13 +20,22 @@ Given the final orbital state after `S` simulation steps, it is computationally
 infeasible to recover the initial orbital configuration (masses, positions,
 velocities) within useful precision.
 
+> ⚠️ **This assumption has NOT been formally reduced to any known hard problem.**
+> Unlike standard cryptographic assumptions (RSA, discrete log, LWE), there is
+> no proof that recovering the initial conditions from the orbital state is
+> computationally hard. This is a conjecture based on physical reasoning about
+> chaotic dynamics — it is plausible but mathematically unproven.
+
 ### Rationale
 
 The N-body problem (N ≥ 3) has no closed-form analytical solution (Poincaré,
 1899). Numerical integration is the only path forward. There is no known
 algorithm to invert the Verlet or Euler integrator for a general N-body
 configuration — an attacker would need to simulate forward from every possible
-initial condition to find one matching the final state.
+initial condition to find one matching the final state. However, Poincaré's
+theorem only proves there is no analytic closed-form solution — it does NOT
+prove that recovering initial conditions from observed output is
+computationally hard. That is a separate question.
 
 ### Enforcement
 
@@ -45,7 +54,12 @@ initial condition to find one matching the final state.
 ### Violation Consequence
 
 If an attacker could efficiently invert the simulation, they could recover
-the shared OrbitalConfig from intercepted ciphertext, breaking the OTP.
+the shared OrbitalConfig from intercepted ciphertext, breaking the stream cipher.
+However, the attacker must also invert SHAKE256 (256-bit preimage resistance),
+which bounds the system's security regardless of the n-body layer.
+With known plaintext, the keystream is directly revealed (standard stream cipher
+property), and the attacker bypasses the n-body simulation entirely to attack
+SHAKE256 directly.
 
 ### Supporting Evidence
 
@@ -127,14 +141,14 @@ distinguishing attacks exist against SHAKE256 at the time of writing.
   extraction uses SHAKE256 via `extract_shake256_into()`.
 - **Keystream generation** (`kelvin/src/photon.rs`, `kelvin/src/quantum.rs`,
   `kelvin/src/prism.rs`, `kelvin/src/split.rs`, `kelvin/src/flare.rs`): All
-  OTP modes use SHAKE256 XOR as the core cipher construction.
+  Stream cipher modes use SHAKE256 XOR as the core cipher construction.
 - **Domain separation**: Each mode and operation uses a distinct domain
   separator string (e.g., `DOMSEP_PHOTON_KEYSTREAM_V1`, `DOMSEP_ORBITAL_STATE_V1`),
   ensuring cryptographic independence even when derived from the same seed.
 
 ### Violation Consequence
 
-A break of SHAKE256 would compromise all OTP modes (V2, V3, H, Prism, Split,
+A break of SHAKE256 would compromise all stream cipher modes (V2, V3, H, Prism, Split,
 Flare) and the entropy extraction pipeline. However, the orbital chaos layer
 provides a second line of defense — an attacker would also need to invert the
 N-body simulation.
@@ -155,6 +169,8 @@ N-body simulation.
 Simulations with `total_steps < min_chaos_steps` produce keystream that is
 computationally indistinguishable from random. Simulation beyond the Lyapunov
 horizon may degrade unpredictability as trajectory divergence saturates.
+
+> ⚠️ **Important caveat**: A positive Lyapunov exponent (λ > 0) confirms the system operates in a chaotic regime (exponential sensitivity to initial conditions). This is a **qualitative** property. It does **not** directly measure or bound the cryptographic entropy of the output. The Kaplan-Yorke dimension (used in C2) estimates the fractal dimension of the attractor in phase space — this is a geometric quantity, not bits of min-entropy. The conversion from Lyapunov exponents to "bits of entropy" is an informal argument, not a formal reduction.
 
 ### Rationale
 
@@ -239,9 +255,9 @@ entropy pool (requiring SHAKE256 inversion) and invert the n-body simulation.
 
 | # | Assumption | Enforcement Location | Risk if Violated |
 |:---:|---|:---|:---|
-| 1 | N-body one-way | `lyapunov.rs`, `stability.rs`, `lib.rs` | OTP key recovery |
+| 1 | N-body one-way | `lyapunov.rs`, `stability.rs`, `lib.rs` | Stream cipher key recovery |
 | 2 | Fixed-point determinism | `fixed_math.rs`, `determinism.rs` | Cross-platform decryption failure |
-| 3 | SHAKE256 security | `extractor.rs`, mode `.rs` files | OTP keystream prediction |
+| 3 | SHAKE256 security | `extractor.rs`, mode `.rs` files | Keystream prediction |
 | 4 | Lyapunov horizon | `lyapunov.rs`, `lib.rs` | Correlated keystream |
 | 5 | HKDF-SHA512 security | `schedule.rs`, `authenticated.rs` | Key schedule compromise |
 

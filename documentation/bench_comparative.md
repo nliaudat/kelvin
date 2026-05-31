@@ -57,7 +57,7 @@ Sign and verify 1 MiB message. HAWK unavailable — no production Rust implement
 
 ## Notes
 
-- **KelvinQuantum (H)**: SHAKE256 OTP stream cipher with periodic orbital reseeding. No authentication (XOR is malleable).
+- **KelvinQuantum (H)**: SHAKE256 stream cipher with periodic orbital reseeding. No authentication (XOR is malleable).
 - **AES-256-GCM / ChaCha20-Poly1305 (ring)**: Authenticated encryption (AEAD). Throughput includes AEAD tag but not verification.
 - **KelvinStreaming (V2)**: Advances n-body simulation one step per chunk — simulation cost dominates throughput.
 - **AES-256-CTR**: `aes` + `ctr` crates with 128-bit counter. No authentication.

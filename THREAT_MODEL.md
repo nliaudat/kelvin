@@ -51,7 +51,9 @@ Kelvin provides:
 - **Metadata**: Message length, timing, and communication patterns are not hidden.
 - **Forward secrecy for long-lived keys**: If the orbital configuration is compromised, all past and future keystreams derived from it are compromised. Per-message reseeding mitigates this within a session.
 - **Denial of service**: The n-body simulation is computationally expensive. An attacker can force a legitimate party to waste CPU time by initiating many connections.
-- **Side-channel resistance of the simulation loop**: The Verlet/Euler integrator is not constant-time. Timing variations of |t| ≈ 75 have been measured in dudect benchmarks. This is a benchmark artifact: individual `Fixed` operations and `compute_accelerations` pass independently (|t| < 5). The variation stems from `vec![]` allocation inside the timed closure combined with state evolution differences between classes. The simulation runs before any keystream is produced, and the seed extraction is a one-way function, so this does not create a practical side channel.
+- **Side-channel resistance of the simulation loop**: The Verlet/Euler integrator is not constant-time. Timing variations of |t| ≈ 75 have been measured in dudect benchmarks. Individual `Fixed` operations and `compute_accelerations` pass independently (|t| < 5), but the composite integrator shows measurable timing variation.
+  - **For V3/H/Prism/Split/Flare modes**: The simulation runs once before any keystream is produced. Timing variations during this one-time setup do not leak keystream material in a practical sense, as no secret data is being input or output during the simulation.
+  - **⚠️ For V2 (Chaos) mode**: This defense does NOT apply. V2 interleaves simulation with keystream generation — the simulation advances one step per chunk of data processed. Timing variations in the simulation loop correlate with orbital state and may be observable by an attacker in streaming scenarios. Additionally, if any intermediate orbital state is compromised (via timing side-channel, memory disclosure, or checkpointing), an attacker can forward-simulate from that point to decrypt all subsequent traffic.
 
 ### 2.3 Trust Assumptions
 
@@ -86,11 +88,11 @@ Kelvin does **not** rely on system entropy (OS RNG) for keystream generation. Al
 
 | Level | Bodies | Steps | Raw Keyspace | Equivalent Security |
 |-------|--------|-------|-------------|-------------------|
-| Standard | 5 | 1,000,000 | ~2¹²⁸⁷ | > AES-256 |
-| Paranoid | 5 | 10,000,000 | ~2¹²⁸⁷ | > AES-256 |
-| Maximum | 10 | 100,000,000 | ~2²⁷⁴⁴ | > AES-256 |
+| Standard | 5 | 1,000,000 | ~2¹²⁸⁷ | 128-bit (SHAKE256 bound) |
+| Paranoid | 5 | 10,000,000 | ~2¹²⁸⁷ | 128-bit (SHAKE256 bound) |
+| Maximum | 10 | 100,000,000 | ~2²⁷⁴⁴ | 128-bit (SHAKE256 bound) |
 
-The raw keyspace exceeds the security level of the underlying hash function (SHAKE256 provides 256-bit classical / 128-bit quantum security). The practical security is bounded by the hash function, not the keyspace. Post-quantum effective security: 128-bit (Grover's bound on SHAKE256).
+The raw keyspace exceeds the security level of the underlying hash function (SHAKE256 provides 256-bit classical / 128-bit quantum security). The practical security is bounded by the hash function, not the keyspace. **All three levels provide identical effective security** — the extra steps in Paranoid and Maximum increase simulation setup cost but do not raise the security bound. Post-quantum effective security: 128-bit (Grover's bound on SHAKE256).
 
 ---
 
@@ -130,7 +132,9 @@ The raw keyspace exceeds the security level of the underlying hash function (SHA
 
 **Attacker goal**: Extract the orbital configuration from timing measurements.
 
-**Difficulty**: The simulation runs before any keystream is produced. Timing variations in the simulation loop do not leak keystream material. The XOR encryption/decryption is constant-time (verified by dudect benchmarks).
+**Difficulty**: For V3/H/Prism/Split/Flare modes, the simulation runs once before any keystream is produced, so timing variations do not leak keystream material. The XOR encryption/decryption is constant-time (verified by dudect benchmarks).
+
+**⚠️ For V2 (Chaos) mode**: The simulation is interleaved with keystream generation, making per-step timing variations a potential concern. This is an acknowledged limitation requiring further investigation.
 
 ### 5.4 Quantum Attack
 
