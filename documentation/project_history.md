@@ -7,7 +7,7 @@ Kelvin is the culmination of over two decades of research into the intersection 
 ## Timeline
 
 ### 2002: The Foundation (Project "Celestial")
-*   **Initial Conception**: The project began as a theoretical exploration of using the n-body problem for non-repeating keystream generation. (Using fast Euler approximation)
+*   **Initial Conception**: The project began as a theoretical exploration of using the n-body problem for non-repeating keystream generation, initially using Euler integration for speed.
 *   **Early Implementation**: Written in C using IEEE 754 double-precision floating point.
 *   **The "Drift" Crisis**: Early prototypes failed the fundamental requirement of determinism.
     > In a chaotic system, a difference in the 15th decimal place between an **AMD Athlon XP** and an **Intel Pentium 4** would result in completely different orbital states (and thus different keys) after just a few thousand steps.
@@ -33,7 +33,7 @@ Kelvin is the culmination of over two decades of research into the intersection 
     - **Benchmarking & ETA**: `benchmark()` measures simulation speed; `estimate_time()` predicts processing time.
     - **3D Orbital Visualizer**: A browser-based 3D visualization (`kelvin-demo/orbital_visualizer.html`) that renders the n-body simulation in real-time with a KDF pipeline display.
     - **Domain separation**: Uses `b"kelvin-streaming-v2-v1-000000000"` to ensure cryptographic isolation from V1.
-    - **Authenticated wrappers (BLAKE3-keyed MAC)**: Added `KelvinStreamingAuthenticated`, `KelvinPhotonAuthenticated`, and `KelvinQuantumAuthenticated` — drop-in authenticated wrappers that append a 32-byte BLAKE3-keyed MAC tag to defeat ciphertext malleability. Tag verification uses `subtle::ConstantTimeEq` for timing-attack resistance. The CLI exposes this via a shared `--auth` flag across chaos, photon, and quantum modes.
+    - **Authenticated wrappers (KMAC128)**: Added `KelvinStreamingAuthenticated`, `KelvinPhotonAuthenticated`, and `KelvinQuantumAuthenticated` — drop-in authenticated wrappers that append a 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability. Tag verification uses `subtle::ConstantTimeEq` for timing-attack resistance. The CLI exposes this via a shared `--auth` flag across chaos, photon, and quantum modes.
 
 
 ---
@@ -44,7 +44,7 @@ Kelvin is the culmination of over two decades of research into the intersection 
 In the early 2000s, the "3-body theorem" (referring to the Poincaré non-integrability of the 3-body problem) was a known mathematical curiosity, but there were no standard libraries for estimating **Lyapunov Time** for cryptographic use. This led to "ghost keys" — keys that looked random but were actually derived from predictable, stable orbits.
 
 ### 2. The Determinism Wall
-The author spent over a decade trying to make floating-point simulations deterministic across different compilers and operating systems. (not a full time job;) ). It wasn't until the move to fixed-point arithmetic that the project became viable for cross-platform use.
+The author spent over a decade trying to make floating-point simulations deterministic across different compilers and operating systems (not a full-time job). It wasn't until the move to fixed-point arithmetic that the project became viable for cross-platform use.
 
 ### 3. The Sequential Constraint
 Critics often pointed out that Kelvin was "slow." This was a deliberate security design. The sequential nature of the n-body simulation is what provides resistance to parallel brute-force attacks (ASIC/GPU). It took many years to find the right balance between "securely slow" and "usable."

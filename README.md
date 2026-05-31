@@ -11,7 +11,7 @@ Kelvin is a **quantum-resistant one-time pad (OTP) cryptosystem** and **determin
 
 The core insight: the n-body problem has no closed-form solution for N ≥ 3. An attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
-Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant OTP keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). There is no nonce, no IV, no algebraic round function. The only attack is brute force — and the search space is astronomical.
+Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers or nonce-based stream ciphers: there is no nonce, no IV, no algebraic round function. The only attack is brute force — and the search space is astronomical.
 
 ![Orbital simulation demo](documentation/demo_video/orbital_demo.gif)
 
@@ -184,6 +184,7 @@ libs/
 # Prerequisites: Rust 1.75+ (install via rustup)
 git clone https://github.com/nliaudat/kelvin.git
 cd kelvin
+# Use --release for optimization (simulation is CPU-intensive)
 cargo build --release
 ```
 
@@ -254,7 +255,7 @@ kelvin analyze --config my-key.json
 | Setup + Keygen (5 bodies, 1M steps) | ~1.1s | — |
 | Setup + Keygen (5 bodies, 10M steps) | ~12.5s | — |
 
-> **Note:** All crypto throughput is measured on an AMD Ryzen 5 5600 with 1 GB buffers (in-memory, no file I/O). File-based benchmarks are bottlenecked by disk I/O (~48 MB/s) regardless of mode. See the [SHAKE256 Benchmark Analysis](documentation/shake256_benchmark_analysis.md) for details.
+> **Note:** All crypto throughput is measured on an AMD Ryzen 5 5600 with 1 GB buffers (in-memory, no file I/O). For 1 MiB buffers (smaller/fresh data), throughput is lower (e.g., KelvinQuantum H: 438 MB/s) — see [Comparative Benchmarks](documentation/bench_comparative.md). File-based benchmarks are bottlenecked by disk I/O (~48 MB/s) regardless of mode. See the [SHAKE256 Benchmark Analysis](documentation/shake256_benchmark_analysis.md) for details.
 
 ## Formal Verification
 
@@ -266,7 +267,7 @@ Kelvin follows Apple's corecrypto blueprint for formal verification using the Ka
 | L1: Functional Equivalence | Arithmetic ops match mathematical spec within dynamically scaled error bounds | ✅ Done |
 | L2: Composite Correctness | `compute_accelerations` matches Newtonian gravity via force-based assertions | ✅ Done |
 | L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ✅ Done |
-| L4: Determinism | Bit-identical results across platforms | ✅ Done |
+| L4: Determinism | Bit-identical results across platforms (SSE2, AVX, AVX2, NEON) | ✅ Done |
 
 See [formal_verification.md](documentation/formal_verification.md) for details.
 

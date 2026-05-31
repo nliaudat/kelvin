@@ -54,10 +54,7 @@ The Q32.64 fixed-point arithmetic used in the n-body simulation is implemented w
 
 ### No post-quantum authentication (without optional module)
 
-The standard authenticated modes (V1 AEAD, V3/H with KMAC128-based MAC) use classical cryptography for authentication. They are **not** post-quantum secure for authentication purposes. An adversary with a quantum computer could forge MAC tags.
-
-- **Mitigation**: ML-DSA-65 (FIPS 204) is already implemented for post-quantum digital signatures. HAWK-512 is planned as a future option.
-- **Timeline**: Planned for future release, dependent on NIST PQC standardization
+The V1 (ChaCha20Poly1305) mode uses Poly1305 with a 256-bit ChaCha20-derived key — a quantum adversary gains only Grover's speedup (2^128) to forge tags. The V3/H KMAC128 modes use SHAKE256 (NIST PQC standard), providing 128-bit post-quantum MAC security.
 
 ### No key encapsulation (KEM)
 

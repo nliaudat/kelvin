@@ -188,12 +188,50 @@ at initialization prevents this by rejecting insufficient configurations.
 
 - **Lyapunov analysis**: λ ≈ 0.693 (positive → chaotic regime) for standard
   5-body configurations. A Lyapunov time of ~1443 steps means the system
-  doubles its trajectory divergence every ~1443 steps.
+  amplifies trajectory divergence by a factor of e ≈ 2.718 every ~1443 steps.
 - **Entropy extraction**: SHAKE256 extracts entropy from the orbital state
   after the simulation is complete, ensuring the hash is computed on a
   fully-mixed chaotic state.
 - **Reference**: Benettin et al. (1980), Wolf et al. (1985) — standard
   methods for Lyapunov exponent estimation in chaotic systems.
+
+---
+
+## Assumption 5: HKDF-SHA512 Security
+
+### Statement
+
+HKDF-SHA512 (RFC 5869) is a secure extract-and-expand key derivation function.
+SHA-512 provides 256-bit preimage resistance, and HKDF's extraction step
+produces uniformly distributed output even from non-uniform input entropy.
+
+### Rationale
+
+The key schedule in Phase 3 uses HKDF-SHA512 to derive per-key material and
+MAC keys from the 2048-byte entropy pool. The security of the key schedule
+depends on SHA-512's PRF properties.
+
+### Enforcement
+
+- **Key derivation** (`kelvin-kdf/src/schedule.rs`): HKDF-SHA512 with domain
+  separator `DOMSEP_KEY_SCHEDULE_V1` derives encryption keys and nonces.
+- **MAC key derivation** (`kelvin/src/authenticated.rs`): HKDF-SHA512 with
+  domain separator `DOMSEP_MAC_KEY_V1` derives KMAC128 authentication keys.
+- **Domain separation**: Each key derivation uses a distinct domain separator,
+  preventing related-key attacks across different purposes.
+
+### Violation Consequence
+
+A break of SHA-512 or HKDF would compromise the key schedule, allowing an
+attacker to derive encryption keys from the entropy pool or bypass forward
+secrecy guarantees. However, the attacker would still need to recover the
+entropy pool (requiring SHAKE256 inversion) and invert the n-body simulation.
+
+### Supporting Evidence
+
+- **RFC 5869** (Krawczyk & Eronen, 2010): HKDF extract-and-expand specification.
+- **NIST SP 800-56C Rev. 2**: NIST key derivation guidelines followed by
+  Kelvin's key schedule design.
 
 ---
 
@@ -205,6 +243,7 @@ at initialization prevents this by rejecting insufficient configurations.
 | 2 | Fixed-point determinism | `fixed_math.rs`, `determinism.rs` | Cross-platform decryption failure |
 | 3 | SHAKE256 security | `extractor.rs`, mode `.rs` files | OTP keystream prediction |
 | 4 | Lyapunov horizon | `lyapunov.rs`, `lib.rs` | Correlated keystream |
+| 5 | HKDF-SHA512 security | `schedule.rs`, `authenticated.rs` | Key schedule compromise |
 
 ---
 

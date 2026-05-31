@@ -327,7 +327,7 @@ Key Schedule:
 let remaining = k.remaining_safe_bytes();  // bytes before exhaustion
 ```
 
-This returns `remaining_keys × 4 GiB` (conservative estimate). When it reaches 0, the `Kelvin` instance can no longer encrypt or decrypt — you must create a new instance with a different configuration.
+This returns `remaining_keys × 4 GiB` (conservative estimate for V1 ChaCha20Poly1305 mode). For OTP modes (V3/H), the limit is the key schedule's virtual step budget — each key can encrypt well beyond 4 GiB. When the safe bytes counter reaches 0, the `Kelvin` instance can no longer encrypt or decrypt — you must create a new instance with a different configuration.
 
 ---
 
