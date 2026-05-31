@@ -42,7 +42,7 @@ This is the **quantization step size** for `dist_cubed_raw` as seen through the 
 
 ### 2.3 The LSB Leakage Fraction
 
-When the quotient `q` is zero or near-zero (which occurs when `dist_cubed_raw > g_raw · 2^64 / 0.5 ≈ 2 · g_raw · 2^64`), the quotient carries no information about the LSB of `dist_cubed` — the information loss is exactly 1 bit.
+When the quotient `q` is zero or near-zero (which occurs when `dist_cubed_raw > `g_raw` · 2^64 / 0.5 ≈ 2 · `g_raw` · 2^64`), the quotient carries no information about the LSB of `dist_cubed` — the information loss is exactly 1 bit.
 
 When `q` is large (which occurs when `dist_cubed_raw` is near MIN), the quotient **resolves** the LSB of `dist_cubed` — the division acts more like a one-to-one mapping and the information loss is less than 1 bit.
 
@@ -72,7 +72,7 @@ $$k_{op} \geq \log_2(8,000,000) / \log_2(\text{MAX/MIN}) \times 1 \text{ bit} \a
 
 The analytical bound (0.980 bits) is slightly more conservative than the Kani-verified bound (0.992 bits), confirming consistency.
 
-| Bound | k_op | Source |
+| Bound | `k_op` | Source |
 |-------|------|--------|
 | Worst-case (softening limit) | 0.98 bits | Analytical ε-bound |
 | Average (empirical) | ~0.99 bits | `tests/information_loss/` |
@@ -95,14 +95,14 @@ $$\varepsilon \approx \frac{1}{22.9 + 28} = \frac{1}{50.9} \approx 0.0197$$
 
 If the physical bounds were tighter (e.g., MAX = 10 AU instead of 100 AU), ε would increase:
 
-| MAX (AU) | log₂(MAX/MIN) | ε | k_op ≥ |
+| MAX (AU) | log₂(MAX/MIN) | ε | `k_op` ≥ |
 |----------|---------------|---|--------|
 | 100 | 50.9 | 0.0197 | 0.980 |
 | 10 | 47.9 | 0.0209 | 0.979 |
 | 1 | 44.9 | 0.0223 | 0.978 |
 | Softening only (2^36) | 0 | 1.0 | 0.0 |
 
-The bound becomes trivial (k_op ≥ 0) only when MAX = MIN, which never occurs in practice.
+The bound becomes trivial (`k_op` ≥ 0) only when MAX = MIN, which never occurs in practice.
 
 ### 3.3 Why This Bound Is Conservative
 
@@ -117,7 +117,7 @@ The empirical validation in `tests/information_loss/` reports:
 | Measurement | Value | ε-Bound Prediction |
 |-------------|-------|-------------------|
 | K-S p-value (uniformity) | > 0.05 | Supported |
-| Empirical k_op | ~0.992 bits | ≥ 0.980 (conservative) |
+| Empirical `k_op` | ~0.992 bits | ≥ 0.980 (conservative) |
 | ε-bound width | 0.0197 | Consistent |
 
 ---
@@ -125,8 +125,14 @@ The empirical validation in `tests/information_loss/` reports:
 ## 5. References
 
 1. `kelvin-core/src/fixed_math.rs` lines 823–838 (`verify_c1_epsilon_bound`)
-2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (`k_op` ≥ 1 bit)
 3. `documentation/formal_verification/C1/gap2_uniform_distribution.md` (uniformity)
-4. `tests/information_loss/src/main.rs` (ε-bound in output, empirical k_op estimate)
+4. `tests/information_loss/src/main.rs` (ε-bound in output, empirical `k_op` estimate)
 5. Cover, T. M., & Thomas, J. A. (2006). *Elements of Information Theory* (2nd ed.). Wiley.
    — Quantization and entropy bounds.
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

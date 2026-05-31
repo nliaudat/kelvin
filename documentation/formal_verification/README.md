@@ -14,13 +14,13 @@ formal_verification/
 
 ## Summary
 
-| Conjecture | Gaps | Resolved |
-|------------|------|----------|
-| **C1**: Information Loss | 7 | **7** ✅ |
-| **C2**: Lyapunov Certification | 6 | **6** ✅ |
-| **C3**: Quantum Hardness | 3 | **3** ✅ |
-| **C4**: Keystream Indistinguishability | 3 | **3** ✅ |
-| **C5**: Configuration Space | 4 | **4** ✅ |
-| **Total** | **23** | **23 ✅** |
+| Conjecture | Gaps | Resolved | Proof Sketch |
+|------------|------|----------|-------------|
+| **C1**: Information Loss | 7 | **7** ✅ | [`proof_sketch.md`](C1/proof_sketch.md) |
+| **C2**: Lyapunov Certification | 6 | **6** ✅ | [`proof_sketch.md`](C2/proof_sketch.md) |
+| **C3**: Quantum Hardness | 3 | **3** ✅ | [`proof_sketch.md`](C3/proof_sketch.md) |
+| **C4**: Keystream Indistinguishability | 3 | **3** ✅ | [`proof_sketch.md`](C4/proof_sketch.md) |
+| **C5**: Configuration Space | 4 | **4** ✅ | [`proof_sketch.md`](C5/proof_sketch.md) |
+| **Total** | **23** | **23 ✅** | |
 
 All 23 gaps are resolved with full mathematical proofs.

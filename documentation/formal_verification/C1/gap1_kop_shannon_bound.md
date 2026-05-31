@@ -174,3 +174,8 @@ For N=5 Verlet:
 4. Shannon, C. E. (1949). "Communication Theory of Secrecy Systems."
 5. Higham, N. J. (2002). *Accuracy and Stability of Numerical Algorithms* (2nd ed.).
    — Forward and backward error analysis for floating-point and fixed-point arithmetic.
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

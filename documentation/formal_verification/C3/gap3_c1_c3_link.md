@@ -25,3 +25,8 @@ where `ε ≤ 1/log₂(MAX/MIN) ≈ 0.0197` (from C1 Gap 4).
 ## 3. References
 
 - C1 Gap 1 (k_op ≥ 1 bit), Gap 4 (ε-bound), Gap 5 (independence), Gap 7 (Verlet counting)
+---
+
+## See Also
+
+- [C3 Proof Sketch](C3/proof_sketch.md)

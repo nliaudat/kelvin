@@ -41,3 +41,8 @@ This means a 1% change in any parameter changes λ by at most 0.067%. This is co
 - verify_pade_ln_bound (Kani: Padé monotonicity)
 - verify_perturbation_linear_regime (Kani: O(δ) divergence)
 - kelvin-kdf/src/lyapunov.rs (λ computation)
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

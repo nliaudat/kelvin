@@ -27,3 +27,8 @@ For `D_KY ≈ 15`: `log₂(A) ≤ 960 bits`. For `D_KY ≈ 5`: `log₂(A) ≤ 32
 ## 4. References
 
 - Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations." *Lecture Notes in Mathematics*, 730, 204–227.
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

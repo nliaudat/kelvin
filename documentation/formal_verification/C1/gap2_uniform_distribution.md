@@ -10,7 +10,7 @@
 ## 1. Conditional Theorem Statement
 
 **Theorem (Conditional on Ergodicity):**
-If the discrete-time Verlet map `Φ: X → X` for the N-body gravitational system (N ≥ 3) is ergodic on its invariant set with respect to the natural phase-space measure, then for any bounded observation function `f(dist_cubed)`, the time average equals the ensemble average:
+If the discrete-time Verlet map `Φ: X → X` for the N-body gravitational system (N ≥ 3) is ergodic on its invariant set with respect to the natural phase-space measure, then for any bounded observation function `f(`dist_cubed`)`, the time average equals the ensemble average:
 
 $$\lim_{S \to \infty} \frac{1}{S} \sum_{t=1}^{S} f(\text{dist\_cubed}_t) = \int f(x) \, \mu(dx)$$
 
@@ -138,3 +138,8 @@ These Kani harnesses from C2 provide a computational foundation: the system is p
 4. Benettin, G., et al. (1980). "Lyapunov Characteristic Exponents." *Meccanica*, 15, 9–20.
 5. Kolmogorov, A. N. (1933). "Sulla determinazione empirica di una legge di distribuzione."
    — Kolmogorov-Smirnov test foundation.
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

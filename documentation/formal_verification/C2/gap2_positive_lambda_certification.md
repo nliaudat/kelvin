@@ -54,3 +54,8 @@ Reports λ ≈ 0.693 for the standard configuration. The estimate has been robus
 1. `tests/lyapunov_certification/src/main.rs` (empirical estimation)
 2. `kelvin-kdf/src/lyapunov.rs` (estimator implementation)
 3. Poincaré, H. (1899). *Les Méthodes Nouvelles de la Mécanique Céleste*, Vol. 3.
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

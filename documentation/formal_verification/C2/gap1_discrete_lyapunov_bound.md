@@ -101,3 +101,8 @@ The bound shows that λ_disc is within ~0.02 of the true λ_cont. Since λ ≈ 0
 3. `verify_lyapunov_division` (Kani: division safety)
 4. `verify_perturbation_linear_regime` (Kani: O(δ) divergence)
 5. `tests/lyapunov_certification/` (empirical: λ ≈ 0.693, σ ≈ 0.07)
+---
+
+## See Also
+
+- [C2 Proof Sketch](C2/proof_sketch.md)

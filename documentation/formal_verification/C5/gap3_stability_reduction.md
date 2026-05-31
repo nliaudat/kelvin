@@ -52,3 +52,8 @@ The stability reduction factor of 2^{-100} used in the C5 cardinality bound is t
 
 - `tests/configuration_space/` (Monte Carlo: >90% random configs pass stability)
 - C5 cardinality bound document (`gap1_cardinality_bound.md`)
+---
+
+## See Also
+
+- [C5 Proof Sketch](C5/proof_sketch.md)

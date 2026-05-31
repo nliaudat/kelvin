@@ -88,7 +88,7 @@ The min-entropy is within 0.02 bits of the Hartley entropy — the preimage dist
 
 ### 3.1 Information Loss in Meaningful Units
 
-The C1 claim that "the simulation loses k_step bits of information per step" uses Hartley entropy (`log₂` of preimage size). The security implications (quantum adversary advantage bounds) use **min-entropy** because security is defined against the worst-case preimage, not the average.
+The C1 claim that "the simulation loses `k_step` bits of information per step" uses Hartley entropy (`log₂` of preimage size). The security implications (quantum adversary advantage bounds) use **min-entropy** because security is defined against the worst-case preimage, not the average.
 
 Gap 6 proves that these two measures are nearly identical:
 
@@ -96,7 +96,7 @@ Gap 6 proves that these two measures are nearly identical:
 |---------|-------|-------------|
 | Hartley `H₀` (per-step loss) | `k_step = 40 bits` | Used in analysis |
 | Min-entropy `H∞` (per-step loss) | `k_step − δ ≈ 39.98 bits` | Used in security bounds |
-| Relative difference | `δ / k_step ≈ 0.05%` | Negligible |
+| Relative difference | `δ / `k_step` ≈ 0.05%` | Negligible |
 
 ### 3.2 The reduction is:
 
@@ -131,3 +131,9 @@ All 6 C1 gaps are now resolved:
 4. `documentation/formal_verification/C1/gap4_epsilon_bound.md` (ε-bound)
 5. `documentation/formal_verification/C1/gap5_error_independence.md` (independence)
 6. Renyi, A. (1961). "On Measures of Entropy and Information." *Proc. 4th Berkeley Symp. Math. Stat. Prob.*, 1, 547–561. — Hartley and min-entropy definitions.
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

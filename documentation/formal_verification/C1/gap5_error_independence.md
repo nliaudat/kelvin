@@ -62,7 +62,7 @@ After C1 saturation and C2 Lyapunov mixing, the body positions are effectively d
 
 The crossover between regimes occurs at the Lyapunov time `T_L ≈ 1443` steps — well after C1 saturation at ~96 steps. For the default configuration (`S = 1,000,000`):
 
-| Regime | Steps | k_step | Total Loss | Mechanism |
+| Regime | Steps | `k_step` | Total Loss | Mechanism |
 |--------|-------|--------|------------|-----------|
 | Pre-saturation | < 96 | ≥ 4 | ≥ 384 bits | Conservative bound (no independence) |
 | Chaotic mixing | 96–1443 | ≥ 4–40 | Growing | Transition to independence |
@@ -80,7 +80,7 @@ The empirical validation in `tests/information_loss/` provides supporting eviden
 |-------------|-------|----------------|
 | K-S p-value for `dist_cubed` uniformity | > 0.05 | Distribution is approximately uniform |
 | Correlation between pair (i,j) and (i,k) remainders | Near zero (empirical, S > 100) | Supports independence for long runs |
-| Empirical k_step estimate | ~40 bits/step | Consistent with **full additive model** for N=5 Verlet |
+| Empirical `k_step` estimate | ~40 bits/step | Consistent with **full additive model** for N=5 Verlet |
 
 ### 4.1 Correlation Measurement Procedure
 
@@ -99,7 +99,7 @@ The empirical validation in `tests/information_loss/` provides supporting eviden
 
 | Aspect | With Independence | Without Independence | Actual |
 |--------|-------------------|---------------------|--------|
-| k_step (N=5 Verlet) | 40 bits | ≥ 4 bits | ~40 bits |
+| `k_step` (N=5 Verlet) | 40 bits | ≥ 4 bits | ~40 bits |
 | Saturation horizon | 96 steps | 960 steps | ~96 steps |
 | Conservative for S=1e6? | Yes | Too weak | Full model works |
 
@@ -110,7 +110,13 @@ The full additive model (`k_step = 2N(N-1) = 40 bits`) is justified for the defa
 ## 6. References
 
 1. `kelvin-core/src/fixed_math.rs` lines 838–891 (C1 Kani harnesses)
-2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (k_op ≥ 1 bit)
+2. `documentation/formal_verification/C1/gap1_kop_shannon_bound.md` (`k_op` ≥ 1 bit)
 3. `documentation/formal_verification/C1/gap2_uniform_distribution.md` (uniformity)
 4. `tests/information_loss/src/main.rs` (empirical entropy measurements)
 5. `documentation/formal_verification.md` §L2' (Lyapunov mixing timescale)
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](C1/proof_sketch.md)

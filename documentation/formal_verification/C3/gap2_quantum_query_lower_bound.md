@@ -35,3 +35,8 @@ C5: |Θ| ≥ 2^{1920}  [configuration space cardinality, proven]
 - C5 Gap 1 (cardinality bound `|Θ_5| ≥ 2^{1920}`)
 - C3 Gap 1 (corrected attack model)
 - Zalka (1999). "Grover's quantum searching algorithm is optimal." *Phys. Rev. A*
+---
+
+## See Also
+
+- [C3 Proof Sketch](C3/proof_sketch.md)

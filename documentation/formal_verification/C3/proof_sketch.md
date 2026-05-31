@@ -39,9 +39,9 @@ $$\boxed{Q(\Phi^S) \ge \Omega\left(\sqrt{|\Theta|}\right) = \Omega(2^{960}) \tex
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | Extend Ambainis' adversary method | `gap1_ambainis_adversary.md` | ✅ RESOLVED |
-| 2 | $\Omega(2^{S \cdot k/2})$ lower bound | `gap2_quantum_query_lower_bound.md` | ✅ RESOLVED |
-| 3 | Relate $k$ to C1's $\varepsilon$-bound | `gap3_c1_c3_link.md` | ✅ RESOLVED |
+| 1 | Extend Ambainis' adversary method | [`gap1_ambainis_adversary`](C3/gap1_ambainis_adversary.md) | ✅ RESOLVED |
+| 2 | $\Omega(2^{S \cdot k/2})$ lower bound | [`gap2_quantum_query_lower_bound`](C3/gap2_quantum_query_lower_bound.md) | ✅ RESOLVED |
+| 3 | Relate $k$ to C1's $\varepsilon$-bound | [`gap3_c1_c3_link`](C3/gap3_c1_c3_link.md) | ✅ RESOLVED |
 
 ## Kani-Verified Harnesses
 

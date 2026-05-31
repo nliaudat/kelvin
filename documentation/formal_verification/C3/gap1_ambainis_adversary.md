@@ -100,3 +100,8 @@ $$Q \ge \Omega(\sqrt{|\Theta|}) = \Omega(2^{960}) \quad \text{quantum oracle que
 - Zalka, C. (1999). "Grover's quantum searching algorithm is optimal." *Phys. Rev. A*, 60(4), 2746–2751. — Proof of Grover optimality.
 - C5 Gap 1: `|\Theta_5| \ge 2^{1920}` (configuration space cardinality proof).
 - Grover, L. K. (1996). "A fast quantum mechanical algorithm for database search." *STOC '96*, 212–219.
+---
+
+## See Also
+
+- [C3 Proof Sketch](C3/proof_sketch.md)
