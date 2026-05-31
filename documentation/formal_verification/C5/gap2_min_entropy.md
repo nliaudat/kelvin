@@ -28,4 +28,4 @@ The uniform distribution over the valid space `Θ_5` assigns each valid configur
 
 ## See Also
 
-- [C5 Proof Sketch](C5/proof_sketch.md)
+- [C5 Proof Sketch](proof_sketch.md)

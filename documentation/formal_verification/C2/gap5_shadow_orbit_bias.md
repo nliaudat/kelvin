@@ -32,4 +32,4 @@ $$C_{bias} \le \frac{3 \times 0.1 \times 0.693}{\sqrt{3} \times 2000 \times 0.01
 
 ## See Also
 
-- [C2 Proof Sketch](C2/proof_sketch.md)
+- [C2 Proof Sketch](proof_sketch.md)

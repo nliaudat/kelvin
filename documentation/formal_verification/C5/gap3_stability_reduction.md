@@ -56,4 +56,4 @@ The stability reduction factor of 2^{-100} used in the C5 cardinality bound is t
 
 ## See Also
 
-- [C5 Proof Sketch](C5/proof_sketch.md)
+- [C5 Proof Sketch](proof_sketch.md)
