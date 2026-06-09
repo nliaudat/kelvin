@@ -41,8 +41,8 @@ The Lyapunov exponent measures how fast nearby trajectories diverge. Euler's num
 | Metric¹ | Euler (dt=0.001) | Verlet (dt=0.01) |
 |---|---|---|
 | Lyapunov time | ~100 steps | ~1000 steps |
-| Trajectory decorrelation per step² | ~0.1 decorrelation units | ~0.01 decorrelation units |
-| Steps for trajectory decorrelation² | ~2,560 steps (estimate) | ~25,600 steps (estimate) |
+| Trajectory decorrelation per step¹ | ~0.1 decorrelation units | ~0.01 decorrelation units |
+| Steps for trajectory decorrelation¹ | ~2,560 steps (estimate) | ~25,600 steps (estimate) |
 | Energy drift | 1% per 1000 steps | 0.0001% per 1000 steps |
 
 > ¹ These metrics measure **trajectory divergence** (how fast nearby trajectories separate from each other), not cryptographic entropy. A deterministic computation has zero bits of min-entropy regardless of how chaotic the dynamics appears.  
