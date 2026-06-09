@@ -17,7 +17,7 @@ keywords:
   - chaos-theory
   - post-quantum
   - rust
-abstract: "Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines Q32.64 fixed-point arithmetic, symplectic Verlet and Euler integrators, Lyapunov time estimation, SHAKE256 entropy extraction, and multiple encryption modes including ChaCha20Poly1305 (V1), SHAKE256 XOR streaming (V2), HKDF-SHA512 batch OTP (V3), and hybrid quantum streaming (H)."
+abstract: "Kelvin is an experimental cryptosystem that derives cryptographic keys from the chaotic evolution of an n-body gravitational system. It combines Q32.64 fixed-point arithmetic, symplectic Verlet and Euler integrators, Lyapunov time estimation, SHAKE256 entropy extraction, and multiple encryption modes including ChaCha20Poly1305 (V1), SHAKE256 XOR streaming (V2), HKDF-SHA512 batch stream cipher (V3), and hybrid quantum streaming (H)."
 references:
   - type: article
     authors:

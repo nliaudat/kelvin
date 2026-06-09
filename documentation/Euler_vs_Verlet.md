@@ -47,9 +47,9 @@ The Lyapunov exponent measures how fast nearby trajectories diverge. Euler's num
 
 > ¹ These metrics measure **trajectory divergence** (how fast nearby trajectories separate from each other), not cryptographic entropy. A deterministic computation has zero bits of min-entropy regardless of how chaotic the dynamics appears.  
 
-### 3. Harder to Reverse = Numerical Irreversibility
+### 3. Harder to Reverse = No Known Efficient Inversion Algorithm
 
-Verlet integration is symplectic — it preserves phase-space volume and is theoretically reversible. Given the full state, you can run Verlet backwards to recover previous states. Euler's numerical dissipation makes this practically impossible for a backward integrator: information is lost at each step through energy drift.
+Verlet integration is symplectic — it preserves phase-space volume and is theoretically reversible. Given the full state, you can run Verlet backwards to recover previous states. Euler has no known efficient inversion algorithm: the Euler step is a deterministic function with no known efficient way to find preimages.
 
 > ⚠️ **Important caveat**: Numerical irreversibility is **not** the same as a cryptographic one-way function. An attacker does not need to run the integrator backwards. The attacker runs the integrator **forwards** over candidate initial conditions — exactly the same operation as the legitimate party. Numerical dissipation makes the integrator non-invertible as a mathematical map, but this does **not** make the forward search problem any harder. The "one-way function" property Kelvin needs is that recovering initial conditions from observed output is computationally hard — this is a conjecture about forward search, not a consequence of backward irreversibility.
 

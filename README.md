@@ -10,7 +10,7 @@
 > **⚠️ EXPERIMENTAL — Not for production use.** This is a research cryptosystem.
 > It has not undergone formal cryptanalysis. See [Security](#security) for details.
 
-Kelvin is a **quantum-resistant stream cipher** and **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**. It transforms a shared orbital configuration (masses, positions, velocities) into a cryptographic keystream by simulating chaotic gravitational dynamics and extracting entropy via SHAKE256. The XOR-based modes are computational stream ciphers: no nonce, no IV, keystream length = plaintext length.
+Kelvin is a **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**, with reference stream cipher modes demonstrating the KDF output. The novel contribution is the chaotic n-body → SHAKE256 extraction pipeline. The stream cipher modes (V2 Chaos, V3 Photon, H Quantum) consume KDF seed material via standard SHAKE256 XOR — their security is bounded by SHAKE256's 128-bit post-quantum resistance, identical to any SHAKE256-based construction. The KDF security (inverting the n-body simulation from SHAKE256 output) is a novel conjecture, not a formally proven reduction.
 
 The core insight: the n-body problem has no closed-form solution for N ≥ 3. Under the assumption that the n-body simulation is a one-way function (an unproven conjecture, see [Security Assumptions](documentation/security_assumptions.md)), an attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies trajectory divergence ~10× faster than Verlet through numerical instability, creating stronger trajectory divergence (this is a conjecture about complicating initial-condition recovery, not a proven property). This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
@@ -145,7 +145,7 @@ See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.m
 
 ## Architecture
 
-Kelvin is organized as a Rust workspace with 22 crates:
+Kelvin is organized as a Rust workspace with multiple crates:
 
 ```
 kelvin-core/     — Fixed-point Q32.64 arithmetic, n-body simulation, entropy extraction

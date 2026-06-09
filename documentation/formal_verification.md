@@ -1,7 +1,7 @@
 # Formal Verification — Kelvin Cryptosystem
 
-> **Status:** ✅ **All 23 gaps resolved.** See [`formal_verification/`](formal_verification/) for complete proof documents.
-> **Last Updated:** 2026-05-31
+> **Status:** ✅ **All 23 implementation correctness gaps resolved.** The L0–L4 Kani proofs verify the code matches its specification. The C1–C5 conjectures are empirical arguments and plausibility estimates — they are **not** formal security reductions. See [`formal_verification/`](formal_verification/) for complete proof documents.
+> **Last Updated:** 2026-06-09
 
 ## 1. Proof Architecture
 
@@ -29,20 +29,23 @@ The L1 (Functional Equivalence) and L2 (Composite Correctness) proofs use the
 
 ---
 
-
 ## 2. Executive Summary
 
-The Kelvin cryptosystem derives cryptographic keystream from a deterministic fixed-point n-body gravitational simulation followed by SHAKE256 extraction. The security rests on the claim that this pipeline is a **quantum-resistant one-way function**: given the final keystream, it is computationally infeasible for any adversary (classical or quantum) to recover the initial orbital configuration or predict future keystream output.
+The Kelvin cryptosystem derives cryptographic keystream from a deterministic fixed-point n-body gravitational simulation followed by SHAKE256 extraction. The security rests on the claim that this pipeline is a **quantum-resistant one-way function** (an unproven conjecture — see [Security Assumptions](security_assumptions.md)): given the final keystream, it is computationally infeasible for any adversary (classical or quantum) to recover the initial orbital configuration or predict future keystream output.
 
-**All 23 formal verification gaps across 5 conjectures (C1–C5) are resolved.** The proof chain is:
+**All 23 implementation correctness gaps (L0–L4) are resolved.** The Kani proofs verify the code matches its specification, but do NOT prove security. The C1–C5 conjectures are empirical arguments and plausibility estimates.
+
+The conjecture chain is:
 
 ```
-C1 (k_step ≥ 40 bits/step) 
-  → C2 (λ > 0, Kaplan-Yorke attractor bound) 
-  → C3 (Ω(2^960) Grover bound via Θ search) 
-  → C5 (|Θ₅| ≥ 2^1920) 
-  → C4 (Adv(A) ≤ negl(n) + 2^{-960})
+C1 (k_step ≥ 40 bits/step) → empirical information-loss measurement
+  → C2 (λ > 0, Kaplan-Yorke attractor bound) → Lyapunov certification
+  → C3 (Ω(2^960) Grover bound via Θ search) → quantum search estimate over theoretical config space
+  → C5 (|Θ₅| ≥ 2^1920) → theoretical config cardinality estimate
+  → C4 (Adv(A) ≤ negl(n) + 2^{-960}) → distinguishing advantage estimate (see caveat below)
 ```
+
+> ⚠️ **Important caveat on C4**: The `2⁻⁹⁶⁰` term is derived from C3's Grover bound over the theoretical configuration space. This assumes unstructured quantum search over the full config space (2¹⁹²⁰). In practice the reachable keyspace is limited by the OS CSPRNG (2²⁵⁶), and the Grover oracle may have exploitable structure. The system's effective post-quantum security, bounded by SHAKE256's Grover resistance, is **128-bit**. See `stream_cipher_security.md` §1 for the effective bound.
 
 ---
 
@@ -55,11 +58,18 @@ C1 (k_step ≥ 40 bits/step)
 | **L2: Composite** | `compute_accelerations` satisfies Newton's laws | `proofs/kani/acceleration_proofs.rs` |
 | **L3: Pipeline** | Verlet loop correctness, domain separation | `proofs/kani/pipeline_proofs.rs` |
 | **L4: Determinism** | Bit-identical across platforms (SSE2/AVX/AVX2) | `tests/kelvin_tests/determinism.rs` |
-| **L1': Information Loss** | Per-step fixed-point rounding irreversibility | [`formal_verification/C1/`](formal_verification/C1/) |
-| **L2': Lyapunov** | Shadow orbit error budget + Kaplan-Yorke bound | [`formal_verification/C2/`](formal_verification/C2/) |
-| **L3': Quantum** | Grover search bound over configuration space Θ | [`formal_verification/C3/`](formal_verification/C3/) |
-| **L4': Keystream** | Deterministic extraction, domain separation | [`formal_verification/C4/`](formal_verification/C4/) |
-| **C5: Config** | Configuration validation + $\ge 2^{1920}$ cardinality | [`formal_verification/C5/`](formal_verification/C5/) |
+
+**These are implementation correctness proofs — they do not prove cryptographic security.**
+
+The following are empirical estimates and plausibility arguments (not formal proofs):
+
+| Level | Description | Type |
+|-------|------------|------|
+| **C1: Information Loss** | Per-step fixed-point rounding irreversibility | Empirical measurement |
+| **C2: Lyapunov** | Shadow orbit error budget + Kaplan-Yorke bound | Chaos theory estimate |
+| **C3: Quantum** | Grover search bound over configuration space Θ | Quantum search estimate |
+| **C4: Keystream** | Deterministic extraction, domain separation | Plausibility argument |
+| **C5: Config** | Configuration validation + estimated cardinality | Counting estimate |
 
 ---
 
@@ -78,85 +88,65 @@ All simulation arithmetic uses Q32.64 fixed-point representation on `i128`:
 ### 4.2 Simulation Loop
 
 ```
-For i ≠ j:
-    r_ij = r_j − r_i
-    dist_sq = |r_ij|² + ε²        (ε = 2^44 raw)
-    dist = sqrt(dist_sq)           → 1 rounding op
-    dist_cubed = dist_sq × dist    → exact
-    a_i += G × m_j × r_ij / dist_cubed  → 1 rounding op
+simulate(bodies, steps, dt, softening, g):
+    for _ in 0..steps {
+        verlet_step(bodies, dt, softening, g);
+    }
 ```
 
-G = 0x277A79937C8BBC0000 raw ≈ 39.478 AU³/(M☉·yr²).
+- **Total steps:** `config.total_steps` (default 1,000,000)
+- **Timestep:** Q32.64 from `DT = 0.01` (Verlet) or `DT = 0.001` (Euler)
+- **Bodyguard (stability monitoring):** Runs in `simulate_with_monitoring()` at the KDF layer via Lyapunov estimation and ejection/collapse checks, not inline in the loop.
 
-### 4.3 Extraction Pipeline
+### 4.3 Entropy Extraction
 
-After S simulation steps:
 ```
-hash(domain_sep || G_raw || ε_raw || S || N || i || m_i || r_i || v_i || a_i)
-Output: 2048-byte entropy pool → keystream via SHAKE256 XOF
+seed_bytes = extract_shake256(
+    &shake256_of(state.positions, state.velocities, G, softening)
+);
 ```
 
----
+SHAKE256 XOF → 2048-byte entropy pool (`kelvin-kdf/src/extractor.rs`).
 
-## 5. Conjecture Status
+### 4.4 Key Schedule
 
-| Conjecture | Total Gaps | Resolved | Key Result |
-|------------|-----------|----------|------------|
-| **C1**: Information Loss | 7 | **7** ✅ | `k_step ≥ 40 bits/step` for N=5 Verlet |
-| **C2**: Lyapunov Certification | 6 | **6** ✅ | `λ ≥ 0.4`, Kaplan-Yorke `log₂(A) ≤ 960 bits` |
-| **C3**: Quantum Hardness | 3 | **3** ✅ | `Ω(2^{960})` Grover bound on `\Theta` |
-| **C4**: Keystream Indistinguishability | 3 | **3** ✅ | `Adv(A) ≤ negl(n) + 2^{-960}` |
-| **C5**: Configuration Space | 4 | **4** ✅ | `$\lvert\Theta_5\rvert \ge 2^{1920}$`, `$H_{\min} \ge 1800$ bits` |
-
----
-
-## 6. Running the Proofs
-
-```bash
-# Kani proofs (via Docker)
-docker compose -f docker/docker-compose.yml run kani bash -c "cd /kelvin && docker/run-kani.sh"
-
-# Empirical validation (C1-C5)
-cargo run -p information_loss          # writes c1_validation.log
-cargo run -p lyapunov_certification    # writes c2_validation.log
-cargo run -p quantum_hardness          # writes c3_validation.log
-cargo run -p keystream_indistinguishability  # writes c4_validation.log
-cargo run -p configuration_space       # writes c5_validation.log
+```
+Pool → HKDF-SHA512(domain_sep, pool) → (KEY, NONCE, reseed_counter) → BLAKE3 → new_pool
 ```
 
 ---
 
-## 7. Directory Structure
+## 5. L0: Safety Proofs
 
-```
-documentation/formal_verification/
-├── README.md
-├── code_verification.md              L1/L2 code proofs with Rust snippets
-├── C1/
-│   ├── readme.md                      Full C1 proof sketch
-│   └── gap{1..7}_*.md                 Individual gap resolutions
-├── C2/
-│   ├── readme.md                      Full C2 proof sketch
-│   └── gap{1..6}_*.md                 Individual gap resolutions
-├── C3/
-│   ├── readme.md                      Full C3 proof sketch
-│   └── gap{1..3}_*.md                 Individual gap resolutions
-├── C4/
-│   ├── readme.md                      Full C4 proof sketch
-│   └── gap{1..3}_*.md                 Individual gap resolutions
-└── C5/
-    ├── readme.md                      Full C5 proof sketch
-    └── gap{1..4}_*.md                 Individual gap resolutions
-```
+- **Kani harness:** `proofs/kani/fixed_safety.rs`
+- **Proves:** No panic, no overflow for `Fixed::{from_raw, add, sub, mul, div, sqrt}` and `compute_accelerations` under bounded inputs
+- **Proof range:** Physical domain bounds (positions ±100 AU, masses 0–1 M☉, etc.)
+
+## 6. L1: Functional Equivalence
+
+- **Kani harness:** `proofs/kani/fixed_equivalence.rs`
+- **Proves:** Fixed-point arithmetic matches mathematical spec within dynamically scaled error bounds
+
+## 7. L2: Composite Correctness
+
+- **Kani harness:** `proofs/kani/acceleration_proofs.rs`
+- **Proves:** `compute_accelerations` satisfies Newton's laws (action-reaction, direction, magnitude)
+
+## 8. L3: Pipeline Integrity
+
+- **Kani harness:** `proofs/kani/pipeline_proofs.rs`
+- **Proves:** `simulate_and_extract_seed` executes the correct number of steps, uses the correct domain separators, and produces consistent output
+
+## 9. L4: Determinism
+
+- **18 tests** in `tests/kelvin_tests/determinism.rs`
+- **Proves:** Bit-identical results across SSE2, AVX, AVX2 for Verlet and Euler integrators
 
 ---
 
-## 8. References
+## References
 
-- Apple Security Research (2026). "Formal verification of corecrypto for post-quantum cryptography." security.apple.com/blog/formal-verification-corecrypto/
-- Kani Rust Verifier. https://model-checking.github.io/kani/
-- Benettin, G., et al. (1980). "Lyapunov Characteristic Exponents." *Meccanica*, 15, 9–20.
+- Benettin, G., Galgani, L., Giorgilli, A., & Strelcyn, J.-M. (1980). "Lyapunov Characteristic Exponents for Smooth Dynamical Systems and for Hamiltonian Systems." *Meccanica*, 15, 9–20.
+- Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations." *Functional Differential Equations and Approximation of Fixed Points*, 204–227.
 - Poincaré, H. (1899). *Les Méthodes Nouvelles de la Mécanique Céleste*, Vol. 3.
-- Bennett, C. H., et al. (1997). "Strengths and Weaknesses of Quantum Computing." *SIAM J. Comput.*
-- Zalka, C. (1999). "Grover's quantum searching algorithm is optimal." *Phys. Rev. A*
-- National Institute of Standards and Technology. (2015). "SHA-3 Standard." FIPS PUB 202.
+- Shannon, C. E. (1949). "Communication Theory of Secrecy Systems." *Bell System Technical Journal*, 28(4), 656–715.

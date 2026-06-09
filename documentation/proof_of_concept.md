@@ -118,7 +118,6 @@ This proves that the orbital simulation operates in the chaotic regime, where sm
 
 The n-body integrator (Verlet or Euler) is inherently sequential — step N+1 requires the output of step N. This means:
 
-- **No parallelization advantage**: An attacker with 1,000 cores cannot simulate 1,000 steps faster than a single core.
 - **No closed-form solution**: The n-body problem ($N \ge 3$) has no known analytical solution. Kelvin strictly enforces $N \ge 3$ to prevent integration of predictable 2-body orbits.
 - **No precomputation advantage**: Each `OrbitalConfig` produces a unique keystream; precomputed tables are useless due to the dynamic gravitational constant ($G$) and large state space.
 
@@ -237,7 +236,7 @@ The Sprott-A system is conservative (Hamiltonian), preserving phase-space volume
 
 ## 4.9 V2 Streaming Mode (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) introduces a true one-time pad streaming mode where each chunk of data advances the orbital simulation by one integration step (Verlet or Euler). This is verified by the built-in self-test:
+V2 Streaming (`KelvinStreaming`) introduces a per-step stream cipher mode where each chunk of data advances the orbital simulation by one integration step (Verlet or Euler). This is verified by the built-in self-test:
 
 ```
 === V2 Streaming Self-Tests ===
