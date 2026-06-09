@@ -65,11 +65,11 @@ The following are empirical estimates and plausibility arguments (not formal pro
 
 | Level | Description | Type |
 |-------|------------|------|
-| **C1: Information Loss** | Per-step fixed-point rounding irreversibility | Empirical measurement |
-| **C2: Lyapunov** | Shadow orbit error budget + Kaplan-Yorke bound | Chaos theory estimate |
-| **C3: Quantum** | Grover search bound over configuration space Θ | Quantum search estimate |
-| **C4: Keystream** | Deterministic extraction, domain separation | Plausibility argument |
-| **C5: Config** | Configuration validation + estimated cardinality | Counting estimate |
+| **[C1: Information Loss](formal_verification/C1/readme.md)** | Per-step fixed-point rounding irreversibility | Empirical measurement |
+| **[C2: Lyapunov](formal_verification/C2/readme.md)** | Shadow orbit error budget + Kaplan-Yorke bound | Chaos theory estimate |
+| **[C3: Quantum](formal_verification/C3/readme.md)** | Grover search bound over configuration space Θ | Quantum search estimate |
+| **[C4: Keystream](formal_verification/C4/readme.md)** | Deterministic extraction, domain separation | Plausibility argument |
+| **[C5: Config](formal_verification/C5/readme.md)** | Configuration validation + estimated cardinality | Counting estimate |
 
 ---
 

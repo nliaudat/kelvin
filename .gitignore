@@ -69,6 +69,6 @@ proofs/kani/results/
 golden_hash_output.txt
 golden_hash_stderr.txt
 streaming_test_result.txt
-/tests
-/tests/configuration_space
-/tests
+# Test build artifacts (not the test sources themselves)
+/tests/**/target/
+/tests/**/*.exe

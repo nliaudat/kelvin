@@ -27,7 +27,7 @@ where:
 | $\varepsilon_q$ | $2^{-64} \approx 5.4 \times 10^{-20}$ | Q32.64 quantization step |
 | $\sigma$ | $\approx 0.07$ | Std dev across 3 perturbed axes |
 | $S$ | $2000$ | Default shadow steps |
-| $dt$ | $2^{54}$ raw $\approx 0.0156$ yr | Verlet time step |
+| $dt$ | $2^{58}$ raw $\approx 0.0156$ yr | Verlet time step |
 
 ## Theorem 3: Full Lyapunov Spectrum
 
