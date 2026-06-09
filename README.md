@@ -309,7 +309,6 @@ See [formal_verification.md](documentation/formal_verification.md) for details.
 - [Windows DLL Tool Fix](documentation/windows_dlltool_fix.md) — Cross-compilation workaround
 
 ### Operations
-- [Production Readiness Plan](production_readiness_plan.md) — Roadmap to 1.0
 
 
 ## Academic Context
