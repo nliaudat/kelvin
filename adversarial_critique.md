@@ -691,6 +691,8 @@ The 2¹⁹²⁰ figure appears to be: "128-bit fields are wasteful, about 40 bit
 
 ## What a Professor Would Say
 
+> *Note: The specific claims referenced in this section (OTP terminology, bulletproof/unbreakable framing, C1–C5 as informal estimates, Euler entropy numbers, reseeding circularity, Deep Physical Binding, and the 2¹⁹²⁰ derivation) have been addressed in points 1, 3, 10, 17, 18, 21, and 26 respectively. This section is preserved as the original framing narrative to show the difference between the pre-fix and post-fix state of the project.*
+>
 > *"This is an interesting engineering project that demonstrates cross-platform determinism and implements known good primitives (SHAKE256, HKDF, BLAKE3, ML-DSA-65). The implementors clearly understand side-channel resistance and have done serious work on the implementation layer.*
 >
 > *However, the security claims are not supported by the mathematical framework. Calling this an 'OTP' is terminologically wrong. Calling it 'bulletproof' or 'computationally unbreakable' is scientifically reckless for an experimental system. The security 'proofs' (C1–C5) are informal physical arguments dressed in mathematical notation — not formal reductions to hard problems.*
@@ -705,6 +707,8 @@ The 2¹⁹²⁰ figure appears to be: "128-bit fields are wasteful, about 40 bit
 
 ## What the Evil Critic Would Say
 
+> *Note: The specific claims referenced in this section (OTP labeling, quantum-resistant framing, bulletproof/unbreakable language, C1–C5 as informal estimates, Lyapunov/entropy conflation, Euler entropy numbers, Deep Physical Binding, reseeding circularity, and the 2¹⁹²⁰ derivation) have been addressed in points 1, 3, 4, 7, 10, 17, 18, 21, and 26 respectively. This section is preserved as the original framing narrative to show the difference between the pre-fix and post-fix state of the project.*
+>
 > *"The authors have wrapped ChaCha20 XOR (effectively) in a very elaborate key derivation scheme and then called it a 'quantum-resistant one-time pad.' The OTP label is wrong (stream cipher), the 'quantum resistant' label applies only to SHAKE256 (which is in every other post-quantum cipher anyway), and the 'computationally unbreakable' language is unpublishable in any peer-reviewed venue.*
 >
 > *The Kani proofs prove the code doesn't crash. The NIST tests prove it doesn't fail a randomness filter. Neither proves anything about cryptographic security. The 'conjectures C1–C5' are informal estimates with no security reductions. The Lyapunov exponent is a qualitative indicator, not a security parameter.*
