@@ -6,3 +6,7 @@ description = "Empirical validation of C3: sequential simulation hardness agains
 
 [dependencies]
 kelvin-core = { path = "../../kelvin-core" }
+
+[lints.clippy]
+disallowed_methods = "allow"
+unnecessary_cast = "allow"

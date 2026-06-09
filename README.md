@@ -7,8 +7,7 @@
 > **Project Name:** kelvin — **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
 > *A chaotic 3D n-body gravitational key derivation system*
 
-> **⚠️ EXPERIMENTAL — Not for production use.** This is a research cryptosystem.
-> It has not undergone formal cryptanalysis. See [Security](#security) for details.
+> **⚠️ STALLED — No further research is planned.** This project is archived as a research exploration. It has not undergone formal cryptanalysis and should not be used in production. For a balanced assessment of its limitations and contributions, see [Why This Project Is Stupid](stupid.md) (production crypto critique) and [Novel Contributions](novel.md) (academic contributions to chaos-based cryptography).
 
 Kelvin is a **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**, with reference stream cipher modes demonstrating the KDF output. The novel contribution is the chaotic n-body → SHAKE256 extraction pipeline. The stream cipher modes (V2 Chaos, V3 Photon, H Quantum) consume KDF seed material via standard SHAKE256 XOR — their security is bounded by SHAKE256's 128-bit post-quantum resistance, identical to any SHAKE256-based construction. The KDF security (inverting the n-body simulation from SHAKE256 output) is a novel conjecture, not a formally proven reduction.
 

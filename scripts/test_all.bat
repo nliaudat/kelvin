@@ -38,7 +38,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo build --workspace --release
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=2/8: Build with AES-NI feature
 echo.
@@ -51,7 +51,7 @@ if !EXITCODE! equ 0 (
     cargo build --release -p kelvin --features aes-ni
     if errorlevel 1 call :fail
 )
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=2b/8: Build Chaos Streaming example
 echo.
@@ -60,7 +60,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo build --release --example simple_streaming -p kelvin
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=2c/8: Build kelvin-ffi (C FFI bindings)
 echo.
@@ -69,7 +69,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo build --release -p kelvin-ffi
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 2. Lint -- clippy + rustfmt
@@ -82,7 +82,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo clippy --workspace -- -D warnings
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=4/8: Check formatting
 echo.
@@ -91,7 +91,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo fmt --check
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 3. Unit tests (all workspace members)
@@ -103,7 +103,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release --lib --workspace
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=6/8: Unit tests - kelvin-stream (AES-NI feature)
 echo.
@@ -112,7 +112,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release --lib -p kelvin-stream --features aes-ni
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 4. Integration tests
@@ -124,7 +124,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test v1_round_trip
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Photon cipher
 echo.
@@ -133,7 +133,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test photon
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Quantum cipher
 echo.
@@ -142,7 +142,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test quantum
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Authenticated encryption
 echo.
@@ -151,7 +151,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test authenticated
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Full pipeline
 echo.
@@ -160,7 +160,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test full_pipeline
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Streaming API - Photon, Quantum, Chaos, Secure
 echo.
@@ -169,7 +169,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test streaming_api
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Prism OTP key generator
 echo.
@@ -178,7 +178,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test prism
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Flare FHE key generator
 echo.
@@ -187,7 +187,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test flare
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Split secret sharing
 echo.
@@ -196,7 +196,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test split
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Canonical test vectors (all modes)
 echo.
@@ -205,7 +205,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin --test test_vectors
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Determinism (cross-platform golden hash)
 echo.
@@ -214,7 +214,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin-core --test determinism
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Chaos test (Lyapunov estimation)
 echo.
@@ -223,7 +223,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p kelvin-kdf --test chaos_test
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: Client/Server self-test - Secure + Chaos Streaming
 echo.
@@ -232,7 +232,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo run --release -p kelvin-test-client
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 5. Entropy analysis & statistical tests
@@ -244,7 +244,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo run --release -p entropy_analysis -- --keystream
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: NIST SP 800-22 statistical tests (all 6 variants)
 echo.
@@ -253,7 +253,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo run --release -p nist_tests
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: NIST SP 800-90B keystream generation + analysis
 echo.
@@ -262,7 +262,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cmd /c "cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_test.bin && cargo run --release -p nist_800_90b -- analyze --input keystream_90b_test.bin"
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: NIST SP 800-90B Prism keystream generation + analysis
 echo.
@@ -271,7 +271,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cmd /c "cargo run --release -p nist_800_90b -- generate --size 1048576 --output keystream_90b_prism.bin --prism && cargo run --release -p nist_800_90b -- analyze --input keystream_90b_prism.bin"
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 set STEP_NAME=Integration: NIST SP 800-90B non-IID entropy estimation (dj-on-github)
 echo.
@@ -280,7 +280,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cmd /c "python tests\sp800_90b_non_iid\sp800_90b_tests.py -t mcv keystream_90b_test.bin -s 10000 && python tests\sp800_90b_non_iid\sp800_90b_tests.py -t ttuple keystream_90b_test.bin -s 10000"
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 del keystream_90b_test.bin 2>nul
 
@@ -294,7 +294,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo run --release -p constant_time_bench
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM 7. Zeroize verification tests
@@ -306,7 +306,7 @@ echo %CYAN%  %STEP_NAME%%NC%
 echo %CYAN%========================================%NC%
 cargo test --release -p zeroize_verify
 if errorlevel 1 call :fail
-echo %GREEN%PASSED%NC%
+if !EXITCODE! equ 0 echo %GREEN%PASSED%NC%
 
 REM ---------------------------------------------------------------------------
 REM Summary

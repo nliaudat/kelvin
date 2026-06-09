@@ -1,7 +1,7 @@
 //! # Kelvin — Quantum-Resistant One-Time Pad Cryptosystem
 //!
 //! Top-level orchestrator for the Kelvin cryptosystem — a **quantum-resistant
-//! one-time pad (OTP) cryptosystem** based on fixed-point gravitational n-body
+//! stream cipher cryptosystem** based on fixed-point gravitational n-body
 //! simulation.
 //!
 //! All XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare)

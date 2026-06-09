@@ -123,7 +123,7 @@ fn main() {
     }
 
     // ── 8. Summary ─────────────────────────────────────────────────
-    output.push_str(&format!("\nRESULTS: C4 validation complete\n"));
+    output.push_str("\nRESULTS: C4 validation complete\n");
 
     let _ = fs::write(&results_path, &output);
     print!("{output}");

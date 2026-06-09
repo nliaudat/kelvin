@@ -2,7 +2,7 @@
 //!
 //! ## Architecture
 //!
-//! H Kelvin-Quantum is a **quantum-resistant one-time pad (OTP) stream cipher**
+//! H Kelvin-Quantum is a **quantum-resistant stream cipher**
 //! that combines the orbital chaos KDF with SHAKE256 XOF. Unlike V3 Photon
 //! (which uses HKDF→SHAKE256), H Quantum periodically refreshes its base seed
 //! with fresh orbital entropy via `reseed_from_orbital_chaos`:

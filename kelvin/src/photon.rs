@@ -2,7 +2,7 @@
 //!
 //! ## Architecture
 //!
-//! V3 Photon is a **quantum-resistant one-time pad (OTP) stream cipher**.
+//! V3 Photon is a **quantum-resistant stream cipher**.
 //! Unlike V1 (which extracts only 32+12 bytes per HKDF call), V3 uses HKDF's
 //! full capacity to derive a SHAKE256 XOF seed, then produces arbitrary-length
 //! keystream:

@@ -2,8 +2,12 @@
 name = "configuration_space"
 version = "0.1.0"
 edition = "2021"
-description = "Monte Carlo validation of C5: configuration space cardinality for the Kelvin cryptosystem"
+description = "Monte Carlo validation of C5: configuration space cardinality"
 
 [dependencies]
 kelvin-core = { path = "../../kelvin-core" }
 kelvin-kdf = { path = "../../kelvin-kdf" }
+
+[lints.clippy]
+disallowed_methods = "allow"
+useless_format = "allow"
