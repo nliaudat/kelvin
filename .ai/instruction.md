@@ -41,6 +41,7 @@ RUST BEST PRACTICES (MANDATORY)
 - rustfmt + clippy (strict) in CI
 - Safety docs on all pub fn that touch secrets
 - Dead code forbidden (no `#[allow(dead_code)]`, no unused imports/variables/fields)
+- **No `#[allow(...)]` attributes in any Rust source file** — use `[lints.clippy]` in `Cargo.toml` instead. Exception: test/analysis crates in `tests/` may use `[lints.clippy]` in their `Cargo.toml` for legitimate f64 math operations (NIST tests, Lyapunov exponents, entropy analysis, etc.)
 
 ===============================================================================
 
