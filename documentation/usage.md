@@ -441,7 +441,6 @@ material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
 > by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4
 > floating-point integration. Kelvin-Flare provides an alternative approach
 > using 30-DOF n-body gravitational dynamics with fixed-point arithmetic and
-> domain-separated extraction. See [Patent Review #3](patent_review_3.md) for
 > full analysis.
 
 

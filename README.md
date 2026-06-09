@@ -55,7 +55,7 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 
 Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems.
 
-> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review_3.md) for full analysis.
+> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review/patent_review_3.md) for full analysis.
 
 
 ## How It Works
@@ -283,9 +283,9 @@ See [formal_verification.md](documentation/formal_verification.md) for details.
 ### Formal Verification & Security
 - [Formal Verification](documentation/formal_verification.md) — Kani proof strategy (L0–L4)
 - [Security Analysis](documentation/stream_cipher_security.md) — Quantum-resistant stream cipher security argument
-- [Patent Landscape #1](documentation/patent_review_1.md) — Prior art analysis (overview)
-- [Patent Landscape #2](documentation/patent_review_2.md) — Prior art analysis (in-depth)
-- [Patent Landscape #3](documentation/patent_review_3.md) — Prior art analysis (conclusion)
+- [Patent Landscape #1](documentation/patent_review/patent_review_1.md) — Prior art analysis (overview)
+- [Patent Landscape #2](documentation/patent_review/patent_review_2.md) — Prior art analysis (in-depth)
+- [Patent Landscape #3](documentation/patent_review/patent_review_3.md) — Prior art analysis (conclusion)
 - [Project History](documentation/project_history.md) — Development timeline and milestones
 
 ### Performance & Benchmarks

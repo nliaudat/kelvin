@@ -107,7 +107,6 @@ Key features of `KelvinPrism`:
 > by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4
 > floating-point integration. Kelvin-Flare offers an alternative approach using
 > 30-DOF n-body gravitational dynamics with fixed-point arithmetic and
-> domain-separated extraction. See [Patent Review #3](patent_review_3.md) for
 > full analysis.
 
 A 2025 paper by Jawad proposes **DUff-skg**: generating FHE secret keys using chaotic Duffing equations.
