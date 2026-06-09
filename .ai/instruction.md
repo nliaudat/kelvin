@@ -136,7 +136,7 @@ Encrypt and decrypt are the same operation (XOR with keystream).
 
 FILES IN REPO
 
-implementation_plan.md    Full specification (long, detailed)
+documentation/implementation_plan.md    Full specification (long, detailed)
 project_summary.md        Concise overview (shorter)
 ai/instruction.md         This file (session restoration)
 .clinerules               AI tool operational instructions (build, CLI, Windows)
