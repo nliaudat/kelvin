@@ -45,4 +45,4 @@ This means a 1% change in any parameter changes `λ` by at most 0.067%. This is 
 
 ## See Also
 
-- [C2 Proof Sketch](proof_sketch.md)
+- [C2 Proof Sketch](readme.md)

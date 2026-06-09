@@ -223,11 +223,13 @@ The comparison is unfair in multiple ways:
 
 ---
 
-## 10. MAJOR: The "Bulletproof" Title and Framing Is Scientifically Inappropriate
+## 10. [ADDRESSED] The "Bulletproof" Title and Framing Is Scientifically Inappropriate
 
-**Source document:** `otp_bulletproof.md`
+**Status: ADDRESSED** — Documentation updated 2026-05-31 as part of the point 1 terminology cleanup. The `otp_bulletproof.md` file was renamed to `stream_cipher_security.md` with a new title: "Kelvin Stream Cipher Security: Security Analysis and Assumptions." All "Bulletproof" and "Computationally Unbreakable" language removed across the project. `README.md` now accurately describes the system as an "experimental" stream cipher with explicit caveats. See resolution of point 1 for full change set.
 
-### The Criticism
+**Source document:** `stream_cipher_security.md`
+
+### The Original Criticism
 
 Using the word "Bulletproof" in official documentation for an *experimental, unaudited* cryptosystem is a serious credibility problem. The document's own opening states:
 > "Status: Active Documentation" / "EXPERIMENTAL"
@@ -238,13 +240,19 @@ but then titles itself "Why This Architecture Is Quantum-Resistant and Computati
 
 This framing would be flagged immediately in peer review and potentially harm the credibility of all other claims.
 
+### Resolution (2026-05-31)
+
+All "Bulletproof" and "Computationally Unbreakable" language removed throughout the project. The `otp_bulletproof.md` file was renamed to `stream_cipher_security.md` with its title updated from "Why This Architecture Is Quantum-Resistant and Computationally Unbreakable" to "Kelvin Stream Cipher Security: Security Analysis and Assumptions." The `README.md` no longer uses "Bulletproof" framing and correctly marks the system as experimental. The project's self-description now accurately reflects its status as a research cryptosystem with known assumptions and limitations.
+
 ---
 
-## 11. MAJOR: Acknowledged "Not a Hard Problem" — But Implications Are Under-Stated
+## 11. [PARTIALLY ADDRESSED] Acknowledged "Not a Hard Problem" — But Implications Are Under-Stated
+
+**Status: PARTIALLY ADDRESSED** — The "no formal reduction" admission is now prominent across key documents. `README.md` labels the n-body one-way function as "an unproven conjecture" (line 16). `stream_cipher_security.md` §1 caveats explicitly state "no formal reduction to a known hard problem (lattice, discrete log, factoring, or similar)" and that C1–C5 are "plausibility arguments based on physical chaos — not formal security reductions." C1–C5 are now labeled as "estimates" rather than "bounds" (resolution of point 3). `README.md` and `bench_comparative.md` benchmark tables include fairness caveats (resolution of point 9). Full resolution would require a formal security reduction, which remains an open research goal.
 
 **Source documents:** `README.md`, `proof_of_concept.md` (§6)
 
-### The Criticism
+### The Original Criticism
 
 The documentation admirably admits:
 > "No reduction to a standard hard problem: No reduction to lattices, discrete log, or similar."
@@ -259,6 +267,10 @@ Without a reduction:
 The documentation compares Kelvin to AES-256, Argon2id, and HKDF in tables — but these comparisons are misleading because Kelvin's security model is fundamentally different in kind, not just in degree. Kelvin's security is based on an *unproven assumption* about a physical system; AES, Argon2id and HKDF are based on extensively studied mathematical problems.
 
 A critic would say: **This is a novel construction with no formal security model. The extensive documentation provides comfort but not proof.**
+
+### Resolution (2026-05-31)
+
+The "no formal reduction" admission is now prominent in `README.md`, `security_assumptions.md`, and `stream_cipher_security.md`. The README labels the n-body one-way function explicitly as "an unproven conjecture." C1–C5 are referred to as "estimates" not "bounds." Benchmark comparisons include fairness caveats. The original quoted text ("No reduction to a standard hard problem") has been superseded by these more precise caveats. Full resolution (a formal security reduction) is identified as an open research goal, consistent with point 2.
 
 ---
 
@@ -356,11 +368,13 @@ Presenting this as a distinct capability of Kelvin's "Split mode" adds complexit
 
 ---
 
-## 17. [CRITICAL] Euler "One-Way Function" Argument Is Based on a Category Error
+## 17. [ADDRESSED] Euler "One-Way Function" Argument Is Based on a Category Error
 
-**Source documents:** `documentation/Euler_vs_Verlet.md`, `README.md` line 12
+**Status: ADDRESSED** — `Euler_vs_Verlet.md` §3 and §4 already contained explicit caveats: "Numerical irreversibility is **not** the same as a cryptographic one-way function" and "A deterministic computation, no matter how divergent, has zero bits of min-entropy." The remaining issue was the first table (lines 41–46) which still used "Entropy per step" and "Steps for 256-bit entropy" — this has been replaced with "Trajectory decorrelation per step" and "Steps for trajectory decorrelation (estimate)" with footnotes clarifying these are physical chaos metrics, not cryptographic entropy. The `README.md` line 16 now reads "amplifies trajectory divergence" with the caveat "(this is a conjecture about complicating initial-condition recovery, not a proven property)."
 
-### The Criticism
+**Source documents:** `documentation/Euler_vs_Verlet.md`, `README.md`
+
+### The Original Criticism
 
 The README claims:
 > "The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry."
@@ -376,20 +390,19 @@ There is **no derivation** for converting numerical integration error to cryptog
 
 **The "Euler is more secure" thesis appears to be:** noise → harder to predict → more secure. But the noise is deterministic (fixed-point computation), so it's part of the function — it is just a more convoluted deterministic function, not a harder one to search.
 
-### Suggested Fix Direction
+### Resolution (2026-05-31)
 
-- Remove all fabricated "entropy per step" numbers from `Euler_vs_Verlet.md`
-- Eliminate language claiming Euler creates a "one-way function" on its own
-- Replace with honest statement: "Euler amplifies trajectory divergence faster, potentially complicating initial-condition recovery. This is a conjecture, not a proven property."
-- Add a caveat that numerical instability produces deterministic error, not cryptographic entropy
+The `Euler_vs_Verlet.md` document already had a caveat in §3 (§52–53) stating numerical irreversibility is not a cryptographic one-way function, and in §4 (§58–59) stating any deterministic computation has zero bits of min-entropy. The remaining issue, the first table's "Entropy per step" and "Steps for 256-bit entropy" rows, has been corrected to "Trajectory decorrelation per step" with a footnote: "These metrics measure trajectory divergence, not cryptographic entropy. A deterministic computation has zero bits of min-entropy regardless of how chaotic the dynamics appears." The `README.md` line 16 has been softened from "creating even stronger computational asymmetry" to "creating stronger trajectory divergence (this is a conjecture about complicating initial-condition recovery, not a proven property)."
 
 ---
 
-## 18. [CRITICAL] "Continuous Reseeding" Against Periodicity Is Architecturally Circular
+## 18. [ADDRESSED] "Continuous Reseeding" Against Periodicity Is Architecturally Circular
+
+**Status: ADDRESSED** — `README.md` security section (line 133) now includes: "⚠️ Reseeding note: The SHAKE256 reseeding is a deterministic transformation — it cannot break finite-precision periodicity in the orbital simulation. See Finite Precision Analysis." This note appears prominently in the What Kelvin Provides section, elevating the §4.8 warning from proof_of_concept.md. No reseeding claims remain in README.md or stream_cipher_security.md that present reseeding as a "resolved defense."
 
 **Source documents:** `proof_of_concept.md` §4.8, `stream_cipher_security.md`
 
-### The Criticism
+### The Original Criticism
 
 The defense against finite-precision periodicity is "continuous reseeding via SHAKE256." But this argument is logically circular:
 
@@ -402,19 +415,19 @@ The reseeding adds zero fresh entropy. It is a deterministic transformation of d
 
 The `proof_of_concept.md` §4.8 acknowledges this as "a genuine unsolved concern," but this admission is **buried in §4.8** of a supporting document while the `README.md` and `stream_cipher_security.md` present the reseeding as a resolved defense. This inconsistency between documents is itself a credibility problem.
 
-### Suggested Fix Direction
+### Resolution (2026-05-31)
 
-- Remove or downgrade the "reseed breaks periodicity" claim in `README.md` and `stream_cipher_security.md`
-- Add explicit caveat in `README.md` security section that deterministic reseeding cannot break deterministic periodicity
-- Elevate the §4.8 warning from "buried in sub-section" to a prominent security note
+`README.md` security section now includes a prominent "⚠️ Reseeding note" stating that SHAKE256 reseeding is a deterministic transformation that cannot break finite-precision periodicity. Existing claims presenting reseeding as a "resolved defense" have been removed. The warning from §4.8 of proof_of_concept.md is elevated to a prominent security note in `README.md`.
 
 ---
 
-## 19. [MAJOR] V2 Mode Bypasses the "Simulation Runs Before Keystream" Side-Channel Defense
+## 19. [ADDRESSED] V2 Mode Bypasses the "Simulation Runs Before Keystream" Side-Channel Defense
+
+**Status: ADDRESSED** — `THREAT_MODEL.md` §2.2 (lines 55–56) now includes: "⚠️ For V2 (Chaos) mode: This defense does NOT apply. V2 interleaves simulation with keystream generation — the simulation advances one step per chunk of data processed. Timing variations in the simulation loop correlate with orbital state... Additionally, if any intermediate orbital state is compromised, an attacker can forward-simulate from that point to decrypt all subsequent traffic."
 
 **Source documents:** `THREAT_MODEL.md` §2.2, `proof_of_concept.md` §4.9
 
-### The Criticism
+### The Original Criticism
 
 The threat model (THREAT_MODEL.md §2.2) claims:
 > "The simulation runs before any keystream is produced. Timing variations in the simulation loop do not leak keystream material."
@@ -433,11 +446,13 @@ Furthermore, in V2 mode:
 
 ---
 
-## 20. [MAJOR] "No Nonce" Is a Liability Masquerading as a Feature
+## 20. [ADDRESSED] "No Nonce" Is a Liability Masquerading as a Feature
+
+**Status: ADDRESSED** — `README.md` now includes an explicit warning (line 104): "⚠️ Important caveat: The absence of a nonce means there is no built-in defense against config reuse between instances. Loading the same orbital configuration into two separate Kelvin instances produces identical keystream prefixes — this is the two-time pad problem. Users MUST ensure each orbital configuration is used by at most one Kelvin instance."
 
 **Source documents:** `README.md` §"Why a Stream Cipher Without Nonces?", `stream_cipher_security.md` §7
 
-### The Criticism
+### The Original Criticism
 
 The documents present the absence of nonces as an advantage: "no catastrophic nonce reuse vulnerability." But this conceals a worse problem:
 
@@ -458,11 +473,13 @@ Both instances start from the same initial state and produce **identical keystre
 
 ---
 
-## 21. [MAJOR] "Deep Physical Binding" Security Claims Are Pseudoscience
+## 21. [ADDRESSED] "Deep Physical Binding" Security Claims Are Pseudoscience
+
+**Status: ADDRESSED** — The "Deep Physical Binding" section referencing "prevents quantum shortcut attacks" and "different set of physical laws" language has been removed from `quantum_analysis.md`. The section now accurately describes these values as included in the hash for domain separation and reproducibility, not additional cryptographic security.
 
 **Source documents:** `quantum_analysis.md` §2.3.1
 
-### The Criticism
+### The Original Criticism
 
 > "Physical Constants: The gravitational constant G and softening factor ε are hashed into every seed. This prevents quantum 'shortcut' attacks that might attempt to model the orbital evolution using a different set of physical laws."
 
@@ -484,11 +501,13 @@ The acceleration is **computed from the positions and masses** — it contains n
 
 ---
 
-## 22. [MAJOR] The Documented Security Posture Collapses Under Known Plaintext
+## 22. [ADDRESSED] The Documented Security Posture Collapses Under Known Plaintext
+
+**Status: ADDRESSED** — `README.md` (line 18) now includes the explicit caveat: "Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance." The attack table language has been updated accordingly.
 
 **Source documents:** `stream_cipher_security.md` attack table, `THREAT_MODEL.md`
 
-### The Criticism
+### The Original Criticism
 
 The attack table in `stream_cipher_security.md` lists "Reverse engineer keystream from ciphertext" as:
 > "⚠️ Doesn't reveal other messages"
@@ -510,11 +529,13 @@ The system's security collapses to exactly SHAKE256's preimage resistance under 
 
 ---
 
-## 23. [MODERATE] "No Algebraic Structure" Is True of All Stream Ciphers, Not Special to Kelvin
+## 23. [ADDRESSED] "No Algebraic Structure" Is True of All Stream Ciphers, Not Special to Kelvin
+
+**Status: ADDRESSED** — `README.md` (line 110) now includes the explicit caveat: "(this is true of all symmetric stream ciphers, not unique to Kelvin)." The mode comparison section no longer presents "no algebraic structure" as a distinguishing advantage.
 
 **Source documents:** `README.md` §"What Makes Kelvin Novel", `stream_cipher_security.md` §7, `quantum_analysis.md` §4
 
-### The Criticism
+### The Original Criticism
 
 The documents repeatedly claim Kelvin has "no algebraic structure — nothing for Shor's algorithm to factor or for lattice reduction to exploit" as if this is a distinguishing property. But:
 
@@ -530,26 +551,29 @@ This is security-by-lack-of-imagination dressed as a feature.
 
 ---
 
-## 24. [MODERATE] The "Quantum" Mode Name Is Marketing, Not Science
+## 24. [ADDRESSED] The "Quantum" Mode Name Is Marketing, Not Science
+
+**Status: ADDRESSED** — `README.md` mode table now includes a footnote next to "Kelvin-Quantum²": "² The name 'Quantum' refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The security of all Kelvin modes derives from classical chaotic n-body dynamics and standardized cryptographic primitives (SHAKE256, HKDF-SHA512), not from quantum mechanics."
 
 **Source documents:** `README.md` mode table, `kelvin/src/quantum.rs`
 
-### The Criticism
+### The Original Criticism
 
 Mode H is named "Kelvin-Quantum." There is nothing quantum about it — it is a classical stream cipher with a hybrid key schedule. The name implies quantum-mechanical properties that do not exist. Even "Kelvin-Hybrid" or "Kelvin-Composite" would be more honest. A reviewer would call this out as misleading branding that exploits the "quantum" buzzword.
 
-### Suggested Fix Direction
+### Resolution (2026-05-31)
 
-- Add a footnote in `README.md` and `usage.md` clarifying that the name "Quantum" refers to the hybrid V2+V3 architecture, not quantum-mechanical properties
-- Consider renaming the mode in a future breaking release
+`README.md` mode table now includes a footnote for "Kelvin-Quantum²" clarifying the name refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The footnote explicitly states all Kelvin modes derive security from classical chaotic dynamics and standardized cryptographic primitives, not from quantum mechanics.
 
 ---
 
-## 25. [MODERATE] All Security Levels Provide Exactly the Same Effective Security
+## 25. [ADDRESSED] All Security Levels Provide Exactly the Same Effective Security
+
+**Status: ADDRESSED** — `THREAT_MODEL.md` §3.3 Equivalent Security column now reads "128-bit (SHAKE256 bound)" for all three levels (Standard, Paranoid, Maximum). A note below the table states: "All three levels provide identical effective security — the extra steps in Paranoid and Maximum increase simulation setup cost but do not raise the security bound."
 
 **Source documents:** `THREAT_MODEL.md` §3.3
 
-### The Criticism
+### The Original Criticism
 
 The security levels table in `THREAT_MODEL.md` shows:
 
@@ -567,18 +591,19 @@ But the document itself admits effective security is bounded by SHAKE256 at 128-
 
 **All three levels provide exactly the same effective security.** The extra steps add computation cost but zero additional security. The "Raw Keyspace" column is security theater — it presents numbers that look impressive but are clamped to the same bound. The levels are not "security levels" — they are "wait time levels."
 
-### Suggested Fix Direction
+### Resolution (2026-05-31)
 
-- Modify the "Equivalent Security" column in `THREAT_MODEL.md` §3.3 to show "128-bit (SHAKE256 bound)" for all three levels
-- Add an explicit note: "All levels are bounded by the same 128-bit SHAKE256 effective security. Extra steps increase simulation cost but do not raise the security level."
+`THREAT_MODEL.md` §3.3 Equivalent Security column updated from "> AES-256" to "128-bit (SHAKE256 bound)" for all three levels, with an accompanying note explaining that all levels provide identical effective security bounded by SHAKE256's Grover resistance, and additional steps only increase setup cost.
 
 ---
 
-## 26. [MODERATE] The 2¹⁹²⁰ Keyspace Derivation Is Unexplained and Informally Derived
+## 26. [ADDRESSED] The 2¹⁹²⁰ Keyspace Derivation Is Unexplained and Informally Derived
+
+**Status: ADDRESSED** — `README.md` (line 138) now includes a derivation note: "The ≥ 2¹⁹²⁰ config space figure is an estimate (≈ 40 effective bits × ~48 independent fields). See Stream Cipher Security Analysis for the full derivation context." The figure is no longer presented as a formal bound without explanation.
 
 **Source documents:** `stream_cipher_security.md` attack table, `README.md` §"What Kelvin Does NOT Provide"
 
-### The Criticism
+### The Original Criticism
 
 The figure "≥ 2¹⁹²⁰ configuration space" appears dozens of times across documents. The derivation is cited as "40 bits × 48 fields" in the attack table. But:
 

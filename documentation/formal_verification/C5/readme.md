@@ -25,25 +25,34 @@ For $N = 5$ bodies:
 
 ## Analytical Bound Derivation
 
-Each body contributes 7 raw Q32.64 values. For N=5:
+Each body contributes 7 bounded Q32.64 values. For N=5:
 
-$$\text{Unconstrained raw bits} = 5 \times 7 \times 128 = 4480 \text{ bits}$$
+| Component | Per-axis bits | Per-body bits |
+|-----------|---------------|---------------|
+| Mass $m \in (0, 1]$ | — | 64 |
+| Position $p \in [-100, 100]^3$ | $64 + \log_2(201) \approx 71.6$ | $3 \times 71.6 \approx 214.9$ |
+| Velocity $v \in [-100, 100]^3$ | $64 + \log_2(201) \approx 71.6$ | $3 \times 71.6 \approx 214.9$ |
+| **Per body total** | | **$\approx 493.9$** |
 
-With physical bounds:
+- Unconstrained for N=5: $5 \times 493.9 \approx 2469.5$ bits
 
-- Mass: 64 effective bits
-- Position per axis: $64 + \log_2(200) \approx 71.6$ bits
-- Velocity per axis: $64 + \log_2(200) \approx 71.6$ bits
-- Per body: $\approx 493.9$ bits
-- Unconstrained for N=5: $\approx 2470$ bits
+Constraint reductions (from gap1):
 
-Stability constraints reduce by at most $2^{-100}$, giving $H \ge 2370$ bits — above the $2^{1920}$ claim.
+| Constraint | Reduction (bits) |
+|------------|-----------------|
+| Non-collision ($r_i \neq r_j$) | $\leq 0.1$ |
+| Min separation ($\|r_i - r_j\| \ge$ threshold) | $\leq 5$ |
+| Bound orbit ($E <$ ejection-threshold) | $\leq 100$ |
+
+$$H \ge 2469.5 - 0.1 - 5 - 100 \approx 2364.4 \text{ bits} \ge 1920$$
+
+The final bound $H \ge 2364.4$ bits is well above the $2^{1920}$ claim.
 
 ## All Gaps Resolved
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | Cardinality $|\Theta\_5| \ge 2^{1920}$ | [`gap1_cardinality_bound`](gap1_cardinality_bound.md) | ✅ RESOLVED |
+| 1 | Cardinality $\lvert\Theta_5\rvert \ge 2^{1920}$ | [`gap1_cardinality_bound`](gap1_cardinality_bound.md) | ✅ RESOLVED |
 | 2 | Min-entropy $H\_{\min} \ge 1800$ bits | [`gap2_min_entropy`](gap2_min_entropy.md) | ✅ RESOLVED |
 | 3 | Stability reduction $\le 2^{-100}$ | [`gap3_stability_reduction`](gap3_stability_reduction.md) | ✅ RESOLVED |
 | 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config`](gap4_symbolic_kani_config.md) | ✅ RESOLVED |

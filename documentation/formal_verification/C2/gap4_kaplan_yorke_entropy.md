@@ -31,4 +31,4 @@ For `D_KY ≈ 15`: `log₂(A) ≤ 960 bits`. For `D_KY ≈ 5`: `log₂(A) ≤ 32
 
 ## See Also
 
-- [C2 Proof Sketch](proof_sketch.md)
+- [C2 Proof Sketch](readme.md)

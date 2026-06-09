@@ -37,4 +37,4 @@ The current concrete-input harnesses are sufficient. The validation function use
 
 ## See Also
 
-- [C5 Proof Sketch](proof_sketch.md)
+- [C5 Proof Sketch](readme.md)

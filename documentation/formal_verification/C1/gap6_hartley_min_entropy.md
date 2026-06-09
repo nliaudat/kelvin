@@ -136,4 +136,4 @@ All 6 C1 gaps are now resolved:
 
 ## See Also
 
-- [C1 Proof Sketch](proof_sketch.md)
+- [C1 Proof Sketch](readme.md)

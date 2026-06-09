@@ -38,12 +38,14 @@ self.velocities[i][j] += 0.5 * (accel_current[i][j] + accel_new[i][j]) * DT;
 
 The Lyapunov exponent measures how fast nearby trajectories diverge. Euler's numerical noise acts as a constant perturbation, effectively reducing the Lyapunov time by ~10x compared to Verlet.
 
-| Metric | Euler (dt=0.001) | Verlet (dt=0.01) |
+| Metric¹ | Euler (dt=0.001) | Verlet (dt=0.01) |
 |---|---|---|
 | Lyapunov time | ~100 steps | ~1000 steps |
-| Entropy per step | ~0.1 bits | ~0.01 bits |
-| Steps for 256-bit entropy | ~2,560 steps | ~25,600 steps |
+| Trajectory decorrelation per step² | ~0.1 decorrelation units | ~0.01 decorrelation units |
+| Steps for trajectory decorrelation² | ~2,560 steps (estimate) | ~25,600 steps (estimate) |
 | Energy drift | 1% per 1000 steps | 0.0001% per 1000 steps |
+
+> ¹ These metrics measure **trajectory divergence** (how fast nearby trajectories separate from each other), not cryptographic entropy. A deterministic computation has zero bits of min-entropy regardless of how chaotic the dynamics appears.  
 
 ### 3. Harder to Reverse = Numerical Irreversibility
 

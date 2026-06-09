@@ -13,7 +13,7 @@
 
 Kelvin is a **quantum-resistant stream cipher** and **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**. It transforms a shared orbital configuration (masses, positions, velocities) into a cryptographic keystream by simulating chaotic gravitational dynamics and extracting entropy via SHAKE256. The XOR-based modes are computational stream ciphers: no nonce, no IV, keystream length = plaintext length.
 
-The core insight: the n-body problem has no closed-form solution for N ≥ 3. Under the assumption that the n-body simulation is a one-way function (an unproven conjecture, see [Security Assumptions](documentation/security_assumptions.md)), an attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
+The core insight: the n-body problem has no closed-form solution for N ≥ 3. Under the assumption that the n-body simulation is a one-way function (an unproven conjecture, see [Security Assumptions](documentation/security_assumptions.md)), an attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies trajectory divergence ~10× faster than Verlet through numerical instability, creating stronger trajectory divergence (this is a conjecture about complicating initial-condition recovery, not a proven property). This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
 > ⚠️ **Important caveat**: Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance (256-bit classical, 128-bit quantum). The computational asymmetry protects the **KDF** (making brute-force config search expensive), not the **stream cipher** (which is bounded by SHAKE256 resistance).
 
@@ -41,11 +41,13 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 | **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🚀 1,644 MB/s | General purpose with authentication |
 | **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Optional | Unlimited | 🐌 34 MB/s | Streaming, real-time |
 | **V3** | Kelvin-Photon | **Batch Stream** (HKDF→SHAKE256 XOR) | ✅ Optional | Finite | 🚀 542 MB/s | Bulk encryption |
-| **H** | Kelvin-Quantum | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
+| **H** | Kelvin-Quantum² | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
 | **—** | Kelvin-Prism | **HE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | Stream key generation for HE |
 | **—** | Kelvin-Split | **Split Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | XOR key splitting for HE |
 | **—** | Kelvin-Flare | **FHE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | FHE secret key generation |
 
+
+> ² The name "Quantum" refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The security of all Kelvin modes derives from classical chaotic n-body dynamics and standardized cryptographic primitives (SHAKE256, HKDF-SHA512), not from quantum mechanics.
 
 > **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC128 authentication via `KelvinQuantumAuthenticated` (or `KelvinPhotonAuthenticated` / `KelvinStreamingAuthenticated` for V3 / V2 respectively) if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
 

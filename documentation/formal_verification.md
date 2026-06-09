@@ -133,19 +133,19 @@ documentation/formal_verification/
 ├── README.md
 ├── code_verification.md              L1/L2 code proofs with Rust snippets
 ├── C1/
-│   ├── proof_sketch.md                Full C1 proof sketch
+│   ├── readme.md                      Full C1 proof sketch
 │   └── gap{1..7}_*.md                 Individual gap resolutions
 ├── C2/
-│   ├── proof_sketch.md                Full C2 proof sketch
+│   ├── readme.md                      Full C2 proof sketch
 │   └── gap{1..6}_*.md                 Individual gap resolutions
 ├── C3/
-│   ├── proof_sketch.md                Full C3 proof sketch
+│   ├── readme.md                      Full C3 proof sketch
 │   └── gap{1..3}_*.md                 Individual gap resolutions
 ├── C4/
-│   ├── proof_sketch.md                Full C4 proof sketch
+│   ├── readme.md                      Full C4 proof sketch
 │   └── gap{1..3}_*.md                 Individual gap resolutions
 └── C5/
-    ├── proof_sketch.md                Full C5 proof sketch
+    ├── readme.md                      Full C5 proof sketch
     └── gap{1..4}_*.md                 Individual gap resolutions
 ```
 
