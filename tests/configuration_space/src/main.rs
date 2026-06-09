@@ -34,7 +34,7 @@ fn main() {
         .iter()
         .filter(|c| {
             if let Err(ref e) = c {
-                let s = format!("{e}");
+                let s = e.to_string();
                 s.contains("too close") || s.contains("identical")
             } else {
                 false
@@ -43,7 +43,7 @@ fn main() {
         .count();
     let mass_count = samples
         .iter()
-        .filter(|c| if let Err(ref e) = c { format!("{e}").contains("mass") } else { false })
+        .filter(|c| if let Err(ref e) = c { e.to_string().contains("mass") } else { false })
         .count();
 
     let fraction = valid_count as f64 / N_SAMPLES as f64;
@@ -57,8 +57,8 @@ fn main() {
     let estimated_bits = unconstrained_bits + (fraction.max(1e-10)).log2();
     let grover_bits = estimated_bits / 2.0;
 
-    output.push_str(&format!("C5 Configuration Space — Monte Carlo Validation\n"));
-    output.push_str(&format!("===============================================\n\n"));
+    output.push_str("C5 Configuration Space — Monte Carlo Validation\n");
+    output.push_str("===============================================\n\n");
     output.push_str(&format!("Samples: {N_SAMPLES}\n\n"));
     output
         .push_str(&format!("Valid configurations:     {valid_count} ({:.2}%)\n", fraction * 100.0));
@@ -79,7 +79,7 @@ fn main() {
         -(fraction.max(1e-10)).log2()
     ));
     output.push_str(&format!("  Estimated H:                   {estimated_bits:.0} bits\n"));
-    output.push_str(&format!("  Claimed bound:                 ≥ 1920 bits\n\n"));
+    output.push_str("  Claimed bound:                 ≥ 1920 bits\n\n");
     output
         .push_str(&format!("Grover search lower bound:   2^{grover_bits:.0} quantum operations\n"));
     output.push_str(&format!("  (from 2^{{H/2}} with H = {estimated_bits:.0})\n\n"));
@@ -94,9 +94,9 @@ fn main() {
     if grover_bits >= 900.0 {
         output.push_str(&format!("✓ PASS: Grover lower bound 2^{grover_bits:.0} ≥ 2^900\n"));
     } else {
-        output.push_str(&format!("⚠ Grover bound below 2^900 threshold\n"));
+        output.push_str("⚠ Grover bound below 2^900 threshold\n");
     }
-    output.push_str(&format!("\nRESULTS: C5 validation complete\n"));
+    output.push_str("\nRESULTS: C5 validation complete\n");
 
     let _ = fs::write(&results_path, &output);
     print!("{output}");

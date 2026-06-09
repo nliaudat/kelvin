@@ -63,7 +63,7 @@ fn main() {
         rate1 = collision_rate_1 * 100.0,
         rate3 = collision_rate_3 * 100.0,
         rate5 = collision_rate_5 * 100.0,
-        branch = (avg_card as f64).sqrt() as u64,
+        branch = avg_card.sqrt() as u64,
         classical = k_per_step * 10.0,
         grover_cost = k_per_step * 10.0 / 2.0,
     );

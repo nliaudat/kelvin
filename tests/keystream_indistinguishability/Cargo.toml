@@ -7,3 +7,7 @@ description = "Empirical validation of C4: keystream indistinguishability for th
 [dependencies]
 kelvin-core = { path = "../../kelvin-core" }
 kelvin-kdf = { path = "../../kelvin-kdf" }
+
+[lints.clippy]
+disallowed_methods = "allow"
+useless_format = "allow"
