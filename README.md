@@ -6,7 +6,6 @@
 
 > **Project Name:** kelvin — **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
 > *A chaotic 3D n-body gravitational key derivation system*
-> *Three bodies. Infinite chaos.*
 
 > **⚠️ EXPERIMENTAL — Not for production use.** This is a research cryptosystem.
 > It has not undergone formal cryptanalysis. See [Security](#security) for details.
@@ -17,7 +16,7 @@ The core insight: the n-body problem has no closed-form solution for N ≥ 3. Un
 
 > ⚠️ **Important caveat**: Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance (256-bit classical, 128-bit quantum). The computational asymmetry protects the **KDF** (making brute-force config search expensive), not the **stream cipher** (which is bounded by SHAKE256 resistance).
 
-Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers or nonce-based stream ciphers: there is no nonce, no IV, no algebraic round function. No known attack is faster than brute force — and the search space is astronomical.
+Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers or nonce-based stream ciphers: there is no nonce, no IV, no algebraic round function. No known attack is faster than brute force — and the effective security is 128-bit post-quantum (SHAKE256 bound).
 
 ![Orbital simulation demo](documentation/demo_video/orbital_demo.gif)
 
@@ -39,17 +38,17 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 | Mode | Name | Cipher Type | Auth | Keystream | Speed (in-memory) | Use Case |
 |------|------|-------------|:----:|-----------|:-----------------:|----------|
 | **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🚀 1,644 MB/s | General purpose with authentication |
-| **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Optional | Unlimited | 🐌 34 MB/s | Streaming, real-time |
+| **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Optional | ≈Limited⁴ (1B step cap) | 🐌 34 MB/s | Streaming, real-time |
 | **V3** | Kelvin-Photon | **Batch Stream** (HKDF→SHAKE256 XOR) | ✅ Optional | Finite | 🚀 542 MB/s | Bulk encryption |
-| **H** | Kelvin-Quantum² | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
+| **H** | Kelvin-Quantum³ | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
 | **—** | Kelvin-Prism | **HE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | Stream key generation for HE |
 | **—** | Kelvin-Split | **Split Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | XOR key splitting for HE |
 | **—** | Kelvin-Flare | **FHE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | FHE secret key generation |
 
 
-> ² The name "Quantum" refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The security of all Kelvin modes derives from classical chaotic n-body dynamics and standardized cryptographic primitives (SHAKE256, HKDF-SHA512), not from quantum mechanics.
+> ³ The name "Quantum" refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The security of all Kelvin modes derives from classical chaotic n-body dynamics and standardized cryptographic primitives (SHAKE256, HKDF-SHA512), not from quantum mechanics.
+> ⁴ V2 keystream is bounded by the simulation safety limit (1 billion steps) — see the Finite Precision Analysis in proof_of_concept.md for periodicity considerations. All finite-state chaotic systems eventually cycle; the practical limit is determined by the step count.
 
-> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC128 authentication via `KelvinQuantumAuthenticated` (or `KelvinPhotonAuthenticated` / `KelvinStreamingAuthenticated` for V3 / V2 respectively) if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
 
 ## What Makes Kelvin Novel
 
