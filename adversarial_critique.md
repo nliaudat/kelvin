@@ -221,6 +221,10 @@ The comparison is unfair in multiple ways:
 
 4. **"Paranoid" and "Maximum" levels are not usable for most interactive applications.** A 12.5-second key setup for Paranoid mode, or "several minutes" for Maximum, makes these impractical for anything other than offline/batch encryption.
 
+### Resolution (2026-06-07)
+
+A footnote in `bench_comparative.md` now notes the AES comparison uses hardware AES-NI acceleration not available to Kelvin's fixed-point arithmetic. `README.md` performance table includes a note stating benchmarks are in-memory and file I/O is bottlenecked by disk. Full resolution — a separate benchmark comparing Kelvin authenticated modes (Quantum + KMAC128) against AES-256-GCM with keygen cost included — is identified as future work.
+
 ---
 
 ## 10. [ADDRESSED] The "Bulletproof" Title and Framing Is Scientifically Inappropriate
@@ -345,6 +349,10 @@ But this disclosure appears only in a footnote-style warning. A serious prior ar
 
 The documentation claims novelty based on three differentiators (full gravitational simulation, Q32.64, multi-mode architecture), but a patent examiner or reviewer would require a more systematic search of the prior art landscape.
 
+### Resolution (2026-06-08)
+
+Three patent reviews (`patent_review/patent_review_1.md`, `patent_review/patent_review_2.md`, `patent_review/patent_review_3.md`) now document known prior art including Apple '559, Weng 2009, Song 2012, Chai 2025, and DUff-skg 2025. A systematic literature review of the broader chaos-cryptography field (1990s onward) remains an open research task beyond the scope of documentation fixes.
+
 ---
 
 ## 16. [ACKNOWLEDGED] The Homomorphic Cryptosystem Document Over-Reaches
@@ -365,6 +373,10 @@ The XOR split-key scheme described (A ⊕ B = K, server computes E1 ⊕ E2 = K �
 4. This is entirely independent of Kelvin's orbital chaos — any PRNG could be used to generate A and B.
 
 Presenting this as a distinct capability of Kelvin's "Split mode" adds complexity without genuine cryptographic value.
+
+### Resolution (2026-06-09)
+
+The document now correctly states that Kelvin is not homomorphic. The XOR split-key scheme (A ⊕ B = K) is accurately described as a well-known application of XOR independent of Kelvin's orbital chaos. A full rewrite of the document for clarity would require careful technical review and is noted as a future improvement.
 
 ---
 
@@ -444,6 +456,10 @@ Furthermore, in V2 mode:
 - Add explicit caveat in `THREAT_MODEL.md` §2.2: "This defense does not apply to V2 (Chaos) mode, where simulation and keystream generation are interleaved"
 - Document the forward-simulation risk for V2: any intermediate state disclosure compromises all subsequent data
 
+### Resolution (2026-06-02)
+
+`THREAT_MODEL.md` §2.2 now includes the explicit V2 caveat: "⚠️ For V2 (Chaos) mode: This defense does NOT apply. V2 interleaves simulation with keystream generation — the simulation advances one step per chunk of data processed. Timing variations in the simulation loop correlate with orbital state and may be observable by an attacker in streaming scenarios. Additionally, if any intermediate orbital state is compromised, an attacker can forward-simulate from that point to decrypt all subsequent traffic."
+
 ---
 
 ## 20. [ADDRESSED] "No Nonce" Is a Liability Masquerading as a Feature
@@ -470,6 +486,10 @@ Both instances start from the same initial state and produce **identical keystre
 
 - Add explicit warning in `README.md` and `stream_cipher_security.md`: "Loading the same orbital configuration into two separate instances produces identical keystreams — this is a two-time pad. Users MUST ensure each configuration is used by at most one `Kelvin` instance."
 - Document the single-instance-per-config constraint as a security requirement, not an optional suggestion
+
+### Resolution (2026-06-03)
+
+`README.md` §"Why a Stream Cipher Without Nonces?" now includes an explicit warning: "⚠️ Important caveat: The absence of a nonce means there is no built-in defense against config reuse between instances. Loading the same orbital configuration into two separate Kelvin instances produces identical keystream prefixes — this is the two-time pad problem. Users MUST ensure each orbital configuration is used by at most one Kelvin instance." The single-instance-per-config constraint is documented as a security requirement.
 
 ---
 
@@ -499,6 +519,10 @@ The acceleration is **computed from the positions and masses** — it contains n
 - Rephrase the Deep Physical Binding section to state honestly what it does: "These values are included in the hash for domain separation and to ensure reproducibility, not to provide additional cryptographic security."
 - Eliminate the "different set of physical laws" language entirely — it is unprofessional
 
+### Resolution (2026-06-04)
+
+The "prevents quantum shortcut attacks" and "different set of physical laws" language removed from `quantum_analysis.md`. The section now accurately states these values are included in the hash for domain separation and to ensure reproducibility, not to provide additional cryptographic security.
+
 ---
 
 ## 22. [ADDRESSED] The Documented Security Posture Collapses Under Known Plaintext
@@ -527,6 +551,10 @@ The system's security collapses to exactly SHAKE256's preimage resistance under 
 - Reword the attack table entry in `stream_cipher_security.md` to explicitly state: "Known plaintext reduces effective security to 128-bit SHAKE256 preimage resistance — the n-body simulation provides zero additional protection in this scenario"
 - Remove the "doesn't reveal other messages" language which trivialises the risk
 
+### Resolution (2026-06-05)
+
+`README.md` now includes the explicit caveat: "Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance (256-bit classical, 128-bit quantum). The computational asymmetry protects the KDF, not the stream cipher."
+
 ---
 
 ## 23. [ADDRESSED] "No Algebraic Structure" Is True of All Stream Ciphers, Not Special to Kelvin
@@ -548,6 +576,10 @@ This is security-by-lack-of-imagination dressed as a feature.
 
 - Add a note in `stream_cipher_security.md` §7 acknowledging that this property is common to all symmetric stream ciphers, not unique to Kelvin
 - Remove or qualify the suggestion that "no algebraic structure" is a distinguishing advantage
+
+### Resolution (2026-05-31)
+
+`README.md` §"Why a Stream Cipher Without Nonces?" now includes the explicit caveat: "(this is true of all symmetric stream ciphers, not unique to Kelvin)" on the "No algebraic structure" bullet point. The mode comparison section no longer presents this as a distinguishing advantage.
 
 ---
 
@@ -617,6 +649,10 @@ The 2¹⁹²⁰ figure appears to be: "128-bit fields are wasteful, about 40 bit
 ### Suggested Fix Direction
 
 - Add a clear derivation note wherever 2¹⁹²⁰ appears: "Estimated configuration space, derived from approximately 40 effective bits per Q32.64 field × 48 fields. This is a counting argument, not a formal security bound. The effective security of the system is bounded by SHAKE256's 128-bit quantum resistance, not this number."
+
+### Resolution (2026-05-31)
+
+`README.md` §"What Kelvin Does NOT Provide" now includes a derivation note: "The ≥ 2¹⁹²⁰ config space figure is an estimate (≈ 40 effective bits × ~48 independent fields). See Stream Cipher Security Analysis for the full derivation context." The figure is no longer presented as a formal bound without explanation.
 
 ---
 
