@@ -142,4 +142,4 @@ These Kani harnesses from C2 provide a computational foundation: the system is p
 
 ## See Also
 
-- [C1 Proof Sketch](proof_sketch.md)
+- [C1 Proof Sketch](readme.md)

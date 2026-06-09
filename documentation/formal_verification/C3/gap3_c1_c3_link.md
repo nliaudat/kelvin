@@ -29,4 +29,4 @@ where `ε ≤ 1/log₂(MAX/MIN) ≈ 0.0197` (from C1 Gap 4).
 
 ## See Also
 
-- [C3 Proof Sketch](proof_sketch.md)
+- [C3 Proof Sketch](readme.md)

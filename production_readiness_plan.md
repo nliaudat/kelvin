@@ -48,7 +48,6 @@ Security is the primary requirement for production readiness. We must move beyon
 - [x] **Kani CI**: Docker-based reproducible verification environment at `docker/`. Enabled CI workflow at `.github/workflows/kani.yml`.
 
 ### 1.2 Cryptographic Hardening
-- [x] **Physical Binding**: Include $G$, softening, and force vectors in the hash chain to prevent shortcut attacks. *(Completed 2026-05-11)*
 - [x] **Initial Condition Entropy**: Implement $\pm 25\%$ Sun mass randomization to significantly increase the bit-distinct expression space. *(Completed 2026-05-11)*
 - [x] **Lyapunov Enforcement**: Programmatically reject configurations that do not reach the required entropy threshold within the requested step count. *(Completed 2026-05-20)*
 - [x] **Stream Authentication**: KMAC128 authenticated tagging (32-byte tag, NIST SP 800-185) for V3 Photon and H Quantum stream ciphers to defeat ciphertext malleability. *(Completed 2026-05-22)*

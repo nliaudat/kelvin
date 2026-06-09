@@ -38,16 +38,18 @@ self.velocities[i][j] += 0.5 * (accel_current[i][j] + accel_new[i][j]) * DT;
 
 The Lyapunov exponent measures how fast nearby trajectories diverge. Euler's numerical noise acts as a constant perturbation, effectively reducing the Lyapunov time by ~10x compared to Verlet.
 
-| Metric | Euler (dt=0.001) | Verlet (dt=0.01) |
+| Metric¹ | Euler (dt=0.001) | Verlet (dt=0.01) |
 |---|---|---|
 | Lyapunov time | ~100 steps | ~1000 steps |
-| Entropy per step | ~0.1 bits | ~0.01 bits |
-| Steps for 256-bit entropy | ~2,560 steps | ~25,600 steps |
+| Trajectory decorrelation per step² | ~0.1 decorrelation units | ~0.01 decorrelation units |
+| Steps for trajectory decorrelation² | ~2,560 steps (estimate) | ~25,600 steps (estimate) |
 | Energy drift | 1% per 1000 steps | 0.0001% per 1000 steps |
 
-### 3. Harder to Reverse = Numerical Irreversibility
+> ¹ These metrics measure **trajectory divergence** (how fast nearby trajectories separate from each other), not cryptographic entropy. A deterministic computation has zero bits of min-entropy regardless of how chaotic the dynamics appears.  
 
-Verlet integration is symplectic — it preserves phase-space volume and is theoretically reversible. Given the full state, you can run Verlet backwards to recover previous states. Euler's numerical dissipation makes this practically impossible for a backward integrator: information is lost at each step through energy drift.
+### 3. Harder to Reverse = No Known Efficient Inversion Algorithm
+
+Verlet integration is symplectic — it preserves phase-space volume and is theoretically reversible. Given the full state, you can run Verlet backwards to recover previous states. Euler has no known efficient inversion algorithm: the Euler step is a deterministic function with no known efficient way to find preimages.
 
 > ⚠️ **Important caveat**: Numerical irreversibility is **not** the same as a cryptographic one-way function. An attacker does not need to run the integrator backwards. The attacker runs the integrator **forwards** over candidate initial conditions — exactly the same operation as the legitimate party. Numerical dissipation makes the integrator non-invertible as a mathematical map, but this does **not** make the forward search problem any harder. The "one-way function" property Kelvin needs is that recovering initial conditions from observed output is computationally hard — this is a conjecture about forward search, not a consequence of backward irreversibility.
 

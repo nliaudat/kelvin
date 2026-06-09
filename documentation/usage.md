@@ -333,7 +333,7 @@ This returns `remaining_keys × 4 GiB` (conservative estimate for V1 ChaCha20Pol
 
 ## 6. V2 Streaming Mode — Per-Step Stream Cipher (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) is a **per-step one-time pad** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no nonce, no IV, and no key reuse risk — each step produces a unique keystream from fresh chaotic dynamics.
+V2 Streaming (`KelvinStreaming`) is a **per-step stream cipher** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no nonce, no IV, and no key reuse risk — each step produces a unique keystream from fresh chaotic dynamics.
 
 
 ### Key Differences from V1
@@ -441,7 +441,6 @@ material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
 > by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4
 > floating-point integration. Kelvin-Flare provides an alternative approach
 > using 30-DOF n-body gravitational dynamics with fixed-point arithmetic and
-> domain-separated extraction. See [Patent Review #3](patent_review_3.md) for
 > full analysis.
 
 
@@ -493,7 +492,7 @@ KelvinPrism::recrypt(&mut data, &otp_key);
 
 ### Use Cases
 
-1. **Recryption layer**: Generate OTP keys for `parasol_runtime::recrypt_one_time_pad`
+1. **Recryption layer**: Generate keystream keys for `parasol_runtime::recrypt_one_time_pad`
    or any FHE library's recryption API.
 2. **Split-key XOR homomorphism**: Use `split_key()` to produce (A, B) where
    A ⊕ B = K, enabling XOR operations on encrypted data.
@@ -527,7 +526,7 @@ the master key `K`.
 ### Architecture
 
 ```
-2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keys
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited keystream
 ```
 
 Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.
@@ -575,7 +574,7 @@ assert_eq!(&data, b"Secret message");
 2. **Master key generation**: Use `generate_master_key()` to produce the
    master key K directly.
 3. **Encryption/decryption**: Use `encrypt()`/`decrypt()` for domain-separated
-   OTP encryption.
+   stream cipher encryption.
 
 ---
 

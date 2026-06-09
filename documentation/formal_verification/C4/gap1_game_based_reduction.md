@@ -38,4 +38,4 @@ For N=5 Verlet, S=1,000,000: `S·k = 40,000,000 bits` → `2^{-20,000,000}` — 
 
 ## See Also
 
-- [C4 Proof Sketch](proof_sketch.md)
+- [C4 Proof Sketch](readme.md)

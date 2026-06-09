@@ -6,18 +6,17 @@
 
 > **Project Name:** kelvin — **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
 > *A chaotic 3D n-body gravitational key derivation system*
-> *Three bodies. Infinite chaos.*
 
 > **⚠️ EXPERIMENTAL — Not for production use.** This is a research cryptosystem.
 > It has not undergone formal cryptanalysis. See [Security](#security) for details.
 
-Kelvin is a **quantum-resistant stream cipher** and **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**. It transforms a shared orbital configuration (masses, positions, velocities) into a cryptographic keystream by simulating chaotic gravitational dynamics and extracting entropy via SHAKE256. The XOR-based modes are computational stream ciphers: no nonce, no IV, keystream length = plaintext length.
+Kelvin is a **deterministic key derivation function (KDF)** based on **fixed-point gravitational n-body simulation**, with reference stream cipher modes demonstrating the KDF output. The novel contribution is the chaotic n-body → SHAKE256 extraction pipeline. The stream cipher modes (V2 Chaos, V3 Photon, H Quantum) consume KDF seed material via standard SHAKE256 XOR — their security is bounded by SHAKE256's 128-bit post-quantum resistance, identical to any SHAKE256-based construction. The KDF security (inverting the n-body simulation from SHAKE256 output) is a novel conjecture, not a formally proven reduction.
 
-The core insight: the n-body problem has no closed-form solution for N ≥ 3. Under the assumption that the n-body simulation is a one-way function (an unproven conjecture, see [Security Assumptions](documentation/security_assumptions.md)), an attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies chaos ~10× faster than Verlet through numerical instability, creating even stronger computational asymmetry. This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
+The core insight: the n-body problem has no closed-form solution for N ≥ 3. Under the assumption that the n-body simulation is a one-way function (an unproven conjecture, see [Security Assumptions](documentation/security_assumptions.md)), an attacker cannot shortcut the simulation — they must run the same deterministic integration (Verlet or Euler) step-by-step to reproduce the keystream. The Euler method amplifies trajectory divergence ~10× faster than Verlet through numerical instability, creating stronger trajectory divergence (this is a conjecture about complicating initial-condition recovery, not a proven property). This creates a **computational asymmetry**: legitimate parties pay the simulation cost once, while attackers face the same cost for every guess.
 
 > ⚠️ **Important caveat**: Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance (256-bit classical, 128-bit quantum). The computational asymmetry protects the **KDF** (making brute-force config search expensive), not the **stream cipher** (which is bounded by SHAKE256 resistance).
 
-Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers or nonce-based stream ciphers: there is no nonce, no IV, no algebraic round function. No known attack is faster than brute force — and the search space is astronomical.
+Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers or nonce-based stream ciphers: there is no nonce, no IV, no algebraic round function. No known attack is faster than brute force — and the effective security is 128-bit post-quantum (SHAKE256 bound).
 
 ![Orbital simulation demo](documentation/demo_video/orbital_demo.gif)
 
@@ -39,21 +38,23 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 | Mode | Name | Cipher Type | Auth | Keystream | Speed (in-memory) | Use Case |
 |------|------|-------------|:----:|-----------|:-----------------:|----------|
 | **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🚀 1,644 MB/s | General purpose with authentication |
-| **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Optional | Unlimited | 🐌 34 MB/s | Streaming, real-time |
+| **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Optional | ≈Limited⁴ (1B step cap) | 🐌 34 MB/s | Streaming, real-time |
 | **V3** | Kelvin-Photon | **Batch Stream** (HKDF→SHAKE256 XOR) | ✅ Optional | Finite | 🚀 542 MB/s | Bulk encryption |
-| **H** | Kelvin-Quantum | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
+| **H** | Kelvin-Quantum³ | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
 | **—** | Kelvin-Prism | **HE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | Stream key generation for HE |
 | **—** | Kelvin-Split | **Split Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | XOR key splitting for HE |
 | **—** | Kelvin-Flare | **FHE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | FHE secret key generation |
 
 
-> **Recommended default:** Kelvin-Quantum (H) for most use cases. Add KMAC128 authentication via `KelvinQuantumAuthenticated` (or `KelvinPhotonAuthenticated` / `KelvinStreamingAuthenticated` for V3 / V2 respectively) if needed. Use Prism/Split/Flare for homomorphic encryption workflows.
+> ³ The name "Quantum" refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The security of all Kelvin modes derives from classical chaotic n-body dynamics and standardized cryptographic primitives (SHAKE256, HKDF-SHA512), not from quantum mechanics.
+> ⁴ V2 keystream is bounded by the simulation safety limit (1 billion steps) — see the Finite Precision Analysis in proof_of_concept.md for periodicity considerations. All finite-state chaotic systems eventually cycle; the practical limit is determined by the step count.
+
 
 ## What Makes Kelvin Novel
 
 Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems.
 
-> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review_3.md) for full analysis.
+> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review/patent_review_3.md) for full analysis.
 
 
 ## How It Works
@@ -75,7 +76,7 @@ OrbitalConfig (masses, positions, velocities, G, ε)
 ┌──────────────────────────────────────────────────────────────┐
 │  Phase 2: Entropy Extraction (SHAKE256)                       │
 │  • Hash final orbital state + physical constants + forces     │
-│  • Produce 2048-byte entropy pool                              │
+│  • Produce 2048-byte entropy pool                             │
 │  • Domain-separated: V2/V3/H/Prism/Split/Flare are isolated  │
 └──────────────────────────┬───────────────────────────────────┘
                            │
@@ -144,7 +145,7 @@ See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.m
 
 ## Architecture
 
-Kelvin is organized as a Rust workspace with 22 crates:
+Kelvin is organized as a Rust workspace with multiple crates:
 
 ```
 kelvin-core/     — Fixed-point Q32.64 arithmetic, n-body simulation, entropy extraction
@@ -281,9 +282,9 @@ See [formal_verification.md](documentation/formal_verification.md) for details.
 ### Formal Verification & Security
 - [Formal Verification](documentation/formal_verification.md) — Kani proof strategy (L0–L4)
 - [Security Analysis](documentation/stream_cipher_security.md) — Quantum-resistant stream cipher security argument
-- [Patent Landscape #1](documentation/patent_review_1.md) — Prior art analysis (overview)
-- [Patent Landscape #2](documentation/patent_review_2.md) — Prior art analysis (in-depth)
-- [Patent Landscape #3](documentation/patent_review_3.md) — Prior art analysis (conclusion)
+- [Patent Landscape #1](documentation/patent_review/patent_review_1.md) — Prior art analysis (overview)
+- [Patent Landscape #2](documentation/patent_review/patent_review_2.md) — Prior art analysis (in-depth)
+- [Patent Landscape #3](documentation/patent_review/patent_review_3.md) — Prior art analysis (conclusion)
 - [Project History](documentation/project_history.md) — Development timeline and milestones
 
 ### Performance & Benchmarks

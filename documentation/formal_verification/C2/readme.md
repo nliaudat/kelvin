@@ -13,11 +13,21 @@ The attractor size $A$ satisfies $\log_2(A) \le D_{KY} \cdot 64$ (Q32.64 bits pe
 
 ## Theorem 2: Shadow Orbit Error Budget
 
-$$\lambda_{shadow} = \frac{\ln(\bar{d} / \delta)}{S \cdot dt}$$
+$$\lambda_{disc} = \frac{\ln(\bar{d} / \delta)}{S \cdot dt}$$
 
 The estimation error is bounded by:
 
-$$|\lambda_{shadow}(S) - \lambda_{cont}| \le C_{pade} \cdot \varepsilon_{pade} + C_{div} \cdot \varepsilon_{q} + \frac{C_{bias}}{\sqrt{S}}$$
+$$|\lambda_{disc}(S) - \lambda_{cont}| \leq \frac{\varepsilon_{pade}}{S \cdot dt} + \varepsilon_q + \frac{\sigma\sqrt{3}}{\sqrt{S}}$$
+
+where:
+
+| Term | Value | Source |
+|------|-------|--------|
+| $\varepsilon_{pade}$ | $\leq 0.67$ | Padé (1,1) max absolute error |
+| $\varepsilon_q$ | $2^{-64} \approx 5.4 \times 10^{-20}$ | Q32.64 quantization step |
+| $\sigma$ | $\approx 0.07$ | Std dev across 3 perturbed axes |
+| $S$ | $2000$ | Default shadow steps |
+| $dt$ | $2^{54}$ raw $\approx 0.0156$ yr | Verlet time step |
 
 ## Theorem 3: Full Lyapunov Spectrum
 
@@ -27,7 +37,7 @@ The f64 QR decomposition spectrum deviates from Q32.64 by at most $\kappa(J) \cd
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | $|\lambda_{disc} - \lambda_{cont}|$ error bound | [`gap1_discrete_lyapunov_bound`](gap1_discrete_lyapunov_bound.md) | ✅ RESOLVED |
+| 1 | $\lvert\lambda_{disc} - \lambda_{cont}\rvert$ error bound | [`gap1_discrete_lyapunov_bound`](gap1_discrete_lyapunov_bound.md) | ✅ RESOLVED |
 | 2 | Positive $\lambda$ lower bound | [`gap2_positive_lambda_certification`](gap2_positive_lambda_certification.md) | ✅ RESOLVED |
 | 3 | Full Lyapunov spectrum in Q32.64 | [`gap3_q3264_lyapunov_spectrum`](gap3_q3264_lyapunov_spectrum.md) | ✅ RESOLVED |
 | 4 | Kaplan-Yorke entropy bound | [`gap4_kaplan_yorke_entropy`](gap4_kaplan_yorke_entropy.md) | ✅ RESOLVED |

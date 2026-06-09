@@ -10,11 +10,10 @@
 
 Kelvin's XOR-based modes (Chaos V2, Photon V3, Quantum H, Prism, Split, Flare) produce a **quantum-resistant stream cipher keystream** that is computationally indistinguishable from random. The keystream derives from SHAKE256 extraction of chaotic n-body dynamics — a system with no closed-form solution. No known quantum algorithm can shortcut the simulation, and no classical attack can distinguish the keystream from random without inverting SHAKE256.
 
-> **No known attack is faster than brute force on SHAKE256 — and the search space is astronomical.**
 
 ### Important Caveats
 
-This document describes security properties under specific assumptions. Unlike standard cryptosystems (AES, ChaCha20), Kelvin's security model has **no formal reduction to a known hard problem** (lattice, discrete log, factoring, or similar). The security bounds C1–C5 are plausibility arguments based on physical chaos and computational indistinguishability of SHAKE256 — not formal security reductions. The system's effective post-quantum security is bounded by SHAKE256's Grover resistance: **128 bits**.
+This document describes security properties under specific assumptions. Unlike standard cryptosystems (AES, ChaCha20), Kelvin's security model has **no formal reduction to a known hard problem** (lattice, discrete log, factoring, or similar). The security estimates C1–C5 are plausibility arguments based on physical chaos and computational indistinguishability of SHAKE256 — not formal security reductions. The system's effective post-quantum security is bounded by SHAKE256's Grover resistance: **128 bits**.
 
 ---
 
@@ -42,15 +41,15 @@ Kelvin satisfies conditions 1, 3, and 4 — but **not** condition 2. The keystre
 
 Condition 2 is where Kelvin differs from a true information-theoretic OTP. A classical paper OTP uses physical randomness (e.g., radioactive decay, atmospheric noise) that is **truly random** in the information-theoretic sense. Kelvin's keystream is **computationally indistinguishable from random** via SHAKE256 — but it is not information-theoretically random. No practical cryptosystem is.
 
-> **C4 security bound**: Keystream indistinguishability is bounded by `Adv(A) ≤ negl(n) + 2⁻⁹⁶⁰`. For any real-world adversary, computational indistinguishability via SHAKE256 (NIST FIPS 202) is cryptographically equivalent to a true OTP.
+> **C4 note**: Keystream indistinguishability is bounded by SHAKE256's computational security (negl(n)). The `2⁻⁹⁶⁰` term in the original estimate derives from the config space counting argument (C5), which is an estimate, not a formal security reduction.
 
 In practice, this distinction is irrelevant for any real adversary:
 - Distinguishing SHAKE256 output from random requires breaking the Keccak sponge — a problem with no known solution better than brute force (2^256 preimage resistance, 2^128 quantum).
 - A quantum computer gains only Grover's speedup (2^128).
-- The n-body simulation adds a physical entropy layer that no purely mathematical PRNG can replicate.
-- The configuration space is bounded below by |Θ₅| ≥ 2¹⁹²⁰ configurations, and the quantum search complexity is Ω(2⁹⁶⁰) via C3 bound.
+- The n-body simulation provides a complex deterministic transformation of the input — an attacker with unknown initial conditions faces a search problem over the configuration space.
+- The estimated configuration space is bounded below by |Θ₅| ≥ 2¹⁹²⁰ configurations, and the estimated quantum search complexity is Ω(2⁹⁶⁰) via C3 bound. These estimates do not raise the effective 128-bit SHAKE256 security bound.
 
-**Bottom line**: Kelvin's stream cipher provides equivalent security to a true OTP against any polynomial-time adversary, backed by explicit C1–C5 security bounds.
+**Bottom line**: Kelvin is a computational stream cipher providing 256-bit classical / 128-bit post-quantum security, backed by SHAKE256 (NIST FIPS 202) and chaotic key derivation.
 
 ---
 
@@ -60,7 +59,7 @@ In practice, this distinction is irrelevant for any real adversary:
 |--------|-------------|--------------------|
 | **Pillar 1: Chaotic Irreversibility (Assumption)** | The n-body problem (N ≥ 3) has no closed-form solution. Under the assumption that recovering initial conditions from the final state is computationally hard, an attacker must brute-force the orbital configuration. | Poincaré non-integrability theorem proves no analytic solution exists — but this does NOT constitute a cryptographic hardness proof. Validated Lyapunov exponent λ ≈ 0.693 confirms chaotic regime. |
 | **Pillar 2: Deterministic Extraction** | SHAKE256 is a NIST-standardized extendable-output function (XOF) with no known preimage attack better than brute force. | NIST FIPS 202; 2048-byte entropy pool = 2^16384 search space |
-| **Pillar 3: One-Way Key Schedule** | HKDF-SHA512 + BLAKE3 reseeding ensures forward secrecy — compromising the current keystream reveals neither past nor future keys. | HKDF RFC 5869; BLAKE3 security proof |
+| **Pillar 3: One-Way Key Schedule** | HKDF-SHA512 + BLAKE3 reseeding ensures key derivation chaining (labeled "forward secrecy") — compromising the current keystream reveals neither past nor future keys. This is NOT Perfect Forward Secrecy: if the orbital config is compromised, all past and future keys can be recomputed. True PFS would require ephemeral key material. | HKDF RFC 5869; BLAKE3 security proof |
 | **Pillar 4: Quantum Resistance** | No known quantum speedup exists for: (a) sequential chaotic classical simulation, (b) SHAKE256 inversion beyond Grover's square-root reduction. | Grover's → 128-bit effective security; Shor's algorithm does not apply |
 
 ---
@@ -69,7 +68,7 @@ In practice, this distinction is irrelevant for any real adversary:
 
 | Attack | Effort Required | Feasibility | Why |
 |--------|----------------|-------------|-----|
-| **Brute-force orbital config** | ~2^1920 (estimate: ~40 effective bits × ~48 fields) | ❌ Infeasible | Estimated config space; effective security bounded by SHAKE256's 128-bit quantum resistance |
+| **Brute-force orbital config** | ~2¹⁹²⁰ (estimate: ~40 effective bits × ~48 fields) | ❌ Infeasible | Estimated config space; effective security bounded by SHAKE256's 128-bit quantum resistance |
 | **Shortcut simulation (classical)** | Unknown — provably no closed form | ❌ Infeasible | N-body has no algebraic shortcut (Poincaré, 1899) |
 | **Shortcut simulation (quantum)** | Unknown — no known quantum algorithm | ❌ No known speedup | Sequential chaos cannot be superposed; each step depends on the previous |
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
@@ -94,7 +93,7 @@ H(Plaintext) = H(Plaintext | Ciphertext)
 
 This holds when the keystream is truly random and never reused. Kelvin's keystream is **computationally indistinguishable from random** via:
 
-1. **SHAKE256's sponge construction** — proven indifferentiable from a random oracle (Bertoni et al., 2013). No polynomial-time adversary can distinguish SHAKE256 output from a truly random string of the same length.
+1. **SHAKE256's sponge construction** — the Keccak sponge construction (which underlies SHAKE256) has been proven indifferentiable from a random oracle in the random permutation model (Bertoni et al., 2013). No polynomial-time adversary can distinguish SHAKE256 output from a truly random string of the same length.
 2. **Extraction from chaotic dynamics** — the n-body simulation produces orbital states that are exponentially sensitive to initial conditions (validated Lyapunov exponent λ ≈ 0.693). After sufficient steps, the state is fully decorrelated from the initial configuration.
 3. **Domain-separated hashing** — each mode (Chaos, Photon, Quantum, Prism, Split, Flare) uses a unique domain separator, preventing cross-mode keystream collisions.
 

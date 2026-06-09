@@ -14,17 +14,13 @@ cryptosystem. Each assumption includes:
 
 ## Assumption 1: N-Body One-Way Function
 
+> ⚠️ **Status: CONJECTURE — NOT a formal security assumption.** This has NOT been formally reduced to any known hard problem (lattice, discrete log, factoring, or similar). Unlike standard cryptographic assumptions, there is no proof that recovering initial conditions from the orbital state is computationally hard. This is a conjecture based on physical reasoning about chaotic dynamics — plausible but mathematically unproven.
+
 ### Statement
 
 Given the final orbital state after `S` simulation steps, it is computationally
 infeasible to recover the initial orbital configuration (masses, positions,
 velocities) within useful precision.
-
-> ⚠️ **This assumption has NOT been formally reduced to any known hard problem.**
-> Unlike standard cryptographic assumptions (RSA, discrete log, LWE), there is
-> no proof that recovering the initial conditions from the orbital state is
-> computationally hard. This is a conjecture based on physical reasoning about
-> chaotic dynamics — it is plausible but mathematically unproven.
 
 ### Rationale
 
@@ -141,7 +137,7 @@ distinguishing attacks exist against SHAKE256 at the time of writing.
   extraction uses SHAKE256 via `extract_shake256_into()`.
 - **Keystream generation** (`kelvin/src/photon.rs`, `kelvin/src/quantum.rs`,
   `kelvin/src/prism.rs`, `kelvin/src/split.rs`, `kelvin/src/flare.rs`): All
-  Stream cipher modes use SHAKE256 XOR as the core cipher construction.
+  stream cipher modes use SHAKE256 XOR as the core cipher construction.
 - **Domain separation**: Each mode and operation uses a distinct domain
   separator string (e.g., `DOMSEP_PHOTON_KEYSTREAM_V1`, `DOMSEP_ORBITAL_STATE_V1`),
   ensuring cryptographic independence even when derived from the same seed.

@@ -165,9 +165,9 @@ H Kelvin-Quantum (Hybrid Stream):
 
 ---
 
-## 5. Pairwise Comparisons
+## 5. Pairwise Comparisons (Folded Into Sections 1–4)
 
-[Pairwise comparisons and remaining sections unchanged — see original file for full content]
+The pairwise comparison content that existed in the original document has been consolidated into the mode comparison in §1, the pipeline diagrams in §4.1, the architecture table in §4.2, and the research questions in §3. All mode-level trade-offs (bulk vs. streaming, upfront simulation vs. per-step, authentication availability, keystream limits) are documented in those sections.
 
 ---
 

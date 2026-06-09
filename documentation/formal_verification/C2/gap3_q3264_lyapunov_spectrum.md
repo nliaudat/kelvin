@@ -32,4 +32,4 @@ The f64 Lyapunov spectrum computed in `tests/lyapunov_certification/` is effecti
 
 ## See Also
 
-- [C2 Proof Sketch](proof_sketch.md)
+- [C2 Proof Sketch](readme.md)

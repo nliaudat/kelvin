@@ -105,4 +105,4 @@ The bound shows that `λ_disc` is within ~0.02 of the true `λ_cont`. Since λ �
 
 ## See Also
 
-- [C2 Proof Sketch](proof_sketch.md)
+- [C2 Proof Sketch](readme.md)

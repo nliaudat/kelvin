@@ -135,4 +135,4 @@ The empirical validation in `tests/information_loss/` reports:
 
 ## See Also
 
-- [C1 Proof Sketch](proof_sketch.md)
+- [C1 Proof Sketch](readme.md)

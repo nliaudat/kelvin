@@ -178,4 +178,4 @@ For N=5 Verlet:
 
 ## See Also
 
-- [C1 Proof Sketch](proof_sketch.md)
+- [C1 Proof Sketch](readme.md)

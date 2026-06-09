@@ -149,4 +149,4 @@ The empirical measurement confirms that entropy does not drop below zero (it sat
 
 ## See Also
 
-- [C1 Proof Sketch](proof_sketch.md)
+- [C1 Proof Sketch](readme.md)
