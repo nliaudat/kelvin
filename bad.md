@@ -1,4 +1,4 @@
-# Kelvin: The "Stupid" Perspective
+# Kelvin: The "Bad" Perspective
 
 > **Why the project is overengineered, cryptographically unnecessary, and a bad idea if pitched as a production cipher.**
 
@@ -92,13 +92,19 @@ This is the same as **any** stream cipher. But Kelvin's documentation historical
 
 ## 7. What This Does NOT Mean
 
-Just because Kelvin isn't a production cipher doesn't mean it has no value. The next section — the "stupid" critique — is a valid perspective, but it is not the *only* valid perspective. The project also has genuine novelty:
+Just because Kelvin isn't a production cipher doesn't mean it has no value. The "bad" critique — is a valid perspective, but it is not the *only* valid perspective. The project also has genuine novelty:
 
 - Deterministic cross-platform chaos is genuinely hard and Kelvin solves it
 - Formal verification of dynamical properties is rare and valuable
 - A 30-DOF chaotic system is mathematically richer than prior art
 
-The "stupid" critique says: *"Don't use this to encrypt data."*  
+The "bad" critique says: *"Don't use this to encrypt data."*  
 The "novel" case says: *"This is interesting research with genuine engineering achievements."*
 
 Both are true simultaneously.
+
+---
+
+## Cross-Reference
+
+See also: [Novel Contributions](novel.md) for the academic perspective on the project's technical contributions.

@@ -2,6 +2,8 @@
 
 > **An objective assessment of the project's technical contributions to chaos-based cryptography, independent of its suitability as a production encryption primitive.**
 
+**Cross-reference:** See [Why This Project Is Bad](bad.md) for the production crypto critique.
+
 ---
 
 ## Abstract
