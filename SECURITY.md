@@ -1,5 +1,11 @@
 # Security Policy
 
+> Last updated 2026-10-10. Status tracking lives in [COMPLIANCE.md](COMPLIANCE.md);
+> full assumption catalog in [documentation/security_assumptions.md](documentation/security_assumptions.md)
+> (7 assumptions); threat model in [THREAT_MODEL.md](THREAT_MODEL.md).
+> Full `test_all.bat` gate green 2026-10-10 (release builds, clippy, fmt,
+> 215 lib tests, all integration suites, NIST/DudeCT/zeroize).
+
 ## Supported Versions
 
 Currently, only the latest version of Kelvin is supported for security updates.
@@ -27,34 +33,54 @@ The keystream is derived from the orbital state via SHAKE256 (a NIST-standardize
 - **Status**: NIST-approved, widely deployed in post-quantum cryptography (Kyber, Dilithium)
 - **Risk**: A cryptanalytic break of SHAKE256 would compromise all modes (V1, V2, V3, H)
 
-### Assumption 2: Orbital chaos provides ≥256 bits of min-entropy per reseed
+### Assumption 2: Orbital chaos feeds the extractor (no quantified min-entropy rate)
 
-The n-body gravitational simulation amplifies small differences in initial conditions into exponential divergence (Lyapunov chaos). We estimate that the orbital state provides at least 256 bits of min-entropy per reseed interval.
+The n-body simulation amplifies small differences in initial conditions
+into exponential divergence (Lyapunov chaos), and the extractor hashes the
+resulting state via SHAKE256. No proven bits-per-reseed figure is claimed:
+the old "≥256 bits of min-entropy per reseed" statement is withdrawn —
+C1's rate chain is under re-derivation and the empirical figure measures
+local sensitivity, not a rate (see C1/gap1 2026-10-10 notes). What holds:
+configurations below the measured chaos horizon are rejected at init.
 
 - **Validation**: Lyapunov time estimation rejects configurations below the entropy threshold
 - **Testing**: NIST SP 800-90B health tests validate keystream quality
 - **Risk**: A configuration with insufficient chaos (e.g., too few bodies, too few steps) may produce predictable keystream. This is mitigated by Lyapunov enforcement at initialization.
 
-### Assumption 3: BLAKE3 reseed provides forward secrecy
+### Assumption 3: BLAKE3 reseed provides key-derivation chaining (not PFS)
 
-When the key schedule reseeds, the new key is derived from the original seed via BLAKE3. We assume BLAKE3 is a secure PRF, ensuring that compromise of a single session key does not reveal past or future keys.
+When the key schedule reseeds, the new key is derived from the original seed via BLAKE3. We assume BLAKE3 is a secure PRF, ensuring that compromise of a single session key does not reveal past or future keys *through the schedule*. This is **not** Perfect Forward Secrecy: anyone holding the orbital config can recompute all keys from scratch.
 
 - **Standard**: BLAKE3 (O'Connor, Aumasson, Neves, & Wilcox-O'Hearn, 2021)
 - **Status**: Fast, well-analyzed hash function
-- **Risk**: A cryptanalytic break of BLAKE3 would compromise forward secrecy guarantees
+- **Risk**: A cryptanalytic break of BLAKE3 would compromise schedule chaining guarantees
 
-### Assumption 4: Fixed-point arithmetic is constant-time
+### Assumption 4: Integer-only arithmetic bounds timing hazards (not a constant-time proof)
 
-The Q32.64 fixed-point arithmetic used in the n-body simulation is implemented without secret-dependent branches or variable-time operations.
+The Q32.64 simulation uses integer arithmetic (no floating point in the
+core loop), removing the largest cross-platform timing hazard. This is
+**not** a constant-time guarantee: the code contains operand-dependent
+branches (e.g. sign handling, zero-divisor checks), and no full-pipeline
+timing measurement exists.
 
-- **Validation**: dudect-bencher t-test passes (|t| < 5) for all individual arithmetic operations
+- **Validation**: dudect-bencher t-test passes (|t| < 5) on 12 primitive-level benches (arithmetic, extract, simulate, schedule — gated in `test_all.bat`)
 - **Risk**: A timing leak in the simulation could reveal orbital state information. The `compute_accelerations` function passes independently; `verlet_step` timing variation is under investigation (see [THREAT_MODEL.md](THREAT_MODEL.md)).
 
 ## Limitations
 
-### No post-quantum authentication (without optional module)
+### Authentication (on by default for XOR modes)
 
-The V1 (ChaCha20Poly1305) mode uses Poly1305 with a 256-bit ChaCha20-derived key — a quantum adversary gains only Grover's speedup (2^128) to forge tags. The V3/H KMAC128 modes use SHAKE256 (NIST PQC standard), providing 128-bit post-quantum MAC security.
+V1 (ChaCha20Poly1305) is AEAD. V2/V3/H append a KMAC128 tag by default
+(`--no-auth` opts out) — a quantum adversary gains only Grover's speedup
+(2^128) to forge tags. Running unauthenticated XOR modes accepts
+malleability; that is an explicit opt-out, not the default.
+
+### Session discipline (config, nonce)
+
+Security requires one (config, nonce) pair per instance: the CLI
+generates a fresh nonce at encrypt time and requires it at decrypt time
+(see [COMPLIANCE.md](COMPLIANCE.md) §3). Same-nonce reuse reuses
+keystream (two-time pad).
 
 ### No key encapsulation (KEM)
 
