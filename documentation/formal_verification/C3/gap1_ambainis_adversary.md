@@ -87,10 +87,19 @@ $$Q \ge \Omega(\sqrt{|\Theta|}) = \Omega(2^{960}) \quad \text{quantum oracle que
 |-----------|-------|--------|
 | `|Θ|` | ≥ 2^{1920} | C5 Gap 1 |
 | Grover lower bound | Ω(2^{960}) | Zalka (1999) |
-| Grover iterations at 10 MHz | > 10^{260} years | Physics estimate |
-| Quantum ops at Landauer limit | > 10^{270} years | Physics estimate |
+| Grover iterations at 10 MHz | > 10^{274} years (≈ 2.7×10²⁷⁴: 2⁹⁶⁰/10⁷/3.156×10⁷) | Physics estimate |
+| Quantum ops at Landauer limit | > 10^{270} years | Physics estimate (order-of-magnitude illustration) |
 
-**Ω(2^{960}) quantum operations is an unconditional lower bound** — no conjectured extension of the adversary method is required.
+> **Corrections (2026-10-10):** the 10-MHz figure was previously "> 10^260
+> years", understating the doc's own inputs by ~14 orders of magnitude.
+> More importantly, "unconditional lower bound" below means *unconditional
+> in the black-box oracle model* (BBBV/Zalka optimality for oracle `F`) —
+> the real adversary receives white-box circuits for `Φ^S` and SHAKE256, so
+> structural attacks are not ruled out. Likewise "exactly one marked
+> element" needs keystream length L ≥ 1920 plus a distribution argument;
+> for shorter blocks the bound is Ω(√(N/M)) over M preimages.
+
+**Ω(2^{960}) quantum operations is an unconditional lower bound in the black-box oracle model** — no conjectured extension of the adversary method is required (but see the white-box caveat above).
 
 ---
 

@@ -142,9 +142,16 @@ fn verify_c1_preimage_bound() {
     );
 
     // ── Analytical bound verification ────────────────────────────────
+    // NOTE (2026-10-10, verified by brute force on a scaled model): the
+    // true preimage width for q = floor(C/den) is den^2/C, reaching
+    // ~2^40.6 at the maximum denominator — NOT ceil(den/2^64) ≤ 8M. The
+    // assertions below prove true arithmetic statements about
+    // ceil(den/2^64), but that quantity is a quotient-scale ratio, not the
+    // preimage count. Labels retained for continuity; see C1/gap1 for the
+    // corrected width and its consequences for the k_op chain.
     // The full preimage bound for the division is:
     //
-    //   preimage_size = ⌊dist_cubed_raw / 2^64⌋
+    //   preimage_size ≈ den^2 / C  (C = g_raw · 2^64), up to ~2^40.6 at MAX
     //
     // At the softening limit: 2^36 / 2^64 = 2^(-28) → effectively 1 source
     // At the mid-range: ~2^96 / 2^64 = 2^32 sources
@@ -185,9 +192,11 @@ fn verify_c1_preimage_bound() {
 //
 // where ε = 1 / log₂(MAX_DIST_CUBED_RAW / MIN_DIST_CUBED_RAW)
 //        = 1 / log₂(8_000_000 × 2^64 / 2^36)
-//        ≈ 1 / 132 ≈ 0.0076
+//        = 1 / (22.93 + 28) = 1 / 50.93 ≈ 0.0196
+//        (a previous revision wrote 1/132 ≈ 0.0076 here — arithmetic error,
+//        corrected 2026-10-10)
 //
-// Therefore: k_div ≥ 0.992 bits per division.
+// Therefore: k_div ≥ 0.980 bits per division.
 //
 // ## Proof Strategy
 //
@@ -243,38 +252,34 @@ fn verify_c1_epsilon_bound() {
     // The input entropy over RANGE:
     //   H(input) = log₂(RANGE) ≈ log₂(8_000_000 × 2^64) ≈ 22.9 + 64 = 86.9 bits
     //
-    // The precision loss per division = 64 bits (from quantization to i128),
-    // but the Shannon information loss per division in expectation:
-    //   loss = H(input) - H(output) ≈ 86.9 - 22.9 = 64 bits
-    //
-    // This is the precision loss. The fraction of this loss that corresponds
-    // to information about the LSB of the *preceding* state (which is what C1
-    // measures) is exactly:
-    //   k_div = loss / log₂(RANGE / floor(RANGE / 2^64))
-    //         = 64 / (64 + ε')  where ε' = log₂(RANGE) - log₂(2^64 × ⌊RANGE/2^64⌋)
-    //         ≥ 64 / (64 + 1/ln(2)) ≈ 0.992 bits
-    //
-    // This is the ε-bound: k_op ≥ 1 - ε where ε ≈ 0.0076.
+    // NOTE (2026-10-10): the derivation previously in this comment block
+    // (loss = 64 bits, k_div = 64/(64+1/ln2) ≈ 0.992) is withdrawn — it
+    // mixes quantization precision with Shannon loss and the 0.992 figure
+    // does not follow. The per-division Shannon rate rests on the
+    // analytical ε-bound (k_op ≥ 0.98) and the empirical ~0.99 bits/op;
+    // see C1/gap4. The assertions below check true ceil-division
+    // arithmetic used as a scale ratio, not a preimage count.
 
-    // Verify the preimage bound symbolically.
+    // Verify the scale ratio symbolically (formerly mislabeled "preimage
+    // bound": ceil(den/2^64) is a quotient-scale ratio; the true preimage
+    // width is den^2/C, up to ~2^40.6 at MAX — see C1/gap1).
     // For any dist_cubed in the physical range, the remainder
     // r = (g_raw · 2^64) mod dist_cubed_raw determines how many
     // consecutive dist_cubed_raw values produce the same factor_raw.
     //
-    // The number is at most ⌈dist_cubed_raw / 2^64⌉, which attains
-    // its maximum at the largest denominator.
+    // The ratio below attains its maximum at the largest denominator.
     let denominator: i128 = kani::any();
     kani::assume(denominator >= MIN_DIST_CUBED_RAW);
     kani::assume(denominator <= MAX_DIST_CUBED_RAW);
 
-    // The preimage count for a single division is bounded by:
-    //   preimage ≤ ⌈denominator / 2^64⌉
+    // Scale ratio check (NOT a preimage count — see note above):
+    //   ceil(denominator / 2^64)
     // At MAX_DIST_CUBED_RAW: ⌈8_000_000 × 2^64 / 2^64⌉ = 8_000_000
     // At MIN_DIST_CUBED_RAW: ⌈2^36 / 2^64⌉ = 1
     let max_preimage_raw = (denominator + (1 << 64) - 1) >> 64; // ceil division
     kani::assert(
         max_preimage_raw <= 8_000_000,
-        "C1: worst-case preimage count per division ≤ 8,000,000 (at max denominator)",
+        "C1: ceil(denominator/2^64) <= 8,000,000 over the physical range",
     );
 
     // The minimum preimage count (at softening limit) is 1 or 2:

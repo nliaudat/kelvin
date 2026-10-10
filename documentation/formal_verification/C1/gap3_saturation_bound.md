@@ -12,7 +12,12 @@
 **Lemma (Preimage Monotonicity and Saturation):**
 Let `Φ: X → X` be the Verlet step map on the finite state space `X = (ℤ/2^128)^(6N)` with per-step information loss `k_step ≥ 2N(N-1)` bits (from Gap 1 & 2). For any target state `y ∈ X` after `S` steps, the preimage set `P_S(y) = {x ∈ X : Φ^S(x) = y}` satisfies:
 
-$$\log_2 |P_S(y)| \leq \min(S \cdot k_{\text{step}},\; H_{\max} - \log_2(A))$$
+$$\min(S \cdot k_{\text{step}},\; H_{\max} - \log_2(A)) \leq \log_2 |P_S(y)| \leq H_{\max}$$
+
+> **Correction (2026-10-10):** the lemma as originally stated had the
+> inequality backwards (`≤ min(...)`). The proof below establishes a
+> *lower* bound growing as `S·k_step` (§2.3) capped by the state space
+> (§2.3 upper cap) and the attractor (§2.4); corrected accordingly.
 
 where:
 - `H_max = 6N × 128` bits is the state space entropy
@@ -38,11 +43,19 @@ For N = 5: `|X| = 2^{3840}`.
 
 ### 2.2 Many-to-One Map
 
-From Gaps 1 and 2, each Verlet step `Φ` discards at least `k_step` bits of Shannon entropy. This means each step maps at least `2^{k_step}` distinct input states to the same output state in expectation:
+From Gaps 1 and 2, each Verlet step `Φ` discards at least `k_step` bits of Shannon entropy on average. This means each step maps on the order of `2^{k_step}` distinct input states to the same output state in expectation:
 
-$$\forall x \in X:\; |\Phi^{-1}(\{\Phi(x)\})| \geq 2^{k_{\text{step}}}$$
+$$|\Phi^{-1}(\{\Phi(x)\})| \approx 2^{k_{\text{step}}} \quad \text{(average over } x\text{, not worst-case)}$$
 
-The Kani harness `verify_c1_epsilon_bound` confirms this at the division level: a single division maps up to 8,000,000 distinct `dist_cubed` values to the same quotient. The Kani harness `verify_c3_two_step_preimage_growth` confirms compounding: after 2 steps, 4 distinct 1-ULP-perturbed states show preimage convergence.
+> **Correction (2026-10-10):** the previous revision stated this with a
+> universal quantifier (`∀x … ≥ 2^40`), which is false — gap1's own
+> softening-limit case has preimage 1–2. Average-case (Shannon) loss does
+> not imply a per-state lower bound.
+
+The Kani harness `verify_c1_epsilon_bound` checks true ceil-division
+arithmetic (see gap1's 2026-10-10 correction: the asserted quantity is a
+scale ratio, with true preimage width `≈ den²/C` up to ~2^40.6 at MAX).
+The Kani harness `verify_c3_two_step_preimage_growth` confirms compounding: after 2 steps, 4 distinct 1-ULP-perturbed states show preimage convergence.
 
 ### 2.3 Preimage Growth Under Repeated Application
 

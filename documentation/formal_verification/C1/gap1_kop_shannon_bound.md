@@ -34,7 +34,7 @@ entropy about the system state.
 The Q32.64 division `q = g / dist_cubed` is implemented as integer division of
 `g_raw · 2^64` by `dist_cubed_raw`:
 
-$$q_{\text{raw}} = \left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{d^3_{\text{raw}}} \right\rceil$$
+$$q_{\text{raw}} = \left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{d^3_{\text{raw}}} \right\rfloor$$
 
 This produces a remainder:
 
@@ -52,20 +52,31 @@ irretrievably lost.
 Given a quotient `q_raw`, the set of `dist_cubed_raw` values that produce this same
 quotient is the set of `den` such that:
 
-$$\left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{\text{den}} \right\rceil = q_{\text{raw}}$$
+$$\left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}{\text{den}} \right\rfloor = q_{\text{raw}}$$
 
 This is equivalent to all `den` in the interval:
 
 $$\text{den} \in \left( \frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}} + 0.5},\;
 \frac{g_{\text{raw}} \cdot 2^{64}}{q_{\text{raw}} - 0.5} \right]$$
 
-The size of this preimage set in raw units is bounded by:
+The size of this preimage set in raw units follows from the interval
+width: for `q ≈ C/den` with `C = g_raw · 2^64`,
 
-$$\text{preimage size} \leq \left\lfloor \frac{d^3_{\text{raw}}}{2^{64}} \right\rfloor$$
+$$\text{width} \approx \frac{C}{q^2} \approx \frac{\text{den}^2}{C}$$
 
-This bound is **verified by Kani** (`verify_c1_epsilon_bound`) for the full physical
-range: at maximum denominator, up to 8,000,000 distinct input values map to the same
-output; at the softening limit, at most 1–2 values.
+(brute-force verified on a scaled model: max preimages per quotient
+exactly track `den²/C`). At the maximum denominator this is
+`≈ (8M·2⁶⁴)²/(g·2⁶⁴) ≈ 2^40.6 ≈ 1.6×10¹²` — **not** `⌊d³/2⁶⁴⌋ ≤ 8M
+(2^22.9)` as previously stated (corrected 2026-10-10; the old formula
+understates the worst case by ~2^17.6).
+
+> **Consequence:** the Kani harness `verify_c1_epsilon_bound` asserts the
+> true arithmetic statement `⌈den/2⁶⁴⌉ ≤ 8M` but mislabels it "preimage
+> count". A larger preimage set means *more* per-division ambiguity, so the
+> qualitative many-to-one claim survives — but the quantitative `k_op ≥ 1`
+> chain built on the 8M figure does not follow and needs re-derivation
+> from the `den²/C` width. The empirical ~0.99 bits/op measurement stands
+> independently.
 
 ### 2.3 The LSB Entropy Principle
 

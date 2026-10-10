@@ -20,7 +20,12 @@ where `ε ≤ 1/log₂(MAX/MIN) ≈ 0.0197` (from C1 Gap 4).
 | k_op (per operation) | ≥ 0.980 bits | Gap 4: ε-bound |
 | k_ops/step (Verlet, N=5) | 40 operations | Gap 7: Verlet counting |
 | k_step (per step) | ≥ 39.2 bits | k_step = 40 × 0.980 |
-| Saturation bound | 3840 bits | Gap 3: state space limit |
+| Saturation cap | 3840 bits (raw storage; ≤ 2880 usable — see C1 scope notes) | Gap 3: state space limit |
+
+> **Scope note (2026-10-10):** the Grover exponent `S·k/2` must be capped
+> by the actual search space — `min(S·k, H_max)` — otherwise S = 10⁶ steps
+> implies a 2^40M search space, ~10⁴× the code's state. The cap, not the
+> per-step rate, governs operational bounds (see C4/readme scope note).
 
 ## 3. References
 

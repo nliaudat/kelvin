@@ -29,6 +29,11 @@ $$Adv(A) ≤ negl_{SHAKE}(n) + 2^{-S·k/2}$$
 
 For N=5 Verlet, S=1,000,000: `S·k = 40,000,000 bits` → `2^{-20,000,000}` — astronomically small.
 
+> **Scope notes (2026-10-10, not changing the theorem statement):**
+> 1. `negl_SHAKE(n)` hides a concrete `O(q²/2^c)`-type sponge-indifferentiability term (capacity/birthday) — `q` never appears, so tightness loss is unaccounted.
+> 2. "Requires A to query R at Φ^S(C)" uses classical lazy-sampling logic; against superposition queries this step needs a QROM/compressed-oracle extraction lemma, which is not provided.
+> 3. `2^{-S·k/2}` is the query *count* for constant success (`Q ≈ √N`), not a poly-query success *probability* (which scales as `O(q²/N)`); and the exponent must be capped by the actual search space (`min(S·k, H_max)`, cf. C4/readme scope note) and floored by the keystream-guessing rate `~2^{-L}`.
+
 ## 4. References
 
 - `formal_verification.md` §L4' (full reduction sketch)
