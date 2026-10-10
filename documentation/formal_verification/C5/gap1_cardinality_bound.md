@@ -25,7 +25,7 @@ Each body contributes 7 bounded Q32.64 values:
 |------------|-----------------|--------|
 | Non-collision (r_i ≠ r_j) | ≤ 0.1 bits | Inclusion-exclusion; negligible for large space |
 | Min separation | ≤ 5 bits | Phase-space volume ratio: `V_sep / V_total` |
-| Bound orbit (E < threshold) | ≤ 100 bits | Empirically ≥ 2^{-100} fraction kept |
+| Bound orbit (E < threshold) | ≤ 100 bits claimed | ⚠️ Justification was gap3's 2⁻¹⁰⁰ model — **withdrawn** (gap3 re-opened 2026-10-10: argument inverted). Survives only via the Monte Carlo pass rate cited below; treat the 100-bit figure as unproved. |
 
 $$H ≥ 2469.5 - 0.1 - 5 - 100 ≈ 2364.4 \text{ bits} ≥ 1920$$
 

@@ -17,12 +17,16 @@ $$H_{\min}(P_S) \geq H_0(P_S) - δ$$
 where:
 - `H₀(P_S) = log₂(supp(P_S))` is the Hartley entropy (log of support size)
 - `H∞(P_S) = −log₂(max_y p_S(y))` is the min-entropy
-- `δ = log₂( max_y p_S(y) · |X| / |Φ^(−S)({y})| )` is the uniformity deviation
-- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≈ 0.0197` where `ε = 1 / log₂(MAX/MIN)`
+- `δ = log₂(max_y |Φ^(−S)({y})| / avg_y |Φ^(−S)({y})|)` is the uniformity deviation (max-to-average preimage ratio)
+- The deviation `δ` is bounded by `δ ≤ log₂(1 + ε) ≈ 0.0280` where `ε = 1 / log₂(MAX/MIN)`
 
-For the standard 5-body Verlet configuration, **δ ≤ 0.0197**, giving:
+> **Correction (2026-10-10):** the previous revision wrote the δ
+> definition with the max-scope `y` leaking into the denominator
+> (ill-formed) and gave 0.0197 (missing the 1/ln 2 factor — see §2.3).
 
-$$\boxed{H_{\min}(P_S) \geq H_0(P_S) - 0.0197}$$
+For the standard 5-body Verlet configuration, **δ ≤ 0.0280**, giving:
+
+$$\boxed{H_{\min}(P_S) \geq H_0(P_S) - 0.0280}$$
 
 **Physical interpretation:** The preimage distribution after `S` steps is nearly uniform — the most likely preimage has at most `2^δ ≈ 1.014` more weight than the average.
 
@@ -62,25 +66,29 @@ The ratio between the largest and average preimage size is:
 
 $$\frac{\max_y p_S(y)}{\bar{p}} = \frac{\max_y |Φ^{-S}(\{y\})|}{\text{avg}_y |Φ^{-S}(\{y\})|}$$
 
-From the finite-state pigeonhole argument (Gap 3), the preimage sizes are bounded by:
-
-$$1 \leq |Φ^{-1}(\{z\})| \leq \left\lfloor \frac{d^3_{\text{raw}}}{2^{64}} \right\rfloor \leq 8,000,000$$
+From the finite-state pigeonhole argument (Gap 3), single-division preimage sizes grow with the denominator (true width ≈ den²/C, up to ~2^40.6 at MAX — see gap1's 2026-10-10 correction, not the old 8M figure).
 
 The ratio of maximum to average preimage is bounded by the fraction of inputs in the "resolving" regime of the division (Gap 4):
 
-$$δ \leq \log_2\left(1 + \frac{1}{\log_2(\text{MAX/MIN})}\right) \approx 0.0197$$
+$$δ \leq \log_2\left(1 + \frac{1}{\log_2(\text{MAX/MIN})}\right) \approx 0.0280$$
+
+> **Correction (2026-10-10):** the previous revision wrote `≈ 0.0197`,
+> dropping the `1/ln 2 ≈ 1.4427` factor between natural and binary log
+> (`\ln(1.0196)/\ln 2 ≈ 0.0280`). The conclusion below is updated
+> accordingly (0.02 → 0.03 bits); the qualitative point — essentially
+> uniform — is unaffected.
 
 ### 2.4 Explicit Bound
 
 For the standard configuration with `Δ = 2^−64`, `MIN = 2^36`, `MAX = 8·10^6 · 2^64`:
 
-$$δ \leq \log_2\left(1 + \frac{1}{\log_2(8·10^6 · 2^64 / 2^36)}\right) \approx \log_2(1.014) \approx 0.0197$$
+$$δ \leq \log_2\left(1 + \frac{1}{\log_2(8·10^6 · 2^64 / 2^36)}\right) = \log_2(1.0196) \approx 0.0280$$
 
 Therefore:
 
-$$H_{\min}(P_S) \geq H_0(P_S) - 0.0197$$
+$$H_{\min}(P_S) \geq H_0(P_S) - 0.0280$$
 
-The min-entropy is within 0.02 bits of the Hartley entropy — the preimage distribution is essentially uniform.
+The min-entropy is within 0.03 bits of the Hartley entropy — the preimage distribution is essentially uniform.
 
 ---
 

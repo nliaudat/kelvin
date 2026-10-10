@@ -79,17 +79,26 @@ pub fn euler_step(bodies: &mut [OrbitalBody], dt: Fixed, softening: Fixed, g: Fi
 
 The Euler counting provides a cross-check: Verlet has exactly **twice** the rounding operations of Euler per step, consistent with the two acceleration calls.
 
-### 2.4 No Additional Error Sources
+### 2.4 No Additional Error Sources — CORRECTED (2026-10-10)
 
-The Verlet double-computation does not introduce any new **stochastic error sources** beyond the fixed-point rounding operations already counted:
+> The previous revision of this table labeled the kick/drift arithmetic
+> "exact". That is false against the implementation
+> (`kelvin-core/src/integrator.rs:127-145`): `dt / Fixed::from_int(2)` is
+> a full fixed-point `Div` (≤1 ULP rounding, not an exact halve), and
+> `Vec3::scale`/`+=` are truncating `Mul`/`Add` (≤1–2 ULP each, may wrap).
+> Corrected classification:
 
 | Operation | Nature | Counted? |
 |-----------|--------|----------|
-| `dt / 2` (division) | Fixed-point division | ✅ Counted in `k_step` (1 div per step) |
-| `acc.scale(half_dt)` | Exact multiplication | Not rounding (exact) |
-| `velocity += acc * half_dt` | Exact addition | Not rounding (exact) |
-| `position += velocity * dt` | Exact multiplication + addition | Not rounding (exact) |
-| `compute_accelerations` | Contains sqrt + div | ✅ Counted for each call |
+| `dt / 2` (division) | Rounding division (≤1 ULP) | ❌ NOT in the `2N(N−1)` formula — a 41st op/step for N=5 |
+| `acc.scale(half_dt)` | Rounding multiplication | ❌ Uncounted (2N per step) |
+| `velocity += …`, `position += …` | Rounding addition | ❌ Uncounted (2N per step) |
+| `compute_accelerations` | Contains sqrt + div | ✅ Counted (2 calls) |
+
+The `k_step = 40` figure therefore counts only the acceleration-evaluation
+rounding ops; kick/drift arithmetic adds further (smaller) rounding. The
+40-bit/step loss rate is retained as an approximate lower bound, not an
+exact op census.
 
 ---
 

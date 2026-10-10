@@ -17,9 +17,9 @@ The uniform distribution over the valid space `Θ_5` assigns each valid configur
 | Factor | Entropy (bits) |
 |--------|---------------|
 | Unconstrained product measure | ~2469.5 |
-| Constraint bias (worst-case configuration) | ≤ 5 bits |
+| Constraint bias (worst-case configuration) | ≤ 5 bits (empirical: Monte Carlo uniformity; the former gap3 constraint analysis is withdrawn — see gap3) |
 | Resulting min-entropy | ≥ 2464.5 bits |
-| Claimed lower bound | ≥ 1800 bits |
+| Claimed lower bound | ≥ 1800 bits (664 bits of unexplained margin below the derivation — conservative and valid, but the margin is luck, not analysis) |
 
 ## 3. References
 

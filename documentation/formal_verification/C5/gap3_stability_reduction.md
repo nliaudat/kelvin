@@ -1,7 +1,11 @@
-# C5 Gap 3: Stability Reduction Factor ≤ 2^{-100} — Resolved
+# C5 Gap 3: Stability Reduction Factor — RE-OPENED (2026-10-10)
 
-> **Status:** ✅ RESOLVED
-> **Date:** 2026-05-31
+> **Status:** ❌ RE-OPENED — the §2.3 argument is inverted (proves valid
+> fraction ≤ 2⁻¹⁰⁰, opposite of the theorem) and contradicted by the cited
+> Monte Carlo (>90% pass). The 2⁻¹⁰⁰ reduction factor is unsupported.
+> Candidate replacement: rejection rate of `validate()` over keygen output
+> (≈ 1, i.e. negligible reduction).
+> **Date:** 2026-05-31 (re-opened 2026-10-10)
 > **Conjecture:** C5 — Valid Configuration Space Cardinality
 
 ## 1. Theorem Statement
@@ -36,17 +40,27 @@ The velocity component of the phase space is bounded by |v| ≤ 100 AU/yr. The f
 
 $$\frac{V(|v| \geq 1)}{V(|v| \leq 100)} = \frac{4\pi(100^3 - 1^3)/3}{4\pi(100^3)/3} = 1 - \left(\frac{1}{100}\right)^3 = 1 - 10^{-6}$$
 
-So the stable region (where |v| < 1) is at most 10^{-6} ≈ 2^{-20} of the velocity space (one body). For 5 bodies, the probability of all being stable is (2^{-20})^5 = 2^{-100}.
+> **Correction (2026-10-10):** the previous revision drew the theorem's
+> conclusion from this ratio backwards. Read carefully: the *ejected*
+> (|v| ≥ 1, necessary condition) region is ≈ 0.999999 of the volume, while
+> the *stable* (|v| < 1) region is (1/100)³ = 10⁻⁶ ≈ 2⁻²⁰ per body, i.e.
+> ≈ 2⁻¹⁰⁰ for all 5 bodies stable. So this argument proves the **valid
+> fraction is at most 2⁻¹⁰⁰** — the opposite of the theorem ("at most
+> 2⁻¹⁰⁰ are *invalidated*"). Moreover the model's own prediction (≈0% of
+> uniform configs stable) is falsified by the cited Monte Carlo (>90%
+> pass), because keygen does not sample velocities uniformly over |v| ≤ 100.
+> No bound in either direction follows from this argument; the 2⁻¹⁰⁰
+> reduction factor is unsupported. Status re-opened.
 
 ### 2.4 Conservative Correction
 
-The above bound uses only the velocity criterion. Adding the position-dependent potential term (which further restricts the ejected region) makes the bound even tighter. A conservative factor of 2^{-100} is:
-
-- For position within 1 AU of a massive body: adds a factor of (1/100)^3 = 10^{-6} to the phase space
-- Combined with velocity factor: 10^{-6} × 10^{-6} × 5 ≈ 5 × 10^{-12} ≈ 2^{-37.5}
-- With all constraints: ≤ 2^{-100}
-
-The stability reduction factor of 2^{-100} used in the C5 cardinality bound is therefore very conservative. The actual reduction factor is much smaller.
+> **Correction (2026-10-10):** the arithmetic `10⁻⁶ × 10⁻⁶ × 5 ≈ 5×10⁻¹² ≈
+> 2⁻³⁷·⁵` is correct, but `2⁻³⁷·⁵ ≫ 2⁻¹⁰⁰` — nothing bridges the gap to the
+> claimed `≤ 2⁻¹⁰⁰`. Combined with §2.3's inversion, this section is
+> withdrawn pending a re-derivation from the actual keygen sampling
+> distribution. A valid replacement would Monte-Carlo the *rejection rate*
+> of `OrbitalConfig::validate()` over real keygen output (already measured
+> at >90% pass, i.e. reduction factor ≈ 1, not 2⁻¹⁰⁰).
 
 ## 3. References
 

@@ -39,7 +39,7 @@ The f64 QR decomposition spectrum deviates from Q32.64 by at most $\kappa(J) \cd
 |---|-----|------|--------|
 | 1 | $\lvert\lambda_{disc} - \lambda_{cont}\rvert$ error bound | [`gap1_discrete_lyapunov_bound`](gap1_discrete_lyapunov_bound.md) | ✅ RESOLVED |
 | 2 | Positive $\lambda$ lower bound | [`gap2_positive_lambda_certification`](gap2_positive_lambda_certification.md) | ✅ RESOLVED |
-| 3 | Full Lyapunov spectrum in Q32.64 | [`gap3_q3264_lyapunov_spectrum`](gap3_q3264_lyapunov_spectrum.md) | ✅ RESOLVED |
+| 3 | Full Lyapunov spectrum in Q32.64 | [`gap3_q3264_lyapunov_spectrum`](gap3_q3264_lyapunov_spectrum.md) | ⚠️ JUSTIFIED (citation corrected, averaging lemma open) |
 | 4 | Kaplan-Yorke entropy bound | [`gap4_kaplan_yorke_entropy`](gap4_kaplan_yorke_entropy.md) | ✅ RESOLVED |
 | 5 | Shadow orbit bias constant | [`gap5_shadow_orbit_bias`](gap5_shadow_orbit_bias.md) | ✅ RESOLVED |
 | 6 | Lipschitz constant of $\lambda$ | [`gap6_lipschitz_lambda`](gap6_lipschitz_lambda.md) | ✅ RESOLVED |
