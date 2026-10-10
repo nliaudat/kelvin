@@ -1,5 +1,8 @@
 # Kelvin — Compliance Register
 
+> Last verified against code and docs: **2026-10-10** (tree incl. PR #80/#81;
+> re-verified with this correction pass).
+>
 > This document replaces `bad.md` (removed 2026-10-10). Every limb of the old
 > production-cipher critique is tracked below as **FIXED**, **BOUNDED**, or
 > **ACCEPTED LIMITATION** with evidence. Nothing here raises the effective
@@ -46,7 +49,7 @@ instead of returning malleated plaintext.
 
 | Hallmark | Status |
 |----------|--------|
-| Formal security reduction | ACCEPTED LIMITATION — none; C1–C5 are plausibility arguments (21 proved-step / 2 justified), not reductions |
+| Formal security reduction | ACCEPTED LIMITATION — none; C1–C5 are plausibility arguments (21 proved / 2 justified), not reductions |
 | Independent cryptanalysis | ACCEPTED LIMITATION — none to date; adversarial chain (v1–v5) is self-review, not independent audit |
 | Standardized primitives | MET where used — SHAKE256, ChaCha20Poly1305, HKDF-SHA512, BLAKE3, ML-KEM-768, ML-DSA-65 |
 | Side-channel hardening | PARTIAL — DudeCT \|\|t\| < 5 on arithmetic primitives + extract/simulate/schedule (12 benches, gated in `test_all.bat`); full encrypt/decrypt pipeline not covered |

@@ -88,9 +88,15 @@ Kelvin does **not** rely on system entropy (OS RNG) for keystream generation. Al
 
 | Level | Bodies | Steps | Raw Keyspace | Equivalent Security |
 |-------|--------|-------|-------------|-------------------|
-| Standard | 5 | 1,000,000 | ~2¹²⁸⁷ | 128-bit (SHAKE256 bound) |
-| Paranoid | 5 | 10,000,000 | ~2¹²⁸⁷ | 128-bit (SHAKE256 bound) |
-| Maximum | 10 | 100,000,000 | ~2²⁷⁴⁴ | 128-bit (SHAKE256 bound) |
+| Standard | 8 | 1,000,000 | ~2¹²⁸⁷ * | 128-bit (SHAKE256 bound) |
+| Paranoid | 8 | 10,000,000 | ~2¹²⁸⁷ * | 128-bit (SHAKE256 bound) |
+| Maximum | 10 | 100,000,000 | ~2²⁷⁴⁴ * | 128-bit (SHAKE256 bound) |
+
+\* Raw-keyspace figures predate the 8-body standard (derived for 5-body
+configs); retained pending recomputation. The operative column is
+Equivalent Security: **all three levels provide identical effective
+security** — the extra steps in Paranoid and Maximum increase simulation
+setup cost but do not raise the security bound.
 
 The raw keyspace exceeds the security level of the underlying hash function (SHAKE256 provides 256-bit classical / 128-bit quantum security). The practical security is bounded by the hash function, not the keyspace. **All three levels provide identical effective security** — the extra steps in Paranoid and Maximum increase simulation setup cost but do not raise the security bound. Post-quantum effective security: 128-bit (Grover's bound on SHAKE256).
 
