@@ -1,7 +1,7 @@
 # Kelvin Stream Cipher Security: Security Analysis and Assumptions
 
-**Status:** Active Documentation  
-**Date:** 2026-05-28  
+**Status:** Living document (corrected as needed; see git history)
+**Date:** 2026-10-10
 **Author:** Kelvin Project
 
 ---
@@ -32,9 +32,9 @@ Kelvin satisfies conditions 1, 3, and 4 — but **not** condition 2. The keystre
 
 | # | OTP Condition | Kelvin's Approach | Status |
 |---|---------------|-------------------|--------|
-| 1 | **Key ≥ plaintext** | SHAKE256 XOF produces unlimited keystream — the key is always exactly as long as the plaintext. V2 (Chaos) mode has no upper bound; V3/H modes have practical limits (key schedule exhaustion) but can be configured for any file size. | ✅ **Satisfied** |
+| 1 | **Key ≥ plaintext** | SHAKE256 XOF produces keystream on demand — the key is always exactly as long as the plaintext. V2 (Chaos) mode is bounded by the 1B-step safety cap; V3/H modes have practical limits (key schedule exhaustion) but can be configured for any file size within budget. | ✅ **Satisfied** |
 | 2 | **Key must be truly random** | SHAKE256 is a NIST-standardized XOF proven indifferentiable from a random oracle. The keystream is computationally indistinguishable from true randomness. The n-body chaos extraction provides physical entropy input. | ⚠️ **Computationally random** (not information-theoretically random, but indistinguishable by any known polynomial-time adversary) |
-| 3 | **Key must never be reused** | The key schedule enforces forward secrecy via BLAKE3 reseeding — each key is derived from a unique reseeded state. V2 generates fresh keystream per simulation step. The only way to reuse a key is to reuse the same orbital config at the same step count, which is prevented by the schedule. | ✅ **Satisfied** (enforced by architecture) |
+| 3 | **Key must never be reused** | Key schedule reseeding plus session nonces separate instances: same config + distinct nonces = independent keystreams. Reusing a (config, nonce) pair reuses keystream (two-time pad) — prevented by caller discipline (CLI generates a fresh nonce by default), not by the schedule alone. | ✅ **Satisfied** (enforced by defaults + documented rule) |
 | 4 | **Key must be kept secret** | The orbital configuration (~2 KB) is the shared secret. It must be protected like any symmetric key. The simulation and extraction are deterministic — anyone with the config can reproduce the keystream. | ✅ **Satisfied** (standard key hygiene) |
 
 ### The Honest Qualification
@@ -57,7 +57,7 @@ In practice, this distinction is irrelevant for any real adversary:
 
 | Pillar | Description | Rationale / Status |
 |--------|-------------|--------------------|
-| **Pillar 1: Chaotic Irreversibility (Assumption)** | The n-body problem (N ≥ 3) has no closed-form solution. Under the assumption that recovering initial conditions from the final state is computationally hard, an attacker must brute-force the orbital configuration. | Poincaré non-integrability theorem proves no analytic solution exists — but this does NOT constitute a cryptographic hardness proof. Validated Lyapunov exponent λ ≈ 0.693 confirms chaotic regime. |
+| **Pillar 1: Chaotic Irreversibility (Assumption)** | The n-body problem (N ≥ 3) has no closed-form solution. Under the assumption that recovering initial conditions from the final state is computationally hard, an attacker must brute-force the orbital configuration. | Poincaré non-integrability theorem proves no analytic solution exists — but this does NOT constitute a cryptographic hardness proof. Validated Lyapunov exponent λ ≈ 0.7/yr (pre-`ln(10)`-fix literature: 0.693) confirms chaotic regime. |
 | **Pillar 2: Deterministic Extraction** | SHAKE256 is a NIST-standardized extendable-output function (XOF) with no known preimage attack better than brute force. | NIST FIPS 202; 2048-byte entropy pool = 2^16384 search space |
 | **Pillar 3: One-Way Key Schedule** | HKDF-SHA512 + BLAKE3 reseeding ensures key derivation chaining (labeled "forward secrecy") — compromising the current keystream reveals neither past nor future keys. This is NOT Perfect Forward Secrecy: if the orbital config is compromised, all past and future keys can be recomputed. True PFS would require ephemeral key material. | HKDF RFC 5869; BLAKE3 security proof |
 | **Pillar 4: Quantum Resistance** | No known quantum speedup exists for: (a) sequential chaotic classical simulation, (b) SHAKE256 inversion beyond Grover's square-root reduction. | Grover's → 128-bit effective security; Shor's algorithm does not apply |
@@ -74,8 +74,8 @@ In practice, this distinction is irrelevant for any real adversary:
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
 | **Invert SHAKE256 (classical preimage)** | 2^256 | ❌ Infeasible | 256-bit preimage resistance (SHAKE256 capacity) |
 | **Nonce reuse / IV collision** | N/A | ⚠️ **Guarded by session nonces** | Same config + distinct nonces (`--nonce`, `new_with_nonce`) give independent keystreams; reusing a config *with the same nonce* still reuses keystream — users must enforce unique nonce per deployment |
-| **Malleability (bit-flip)** | Trivial | ⚠️ Mitigated by `--auth` | XOR is malleable; KMAC128 (NIST SP 800-185) defeats this |
-| **Key reuse across messages** | Catastrophic | ❌ Prevented by schedule | Key schedule enforces forward secrecy; each key is derived from a unique reseeded state |
+| **Malleability (bit-flip)** | Trivial | ⚠️ Defeated by default-on KMAC128 (`--no-auth` opts out) | XOR is malleable; KMAC128 (NIST SP 800-185) defeats this |
+| **Key reuse across messages** | Catastrophic | ❌ Prevented by (config, nonce) discipline + schedule | Same-pair reuse reuses keystream; distinct nonces isolate instances; schedule reseeds within an instance |
 | **Reverse engineer keystream from ciphertext** | Requires known plaintext | ⚠️ Bypasses n-body layer — reduces to SHAKE256 preimage (128-bit quantum) | Keystream = ciphertext ⊕ known plaintext; attacker attacks SHAKE256 directly, n-body simulation provides zero additional protection |
 | **Grover's on ChaCha20 (V1 only)** | 2^128 | ❌ Infeasible | V1 uses ChaCha20; all other modes use SHAKE256 directly |
 
@@ -94,7 +94,7 @@ H(Plaintext) = H(Plaintext | Ciphertext)
 This holds when the keystream is truly random and never reused. Kelvin's keystream is **computationally indistinguishable from random** via:
 
 1. **SHAKE256's sponge construction** — the Keccak sponge construction (which underlies SHAKE256) has been proven indifferentiable from a random oracle in the random permutation model (Bertoni et al., 2013). No polynomial-time adversary can distinguish SHAKE256 output from a truly random string of the same length.
-2. **Extraction from chaotic dynamics** — the n-body simulation produces orbital states that are exponentially sensitive to initial conditions (validated Lyapunov exponent λ ≈ 0.693). After sufficient steps, the state is fully decorrelated from the initial configuration.
+2. **Extraction from chaotic dynamics** — the n-body simulation produces orbital states that are exponentially sensitive to initial conditions (Lyapunov exponent λ ≈ 0.7/yr post-`ln(10)` fix). After sufficient steps, the state is fully decorrelated from the initial configuration.
 3. **Domain-separated hashing** — each mode (Chaos, Photon, Quantum, Prism, Split, Flare) uses a unique domain separator, preventing cross-mode keystream collisions.
 
 ### 5.2 Computational Security
@@ -126,12 +126,12 @@ This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-
 | Property | Classical OTP (paper pad) | Kelvin Stream Cipher |
 |----------|---------------------------|----------------------|
 | **Key source** | True physical randomness (e.g., radioactive decay) | SHAKE256 XOF from chaotic n-body simulation |
-| **Key distribution** | Same-length pad must be pre-shared (impractical for large data) | Compact orbital config (~2 KB) shared once, generates unlimited keystream |
-| **Key reuse risk** | Catastrophic — two-time pad is trivially breakable | Prevented by key schedule — each key is derived from a unique reseeded state |
+| **Key distribution** | Same-length pad must be pre-shared (impractical for large data) | Compact orbital config (~2 KB) shared once, plus a public per-deployment nonce; keystream bounded by step caps and schedule budget |
+| **Key reuse risk** | Catastrophic — two-time pad is trivially breakable | Same-(config, nonce) reuse reuses keystream; distinct nonces isolate instances (CLI default) |
 | **Randomness quality** | Requires perfect physical RNG | SHAKE256 is NIST-standardized; extraction from chaos adds physical entropy |
 | **Quantum resistance** | Perfect (no mathematical structure) | 128-bit quantum security (Grover's bound on SHAKE256) |
 | **Practicality** | Impractical for data > pad length | ~1.6 GB/s (V1) / ~0.5 GB/s (V3/H) in-memory throughput (see `bench_1gb.md`); V2/H keystream bounded by 1B-step cap |
-| **Authentication** | None (XOR is malleable) | Optional KMAC128 (`--auth`) defeats malleability |
+| **Authentication** | None (XOR is malleable) | KMAC128 on by default (`--no-auth` opts out) |
 
 ---
 
@@ -168,7 +168,7 @@ Kelvin's stream cipher modes are **structurally different** from traditional str
 | What anchors the security? | **SHAKE256** — the n-body simulation adds computational cost for key derivation, but the cipher's security is bounded by SHAKE256's resistance (256-bit classical, 128-bit quantum). |
 | What's the weakest link? | The orbital configuration itself — if an attacker learns the config, they can reproduce the keystream. Protect it like any symmetric key. |
 | What about known plaintext? | Standard stream cipher property: known plaintext reveals keystream for that session. The attacker then faces SHAKE256 preimage resistance (256-bit classical) to recover the config — the n-body layer is bypassed. |
-| What about malleability? | XOR is malleable — use `--auth` (KMAC128) for integrity. |
+| What about malleability? | XOR is malleable — KMAC128 authentication is on by default (opt out with `--no-auth`). |
 
 ---
 
@@ -181,6 +181,5 @@ Kelvin's stream cipher modes are **structurally different** from traditional str
 - NIST FIPS 202 (2015). "SHA-3 Standard: Permutation-Based Hash and Extendable-Output Functions."
 - NIST FIPS 203 (2024). "Module-Lattice-Based Key-Encapsulation Mechanism Standard (ML-KEM)."
 - NIST FIPS 204 (2024). "Module-Lattice-Based Digital Signature Standard (ML-DSA)."
-- Aumasson, J. P., et al. (2013). "BLAKE2: simpler, smaller, fast as MD5." *ACNS 2013*.
 - O'Connor, J., Aumasson, J. P., Neves, S., & Wilcox-O'Hearn, Z. (2021). "BLAKE3: one function, fast everywhere." *USENIX Security 2021*.
 - NIST SP 800-185 (2016). "SHA-3 Derived Functions: cSHAKE, KMAC, TupleHash, and ParallelHash."
