@@ -47,7 +47,7 @@ V3 [Base Seed] ──HKDF→SHAKE256──→ 1MB keystream (fast, ~200ms/GB)
                    ↑
                    │ XOR fresh chaos every N bytes
                    │
-V2 [Orbital State] ──Verlet(10k steps)──→ Fresh Entropy (~0.5ms per reseed)
+V2 [Orbital State] ──Verlet (default 1k steps per reseed)──→ Fresh Entropy
 ```
 
 V3 provides **bulk throughput** (SHAKE256 is fast). V2 provides **fresh chaotic entropy** (each integration step produces genuinely new dynamics). The hybrid combines them: use V3's fast cache for throughput, but inject V2's fresh orbital chaos at reseed boundaries to prevent seed exhaustion attacks.
@@ -58,8 +58,8 @@ V3 provides **bulk throughput** (SHAKE256 is fast). V2 provides **fresh chaotic 
 
 | Mode | Library Name | Tagline | Rationale |
 |------|-------------|---------|-----------|
-| V1 | `KelvinSecure` | "The safe choice" | AEAD authentication, proven ChaCha20Poly1305 |
-| V2 | `KelvinChaos` | "Pure chaotic streaming" | Each byte from fresh orbital dynamics, unlimited keystream |
+| V1 | `Kelvin` | "The safe choice" | AEAD authentication, proven ChaCha20Poly1305 |
+| V2 | `KelvinStreaming` | "Pure chaotic streaming" | Each byte from fresh orbital dynamics, 1B-step safety cap |
 | V3 | `KelvinPhoton` | "Fast as light" | Pure XOR stream from upfront simulation, quantum-resistant |
 | H | `KelvinQuantum` | "Best of all worlds" | Hybrid: V3 speed + V2 entropy freshness |
 
@@ -91,7 +91,7 @@ V3 provides **bulk throughput** (SHAKE256 is fast). V2 provides **fresh chaotic 
 | V1 Kelvin-Secure | 44 bytes (32+12) | 1× HKDF expand + BLAKE3 reseed |
 | V2 Kelvin-Chaos | `bytes_per_step` bytes | 1× Verlet step + 1× SHAKE256 XOF |
 | V3 Kelvin-Photon | Arbitrary (HKDF→SHAKE256) | 1× HKDF expand + SHAKE256 XOF + BLAKE3 reseed |
-| H Kelvin-Quantum | Cache-size (default 1MB) | 1× HKDF→SHAKE256 + periodic Verlet(10k) |
+| H Kelvin-Quantum | Cache-size (default 1MB) | 1× HKDF→SHAKE256 + periodic Verlet (default 1k steps) |
 
 ### 3.3 What is the effective entropy per reseed?
 
@@ -145,7 +145,7 @@ H Kelvin-Quantum (Hybrid Stream):
   simulate(total_steps) → SHAKE256 → 2048B base seed
     → HKDF → SHAKE256 → refill 1MB cache
     → XOR from cache → ... → XOR from cache → cache empty
-    → Verlet(10k steps) → SHAKE256 → fresh 64B entropy
+    → Verlet (default 1k steps per reseed) → SHAKE256 → fresh 64B entropy
     → XOR fresh entropy into base seed
     → HKDF → SHAKE256 → refill 1MB cache (with fresh entropy)
     → XOR from cache → ... (repeat indefinitely)
@@ -158,8 +158,8 @@ H Kelvin-Quantum (Hybrid Stream):
 | **Simulation** | Upfront full | Per-step | Upfront full | Upfront + periodic |
 | **Cipher** | ChaCha20Poly1305 | SHAKE256 XOR | HKDF→SHAKE256 XOR | Hybrid cache + XOR |
 | **Auth** | ✅ AEAD tag | ❌ None | ❌ None | ❌ None |
-| **Nonce** | 12-byte internal counter per key (auto-incremented; never reused unless API is misused by manually resetting/forking state) | None | None | None |
-| **Keystream** | Finite (~28 GiB) | ✅ Truly unlimited (simulation never stops; 1B step safety limit in impl) | Finite (max_keys × 16KB HKDF bound) | ⚠️ Effectively unlimited (max_keys × reseed_interval; with 1B step limit: ~100k reseeds × 10MB ≈ 1TB max) |
+| **Nonce** | 12-byte internal counter per key (auto-incremented; never reused unless API is misused by manually resetting/forking state) | Session nonce (`--nonce`, `new_with_nonce`); same-nonce config reuse reuses keystream | Session nonce (bound at seed extraction) | Session nonce (bound at seed extraction) |
+| **Keystream** | Finite (~28 GiB) | ✅ Bounded only by 1B-step safety cap (practically unlimited) | Finite (reseed every 64 MiB via persistent SHAKE256 XOF) | ⚠️ Effectively unlimited (periodic reseed; bounded by 1B-step cap) |
 | **Entropy renewal** | Deterministic reseed | Fresh per step | Deterministic reseed | Fresh per reseed |
 | **Setup cost** | High (seconds) | None | High (seconds) | High (seconds) |
 

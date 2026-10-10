@@ -36,6 +36,17 @@ $$|\Pr[\mathcal{A}(K(C)) = 1] - \Pr[\mathcal{A}(U_L) = 1]| \le \text{negl}(n) + 
 
 **Security bound:** $\boxed{Adv(A) \le \text{negl}(n) + 2^{-960}}$
 
+> **Scope note (2026-10-10):** this bound is stated over the *representable*
+> configuration space $|\Theta| = 2^{1920}$ (C5). The *generated* keyspace is
+> capped by OS CSPRNG entropy at $2^{256}$ (Grover $2^{128}$), and
+> `gap1`/`gap3` derive $2^{-20{,}000{,}000}$ from $S \cdot k/2$ (S=1M steps,
+> k=40 bits/step) — a per-step-loss reading, not the operational bound. The
+> effective operational claim across all three wordings is "128-bit PQ via
+> SHAKE256" (`bad.md` §1, `formal_verification.md:48`); the three exponents
+> ($-960$, $-20$M, $-128$) answer different questions and must not be quoted
+> interchangeably. See `implementation_plan.md` (C4 section), which proposes
+> restating the operational bound as $\text{negl}(n) + 2^{-128}$.
+
 ## Kani-Verified Harnesses
 
 | Harness | What It Proves |

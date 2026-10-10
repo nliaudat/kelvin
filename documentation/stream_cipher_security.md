@@ -73,7 +73,7 @@ In practice, this distinction is irrelevant for any real adversary:
 | **Shortcut simulation (quantum)** | Unknown — no known quantum algorithm | ❌ No known speedup | Sequential chaos cannot be superposed; each step depends on the previous |
 | **Invert SHAKE256 (Grover's)** | 2^128 | ❌ Infeasible | Standard NIST PQC security margin |
 | **Invert SHAKE256 (classical preimage)** | 2^256 | ❌ Infeasible | 256-bit preimage resistance (SHAKE256 capacity) |
-| **Nonce reuse / IV collision** | N/A | ⚠️ **No nonce means no guard against config reuse** | Two instances loaded with the same config produce identical keystreams — users must enforce single-instance-per-config |
+| **Nonce reuse / IV collision** | N/A | ⚠️ **Guarded by session nonces** | Same config + distinct nonces (`--nonce`, `new_with_nonce`) give independent keystreams; reusing a config *with the same nonce* still reuses keystream — users must enforce unique nonce per deployment |
 | **Malleability (bit-flip)** | Trivial | ⚠️ Mitigated by `--auth` | XOR is malleable; KMAC128 (NIST SP 800-185) defeats this |
 | **Key reuse across messages** | Catastrophic | ❌ Prevented by schedule | Key schedule enforces forward secrecy; each key is derived from a unique reseeded state |
 | **Reverse engineer keystream from ciphertext** | Requires known plaintext | ⚠️ Bypasses n-body layer — reduces to SHAKE256 preimage (128-bit quantum) | Keystream = ciphertext ⊕ known plaintext; attacker attacks SHAKE256 directly, n-body simulation provides zero additional protection |
@@ -130,7 +130,7 @@ This is fundamentally different from algebraic cryptosystems (RSA, ECC, lattice-
 | **Key reuse risk** | Catastrophic — two-time pad is trivially breakable | Prevented by key schedule — each key is derived from a unique reseeded state |
 | **Randomness quality** | Requires perfect physical RNG | SHAKE256 is NIST-standardized; extraction from chaos adds physical entropy |
 | **Quantum resistance** | Perfect (no mathematical structure) | 128-bit quantum security (Grover's bound on SHAKE256) |
-| **Practicality** | Impractical for data > pad length | ~5 GB/s throughput; unlimited keystream in V2/H modes |
+| **Practicality** | Impractical for data > pad length | ~1.6 GB/s (V1) / ~0.5 GB/s (V3/H) in-memory throughput (see `bench_1gb.md`); V2/H keystream bounded by 1B-step cap |
 | **Authentication** | None (XOR is malleable) | Optional KMAC128 (`--auth`) defeats malleability |
 
 ---
@@ -141,13 +141,13 @@ Critics may compare Kelvin's modes to stream ciphers like ChaCha20 or AES-CTR. W
 
 | Aspect | Traditional Stream Cipher (e.g., ChaCha20) | Kelvin Stream Cipher Modes |
 |--------|---------------------------------------------|----------------------------|
-| **Nonce/IV** | Required — nonce reuse is catastrophic | **No nonce** — the only secret is the orbital config |
+| **Nonce/IV** | Required — nonce reuse is catastrophic | **Session nonce** — reuse with the same nonce is catastrophic; distinct nonces isolate instances (`--nonce`, `new_with_nonce`) |
 | **Key schedule** | Fixed key stretched via PRF | Chaotic entropy pool with forward-secret reseeding |
 | **Entropy source** | Single seed → deterministic PRF | Continuous fresh entropy from orbital dynamics (V2, H) |
 | **Quantum resistance** | 128-bit (Grover on 256-bit key) | 128-bit (Grover on SHAKE256) — same bound |
 | **Algebraic structure** | ARX construction (add-rotate-xor) | XOR + hash-based extraction (note: this property is common to all symmetric stream ciphers, not unique to Kelvin) |
 
-Kelvin's stream cipher modes are **structurally different** from traditional stream ciphers: they have no nonce, no IV, no algebraic round function, and their entropy is continuously renewed from a physical system with no closed-form solution.
+Kelvin's stream cipher modes are **structurally different** from traditional stream ciphers: they use session nonces rather than wire nonces (same reuse rule, different transport), no algebraic round function, and their entropy is continuously renewed from a physical system with no closed-form solution.
 
 ---
 

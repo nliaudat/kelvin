@@ -26,7 +26,7 @@
 | **Conditioning function** | SHAKE256 (Extendable-Output Function) |
 | **NIST standard** | FIPS 202 / SP 800-185 |
 | **Input** | Orbital state (positions, velocities, masses, accelerations, G, softening, step counter, domain separator) |
-| **Output length** | Configurable (default: 65,536 bytes per step) |
+| **Output length** | Configurable (mode default: 1 MiB/step Chaos, 64 MiB/step Photon/Quantum) |
 | **Domain separation** | `b"kelvin-streaming-v2-v1-000000000"` |
 | **Security strength** | 256 bits (classical) / 128 bits (quantum) |
 
@@ -79,9 +79,9 @@
 | **Sample size** | 1,073,741,824 bytes (1 GiB) |
 | **Sample format** | Raw binary (no headers, no framing) |
 | **Generation tool** | `cargo run -p nist_800_90b -- generate --size 1073741824 --output keystream.bin` |
-| **Orbital config** | Default 5-body (see §2.2) |
+| **Orbital config** | 5-body test config used for this run (see §2.2; current `standard` keygen produces 8 bodies) |
 | **Integration** | Euler (maximum chaos amplification) |
-| **Bytes per step** | 65,536 (64 KiB) |
+| **Bytes per step** | 65,536 (64 KiB — parameter of this run; current mode defaults are 1 MiB Chaos / 64 MiB Photon/Quantum) |
 | **Total simulation steps** | 16,384 |
 
 ### 2.2 Orbital Configuration
@@ -121,7 +121,7 @@
 
 ### 3.1 Built-in Health Tests
 
-Results from 1,048,576 bytes (1 MiB) of raw SHAKE256 XOR keystream, default 5-body Euler configuration:
+Results from 1,048,576 bytes (1 MiB) of raw SHAKE256 XOR keystream, 5-body Euler test configuration used for this run (not the current 8-body `standard` keygen output):
 
 | Test | Result | Value | Threshold | Status |
 |------|--------|-------|-----------|--------|

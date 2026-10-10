@@ -3,7 +3,7 @@
 **Status:** Second Review — Updated  
 **Date:** 2026-05-28  
 **Author:** Kelvin Project  
-**Cross-references:** [Patent Review #1](patent_review_1.md), [REFERENCES.bib](../REFERENCES.bib)
+**Cross-references:** [Patent Review #1](patent_review_1.md), [REFERENCES.bib](../../REFERENCES.bib)
 
 ---
 

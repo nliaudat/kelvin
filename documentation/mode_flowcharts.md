@@ -2,12 +2,13 @@
 
 ## Overview
 
-The Kelvin cryptosystem provides five encryption modes, each with different
-security properties and performance characteristics:
+The Kelvin cryptosystem provides seven encryption modes (plus the V1
+ChaCha20Poly1305 AEAD baseline), each with different security properties
+and performance characteristics:
 
 | Mode | Cipher | Authentication | Key Derivation |
 |------|--------|---------------|----------------|
-| **Secure** | ChaCha20 stream cipher | BLAKE3 keyed hash (32-byte tag) | HKDF-SHA512 from orbital seed |
+| **Secure** | ChaCha20Poly1305 AEAD (16-byte tag) | AEAD tag | HKDF-SHA512 from orbital seed |
 | **Chaos** | Per-step SHAKE256 XOR | None (malleable) | Orbital simulation (1 step per chunk) |
 | **Photon** | HKDF→SHAKE256 XOR | None (malleable) | HKDF-SHA512 → SHAKE256 XOF |
 | **Quantum** | Hybrid cache+XOR + orbital reseed | None (malleable) | BLAKE3 → SHAKE256 cache + orbital reseed |

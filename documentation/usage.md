@@ -218,10 +218,11 @@ let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
 let mut data = b"Hello authenticated photon!".to_vec();
 photon.encrypt(&mut data)?;
 
-// H Quantum + KMAC128
-let mut quantum = KelvinQuantumAuthenticated::with_config(
-    seed, 100_000, 1024 * 1024, 10_000, 10 * 1024 * 1024
-)?;
+// H Quantum + KMAC128 (authenticated Quantum exposes only
+// new(seed, max_reseeds); bare KelvinQuantum has with_config with
+// QUANTUM_DEFAULT_ORBITAL_STEPS = 1,000 and
+// QUANTUM_DEFAULT_RESEED_INTERVAL = 64 MiB defaults)
+let mut quantum = KelvinQuantumAuthenticated::new(seed, 100_000);
 let mut data = b"Hello authenticated quantum!".to_vec();
 quantum.encrypt(&mut data)?;
 ```
@@ -248,8 +249,8 @@ Kelvin provides three security levels that control the number of bodies and simu
 
 | Level | Bodies | Steps | Use Case |
 |-------|--------|-------|----------|
-| `standard` | 5 | 1,000,000 | General purpose — fast setup, strong chaos |
-| `paranoid` | 5 | 10,000,000 | Sensitive data — deeper simulation, higher entropy |
+| `standard` | 8 | 1,000,000 | General purpose — fast setup, strong chaos |
+| `paranoid` | 8 | 10,000,000 | Sensitive data — deeper simulation, higher entropy |
 | `maximum` | 10 | 100,000,000 | **Highest security** — maximum bodies and steps for strongest entropy |
 
 **Recommendation:** Use `standard` for everyday encryption, `paranoid` for sensitive data, and `maximum` for the strongest possible security (note: `maximum` takes significantly longer to generate).
@@ -353,7 +354,7 @@ This returns `remaining_keys × 4 GiB` (conservative estimate for V1 ChaCha20Pol
 
 ## 6. V2 Streaming Mode — Per-Step Stream Cipher (Real-Time Per-Step Simulation)
 
-V2 Streaming (`KelvinStreaming`) is a **per-step stream cipher** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no nonce, no IV, and no key reuse risk — each step produces a unique keystream from fresh chaotic dynamics.
+V2 Streaming (`KelvinStreaming`) is a **per-step stream cipher** mode that replaces the virtual-time key schedule with a true per-step simulation. Each chunk of data advances the orbital simulation by one simulation step (Verlet or Euler), extracting keystream from the current chaotic state via SHAKE256 XOR. There is no wire nonce — instance separation comes from session nonces (`KelvinStreaming::new_with_nonce`, CLI `--nonce`): same config + different nonces = independent keystreams, while config reuse *with the same nonce* still reuses keystream. Within one instance, each step produces a unique keystream from fresh chaotic dynamics.
 
 
 ### Key Differences from V1
@@ -361,7 +362,7 @@ V2 Streaming (`KelvinStreaming`) is a **per-step stream cipher** mode that repla
 | Feature | V1 (`Kelvin`) | V2 (`KelvinStreaming`) |
 |---------|---------------|------------------------|
 | Simulation | Runs once upfront | One step per chunk |
-| Keystream | Finite (key schedule) | Unlimited (keep simulating) |
+| Keystream | Finite (key schedule) | Bounded by 1B-step cap (practically unlimited) |
 | Setup time | Seconds to minutes | Instant |
 | Cipher | ChaCha20Poly1305 AEAD | XOR with SHAKE256 XOF |
 | Authentication | AEAD tag | None (XOR only) |

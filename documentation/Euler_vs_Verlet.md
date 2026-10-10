@@ -71,7 +71,7 @@ Euler uses a smaller timestep (dt=0.001 vs Verlet's dt=0.01) for stability, but 
 
 ## Implementation
 
-### Euler Step (Default for Kelvin-Quantum)
+### Euler Step (available for Kelvin-Quantum via `IntegrationMethod::Euler`; the default is Verlet)
 
 ```rust
 /// Euler integration optimized for maximum chaos amplification.

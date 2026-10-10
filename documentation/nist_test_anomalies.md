@@ -59,7 +59,8 @@ enough zero-crossings, the test reports itself as inapplicable.
 
 V3 Photon uses a **SHAKE256 XOF keystream XOR** directly with the plaintext.
 This produces a different bit distribution than the ChaCha20Poly1305 AEAD
-construction used by V1/V2. Specifically:
+construction used by V1. (V2 Chaos likewise uses per-step SHAKE256-XOR, not
+ChaCha.) Specifically:
 
 - ChaCha20Poly1305 includes a Poly1305 authentication tag and block counter
   in the ciphertext, which introduces additional structure that increases

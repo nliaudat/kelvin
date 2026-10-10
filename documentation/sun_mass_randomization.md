@@ -1,9 +1,9 @@
 # Sun Mass Randomization Analysis
 
 *Generated: 2026-05-11*
-*Status: COMPLETED*
+*Status: COMPLETED — implemented in `kelvin-cli/src/keygen.rs:52-58` (rejection-sampled sun mass in `[SUN_MASS_MIN_RAW, SUN_MASS_MAX_RAW]`). The "Current Behavior" section below describes the pre-fix code and is kept for history.*
 
-## Current Behavior
+## Current Behavior (pre-fix, historical)
 
 In `generate_config()` (`kelvin-cli/src/main.rs` line 194), the sun mass is
 hardcoded:
@@ -29,7 +29,7 @@ Vary the sun mass within a safe range determined by orbital physics.
 The planets are generated with velocity:
 
 ```rust
-let v_mag = 1.0 / (radius as f64).sqrt() * 6.3;
+let v_mag = 1.0 / (radius as f64).sqrt() * ORBITAL_VELOCITY_CONSTANT; // TAU ≈ 6.283 (kelvin-cli/src/keygen.rs)
 ```
 
 For a circular orbit, orbital velocity ≈ √(GM/r). With G = 4π² ≈ 39.478 and
