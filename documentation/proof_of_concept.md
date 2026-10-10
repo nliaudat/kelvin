@@ -89,14 +89,14 @@ All unit tests pass across the core crates:
 | Crate | Tests | Status |
 |-------|-------|--------|
 | kelvin-core | 61 | ✅ PASS |
-| kelvin-kdf | 64 | ✅ PASS |
-| kelvin-stream | 10 | ✅ PASS |
-| kelvin | 46 | ✅ PASS |
-| **Lib subtotal** | **181** | **✅ ALL PASS** |
+| kelvin-kdf | 51 | ✅ PASS |
+| kelvin-stream | 15 | ✅ PASS |
+| kelvin | 88 | ✅ PASS |
+| **Lib subtotal** | **215** | **✅ ALL PASS** |
 | Integration (full_pipeline) | 16 | ✅ PASS |
 | Chaos (chaos_test) | 2 | ✅ PASS |
-| Streaming (streaming_api) | 8 | ✅ PASS |
-| **Grand total** | **207** | **✅ ALL PASS** |
+| Streaming (streaming_api) | 30 | ✅ PASS |
+| **Grand total (lib + these suites)** | **263** | **✅ ALL PASS** |
 
 
 
@@ -270,25 +270,23 @@ The streaming API processes data in fixed-size chunks of `bytes_per_step` bytes,
 
 ### Unit Test Coverage
 
-The `kelvin` crate includes 8 dedicated V2 streaming tests:
-
-| Test | What it verifies |
-|------|-----------------|
-| `test_streaming_round_trip` | Encrypt → decrypt returns original |
-| `test_streaming_determinism` | Two instances produce identical ciphertext |
-| `test_streaming_multi_chunk` | Multi-call processing works correctly |
-| `test_streaming_empty_data` | Empty input is handled gracefully |
-| `test_streaming_step_counter` | Step counter increments correctly |
-| `test_streaming_bytes_processed` | Byte counter tracks total correctly |
-| `test_streaming_estimate_time` | ETA math matches actual processing |
-| `test_streaming_benchmark` | Benchmark returns positive rate |
+The `streaming_api` integration suite holds 30 tests covering all four
+streaming modes (Photon, Quantum, Chaos, Secure): per-mode round-trips,
+determinism across instances, multi-chunk and chunk-independence processing,
+empty input, batch-vs-streaming consistency, tamper/wrong-tag detection,
+file-streaming round-trips, and trait-object dispatch — e.g.
+`test_chaos_streaming_round_trip`, `test_photon_streaming_determinism`,
+`test_secure_streaming_wrong_tag`, `test_file_streaming_chaos_round_trip`.
+The `kelvin` crate unit tests additionally cover V2 `KelvinStreaming`
+(`test_kelvin_streaming_*`: step counter, bytes-processed accounting,
+benchmark rate, ETA math).
 
 ---
 
 ## 5. Performance Benchmarks
 
 
-| Operation | Standard (5 bodies, 1M steps) | Paranoid (5 bodies, 10M steps) | Maximum (10 bodies, 100M steps) |
+| Operation | Standard (8 bodies, 1M steps) | Paranoid (8 bodies, 10M steps) | Maximum (10 bodies, 100M steps) |
 |-----------|-------------------------------|-------------------------------|---------------------------------|
 | Setup + Keygen (CLI) | ~1.1s | ~12.5s | ~several minutes |
 | ML-DSA Signature | ~2ms | ~2ms | ~2ms |

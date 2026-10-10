@@ -2,6 +2,13 @@
 
 *Generated: 2026-05-11*
 
+> **Scope note (2026-10-10):** combinatorics below were derived for the
+> then-standard 5-body configs; current `standard`/`paranoid` keygen emits 8
+> bodies (`STANDARD_BODIES = 8`). Per-body figures still hold; totals scale
+> with body count. The 2^1287 raw / 2^1113 effective figures describe the
+> *representable* space; the *generated* space is RNG-capped at 2^256
+> (effective 128-bit PQ, see `bad.md` §1).
+
 ## Goal
 
 Estimate the total number of distinct, valid orbital configurations (JSON keys)
@@ -10,15 +17,15 @@ Kelvin cryptosystem.
 
 ## Generation Procedure
 
-`generate_config("standard")` in `kelvin-cli/src/main.rs` (lines 182–253):
+`generate_config("standard")` in `kelvin-cli/src/keygen.rs:24` (moved out of `main.rs`):
 
-- **N = 5 bodies** (1 sun + 4 planets)
+- **N = 8 bodies** (1 sun + 7 planets) for `standard`/`paranoid` (`STANDARD_BODIES`, `PARANOID_BODIES`), 10 for `maximum`
 - **1,000,000 simulation steps** (deterministic)
 - **Other parameters fixed:**
-  - dt = `Fixed::from_raw(1 << 54)` ≈ 1/1024 yr
+  - dt = `DEFAULT_DT` = `Fixed::from_raw(1 << 54)` ≈ 2^-10 yr ≈ 1/1024 yr
   - softening = `Fixed::from_raw(1 << 48)` ≈ 1.8e-5 AU
   - g = `DEFAULT_G` ≈ 39.478 (4π²)
-  - reseed_interval = 100,000 steps
+  - reseed_interval = steps / 10 (100,000 steps at standard)
 
 These 5 parameters are **constant** across all generated configs.
 
@@ -214,6 +221,15 @@ While the keyspace is astronomically large, the **practical encryption capacity*
 max_keys = safe_steps / reseed_interval
 ```
 
+> **Note (2026-10-10):** the worked example below (`safe_steps` ≈ 73,
+> `reseed_interval` = 10, `max_keys` = 7, ~28 GiB) predates the current
+> estimator and is stale — current `min_chaos_steps` for standard configs is
+> of order 10^2–10^5 (see `parameters.rs` `FAST_STEPS` discussion), and
+> generation uses `reseed_interval` = steps / 10 (100,000 at standard), not
+> 10. Capacity semantics live in `KeySchedule` (`kelvin-kdf/src/schedule.rs`);
+> this section needs recomputation against the current code and should not be
+> quoted.
+
 For a standard-level configuration:
 - `safe_steps` ≈ 73 (from Lyapunov estimation)
 - `reseed_interval` = 10
@@ -235,11 +251,11 @@ A typical standard-level JSON configuration:
 
 ```json
 {"bodies":[
-  {"mass":18446744073709551616, ...},  // sun (constant)
+  {"mass":18446744073709551616, ...},  // sun (randomized since 2026-05; sample predates it)
   {"mass":29646498041, ...},           // planet 1
   {"mass":23174461117, ...},           // planet 2
   {"mass":31874602983, ...},           // planet 3
-  {"mass":27539184712, ...}            // planet 4
+  {"mass":27539184712, ...}            // planet 4 (sample shows 5 bodies; standard is now 8)
 ],
 "total_steps":1000000,
 "reseed_interval":100000,
@@ -248,7 +264,7 @@ A typical standard-level JSON configuration:
 "g":728248265982611292160}
 ```
 
-- 5 bodies × 7 fields × 16 bytes = 560 bytes of Fixed-point data
+- 5 bodies × 7 fields × 16 bytes = 560 bytes of Fixed-point data (sample config; 8-body standard: 8 × 7 × 16 = 896 bytes)
 - 6 constant integer fields: 6 × 8 = 48 bytes
 - JSON overhead ≈ 200–300 bytes
 - **Total ≈ 800–900 bytes per key**
@@ -256,7 +272,7 @@ A typical standard-level JSON configuration:
 ## Footnotes
 
 1. Additional security levels:
-   - **paranoid:** same 5 bodies, 10× more steps (10M)
+   - **paranoid:** same 8 bodies, 10× more steps (10M)
    - **maximum:** 10 bodies, 100M steps
    Both use identical random generation logic, so the per-body keyspace analysis
    is the same; the number of bodies multiplies the keyspace accordingly.

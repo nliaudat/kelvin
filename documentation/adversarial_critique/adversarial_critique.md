@@ -318,7 +318,7 @@ The real test of a stream cipher is **cryptanalysis** — can an adversary disti
 
 **Status: ADDRESSED** — `proof_of_concept.md` §8 now includes a "Limitations of the Methodology" section covering: dudect is probabilistic (pass ≠ proof), scope limited to arithmetic primitives (not full pipeline), and the verlet_step |t| ≈ 75 variation is acknowledged as a potential side-channel requiring further investigation.
 
-**Source documents:** `proof_of_concept.md` (§8), `THREAT_MODEL.md`, `documentation/production_readiness_plan.md` (§1.3)
+**Source documents:** `proof_of_concept.md` (§8), `THREAT_MODEL.md` (repo root; the former "production readiness plan" §1.3 reference was dangling — no such file exists)
 
 The dudect-bencher (Welch's t-test) methodology for constant-time verification has known limitations:
 

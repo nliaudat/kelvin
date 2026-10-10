@@ -25,13 +25,13 @@ For the standard 5-body configuration, after `S ≥ 100` Verlet steps, the distr
 
 ### 2.1 N-Body Chaos (Poincaré Non-Integrability)
 
-The gravitational N-body problem for N ≥ 3 is **non-integrable** (Poincaré, 1899). This means there is no closed-form solution and the system is generically chaotic. The Kani-verified Lyapunov exponent `λ ≈ 0.693` for the standard 5-body configuration confirms exponential divergence of nearby trajectories.
+The gravitational N-body problem for N ≥ 3 is **non-integrable** (Poincaré, 1899). This means there is no closed-form solution and the system is generically chaotic. The estimator's Lyapunov exponent `λ ≈ 0.693` per year for the standard 5-body configuration confirms exponential divergence of nearby trajectories (≈2× per ~1.44 yr).
 
 ### 2.2 Mixing → Approximate Uniformity
 
 A dynamical system with a positive Lyapunov exponent has the **mixing property**: correlations between observables at times `t` and `t+τ` decay at least as fast as `exp(−λ·τ)`. Translating to phase-space exploration:
 
-> After `T_L = 1/λ ≈ 1443` steps, the system has decorrelated from its initial state by roughly one e-fold.
+> After `T_L = 1/λ ≈ 1.44 yr ≈ 1443 steps` (at dt ≈ 0.001 yr), the system has decorrelated from its initial state by roughly one e-fold.
 
 After `S` Lyapunov times, the distribution of `dist_cubed` values is indistinguishable from the invariant measure `μ` for the purpose of computing empirical averages (Shannon entropy estimates converge at rate `O(1/√S)` by the Birkhoff ergodic theorem).
 
@@ -39,8 +39,8 @@ After `S` Lyapunov times, the distribution of `dist_cubed` values is indistingui
 
 | Quantity | Value | Meaning |
 |----------|-------|---------|
-| `λ` (Lyapunov exponent) | ~0.693 per step | Trajectories diverge by `e^0.693 ≈ 2×` per step |
-| `T_L` (Lyapunov time) | ~1443 steps | One e-fold divergence |
+| `λ` (Lyapunov exponent) | ~0.693 per year | Trajectories diverge by `e^0.693 ≈ 2×` per ~1.44 yr (≈ one Lyapunov time) |
+| `T_L` (Lyapunov time) | ~1.44 yr ≈ ~1443 steps at dt ≈ 0.001 yr | One e-fold divergence |
 | Steps for C1 saturation | ~96 steps | State space fully decorrelated by rounding loss |
 | Shadow run length | 2000 steps (default) | ≈ 1.4 Lyapunov times → mixing well-established |
 

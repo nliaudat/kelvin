@@ -3,7 +3,7 @@
 **Status:** First Review  
 **Date:** 2026-05-27  
 **Author:** Kelvin Project  
-**Cross-references:** [Mode Flowcharts](mode_flowcharts.md), [Homomorphic Cryptosystem Analysis](homomorphic_cryptosystem.md), [Quantum Resistance Analysis](quantum_analysis.md), [Project History](project_history.md), [Proof of Concept](proof_of_concept.md), [Keyspace Analysis](keyspace_analysis.md)
+**Cross-references:** [Mode Flowcharts](../mode_flowcharts.md), [Homomorphic Cryptosystem Analysis](../homomorphic_cryptosystem.md), [Quantum Resistance Analysis](../quantum_analysis.md), [Project History](../project_history.md), [Proof of Concept](../proof_of_concept.md), [Keyspace Analysis](../keyspace_analysis.md)
 
 ---
 
@@ -527,12 +527,12 @@ For a professional prior art search, use the following queries:
 
 ### Kelvin Documentation
 
-11. [Mode Flowcharts](mode_flowcharts.md) — Kelvin encryption mode architecture
-12. [Homomorphic Cryptosystem Analysis](homomorphic_cryptosystem.md) — HE integration details
-13. [Quantum Resistance Analysis](quantum_analysis.md) — Post-quantum security assessment
-14. [Project History](project_history.md) — 24-year evolution of the system
-15. [Proof of Concept](proof_of_concept.md) — Test results and verification
-16. [Keyspace Analysis](keyspace_analysis.md) — Keyspace size estimation
+11. [Mode Flowcharts](../mode_flowcharts.md) — Kelvin encryption mode architecture
+12. [Homomorphic Cryptosystem Analysis](../homomorphic_cryptosystem.md) — HE integration details
+13. [Quantum Resistance Analysis](../quantum_analysis.md) — Post-quantum security assessment
+14. [Project History](../project_history.md) — 24-year evolution of the system
+15. [Proof of Concept](../proof_of_concept.md) — Test results and verification
+16. [Keyspace Analysis](../keyspace_analysis.md) — Keyspace size estimation
 
 ---
 

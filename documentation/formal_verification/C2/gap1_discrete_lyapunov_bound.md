@@ -18,7 +18,7 @@ where:
 | `ε_pade` | ≤ 0.29 × ln(10) ≈ 0.67 | Padé (1,1) approximation max absolute error (ln(10) stored exactly, Padé applies only to remainder z ∈ [1,10]) |
 | `ε_q` | ≤ 2^(-64) | Q32.64 quantization step (verified by L1 Kani proofs) |
 | `σ` | ≈ 0.1 · λ ≈ 0.07 | Standard deviation across 3 perturbed axes (empirical) |
-| `dt` | 2^54 raw ≈ 0.0156 yr | Time step |
+| `dt` | 2^54 raw = 2^-10 yr ≈ 0.001 yr | Time step |
 
 ## 2. Proof
 
@@ -32,7 +32,7 @@ where:
 - `δ = 2^40` raw ≈ 6e-8 AU (initial perturbation)
 - `d̄` = average divergence across 3 perturbed trajectories after S steps
 - `S = 2000` (default shadow steps)
-- `dt = 2^54` raw ≈ 0.0156 yr
+- `dt = 2^54` raw = 2^-10 yr ≈ 0.001 yr
 
 ### 2.2 Error Source 1: Padé ln Approximation
 

@@ -103,7 +103,7 @@ Kelvin differs in several respects:
 - **Zeroization:** Explicit SecureZeroize trait (CryptoChaos does not mention)
 - **Performance:** Benchmarked at ~500MB/s (CryptoChaos does not report)
 
-Both frameworks share the goal of post-quantum chaos-based cryptography, but Kelvin prioritizes stream cipher semantics (no-nonce, forward secrecy) over built-in authentication.
+Both frameworks share the goal of post-quantum chaos-based cryptography, but Kelvin prioritizes stream cipher semantics (session-nonce instance separation, forward secrecy) over built-in authentication.
 
 ### Cang, Kang & Wang (2021) — Chaotic PRNG from Sprott-A System
 > **Cang, S., Kang, Z., & Wang, Z. (2021).** Pseudo-random number generator based on a generalized conservative Sprott-A system. *Nonlinear Dynamics*, 104, 827–844. doi:10.1007/s11071-021-06310-9
@@ -120,8 +120,8 @@ Cang et al. proposed a pseudo-random number generator based on a generalized con
 
 | Aspect | Sprott-A PRNG | Kelvin-Quantum (H) |
 |--------|--------------|-------------------|
-| Chaos source | 3D ODEs | 5-body orbital (30 DOF) |
-| Dimensionality | 3 | 30 (10× higher) |
+| Chaos source | 3D ODEs | 5-body orbital (30 DOF; 48 DOF at current 8-body standard) |
+| Dimensionality | 3 | 30 in analyzed config (10× higher; 48 current) |
 | Quantization | Binary (0/1) | Byte-wise XOR |
 | Scrambling | Post-processing | Reseed + cache |
 | Periodicity mgmt | FPPC algorithm | Continuous reseeding |

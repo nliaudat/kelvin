@@ -13,6 +13,8 @@ Generated `2026-05-30 10:38:25 UTC` from criterion benchmarks.
 ## KelvinQuantum (H) vs AES-256-GCM vs ChaCha20-Poly1305
 
 Throughput comparison for 1 MiB encryption buffers. All in MB/s (higher is better).
+(Buffer size matters: `bench_1gb.md` measures ~512 MB/s for Quantum with 1 GiB
+buffers on the same class of hardware; smaller buffers amortize setup worse.)
 
 | Implementation | Metric | Latency | MB/s |
 |----------------|--------|--------:|-----:|

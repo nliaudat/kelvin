@@ -113,7 +113,7 @@ A 2025 paper by Jawad proposes **DUff-skg**: generating FHE secret keys using ch
 
 | Aspect | DUff-skg (Jawad, 2025) | Kelvin-Flare |
 |--------|------------------------|--------------|
-| Chaos source | Duffing oscillator (2 DOF) | 5-body orbital simulation (30 DOF) |
+| Chaos source | Duffing oscillator (2 DOF) | 5-body orbital simulation (30 DOF; current 8-body standard: 48 DOF) |
 | Key size | 2³²⁵ bits | 2¹⁹²⁰ bits |
 | NIST tests | ✅ Passed | ✅ Passed (Kelvin's own tests) |
 | Integration | BFV, CKKS, TFHE | Same standards |
@@ -128,7 +128,7 @@ sk = integer((x + y + 0.5) × 1000)
 
 Where `(x, y)` come from modified Duffing equations.
 
-**Kelvin's alternative:** The `KelvinFlare` struct uses 5-body orbital chaos (30 DOF) instead of the 2-DOF Duffing system, with fixed-point arithmetic and domain-separated SHAKE256 extraction.
+**Kelvin's alternative:** The `KelvinFlare` struct uses 5-body orbital chaos (30 DOF in the analyzed config; 48 DOF at current 8-body standard) instead of the 2-DOF Duffing system, with fixed-point arithmetic and domain-separated SHAKE256 extraction.
 
 
 #### Using `Flare mode` for FHE Key Generation

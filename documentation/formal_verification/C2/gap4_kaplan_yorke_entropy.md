@@ -24,6 +24,12 @@ $$L_{total}(S) = \min(S \cdot k_{step},\; 3840 - D_{KY} \cdot 64)$$
 
 For `D_KY ≈ 15`: `log₂(A) ≤ 960 bits`. For `D_KY ≈ 5`: `log₂(A) ≤ 320 bits`
 
+> **Reconciliation note (2026-10-10):** `C1/gap3` §4 instead uses
+> `log₂(A) ≈ 2880` bits (3840-bit state minus ~960 observed decay) — a
+> different attractor-size estimate from the same KY reasoning. Both wordings
+> agree that loss saturates (never below zero), but the 960-vs-2880 figure
+> for `log₂(A)` is unresolved and should be reconciled before quoting either.
+
 ## 4. References
 
 - Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations." *Lecture Notes in Mathematics*, 730, 204–227.
