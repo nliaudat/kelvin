@@ -2,7 +2,7 @@
 
 > **An objective assessment of the project's technical contributions to chaos-based cryptography, independent of its suitability as a production encryption primitive.**
 
-**Cross-reference:** See [Why This Project Is Bad](bad.md) for the production crypto critique.
+**Cross-reference:** See the [Compliance Register](COMPLIANCE.md) for per-item production-readiness status and residual risks (formerly `bad.md`, removed 2026-10-10 after its fixable limbs were fixed).
 
 ---
 

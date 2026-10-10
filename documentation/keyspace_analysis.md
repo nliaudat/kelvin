@@ -7,7 +7,7 @@
 > bodies (`STANDARD_BODIES = 8`). Per-body figures still hold; totals scale
 > with body count. The 2^1287 raw / 2^1113 effective figures describe the
 > *representable* space; the *generated* space is RNG-capped at 2^256
-> (effective 128-bit PQ, see `bad.md` §1).
+> (effective 128-bit PQ, see `COMPLIANCE.md` §1).
 
 ## Goal
 

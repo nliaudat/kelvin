@@ -89,23 +89,33 @@ kelvin decrypt --mode quantum --config my_secret.json --input file.enc --output 
 
 ### Session Nonces (`--nonce`)
 
-By default, the same config always yields the same keystream — deploying one
-config in two instances reuses keystream (two-time pad, see `bad.md` §3).
-Pass a unique hex nonce per deployment to derive independent keystreams from
-the same config. The nonce is public and must be identical at decrypt time
-(transport it alongside the config, like a salt).
+Deploying one config in two instances with the same nonce reuses keystream
+(two-time pad, see `COMPLIANCE.md` §3). The CLI makes the safe path default:
+`encrypt` without `--nonce` generates a fresh 16-byte nonce, prints it, and
+you pass it back at decrypt time (which requires `--nonce` and never
+guesses). The nonce is public — transport it alongside the config, like a
+salt.
 
 ```bash
-# Two deployments of the same config, independent keystreams
-kelvin encrypt --config my_secret.json --input a.txt --output a.enc --nonce 01
-kelvin encrypt --config my_secret.json --input b.txt --output b.enc --nonce 02
+# No flag: fresh nonce generated and printed
+kelvin encrypt --config my_secret.json --input a.txt --output a.enc
+# Generated session nonce: 9f2c… (store it)
 
-kelvin decrypt --config my_secret.json --input a.enc --output a.txt --nonce 01
+kelvin decrypt --config my_secret.json --input a.enc --output a.txt --nonce 9f2c…
+
+# Explicit nonces also work (e.g. for scripted deployments)
+kelvin encrypt --config my_secret.json --input b.txt --output b.enc --nonce 02
 ```
 
-An empty `--nonce` (default) reproduces the legacy keystream. Reusing a
-config *with the same nonce* still reuses keystream — generate a fresh
-random nonce (e.g. 16 bytes from your OS CSPRNG, hex-encoded) per instance.
+Pass `--nonce=` explicitly for pre-nonce legacy files (same keystream as
+before nonces existed). Reusing a config *with the same nonce* still reuses
+keystream — never do that.
+
+### Authentication (`--auth`, on by default)
+
+Chaos/photon/quantum modes append a KMAC128 tag unless `--no-auth` is given.
+`secure` mode ignores both flags (ChaCha20Poly1305 AEAD is always
+authenticated).
 
 ### Analyze Configuration Quality
 Verify that a configuration has sufficient chaos and sensitivity to initial conditions.

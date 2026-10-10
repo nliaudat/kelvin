@@ -119,11 +119,15 @@ pub fn process_in_memory(
                     let chunk = std::cmp::min(remaining, read_chunk_size);
                     let mut buf = data[offset..offset + chunk].to_vec();
                     if encrypt {
+                        // Reserve room for the version byte + KMAC128 tag.
+                        buf.resize(buf.len() + AUTH_OVERHEAD, 0);
                         ks.encrypt(&mut buf)?;
+                        output.extend_from_slice(&buf);
                     } else {
                         ks.decrypt(&mut buf)?;
+                        // Strip the version byte + tag.
+                        output.extend_from_slice(&buf[..buf.len() - AUTH_OVERHEAD]);
                     }
-                    output.extend_from_slice(&buf);
                     offset += chunk;
                 }
                 let elapsed = start.elapsed().as_secs_f64();
@@ -168,11 +172,15 @@ pub fn process_in_memory(
                     let chunk = std::cmp::min(remaining, read_chunk_size);
                     let mut buf = data[offset..offset + chunk].to_vec();
                     if encrypt {
+                        // Reserve room for the version byte + KMAC128 tag.
+                        buf.resize(buf.len() + AUTH_OVERHEAD, 0);
                         photon.encrypt(&mut buf)?;
+                        output.extend_from_slice(&buf);
                     } else {
                         photon.decrypt(&mut buf)?;
+                        // Strip the version byte + tag.
+                        output.extend_from_slice(&buf[..buf.len() - AUTH_OVERHEAD]);
                     }
-                    output.extend_from_slice(&buf);
                     offset += chunk;
                 }
                 let elapsed = start.elapsed().as_secs_f64();
@@ -210,11 +218,15 @@ pub fn process_in_memory(
                     let chunk = std::cmp::min(remaining, read_chunk_size);
                     let mut buf = data[offset..offset + chunk].to_vec();
                     if encrypt {
+                        // Reserve room for the version byte + KMAC128 tag.
+                        buf.resize(buf.len() + AUTH_OVERHEAD, 0);
                         quantum.encrypt(&mut buf)?;
+                        output.extend_from_slice(&buf);
                     } else {
                         quantum.decrypt(&mut buf)?;
+                        // Strip the version byte + tag.
+                        output.extend_from_slice(&buf[..buf.len() - AUTH_OVERHEAD]);
                     }
-                    output.extend_from_slice(&buf);
                     offset += chunk;
                 }
                 let elapsed = start.elapsed().as_secs_f64();

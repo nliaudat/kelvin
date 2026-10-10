@@ -459,7 +459,7 @@ mod tests {
     #[test]
     fn test_nonce_separates_instances() {
         // Same orbital state, different nonces -> independent keystream.
-        // This is the guardrail against config-reuse two-time-pad (bad.md §3).
+        // This is the guardrail against config-reuse two-time-pad (COMPLIANCE.md §3).
         let bodies = test_bodies();
         let a = extract_shake256_with_nonce(
             &bodies,

@@ -38,7 +38,7 @@ fn read_full<R: Read>(reader: &mut R, buf: &mut [u8]) -> std::io::Result<usize> 
 ///
 /// `nonce` is a public per-instance session value bound into seed/keystream
 /// extraction so that config reuse with distinct nonces yields independent
-/// keystreams (see `bad.md` §3). An empty nonce selects legacy behavior.
+/// keystreams (see `COMPLIANCE.md` §3). An empty nonce selects legacy behavior.
 #[allow(clippy::too_many_arguments)]
 pub fn process_file_mode(
     mode: &CryptoMode,
@@ -228,11 +228,15 @@ fn process_file_chaos(
             chunk.clear();
             chunk.extend_from_slice(&buffer[..bytes_read]);
             if encrypt {
+                // Reserve room for the version byte + KMAC128 tag.
+                chunk.resize(chunk.len() + AUTH_OVERHEAD, 0);
                 ks.encrypt(&mut chunk)?;
+                output_file.write_all(&chunk)?;
             } else {
                 ks.decrypt(&mut chunk)?;
+                // Strip the version byte + tag: output is plaintext only.
+                output_file.write_all(&chunk[..chunk.len() - AUTH_OVERHEAD])?;
             }
-            output_file.write_all(&chunk)?;
             total_processed += bytes_read as u64;
             if total_processed.is_multiple_of(1024 * 1024) {
                 print!(".");
@@ -336,11 +340,15 @@ fn process_file_photon(
             chunk.clear();
             chunk.extend_from_slice(&buffer[..bytes_read]);
             if encrypt {
+                // Reserve room for the version byte + KMAC128 tag.
+                chunk.resize(chunk.len() + AUTH_OVERHEAD, 0);
                 photon.encrypt(&mut chunk)?;
+                output_file.write_all(&chunk)?;
             } else {
                 photon.decrypt(&mut chunk)?;
+                // Strip the version byte + tag: output is plaintext only.
+                output_file.write_all(&chunk[..chunk.len() - AUTH_OVERHEAD])?;
             }
-            output_file.write_all(&chunk)?;
             total_processed += bytes_read as u64;
             if total_processed.is_multiple_of(1024 * 1024) {
                 print!(".");
@@ -435,11 +443,15 @@ fn process_file_quantum(
             chunk.clear();
             chunk.extend_from_slice(&buffer[..bytes_read]);
             if encrypt {
+                // Reserve room for the version byte + KMAC128 tag.
+                chunk.resize(chunk.len() + AUTH_OVERHEAD, 0);
                 quantum.encrypt(&mut chunk)?;
+                output_file.write_all(&chunk)?;
             } else {
                 quantum.decrypt(&mut chunk)?;
+                // Strip the version byte + tag: output is plaintext only.
+                output_file.write_all(&chunk[..chunk.len() - AUTH_OVERHEAD])?;
             }
-            output_file.write_all(&chunk)?;
             total_processed += bytes_read as u64;
             if total_processed.is_multiple_of(1024 * 1024) {
                 print!(".");

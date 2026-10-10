@@ -30,12 +30,13 @@ mod in_memory;
 mod keygen;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use kelvin::{
     Fixed, IntegrationMethod, Kelvin, OrbitalConfig, OrbitalKeyPair, CHAOS_DEFAULT_BYTES_PER_STEP,
     PHOTON_DEFAULT_BYTES_PER_STEP, QUANTUM_DEFAULT_BYTES_PER_STEP,
 };
 use ml_kem::KeyExport;
+use rand::Rng;
 use std::fs;
 
 use bench::run_benchmark;
@@ -101,14 +102,22 @@ enum Commands {
         #[arg(long)]
         euler: bool,
         /// Append a version byte + 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
-        #[arg(long)]
+        ///
+        /// Authenticated by default: XOR stream ciphers are malleable without
+        /// a tag. Pass --no-auth to opt out (raw XOR throughput benchmarking).
+        #[arg(long, action = ArgAction::SetTrue, default_value_t = true)]
         auth: bool,
+        /// Disable authentication (raw malleable XOR stream cipher)
+        #[arg(long = "no-auth", action = ArgAction::SetTrue)]
+        no_auth: bool,
         /// Session nonce as hex (e.g. --nonce 9f2c...). Binds the keystream to
         /// this instance: same config + different nonces = independent
-        /// keystreams. Must be identical at decrypt time. Empty (default) =
-        /// legacy behavior, identical keystream for identical configs.
-        #[arg(long, default_value = "")]
-        nonce: String,
+        /// keystreams. Must be identical at decrypt time. If omitted, a fresh
+        /// 16-byte nonce is generated and printed (pass it to decrypt).
+        /// Pass --nonce= explicitly for legacy behavior (same keystream
+        /// for identical configs — two-time-pad risk on reuse).
+        #[arg(long)]
+        nonce: Option<String>,
         /// In-memory benchmark mode: process `size` bytes without file I/O
         #[arg(long)]
         in_memory: bool,
@@ -137,11 +146,19 @@ enum Commands {
         #[arg(long)]
         euler: bool,
         /// Verify and strip the version byte + 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
-        #[arg(long)]
+        ///
+        /// On by default to match encrypt; pass --no-auth to decrypt
+        /// unauthenticated ciphertext.
+        #[arg(long, action = ArgAction::SetTrue, default_value_t = true)]
         auth: bool,
+        /// Disable authentication verification (decrypt raw XOR ciphertext)
+        #[arg(long = "no-auth", action = ArgAction::SetTrue)]
+        no_auth: bool,
         /// Session nonce as hex. Must match the value used at encrypt time.
-        #[arg(long, default_value = "")]
-        nonce: String,
+        /// Required: unlike encrypt, decrypt never guesses — pass the printed
+        /// nonce, or --nonce= for pre-nonce legacy files.
+        #[arg(long)]
+        nonce: Option<String>,
         /// In-memory benchmark mode: process `size` bytes without file I/O
         #[arg(long)]
         in_memory: bool,
@@ -202,13 +219,15 @@ fn main() -> Result<()> {
             bytes_per_step,
             euler,
             auth,
+            no_auth,
             nonce,
             in_memory,
             size,
         } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
-            let nonce_bytes = parse_nonce_hex(&nonce)?;
+            let auth = auth && !no_auth;
+            let nonce_bytes = resolve_nonce_encrypt(nonce.as_deref())?;
             if in_memory {
                 process_in_memory(&mode, &config, true, bps, method, auth, size, &nonce_bytes)?;
             } else {
@@ -237,13 +256,15 @@ fn main() -> Result<()> {
             bytes_per_step,
             euler,
             auth,
+            no_auth,
             nonce,
             in_memory,
             size,
         } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
-            let nonce_bytes = parse_nonce_hex(&nonce)?;
+            let auth = auth && !no_auth;
+            let nonce_bytes = resolve_nonce_decrypt(nonce.as_deref())?;
             if in_memory {
                 process_in_memory(&mode, &config, false, bps, method, auth, size, &nonce_bytes)?;
             } else {
@@ -363,7 +384,41 @@ fn resolve_bytes_per_step(mode: &CryptoMode, user_value: Option<u64>) -> u64 {
     })
 }
 
-/// Decode the `--nonce` hex argument into raw bytes.
+/// Resolve the `--nonce` flag for encryption.
+///
+/// An explicit value (including `--nonce=` for legacy output) is used
+/// as-is. When omitted, a fresh 16-byte nonce is drawn from the OS CSPRNG
+/// and printed — the caller must store it alongside the config and pass it
+/// back at decrypt time. Generating by default makes the safe path
+/// (unique nonce per deployment) the easy path.
+fn resolve_nonce_encrypt(flag: Option<&str>) -> Result<Vec<u8>> {
+    match flag {
+        Some(hex_str) => parse_nonce_hex(hex_str),
+        None => {
+            let bytes: [u8; 16] = rand::thread_rng().gen();
+            println!(
+                "Generated session nonce: {} (store it — decrypt requires the same value)",
+                hex::encode(bytes)
+            );
+            Ok(bytes.to_vec())
+        },
+    }
+}
+
+/// Resolve the `--nonce` flag for decryption.
+///
+/// Unlike encryption, decryption never guesses: the flag is required.
+/// Pass the nonce printed at encrypt time, or `--nonce=` explicitly for
+/// pre-nonce legacy files.
+fn resolve_nonce_decrypt(flag: Option<&str>) -> Result<Vec<u8>> {
+    match flag {
+        Some(hex_str) => parse_nonce_hex(hex_str),
+        None => anyhow::bail!(
+            "--nonce is required (same value as at encrypt time); pass --nonce= for pre-nonce legacy files"
+        ),
+    }
+}
+/// Decode a `--nonce` hex argument into raw bytes.
 ///
 /// An empty string selects legacy behavior (empty nonce, pre-nonce output).
 /// Any well-formed hex (odd length is left-padded with a `0` nibble) is
