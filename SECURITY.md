@@ -8,11 +8,11 @@
 
 ## Supported Versions
 
-Currently, only the latest version of Kelvin is supported for security updates.
+Currently, only the latest release line of Kelvin receives security updates.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.x.x   | :white_check_mark: |
+| 0.1.x   | :white_check_mark: |
 | < 0.1   | :x:                |
 
 ## Reporting a Vulnerability
