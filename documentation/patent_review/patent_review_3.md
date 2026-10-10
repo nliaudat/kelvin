@@ -13,7 +13,7 @@ A systematic search of the **IEEE Xplore** digital library (2000–2025) across 
 
 | Query | Result | Impact on Kelvin |
 |-------|--------|:----------------:|
-| **Q1** — N-body cryptography | ✅ **Chai et al. (2025)** — Four-body memristor 7D chaotic image encryption (JCICE 2025, Harbin) | 🔴 **Direct prior art** — first known n-body derived chaotic cryptosystem |
+| **Q1** — N-body cryptography | ✅ **Kwong et al. (2025)** — Four-body memristor 7D chaotic image encryption (JCICE 2025, Harbin) | 🔴 **Direct prior art** — first known n-body derived chaotic cryptosystem |
 | **Q2** — Chaotic stream cipher (XOR) | ✅ **Weng et al. (2009)** — Orbit perturbation for continuous-time chaotic stream ciphers (CISE 2009) | 🟡 Prior art confirmed for orbit perturbation concept |
 | **Q3** — Lyapunov in cryptography | ⚠️ Lyapunov used only as validation metric across all found papers | 🟢 No direct claim blocking — but weakens "novel use" argument |
 | **Q4** — Fixed-point + n-body + crypto | ❌ **No prior art found** in IEEE Xplore, arXiv, or IACR ePrint | ✅ **Strongest novelty claim remains intact** |
@@ -26,7 +26,7 @@ A systematic search of the **IEEE Xplore** digital library (2000–2025) across 
 1. **Fixed-point n-body + cryptography (Q4)** remains the strongest novelty claim — no prior art in any database searched.
 2. **Chaotic HE key generation (Q5)** is no longer novel — DUff-skg (Jawad, 2025) directly covers Duffing chaos + BFV/CKKS FHE key generation. Kelvin must distinguish via 30-DOF n-body vs. 2-DOF Duffing, fixed-point vs. RK4 floating, and domain separation.
 3. **Chaotic reseeding (Q7)** has no peer-reviewed prior art — this is a newly strengthened novelty claim.
-4. **N-body cryptography (Q1)** now has direct prior art beyond Apple '559 — Chai et al. (2025) published a four-body memristor chaotic image encryption system. Kelvin must distinguish via full gravitational simulation (vs. restricted four-body), fixed-point (vs. floating), and general-purpose (vs. image-specific).
+4. **N-body cryptography (Q1)** now has direct prior art beyond Apple '559 — Kwong et al. (2025) published a four-body memristor chaotic image encryption system. Kelvin must distinguish via full gravitational simulation (vs. restricted four-body), fixed-point (vs. floating), and general-purpose (vs. image-specific).
 
 ---
 
@@ -55,7 +55,7 @@ This third review incorporates results from a systematic **IEEE Xplore** digital
 
 | Finding | Previous Status (v2) | New Status (v3) | Change |
 |---------|---------------------|-----------------|--------|
-| N-body cryptography prior art | Apple '559 (expired) only | + **Chai et al. (2025)** — four-body memristor system | 🔴 New direct prior art |
+| N-body cryptography prior art | Apple '559 (expired) only | + **Kwong et al. (2025)** — four-body memristor system | 🔴 New direct prior art |
 | Chaotic HE key generation | No prior art found | + **DUff-skg (2025)** + 3 other papers | 🔴 New RED risk |
 | Fixed-point n-body + crypto | Novel — no prior art | **Still novel** — no prior art | ✅ Confirmed |
 | Chaotic reseeding | Novel — no prior art | **Still novel** — no peer-reviewed prior art | ✅ Strengthened |
@@ -65,7 +65,7 @@ This third review incorporates results from a systematic **IEEE Xplore** digital
 
 | Category | Status | Key Risk |
 |----------|--------|----------|
-| **N-body chaotic cryptography** (broad) | ❌ **Blocked** — Apple '559 + Chai et al. (2025) | Highest risk |
+| **N-body chaotic cryptography** (broad) | ❌ **Blocked** — Apple '559 + Kwong et al. (2025) | Highest risk |
 | **Chaotic stream cipher** (general) | ❌ **Blocked** — Toshiba '445 + Weng et al. (2009) | High risk |
 | **HE + chaotic key generation** | ❌ **Prior art exists** — DUff-skg (2025) + 3 papers | High risk |
 | **Orbit perturbation encryption** | ⚠️ **Prior art exists** — Song (2012), Weng et al. (2009) | Moderate risk |
@@ -106,9 +106,9 @@ This third review incorporates results from a systematic **IEEE Xplore** digital
 
 **Relevance to Kelvin:** This is the most directly relevant prior art found. It explicitly uses an N-body derived system for chaotic encryption. Kelvin must distinguish on the following grounds:
 
-| Distinction | Chai et al. (2025) | Kelvin |
+| Distinction | Kwong et al. (2025) | Kelvin |
 |-------------|-------------------|--------|
-| **N-body type** | Restricted four-body (constrained) | Full 10-body gravitational simulation |
+| **N-body type** | Restricted four-body (constrained) | Full 8-body gravitational simulation (standard; 10 maximum) |
 | **Dimensionality** | 7D chaotic system | 30 DOF (10 bodies × 3D) |
 | **Arithmetic** | Floating-point (presumed) | Q32.64 fixed-point |
 | **Application** | Image encryption only | General-purpose encryption (7 modes) |
@@ -381,7 +381,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 | Concept | Prior Art Source | Impact |
 |---------|-----------------|--------|
-| N-body derived chaotic encryption | Chai et al. (2025) — four-body memristor system | 🔴 Direct overlap with broad concept |
+| N-body derived chaotic encryption | Kwong et al. (2025) — four-body memristor system | 🔴 Direct overlap with broad concept |
 | Chaotic key generation for FHE | DUff-skg (Jawad, 2025) — Duffing + BFV/CKKS | 🔴 Direct overlap with Flare mode |
 | Orbit perturbation in chaotic ciphers | Weng et al. (2009), Song (2012) | 🟡 Prior art for reseeding concept |
 | Chaotic stream cipher (general) | Toshiba '445 + Weng et al. (2009) | 🟡 Prior art for V2 mode |
@@ -390,7 +390,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 ### 5.3 Updated Novelty Matrix
 
-| Kelvin Feature | Apple '559 | Chai 2025 | DUff-skg 2025 | Weng 2009 | Song 2012 | OrBIT-KDF | CryptoChaos |
+| Kelvin Feature | Apple '559 | Kwong 2025 | DUff-skg 2025 | Weng 2009 | Song 2012 | OrBIT-KDF | CryptoChaos |
 |---------------|:----------:|:---------:|:-------------:|:---------:|:---------:|:---------:|:-----------:|
 | N-body gravitational simulation | ⚠️ Broad | 🔴 Direct | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Fixed-point arithmetic (Q32.64) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
@@ -412,7 +412,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 | Risk | Level | Mitigation |
 |------|-------|------------|
-| Apple '559 + Chai (2025) blocking broad n-body claims | 🔴 **High** | Narrow claims to full gravitational n-body (not restricted), fixed-point, general-purpose |
+| Apple '559 + Kwong (2025) blocking broad n-body claims | 🔴 **High** | Narrow claims to full gravitational n-body (not restricted), fixed-point, general-purpose |
 | DUff-skg (2025) blocking Flare HE key generation | 🔴 **High** | Emphasize 30-DOF vs. 2-DOF, fixed-point vs. RK4, domain separation |
 | OrBIT-KDF prior art for "chaotic map + hash = KDF" | 🟡 **Moderate** | Kelvin uses n-body, not Chirikov/Julia |
 | CryptoChaos prior art for "hybrid chaos-crypto" | 🟡 **Moderate** | Kelvin's architecture is distinct (integrated modes, domain separation) |
@@ -425,7 +425,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 ### 6.2 Updated Warning Flags
 
-1. **🔴 Chai et al. (2025) is the most dangerous new prior art** — Published July 2025 in IEEE Xplore (JCICE conference, Harbin). This is the first known paper to explicitly use an N-body derived system for chaotic encryption. While it uses a restricted four-body memristor system (not full gravitational simulation), a patent examiner could argue that the broad concept of "n-body chaotic cryptography" was known before Kelvin.
+1. **🔴 Kwong et al. (2025) is the most dangerous new prior art** — Published July 2025 in IEEE Xplore (JCICE conference, Harbin). This is the first known paper to explicitly use an N-body derived system for chaotic encryption. While it uses a restricted four-body memristor system (not full gravitational simulation), a patent examiner could argue that the broad concept of "n-body chaotic cryptography" was known before Kelvin.
 
 2. **🔴 DUff-skg (Jawad, 2025) directly overlaps with Flare mode** — This paper explicitly uses chaotic dynamics (Duffing oscillator) for FHE key generation in BFV and CKKS schemes. Kelvin's Flare mode claims must be carefully distinguished: 30-DOF n-body vs. 2-DOF Duffing, fixed-point vs. RK4 floating, domain-separated extraction vs. simple integer formula.
 
@@ -451,7 +451,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 ### 7.2 What to Emphasize in Claims (Updated)
 
-1. **Full gravitational n-body simulation** — Not "restricted" or "constrained" n-body (distinction from Chai et al.). Emphasize: 10-body, Newtonian gravity, Verlet/Euler integration, 30 DOF.
+1. **Full gravitational n-body simulation** — Not "restricted" or "constrained" n-body (distinction from Kwong et al.). Emphasize: 8-body standard (10 maximum), Newtonian gravity, Verlet/Euler integration, 48 DOF standard.
 
 2. **Fixed-point arithmetic (Q32.64)** — Cross-platform determinism. No prior art in any database.
 
@@ -463,7 +463,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 
 ### 7.3 What to Avoid in Claims (Updated)
 
-1. **"N-body chaotic cryptography" broadly** — Blocked by Apple '559 + Chai et al. (2025)
+1. **"N-body chaotic cryptography" broadly** — Blocked by Apple '559 + Kwong et al. (2025)
 2. **"Chaotic stream cipher" broadly** — Blocked by Toshiba '445 + Weng et al. (2009)
 3. **"Chaotic key generation for homomorphic encryption" broadly** — Blocked by DUff-skg (2025)
 4. **"Orbit perturbation" broadly** — Blocked by Weng et al. (2009) + Song (2012)
@@ -476,7 +476,7 @@ All patent searches (Google Patents, USPTO, WIPO) returned zero results for quer
 2. ✅ **Web-based prior art search** — Complete (Patent Review #2)
 3. ✅ **IEEE Xplore NPL deep-dive** — Complete (this document)
 4. 🔲 **Professional prior art search** — Pay a patent attorney for a formal prior art search ($2,000–$5,000). Include IEEE Xplore, ACM Digital Library, and Scopus.
-5. 🔲 **Freedom-to-operate opinion** — Legal opinion on commercialization, specifically addressing Chai et al. (2025) and DUff-skg (2025)
+5. 🔲 **Freedom-to-operate opinion** — Legal opinion on commercialization, specifically addressing Kwong et al. (2025) and DUff-skg (2025)
 6. 🔲 **Provisional patent application** — Draft and file within 6 months. Priority: fixed-point n-body + chaotic reseeding.
 7. 🔲 **Defensive publication** — Consider publishing non-patentable innovations on arXiv or GitHub to establish prior art against competitors
 
@@ -493,7 +493,7 @@ Kelvin's concepts, separate from the patent strategy above.
 |----------|--------|-------|
 | **Using Kelvin as a library** | ✅ **Legal** | MIT/Apache-2.0 dual license |
 | **Modifying Kelvin** | ✅ **Legal** | Open source contribution |
-| **Building a compatible implementation** | ⚠️ **Check patents** | Apple '559 expired; Chai et al. (2025) is academic paper, not patent |
+| **Building a compatible implementation** | ⚠️ **Check patents** | Apple '559 expired; Kwong et al. (2025) is academic paper, not patent |
 | **Commercial use** | ✅ **Legal** | MIT/Apache-2.0 permits commercial use |
 | **Filing patents on Kelvin concepts** | ⚠️ **Prior art exists** | See Section 5.2 for established prior art |
 
@@ -501,7 +501,7 @@ Kelvin's concepts, separate from the patent strategy above.
 
 The following prior art means these concepts **cannot be patented by anyone**:
 
-1. **N-body chaotic cryptography** — Apple '559 (expired) + Chai et al. (2025)
+1. **N-body chaotic cryptography** — Apple '559 (expired) + Kwong et al. (2025)
 2. **Chaotic stream cipher** — Toshiba '445 (expired) + Weng et al. (2009)
 3. **Chaotic FHE key generation** — DUff-skg (Jawad, 2025)
 4. **Orbit perturbation encryption** — Weng et al. (2009) + Song (2012)
@@ -521,7 +521,7 @@ The following prior art means these concepts **cannot be patented by anyone**:
 
 ## 9. References
 
-1. Chai, Z. et al. (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*. DOI: 10.1109/JCICE66205.2025.11182029.
+1. Kwong, H., Chai, Z., & Wu, T. (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*, pp. 1–5. DOI: 10.1109/JCICE66205.2025.11182029.
 
 2. Weng, Y., Zheng, R., & Chen, Y. (2009). "A Novel Orbit Perturbation Method for Continuous-Time Chaos to Obtain Dynamic Seeds-Key Stream Cipher." *2009 International Conference on Computational Intelligence and Software Engineering (CISE)*. DOI: 10.1109/CISE.2009.5366879.
 

@@ -38,7 +38,7 @@ Cang et al. (2021) proposed the Finite Precision Period Calculation (FPPC) algor
 
 ### 2.3 N-Body Chaotic Cryptography
 
-Chai et al. (2025) published the first known n-body chaotic image encryption scheme using a four-body memristor system restricted to image encryption. Song et al. (2025) published CryptoChaos, a hybrid chaos-cryptography framework combining multiple chaotic maps with X25519 and SHA3-256. Both use floating-point arithmetic and do not verify cross-platform determinism.
+Kwong et al. (2025) published the first known n-body chaotic image encryption scheme using a seven-dimensional memristor-restricted four-body system for image encryption. Song et al. (2025) published CryptoChaos, a hybrid chaos-cryptography framework combining multiple chaotic maps with X25519 and SHA3-256. Both use floating-point arithmetic and do not verify cross-platform determinism.
 
 Jawad (2025) proposed DUff-skg, a chaotic FHE key generator using a 2-DOF Duffing oscillator with RK4 floating-point integration. Kelvin's Flare mode uses a 30-DOF n-body model and fixed-point arithmetic as an alternative approach to the same problem.
 
@@ -77,15 +77,15 @@ Kelvin uses the Kani Rust Verifier (bounded model checking) to prove:
 | L1 | Fixed-point ops match mathematical spec within error bounds | Kani equivalence harness; error ≤ 3 ULPs for sqrt, ≤ 2 ULPs for div |
 | L2 | `compute_accelerations` satisfies Newton's laws (action-reaction, direction, magnitude) | Kani composite harness on force pairs |
 | L3 | Pipeline executes correct number of steps with correct domain separators | Kani pipeline harness on `simulate_and_extract_seed` |
-| L4 | Bit-identical output across CPU capabilities | 18 golden-hash tests on SSE2, AVX, AVX2, aarch64 |
+| L4 | Bit-identical output on tested toolchain | 18 golden-hash + repeatability tests (cross-arch matrix not automated) |
 
 **Limitation:** These are implementation correctness proofs. They do not prove cryptographic security — they prove that the code matches its specification. The distinction is clearly stated in `documentation/formal_verification.md`.
 
-**Context:** Formal verification of a chaotic simulation is uncommon in the chaos-cryptography literature (Cang et al., 2021 did not perform verification; Chai et al., 2025 did not). Kelvin's L0–L4 proofs are novel within this subfield specifically because of the application of bounded model checking to a physical simulation with dynamical invariants (Newton's laws). The proofs do not extend to security properties.
+**Context:** Formal verification of a chaotic simulation is uncommon in the chaos-cryptography literature (Cang et al., 2021 did not perform verification; Kwong et al., 2025 did not). Kelvin's L0–L4 proofs are novel within this subfield specifically because of the application of bounded model checking to a physical simulation with dynamical invariants (Newton's laws). The proofs do not extend to security properties.
 
 ### 3.3 30-DOF Gravitational Model
 
-Kelvin uses a full gravitational n-body simulation with N ≥ 3 bodies (default: 5). This provides 30 degrees of freedom (N × 3 × 2 for positions and velocities), compared with the 1–3 DOF typical of logistic-map or Lorenz-based systems.
+Kelvin uses a full gravitational n-body simulation with N ≥ 3 bodies (standard: 8, i.e. 48 DOF; the 30-DOF figure refers to the 5-body analysis configuration). This provides an order of magnitude more degrees of freedom (N × 3 × 2 for positions and velocities) compared with the 1–3 DOF typical of logistic-map or Lorenz-based systems.
 
 | System | DOF | Prior use in cryptography |
 |--------|-----|--------------------------|
@@ -126,7 +126,7 @@ Kelvin is positioned within the chaos-based cryptography subfield, not within ma
 
 | Prior System | Deterministic | Verified | DOF | Key Use |
 |-------------|---------------|----------|-----|---------|
-| Chai et al. (2025) | ❌ Float | ❌ | 12 (4 bodies × 3) | Image encryption only |
+| Kwong et al. (2025) | ❌ Float | ❌ | 7-D (restricted four-body) | Image encryption only |
 | Song et al. (2025) | ❌ Float | ❌ | 4× 1D maps | Hybrid stream |
 | Cang et al. (2021) | ❌ Float | ❌ | 3 | PRNG only |
 | Jawad (2025) | ❌ Float (RK4) | ❌ | 2 | FHE keys only |

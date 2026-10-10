@@ -150,8 +150,8 @@ Vuckovac suggested using n-body gravitational simulations as computational puzzl
 
 Kraicha et al. used the real orbital positions of Mars's moons Phobos and Deimos as a shifting mechanism for encryption. While this work draws inspiration from orbital mechanics, the approach is metaphorical rather than simulated — it uses pre-computed ephemeris data rather than running an n-body simulation. Kelvin differs fundamentally by performing actual n-body gravitational simulation with deterministic fixed-point arithmetic, where the chaotic evolution of the system itself generates the cryptographic entropy.
 
-### Kwong & Chai (2025) — Memristor-Restricted Four-Body Chaotic Image Encryption
-> **Kwong, K. S., & Chai, Q. (2025).** Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System. *IEEE Journal on Cybernetics and Intelligent Cyber-Physical Systems*, 2025. doi:10.1109/JCICE66205.2025.11182029
+### Kwong, Chai & Wu (2025) — Memristor-Restricted Four-Body Chaotic Image Encryption
+> **Kwong, H., Chai, Z., & Wu, T. (2025).** Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System. In *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)* (pp. 1–5). doi:10.1109/JCICE66205.2025.11182029
 
 Kwong & Chai built a seven-dimensional memristor-based chaotic system on the *constrained* (restricted) four-body problem for image encryption — the closest published prior art to n-body chaotic cryptography. Kelvin differs on three axes: (1) full gravitational N-body simulation rather than a restricted four-body memristor model; (2) Q32.64 fixed-point arithmetic giving cross-toolchain determinism (required for key derivation, absent in their floating-point image pipeline); (3) general-purpose KDF + multi-mode stream architecture rather than image-specific encryption.
 

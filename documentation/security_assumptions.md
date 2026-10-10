@@ -65,7 +65,7 @@ SHAKE256 directly.
 - **Determinism tests L4** (`tests/kelvin_tests/determinism.rs`): 18 tests
   verify bit-identical simulation results, confirming the forward direction
   is well-defined.
-- **Reference**: Chai et al. (2025), Song et al. (2025), Jawad (2025) —
+- **Reference**: Kwong et al. (2025), Song et al. (2025), Jawad (2025) —
   independent academic research relying on the same N-body one-way property.
 
 ---

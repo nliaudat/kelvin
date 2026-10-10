@@ -53,7 +53,7 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 
 Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems.
 
-> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Chai et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 10-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review/patent_review_3.md) for full analysis.
+> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Kwong et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 8-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review/patent_review_3.md) for full analysis.
 
 
 ## How It Works
@@ -316,7 +316,7 @@ See [formal_verification.md](documentation/formal_verification.md) for details.
 
 Kelvin builds on a rich body of research in chaos-based cryptography:
 
-- **Chai et al. (2025)** — First known n-body chaotic image encryption (four-body memristor system)
+- **Kwong et al. (2025)** — First known n-body chaotic image encryption (seven-dimensional memristor-restricted four-body system)
 - **Song et al. (2025)** — CryptoChaos: hybrid chaos-cryptography framework
 - **Cang, Kang & Wang (2021)** — Conservative Sprott-A PRNG with finite precision analysis
 - **Jawad (2025)** — DUff-skg: chaotic Duffing oscillator for FHE key generation
