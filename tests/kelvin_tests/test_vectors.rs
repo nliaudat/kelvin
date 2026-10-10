@@ -39,7 +39,10 @@ fn test_config() -> OrbitalConfig {
             Vec3::new(Fixed::from_int(-2), Fixed::from_int(3), Fixed::ZERO),
         ),
     ];
-    OrbitalConfig::new(bodies, 200, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
+    // 1000 steps: comfortably above this config's measured chaos horizon
+    // (~254 steps), so Kelvin::new's InsufficientChaos gate passes.
+    // (Round-trip only — no golden bytes depend on the step count.)
+    OrbitalConfig::new(bodies, 1000, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
         .expect("valid test config")
 }
 

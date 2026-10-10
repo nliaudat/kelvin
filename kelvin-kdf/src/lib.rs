@@ -47,7 +47,10 @@ mod schedule;
 mod serde;
 
 pub use config::{ConfigError, OrbitalConfig};
-pub use extractor::{extract_seed, extract_shake256, extract_shake256_into};
+pub use extractor::{
+    extract_seed, extract_seed_with_nonce, extract_shake256, extract_shake256_into,
+    extract_shake256_into_with_nonce, extract_shake256_with_nonce,
+};
 pub use lyapunov::{LyapunovConfidence, LyapunovError, LyapunovEstimator, LyapunovResult};
 
 pub use asymmetric::{AsymmetricError, OrbitalKeyPair};

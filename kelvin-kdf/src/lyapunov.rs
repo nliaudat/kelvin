@@ -217,9 +217,12 @@ impl<'a> LyapunovEstimator<'a> {
 
         // λ = ln(d/ε) / t
         // We approximate ln using a piecewise approach:
-        //   For x ≤ 10:  ln(x) ≈ 2*(x-1)/(x+1)  (Padé, <1% error for x ≤ 10)
-        //   For x > 10:  ln(x) ≈ ln(10) + ln(x/10) where ln(x/10) uses the same Padé
-        // This gives <1% error for x up to 100, and <5% error for x up to 10^6.
+        //   For x ≤ 10:  ln(x) ≈ 2*(x-1)/(x+1)  (Padé; <1% error near x = 1,
+        //                growing to ~29% underestimation at x = 10)
+        //   For x > 10:  ln(x) ≈ k*ln(10) + ln(x/10^k) with x/10^k ∈ (1, 10]
+        // The Padé form always underestimates, so λ is underestimated and the
+        // resulting chaos horizon is conservative (fail-closed: configs are
+        // rejected, never wrongly accepted).
         let ratio = avg_divergence / initial_perturbation;
         let ln_ratio = if ratio > Fixed::ONE {
             let ten = Fixed::from_int(10);
@@ -227,7 +230,7 @@ impl<'a> LyapunovEstimator<'a> {
             // Compute ln via repeated division by 10 to keep the argument in [1, 10]
             let mut x = ratio;
             let mut ln_sum = Fixed::ZERO;
-            let ln_10 = Fixed::from_parts(2, 0x26E978D4FDF3B646); // ln(10) ≈ 2.302585
+            let ln_10 = Fixed::from_parts(2, 0x4D763776AAA2C000); // ln(10) ≈ 2.302585
             while x > ten {
                 x /= ten;
                 ln_sum += ln_10;
@@ -370,7 +373,7 @@ mod kani_proofs {
 
         let pade_at_10 =
             two * (Fixed::from_int(10) - Fixed::ONE) / (Fixed::from_int(10) + Fixed::ONE);
-        let ln_10 = Fixed::from_parts(2, 0x26E978D4FDF3B646);
+        let ln_10 = Fixed::from_parts(2, 0x4D763776AAA2C000);
         kani::assert(
             pade_at_10 < ln_10,
             "C2-Pade: pade(10) < ln(10), consistent with underestimation",

@@ -103,6 +103,12 @@ enum Commands {
         /// Append a version byte + 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
+        /// Session nonce as hex (e.g. --nonce 9f2c...). Binds the keystream to
+        /// this instance: same config + different nonces = independent
+        /// keystreams. Must be identical at decrypt time. Empty (default) =
+        /// legacy behavior, identical keystream for identical configs.
+        #[arg(long, default_value = "")]
+        nonce: String,
         /// In-memory benchmark mode: process `size` bytes without file I/O
         #[arg(long)]
         in_memory: bool,
@@ -133,6 +139,9 @@ enum Commands {
         /// Verify and strip the version byte + 32-byte KMAC128 tag for authentication (chaos, photon, quantum modes)
         #[arg(long)]
         auth: bool,
+        /// Session nonce as hex. Must match the value used at encrypt time.
+        #[arg(long, default_value = "")]
+        nonce: String,
         /// In-memory benchmark mode: process `size` bytes without file I/O
         #[arg(long)]
         in_memory: bool,
@@ -193,13 +202,15 @@ fn main() -> Result<()> {
             bytes_per_step,
             euler,
             auth,
+            nonce,
             in_memory,
             size,
         } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
+            let nonce_bytes = parse_nonce_hex(&nonce)?;
             if in_memory {
-                process_in_memory(&mode, &config, true, bps, method, auth, size)?;
+                process_in_memory(&mode, &config, true, bps, method, auth, size, &nonce_bytes)?;
             } else {
                 let input_path =
                     input.as_deref().context("--input is required (or use --in-memory)")?;
@@ -214,6 +225,7 @@ fn main() -> Result<()> {
                     bps,
                     method,
                     auth,
+                    &nonce_bytes,
                 )?;
             }
         },
@@ -225,13 +237,15 @@ fn main() -> Result<()> {
             bytes_per_step,
             euler,
             auth,
+            nonce,
             in_memory,
             size,
         } => {
             let method = if euler { IntegrationMethod::Euler } else { IntegrationMethod::Verlet };
             let bps = resolve_bytes_per_step(&mode, bytes_per_step);
+            let nonce_bytes = parse_nonce_hex(&nonce)?;
             if in_memory {
-                process_in_memory(&mode, &config, false, bps, method, auth, size)?;
+                process_in_memory(&mode, &config, false, bps, method, auth, size, &nonce_bytes)?;
             } else {
                 let input_path =
                     input.as_deref().context("--input is required (or use --in-memory)")?;
@@ -246,6 +260,7 @@ fn main() -> Result<()> {
                     bps,
                     method,
                     auth,
+                    &nonce_bytes,
                 )?;
             }
         },
@@ -346,4 +361,24 @@ fn resolve_bytes_per_step(mode: &CryptoMode, user_value: Option<u64>) -> u64 {
         CryptoMode::Quantum => QUANTUM_DEFAULT_BYTES_PER_STEP,
         CryptoMode::Secure => CHAOS_DEFAULT_BYTES_PER_STEP, // unused, but keep consistent
     })
+}
+
+/// Decode the `--nonce` hex argument into raw bytes.
+///
+/// An empty string selects legacy behavior (empty nonce, pre-nonce output).
+/// Any well-formed hex (odd length is left-padded with a `0` nibble) is
+/// accepted; the bytes are public and need no secrecy, only uniqueness per
+/// config deployment.
+fn parse_nonce_hex(hex_str: &str) -> Result<Vec<u8>> {
+    if hex_str.is_empty() {
+        return Ok(Vec::new());
+    }
+    let padded;
+    let digits = if hex_str.len() % 2 == 1 {
+        padded = format!("0{}", hex_str);
+        padded.as_str()
+    } else {
+        hex_str
+    };
+    hex::decode(digits).context("--nonce must be valid hex")
 }

@@ -1,6 +1,6 @@
 # Formal Verification — Resolved Proofs
 
-This directory contains formal mathematical proofs that close the gaps identified in `documentation/formal_verification_TODO.md`. Each subdirectory corresponds to a resolved conjecture gap.
+This directory contains formal mathematical proofs for the conjectures documented in `documentation/formal_verification.md`. Each subdirectory corresponds to a resolved conjecture gap.
 
 ```
 formal_verification/

@@ -7,7 +7,7 @@
 
 use anyhow::{Context, Result};
 use kelvin::{
-    simulate_and_extract_seed_with_method, IntegrationMethod, Kelvin, KelvinPhoton,
+    simulate_and_extract_seed_with_method_and_nonce, IntegrationMethod, Kelvin, KelvinPhoton,
     KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated, KelvinStreaming,
     KelvinStreamingAuthenticated, OrbitalConfig, AUTH_OVERHEAD, PHOTON_DEFAULT_MAX_RESEEDS,
     STREAMING_CHUNK_SIZE,
@@ -35,6 +35,10 @@ fn read_full<R: Read>(reader: &mut R, buf: &mut [u8]) -> std::io::Result<usize> 
 }
 
 /// Dispatch to the correct processing function based on mode.
+///
+/// `nonce` is a public per-instance session value bound into seed/keystream
+/// extraction so that config reuse with distinct nonces yields independent
+/// keystreams (see `bad.md` §3). An empty nonce selects legacy behavior.
 #[allow(clippy::too_many_arguments)]
 pub fn process_file_mode(
     mode: &CryptoMode,
@@ -45,10 +49,11 @@ pub fn process_file_mode(
     bytes_per_step: u64,
     method: IntegrationMethod,
     auth: bool,
+    nonce: &[u8],
 ) -> Result<()> {
     match mode {
         CryptoMode::Secure => {
-            process_file_secure(config_path, input_path, output_path, encrypt, method)
+            process_file_secure(config_path, input_path, output_path, encrypt, method, nonce)
         },
         CryptoMode::Chaos => process_file_chaos(
             config_path,
@@ -58,6 +63,7 @@ pub fn process_file_mode(
             bytes_per_step,
             method,
             auth,
+            nonce,
         ),
         CryptoMode::Photon => process_file_photon(
             config_path,
@@ -67,6 +73,7 @@ pub fn process_file_mode(
             method,
             auth,
             bytes_per_step,
+            nonce,
         ),
         CryptoMode::Quantum => process_file_quantum(
             config_path,
@@ -76,6 +83,7 @@ pub fn process_file_mode(
             method,
             auth,
             bytes_per_step,
+            nonce,
         ),
     }
 }
@@ -102,6 +110,7 @@ fn process_file_secure(
     output_path: &str,
     encrypt: bool,
     method: IntegrationMethod,
+    nonce: &[u8],
 ) -> Result<()> {
     let config_json = std::fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -111,7 +120,8 @@ fn process_file_secure(
         "Initializing Kelvin Secure (V1, {} integration, this may take a few seconds)...",
         method_label
     );
-    let mut k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
+    let mut k = Kelvin::new_with_method_and_nonce(config, method, nonce)
+        .context("Failed to initialize Kelvin")?;
 
     let mut input_file = std::fs::File::open(input_path).context("Failed to open input file")?;
     let mut output_file =
@@ -171,6 +181,7 @@ fn process_file_secure(
 ///
 /// When `auth` is true, uses [`KelvinStreamingAuthenticated`] to append a
 /// 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability.
+#[allow(clippy::too_many_arguments)]
 fn process_file_chaos(
     config_path: &str,
     input_path: &str,
@@ -179,6 +190,7 @@ fn process_file_chaos(
     bytes_per_step: u64,
     method: IntegrationMethod,
     auth: bool,
+    nonce: &[u8],
 ) -> Result<()> {
     let config_json = std::fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -191,7 +203,7 @@ fn process_file_chaos(
     );
 
     if auth {
-        let mut ks = KelvinStreamingAuthenticated::new(config, bytes_per_step)
+        let mut ks = KelvinStreamingAuthenticated::new_with_nonce(config, bytes_per_step, nonce)
             .context("Failed to initialize KelvinStreamingAuthenticated")?;
 
         let mut input_file =
@@ -231,7 +243,7 @@ fn process_file_chaos(
         return Ok(());
     }
 
-    let mut ks = KelvinStreaming::new(config, bytes_per_step)
+    let mut ks = KelvinStreaming::new_with_method_and_nonce(config, bytes_per_step, method, nonce)
         .context("Failed to initialize KelvinStreaming")?;
 
     let rate = ks.benchmark(100);
@@ -276,6 +288,7 @@ fn process_file_chaos(
 ///
 /// When `auth` is true, uses [`KelvinPhotonAuthenticated`] to append a
 /// 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability.
+#[allow(clippy::too_many_arguments)]
 fn process_file_photon(
     config_path: &str,
     input_path: &str,
@@ -284,6 +297,7 @@ fn process_file_photon(
     method: IntegrationMethod,
     auth: bool,
     bytes_per_step: u64,
+    nonce: &[u8],
 ) -> Result<()> {
     let config_json = std::fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -294,7 +308,7 @@ fn process_file_photon(
         "Initializing Kelvin Photon (V3, {} integration, running orbital simulation{})...",
         method_label, auth_label
     );
-    let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
+    let (seed, _bodies) = simulate_and_extract_seed_with_method_and_nonce(&config, method, nonce)
         .context("Failed to run orbital simulation")?;
 
     let mut input_file = std::fs::File::open(input_path).context("Failed to open input file")?;
@@ -369,6 +383,7 @@ fn process_file_photon(
 ///
 /// When `auth` is true, uses [`KelvinQuantumAuthenticated`] to append a
 /// 32-byte KMAC128 tag (NIST SP 800-185) to defeat ciphertext malleability.
+#[allow(clippy::too_many_arguments)]
 fn process_file_quantum(
     config_path: &str,
     input_path: &str,
@@ -377,6 +392,7 @@ fn process_file_quantum(
     method: IntegrationMethod,
     auth: bool,
     bytes_per_step: u64,
+    nonce: &[u8],
 ) -> Result<()> {
     let config_json = std::fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -387,7 +403,7 @@ fn process_file_quantum(
         "Initializing Kelvin Quantum (H, {} integration, running orbital simulation{})...",
         method_label, auth_label
     );
-    let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
+    let (seed, _bodies) = simulate_and_extract_seed_with_method_and_nonce(&config, method, nonce)
         .context("Failed to run orbital simulation")?;
 
     let mut input_file = std::fs::File::open(input_path).context("Failed to open input file")?;

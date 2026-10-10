@@ -41,7 +41,7 @@ The n-body simulation acts as a sequential work factor that forces legitimate us
 
 ## 3. The "No-Nonce" Design Is a Foot-Gun
 
-Modern cryptography has spent decades moving away from ciphers that are vulnerable to keystream reuse. Kelvin removes nonces entirely:
+Modern cryptography has spent decades moving away from ciphers that are vulnerable to keystream reuse. Kelvin's original design removed nonces entirely:
 
 ```
 Alice saves config.json to a file server.
@@ -50,7 +50,16 @@ Both encrypt different data with identical keystream prefixes.
 Result: the two-time pad vulnerability — ciphertext is trivially breakable.
 ```
 
-**In modern security engineering, this is a usability vulnerability.** The user is responsible for ensuring single-instance-per-config, with zero protocol-level guardrails. Standard ciphers use nonces precisely to prevent this — the nonce is a cheap, automatic safety mechanism that Kelvin deliberately removes.
+**Status: ADDRESSED (session nonces).** Seed extraction now binds a public
+per-instance session nonce (`extract_shake256_into_with_nonce`,
+`Kelvin::new_with_nonce`, `KelvinStreaming::new_with_nonce`, CLI `--nonce`):
+same config + different nonces = independent keystreams. The rule is now
+*"one (config, nonce) pair per instance"* instead of *"one config per
+instance"*, and the nonce travels with the config like a salt. An empty
+nonce reproduces the legacy keystream, so existing golden vectors are
+unchanged. Reusing a config *with the same nonce* is still a two-time pad —
+the foot-gun is guarded, not removed: callers must still generate a unique
+nonce per deployment.
 
 ---
 
@@ -76,7 +85,7 @@ This is the same as **any** stream cipher. But Kelvin's documentation historical
 | Independent cryptanalysis | ✅ Years of public review | ❌ None |
 | Standardized primitives | ✅ AES, ChaCha20, SHA-3 | ✅ Uses SHAKE256, but novel KDF |
 | Side-channel hardened | ✅ Full pipeline tested | ⚠️ Primitives only, not pipeline |
-| Nonce/IV management | ✅ Standard safety mechanism | ❌ Removed (intentionally) |
+| Nonce/IV management | ✅ Standard safety mechanism | ⚠️ Session nonce (`--nonce`) isolates instances; reuse with same nonce still reuses keystream |
 | Authentication | ✅ Built-in (AEAD) | ⚠️ Optional (KMAC128) |
 | Key setup cost | ⏱️ Microseconds | ⏱️ 1–60 seconds |
 
@@ -86,7 +95,7 @@ This is the same as **any** stream cipher. But Kelvin's documentation historical
 
 > *"Kelvin is an impressive engineering achievement that solves a problem that didn't need solving. It provides 128-bit post-quantum security through SHAKE256 — the same bound as ChaCha20 with a 256-bit key — while adding 1–60 seconds of setup time, no memory hardness, no nonce safety, and a complex attack surface. The n-body simulation is architecturally fascinating and cryptographically irrelevant to the actual security bound."*
 
-**This critique is valid and should be taken seriously.** The project is not suitable for production deployment. It is a research exploration of deterministic cross-platform chaos, not a replacement for established cryptographic standards.
+**This critique is valid and should be taken seriously.** The project is not suitable for production deployment. It is a research exploration of deterministic cross-platform chaos, not a replacement for established cryptographic standards. (Update: the "no nonce safety" limb is now partially addressed by session nonces — see §3. The security-ceiling, KDF-efficiency, known-plaintext, and missing-hallmarks limbs stand.)
 
 ---
 

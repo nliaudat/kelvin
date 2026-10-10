@@ -105,7 +105,7 @@ fn verify_pade_ln_bound() {
     // for x > 10 to compensate. Here we're only verifying the [1,10] core.
     let pade_at_10_raw = two * (Fixed::from_int(10) - Fixed::ONE)
         / (Fixed::from_int(10) + Fixed::ONE);
-    let ln_10_approx = Fixed::from_parts(2, 0x26E978D4FDF3B646); // ln(10)
+    let ln_10_approx = Fixed::from_parts(2, 0x4D763776AAA2C000); // ln(10) ≈ 2.302585
     kani::assert(
         pade_at_10_raw < ln_10_approx,
         "C2-Pade: pade(10) < ln(10), consistent with known underestimation",

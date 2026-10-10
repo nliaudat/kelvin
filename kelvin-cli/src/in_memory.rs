@@ -13,7 +13,7 @@
 
 use anyhow::{Context, Result};
 use kelvin::{
-    simulate_and_extract_seed_with_method, IntegrationMethod, Kelvin, KelvinPhoton,
+    simulate_and_extract_seed_with_method_and_nonce, IntegrationMethod, Kelvin, KelvinPhoton,
     KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated, KelvinStreaming,
     KelvinStreamingAuthenticated, OrbitalConfig, AUTH_OVERHEAD, PHOTON_DEFAULT_MAX_RESEEDS,
     STREAMING_CHUNK_SIZE,
@@ -35,6 +35,7 @@ pub fn process_in_memory(
     method: IntegrationMethod,
     auth: bool,
     size: u64,
+    nonce: &[u8],
 ) -> Result<()> {
     let config_json = std::fs::read_to_string(config_path).context("Failed to read config file")?;
     let config = OrbitalConfig::from_json(&config_json)?;
@@ -58,7 +59,8 @@ pub fn process_in_memory(
     // Initialize the crypto engine (includes orbital simulation for photon/quantum)
     match mode {
         CryptoMode::Secure => {
-            let mut k = Kelvin::new(config).context("Failed to initialize Kelvin")?;
+            let mut k = Kelvin::new_with_method_and_nonce(config, method, nonce)
+                .context("Failed to initialize Kelvin")?;
             println!("  Setup complete. Processing {} bytes...", size);
             let start = std::time::Instant::now();
             let chunk_size = STREAMING_CHUNK_SIZE;
@@ -97,8 +99,9 @@ pub fn process_in_memory(
 
         CryptoMode::Chaos => {
             if auth {
-                let mut ks = KelvinStreamingAuthenticated::new(config, bytes_per_step)
-                    .context("Failed to initialize KelvinStreamingAuthenticated")?;
+                let mut ks =
+                    KelvinStreamingAuthenticated::new_with_nonce(config, bytes_per_step, nonce)
+                        .context("Failed to initialize KelvinStreamingAuthenticated")?;
                 println!("  Setup complete. Processing {} bytes...", size);
                 let start = std::time::Instant::now();
                 let chunk_size = STREAMING_CHUNK_SIZE;
@@ -126,8 +129,13 @@ pub fn process_in_memory(
                 let elapsed = start.elapsed().as_secs_f64();
                 report_throughput(op_label, size, elapsed);
             } else {
-                let mut ks = KelvinStreaming::new(config, bytes_per_step)
-                    .context("Failed to initialize KelvinStreaming")?;
+                let mut ks = KelvinStreaming::new_with_method_and_nonce(
+                    config,
+                    bytes_per_step,
+                    method,
+                    nonce,
+                )
+                .context("Failed to initialize KelvinStreaming")?;
                 println!("  Setup complete. Processing {} bytes...", size);
                 let start = std::time::Instant::now();
                 let chunk_size = STREAMING_CHUNK_SIZE;
@@ -143,8 +151,9 @@ pub fn process_in_memory(
             }
         },
         CryptoMode::Photon => {
-            let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
-                .context("Failed to run orbital simulation")?;
+            let (seed, _bodies) =
+                simulate_and_extract_seed_with_method_and_nonce(&config, method, nonce)
+                    .context("Failed to run orbital simulation")?;
             println!("  Orbital simulation complete. Processing {} bytes...", size);
             if auth {
                 let mut photon = KelvinPhotonAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);
@@ -184,8 +193,9 @@ pub fn process_in_memory(
             }
         },
         CryptoMode::Quantum => {
-            let (seed, _bodies) = simulate_and_extract_seed_with_method(&config, method)
-                .context("Failed to run orbital simulation")?;
+            let (seed, _bodies) =
+                simulate_and_extract_seed_with_method_and_nonce(&config, method, nonce)
+                    .context("Failed to run orbital simulation")?;
             println!("  Orbital simulation complete. Processing {} bytes...", size);
             if auth {
                 let mut quantum = KelvinQuantumAuthenticated::new(seed, PHOTON_DEFAULT_MAX_RESEEDS);

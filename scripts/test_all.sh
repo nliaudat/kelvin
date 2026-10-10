@@ -9,7 +9,7 @@
 # Exit code is 0 only if ALL steps pass.
 #
 # Usage:
-#   ./scripts/test-all.sh
+#   ./scripts/test_all.sh
 # ==============================================================================
 
 set -euo pipefail

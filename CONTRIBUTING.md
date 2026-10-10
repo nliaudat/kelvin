@@ -13,10 +13,10 @@ Thank you for your interest in contributing to Kelvin! As a cryptographic system
     *   All new features must include unit and integration tests.
 4.  **Run the Tests**:
     ```bash
-    cargo test --all
-    cargo clippy --all
-    cargo fmt --all -- --check
-    cargo deny check
+    cargo test --workspace
+    cargo clippy --workspace --all-targets -- -D warnings
+    cargo fmt --check
+    cargo deny check  # requires cargo-deny: cargo install cargo-deny
     ```
     If working on feature-gated code (e.g., `subtle-ct`, `failpoints`), test with:
     ```bash
