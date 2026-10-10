@@ -8,7 +8,7 @@
 
 ## Abstract
 
-This document evaluates the Kelvin project's contribution to chaos-based cryptography. The project addresses a specific open problem — cross-platform deterministic chaotic simulation for key derivation — which has limited the reproducibility and practical applicability of chaos-based cryptosystems since their inception in the 1990s. Kelvin's primary contributions are: (1) a Q32.64 fixed-point arithmetic engine that produces bit-identical chaotic trajectories across x86_64, aarch64, riscv64, and WASM; (2) formal verification of numerical safety and physical invariants using bounded model checking; and (3) a domain-separated multi-mode architecture that isolates the chaotic KDF from downstream cipher operations. The cryptographic security of the system is bounded by SHAKE256 (128-bit post-quantum), which is equivalent to existing standards. The contribution is to the engineering practice of chaos-based cryptography, not to cryptographic theory.
+This document evaluates the Kelvin project's contribution to chaos-based cryptography. The project addresses a specific open problem — cross-platform deterministic chaotic simulation for key derivation — which has limited the reproducibility and practical applicability of chaos-based cryptosystems since their inception in the 1990s. Kelvin's primary contributions are: (1) a Q32.64 fixed-point arithmetic engine that produces bit-identical chaotic trajectories on the tested toolchain (cross-architecture bit-identity follows from integer-only arithmetic by design; no multi-platform matrix currently covers x86_64/aarch64/riscv64/WASM); (2) formal verification of numerical safety and physical invariants using bounded model checking; and (3) a domain-separated multi-mode architecture that isolates the chaotic KDF from downstream cipher operations. The cryptographic security of the system is bounded by SHAKE256 (128-bit post-quantum), which is equivalent to existing standards. The contribution is to the engineering practice of chaos-based cryptography, not to cryptographic theory. Measured basis: 215 library unit tests, 8/8 golden vectors, 12 DudeCT benches with |t| < 5, and a full release gate green 2026-10-10.
 
 ---
 
@@ -136,7 +136,7 @@ Kelvin is positioned within the chaos-based cryptography subfield, not within ma
 
 ## 5. Limitations
 
-1. **The cryptographic security is bounded by SHAKE256 (128-bit post-quantum).** The n-body KDF does not raise this bound. Formal verification C3 and C4 contain errors in their bound calculations (see adversarial_critique_v4.md).
+1. **The cryptographic security is bounded by SHAKE256 (128-bit post-quantum).** The n-body KDF does not raise this bound. Formal verification C3 and C4 contain errors in their bound calculations (see `documentation/adversarial_critique/adversarial_critique_v4.md`).
 
 2. **No formal reduction to a known hard problem exists.** The n-body inversion problem is not known to be as hard as factoring, discrete log, or LWE. This is a conjecture.
 
@@ -152,7 +152,7 @@ Kelvin is positioned within the chaos-based cryptography subfield, not within ma
 
 Kelvin's technical contributions are to the engineering practice of chaos-based cryptography: it solves the cross-platform determinism problem, it applies formal verification to a chaotic simulation, and it provides a clean architectural separation between key derivation and cipher operations. These contributions are real and measurable. They do not constitute a security proof, a production-ready cipher, or a replacement for established cryptographic standards.
 
-The project is correctly described as: *"A research implementation of a chaotic n-body KDF with verified cross-platform determinism and formal proofs of implementation correctness, accompanied by reference stream cipher modes that demonstrate seed consumption via SHAKE256 XOR. The KDF's security is a conjecture; the cipher security is standard SHAKE256."*
+The project is correctly described as: *"A research implementation of a chaotic n-body KDF with golden-hash determinism tests and formal proofs of implementation correctness, accompanied by reference stream cipher modes that demonstrate seed consumption via SHAKE256 XOR. The KDF's security is a conjecture; the cipher security is standard SHAKE256."*
 
 ---
 
@@ -166,7 +166,7 @@ The project is correctly described as: *"A research implementation of a chaotic 
 - Jawad (2025). "DUff-skg: FHE cryptographic systems with chaotic secret key generation." *Acta Scientiarum. Technology*, 47(1).
 - Kocarev, L. (2001). "Chaos-based cryptography: A brief overview." *IEEE Circuits and Systems Magazine*, 1(3), 6–21.
 - Li, S., Chen, G., & Mou, X. (2018). "On the dynamical degradation of digital piecewise linear chaotic maps." *International Journal of Bifurcation and Chaos*, 15(10), 3119–3151.
-- NIST SP 800-185 (2016). "SHA-3 Derived Functions: cSHAKE, KMAC, TupleHash, and ParallelHash."
+- NIST SP 800-185 (2016). "SHA-3 Derived Functions: cSHAKE, KMAC (Keccak Message Authentication Code), TupleHash, and ParallelHash."
 - Short, K. M. (1994). "Steps toward unmasking secure communications." *International Journal of Bifurcation and Chaos*, 4(4), 959–977.
 - Song, Y., et al. (2025). "CryptoChaos: A hybrid chaos-based cryptographic framework." arXiv:2504.08618.
 - Takens, F. (1981). "Detecting strange attractors in turbulence." *Dynamical Systems and Turbulence*, 366–381.
