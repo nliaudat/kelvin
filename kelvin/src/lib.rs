@@ -396,7 +396,7 @@ impl Kelvin {
     /// The nonce is mixed into seed extraction, so two instances sharing one
     /// `OrbitalConfig` but using different nonces produce independent
     /// keystreams. This is the guardrail against config-reuse two-time-pad
-    /// (see `bad.md` §3): every deployment of a config must use a unique
+    /// (see `COMPLIANCE.md` §3): every deployment of a config must use a unique
     /// nonce. The nonce is public and must be communicated to the decrypting
     /// party alongside the config. An empty nonce reproduces legacy output.
     pub fn new_with_nonce(config: OrbitalConfig, nonce: &[u8]) -> Result<Self, KelvinError> {
@@ -581,7 +581,7 @@ pub struct KelvinStreaming {
     /// Session nonce bound into per-step extraction (empty = legacy output).
     ///
     /// Gives each config deployment an independent keystream, addressing
-    /// config-reuse two-time-pad (see `bad.md` §3).
+    /// config-reuse two-time-pad (see `COMPLIANCE.md` §3).
     nonce: Vec<u8>,
     /// Reusable keystream buffer to avoid repeated allocations.
     keystream_buf: Vec<u8>,

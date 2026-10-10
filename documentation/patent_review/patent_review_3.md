@@ -547,7 +547,7 @@ The following prior art means these concepts **cannot be patented by anyone**:
 
 ## 10. OTP Framing Addendum — Patent Implications of the "One-Time Pad" Claim
 
-This section assesses how Kelvin's stream cipher framing (documented in [`stream_cipher_security.md`](../stream_cipher_security.md), [`README.md`](../../README.md), and [`usage.md`](../usage.md)) affects the patent landscape. The OTP-like language emphasizes quantum resistance and the session-nonce architecture (see `bad.md` §3 for the nonce guardrail) while acknowledging the system is a computational stream cipher, not an information-theoretic OTP.
+This section assesses how Kelvin's stream cipher framing (documented in [`stream_cipher_security.md`](../stream_cipher_security.md), [`README.md`](../../README.md), and [`usage.md`](../usage.md)) affects the patent landscape. The OTP-like language emphasizes quantum resistance and the session-nonce architecture (see `COMPLIANCE.md` §3 for the nonce guardrail) while acknowledging the system is a computational stream cipher, not an information-theoretic OTP.
 
 ### 10.1 Prior Art for "Computational OTP" / "Stream Cipher as OTP"
 

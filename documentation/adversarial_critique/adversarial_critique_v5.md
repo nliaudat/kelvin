@@ -31,7 +31,7 @@ The adversarial reading: the failure mode moved, it did not disappear.
 - **Same-nonce reuse = two-time pad**, identical to the old same-config reuse. Nothing in the API prevents it; `new_with_nonce(config, &[])` compiles and runs.
 - **The nonce is load-bearing public metadata.** Lose it and data is undecryptable; reuse it and data is breakable. It must be transported alongside the config with uniqueness guarantees — i.e. nonce management, the exact burden nonces were supposed to carry all along.
 
-**Status:** documented (`bad.md` §3, `usage.md` "Session Nonces"), behavior verified. Fail-open on misuse. A future `keygen --nonce` that mints and prints a fresh nonce alongside each config would make the safe path the default path.
+**Status:** implemented (`COMPLIANCE.md` §§3–4, `usage.md` "Session Nonces"), behavior verified. Encrypt generates a fresh nonce by default and decrypt requires it — the safe path is now the default path. Same-nonce reuse still reuses keystream (fail-open on explicit misuse).
 
 **Sources:** `kelvin-kdf/src/extractor.rs`, `kelvin/src/lib.rs`, `kelvin-cli/src/main.rs` (`--nonce`)
 
