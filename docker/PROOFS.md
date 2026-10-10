@@ -26,7 +26,7 @@ or overflows under physically-realistic orbital bounds.
 | `verify_sub_no_overflow` | sub in [-100, 100] AU | [-200, 200] AU |
 | `verify_mul_range` | mul in [-4, 4] AU | [-16, 16] AU² |
 
-### L1: Fixed-Point Equivalence (`proofs/kani/fixed_equivalence.rs` — 5 harnesses)
+### L1: Fixed-Point Equivalence (`proofs/kani/fixed_equivalence.rs` — 9 harnesses)
 
 | Harness | Property | Error Bound |
 |:---|:---|---:|
@@ -37,16 +37,18 @@ or overflows under physically-realistic orbital bounds.
 | `verify_mul_zero` | a * 0 = 0 | Exact |
 | `verify_div_inverse` | (a/b) * b ≈ a | |den_raw| >> 64 + 2 |
 | `verify_sqrt_inverse` | sqrt(a)² ≈ a | (2 * result_raw) >> 64 + 3 |
+| `verify_vec3_dot_equivalence` | dot matches spec | Exact |
+| `verify_vec3_length_squared_equivalence` | |v|² matches spec | Exact |
 
 ### L2: Composite Correctness (`proofs/kani/acceleration_proofs.rs` — 5 harnesses)
 
 | Harness | Physical Law |
 |:---|:---|
-| `verify_action_reaction` | Newton's Third Law: F_01 = -F_10 within 2 ULP |
+| `verify_acceleration_action_reaction` | Newton's Third Law: F_01 = -F_10 within 2 ULP |
 | `verify_acceleration_direction` | a_ij points from body i toward body j |
-| `verify_single_body_zero` | Single body experiences zero acceleration |
+| `verify_single_body_zero_acceleration` | Single body experiences zero acceleration |
 | `verify_three_body_symmetry` | Net force on symmetric configuration is zero |
-| `verify_mass_proportionality` | |a| ∝ source mass |
+| `verify_acceleration_proportional_to_mass` | |a| ∝ source mass |
 
 ### L3: Pipeline Integrity (`proofs/kani/pipeline_proofs.rs` — 3 harnesses)
 

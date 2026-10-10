@@ -89,10 +89,14 @@ implementations, or NaN propagation rules.
 ### Enforcement
 
 - **Q32.64 format** (`kelvin-core/src/fixed_math.rs`): All simulation math
-  uses `i128`-based fixed-point with `1.0 = 2^64`. No `f32` or `f64` values
-  appear in the simulation engine (only in debug display `to_f64()`).
-- **Cross-SIMD verification** (18 tests in `tests/kelvin_tests/determinism.rs`):
-  All 18 determinism tests pass identically on SSE2, AVX, and AVX2.
+  uses `i128`-based fixed-point with `1.0 = 2^64`. No `f32`/`f64` in the
+  core loop (f64 appears only outside the deterministic path: keygen
+  spherical sampling, display helpers, estimator statistics).
+- **Determinism tests** (18 tests in `tests/kelvin_tests/determinism.rs`):
+  golden hashes + intra-process repeatability pass on the tested
+  toolchain. SSE2/AVX/AVX2/NEON matrix coverage is asserted by design
+  (integer-only arithmetic), not automated — the "pass identically on
+  SSE2, AVX, AVX2" phrasing in earlier revisions overstated this.
 - **Architecture-agnostic golden hashes**: Golden hashes are captured on
   x86_64 and validated across all execution contexts.
 
@@ -106,7 +110,8 @@ other's messages.
 
 - **Kani harness `verify_mul_no_overflow`**: Proves commutativity (`a*b == b*a`),
   identity (`a*1 == a`), and zero (`a*0 == 0`) for all bounded inputs.
-- **18/18 determinism tests pass** on 3 CPU capabilities (SSE2, AVX, AVX2).
+- **18/18 determinism tests pass** on the tested toolchain (see scope note
+  above re: SIMD matrix).
 - **Reference**: Goldberg (1991) — "What Every Computer Scientist Should Know
   About Floating-Point Arithmetic."
 
@@ -184,7 +189,7 @@ trajectory and measuring their divergence rate.
 - **Lyapunov estimator** (`kelvin-kdf/src/lyapunov.rs`): Uses a deterministic
   shadow orbit to estimate λ. The `estimate()` method returns `min_chaos_steps`
   — the minimum number of steps needed to reach the chaotic regime.
-- **Config validation** (`kelvin/src/lib.rs` lines 158-167): Configurations
+- **Config validation** (`kelvin/src/lib.rs`, `run_simulation_pipeline`): Configurations
   with `total_steps < min_chaos_steps` are rejected at instantiation.
 - **Default steps** (`kelvin-core/src/constants.rs`: `DEFAULT_STEPS = 1_000_000`)
   is set well above typical Lyapunov times (~1000 steps for standard configs).
@@ -198,9 +203,7 @@ at initialization prevents this by rejecting insufficient configurations.
 
 ### Supporting Evidence
 
-- **Lyapunov analysis**: λ ≈ 0.693 (positive → chaotic regime) for standard
-  5-body configurations. A Lyapunov time of ~1443 steps means the system
-  amplifies trajectory divergence by a factor of e ≈ 2.718 every ~1443 steps.
+- **Lyapunov analysis**: λ ≈ 0.7/yr (positive → chaotic regime; pre-`ln(10)`-fix literature quotes 0.693) for 5-body configurations. A Lyapunov time of ~1.44 yr (~1443 steps at dt ≈ 0.001) means the system amplifies trajectory divergence by a factor of e ≈ 2.718 per Lyapunov time.
 - **Entropy extraction**: SHAKE256 extracts entropy from the orbital state
   after the simulation is complete, ensuring the hash is computed on a
   fully-mixed chaotic state.
@@ -225,8 +228,8 @@ depends on SHA-512's PRF properties.
 
 ### Enforcement
 
-- **Key derivation** (`kelvin-kdf/src/schedule.rs`): HKDF-SHA512 with domain
-  separator `DOMSEP_KEY_SCHEDULE_V1` derives encryption keys and nonces.
+- **Key derivation** (`kelvin-kdf/src/schedule.rs`): HKDF-SHA512 with info
+  strings `kelvin-hkdf-key-v1` / `kelvin-hkdf-nonce-v1` derives encryption keys and nonces (no `DOMSEP_KEY_SCHEDULE_V1` constant exists — earlier drafts misnamed it).
 - **MAC key derivation** (`kelvin/src/authenticated.rs`): HKDF-SHA512 with
   domain separator `DOMSEP_MAC_KEY_V1` derives KMAC128 authentication keys.
 - **Domain separation**: Each key derivation uses a distinct domain separator,
@@ -256,6 +259,8 @@ entropy pool (requiring SHAKE256 inversion) and invert the n-body simulation.
 | 3 | SHAKE256 security | `extractor.rs`, mode `.rs` files | Keystream prediction |
 | 4 | Lyapunov horizon | `lyapunov.rs`, `lib.rs` | Correlated keystream |
 | 5 | HKDF-SHA512 security | `schedule.rs`, `authenticated.rs` | Key schedule compromise |
+| 6 | Secret zeroization | `Drop` impls (`schedule.rs`, `lib.rs`, flare/prism/split, `Zeroizing` buffers; verified by `zeroize_verify`) | Cold-boot / memory-disclosure recovery |
+| 7 | OS CSPRNG seeding | `keygen.rs` (`rand::thread_rng`) | Generated keyspace capped at OS entropy (2²⁵⁶); weak RNG collapses it |
 
 ---
 

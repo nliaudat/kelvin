@@ -1,6 +1,8 @@
 # RustCrypto Integration Plan — Kelvin
 
-> **Status**: Planning Phase  
+> **Status**: Phases 0–3 DONE as of 2026-10-10 (verified against tree);
+> Phase 4 (argon2, `from_seed`) open. Originally written in Planning Phase;
+> sections below marked ✅ where the code already does it.
 > **Target**: Incrementally replace custom cryptographic plumbing with RustCrypto-ecosystem crates  
 > **Design Principle**: The core n-body simulation (`kelvin-core`) remains dependency-free. RustCrypto integration happens in the cryptographic layers only.
 
@@ -63,8 +65,8 @@
            └───────────────┘       └──────────────────┘      └──────────────────┘
 ```
 
-**Currently using RustCrypto**: `sha3`, `chacha20`, `aes` (optional), `ctr` (optional).  
-**Not using RustCrypto**: `hkdf`, `chacha20poly1305`, `blake3`, `signature`, `aead`, `ed25519-dalek`, `argon2`.
+**Currently using RustCrypto**: `sha3`, `chacha20`, `aes` (optional), `ctr` (optional), `hkdf`, `chacha20poly1305`, `blake3`, `signature`, `aead`, `ed25519-dalek`, `ml-kem`, `ml-dsa`.
+**Not using RustCrypto**: `argon2` (Phase 4, open).
 
 ---
 
@@ -86,7 +88,7 @@
 | `curve25519-dalek` | 4 | `kelvin-kdf` | ECC scalar operations |
 | `x25519-dalek` | 2 | `kelvin-kdf` | X25519 key exchange |
 | `ml-kem` | 0.3 | `kelvin-kdf` | ML-KEM-768 post-quantum KEM |
-| `ml-dsa` | 0.1.0-rc.4 | `kelvin-kdf` | ML-DSA-65 post-quantum signatures |
+| `ml-dsa` | 0.1 (stable) | `kelvin-kdf` | ML-DSA-65 post-quantum signatures |
 
 ### Proposed New Dependencies
 

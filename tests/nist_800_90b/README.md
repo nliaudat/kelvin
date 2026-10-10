@@ -34,8 +34,8 @@ cargo run --release -p nist_800_90b -- generate \
     --output keystream_1gb.bin
 ```
 
-This uses the default 5-body orbital configuration with Euler integration
-(maximum chaos amplification). The output is raw SHAKE256 XOR keystream from
+This uses the default 5-body orbital configuration with Verlet integration.
+The output is raw SHAKE256 XOR keystream from
 `KelvinStreaming` (V2 mode) — the rawest form before any cipher layer.
 
 ### Options
@@ -45,7 +45,12 @@ This uses the default 5-body orbital configuration with Euler integration
 | `--size` | 1048576 (1 MB) | Number of bytes to generate |
 | `--output` | `keystream.bin` | Output file path |
 | `--config` | (default 5-body) | Custom orbital config JSON |
-| `--verlet` | (Euler) | Use Verlet integration instead of Euler |
+| `--euler` | (Verlet) | Use Euler integration instead of Verlet |
+| `--prism` | off | Generate Prism-mode keystream |
+
+> **Correction:** an earlier revision had the default backwards (Euler
+> default with `--verlet` to switch). The tool defaults to Verlet;
+> `--verlet` is not a recognized flag and would be rejected.
 
 ### Custom Configuration
 

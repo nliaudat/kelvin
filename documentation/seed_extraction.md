@@ -32,11 +32,12 @@ Kelvin uses **SHAKE256** (the Keccak Extendable-Output Function) for entropy ext
 All parameters are serialized in **little-endian** format to ensure deterministic behavior across different CPU architectures. The hash input is structured as follows:
 
 1. `domain_separator` (Variable length)
-2. `g` (Gravitational Constant, 16 bytes)
-3. `softening` (Softening Factor, 16 bytes)
-4. `step_counter` (8 bytes)
-5. `body_count` (4 bytes)
-6. For each body:
+2. `nonce_len` (8 bytes, little-endian) + `nonce` (session binding; empty = legacy output)
+3. `g` (Gravitational Constant, 16 bytes)
+4. `softening` (Softening Factor, 16 bytes)
+5. `step_counter` (8 bytes)
+6. `body_count` (4 bytes)
+7. For each body:
    - `mass` (16 bytes)
    - `position.x` (16 bytes)
    - `position.y` (16 bytes)

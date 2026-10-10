@@ -142,8 +142,8 @@ WHAT'S INCLUDED
   simple_streaming.exe    - Streaming encrypt/decrypt demo
   orbital_visualizer.html - 3D orbital simulation (open in browser)
   sample_key.json         - Sample orbital configuration
-  test-all.ps1            - Windows test suite
-  test-all.sh             - Linux test suite
+  test_all.bat            - Windows test suite
+  test_all.sh             - Linux test suite
 
 QUICK START
 -----------

@@ -13,7 +13,7 @@ WHAT'S INCLUDED
   simple_streaming.exe    - V2 streaming encrypt/decrypt demo (SHAKE256 XOR)
   orbital_visualizer.html - 3D orbital simulation with KDF pipeline display
   sample_key.json         - Sample orbital configuration
-   (see scripts/test-all.bat for the full test suite)
+   (see scripts/test_all.bat for the full test suite)
 
 QUICK START
 -----------
@@ -23,11 +23,11 @@ QUICK START
   2. Identify public keys:
      .\kelvin.exe identify --config mykey.json
 
-  3. Encrypt a file:
+  3. Encrypt a file (prints a fresh session nonce — store it):
      .\kelvin.exe encrypt --config mykey.json --input secret.txt --output secret.enc
 
-  4. Decrypt a file:
-     .\kelvin.exe decrypt --config mykey.json --input secret.enc --output secret.txt
+  4. Decrypt a file (same nonce is required):
+     .\kelvin.exe decrypt --config mykey.json --input secret.enc --output secret.txt --nonce <printed-nonce>
 
   5. Open orbital_visualizer.html in a browser for 3D visualization.
      - Drag to rotate, scroll to zoom, Space/P to pause, R to reset
@@ -35,7 +35,7 @@ QUICK START
      - Hover over KDF pipeline stages for detailed information
 
   6. Run all tests (from the repo root):
-     ..\scripts\test-all.bat
+     ..\scripts\test_all.bat
 
 DEMO BINARIES
 -------------
@@ -55,7 +55,8 @@ DEMO BINARIES
 V2 STREAMING MODE
 -----------------
   The V2 streaming mode (KelvinStreaming) provides:
-  - Unlimited keystream: keep simulating as long as needed
+  - Unlimited keystream: keep simulating up to the 1B-step safety cap
+    (100M for Euler)
   - Instant setup: no upfront simulation required
   - Deterministic: same config + same bytes = same keystream
   - Fixed-size chunking: data is processed in bytes_per_step chunks
@@ -65,10 +66,8 @@ V2 STREAMING MODE
 
 NOTES
 -----
-  - Use --fast with identify for quick key display (caps at 10K steps).
-    WARNING: --fast produces a non-deterministic public key that will NOT
-    match the key used for normal encryption/decryption. Use without --fast
-    for consistent identification.
+  - NOTE: identify --fast is currently ignored (prints a warning and runs
+    the full simulation). Do not rely on --fast for identify.
   - Without --fast, identify runs the full simulation (may be slow).
   - All binaries are 64-bit Windows executables.
   - Requires no external dependencies.

@@ -37,16 +37,16 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 | Mode | Name | Cipher Type | Auth | Keystream | Speed (in-memory) | Use Case |
 |------|------|-------------|:----:|-----------|:-----------------:|----------|
 | **V1** | Kelvin-Secure | ChaCha20Poly1305 (AEAD) | ✅ AEAD | Finite (~28 GiB) | 🚀 1,644 MB/s | General purpose with authentication |
-| **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Optional | ≈Limited⁴ (1B step cap) | 🐌 34 MB/s | Streaming, real-time |
-| **V3** | Kelvin-Photon | **Batch Stream** (HKDF→SHAKE256 XOR) | ✅ Optional | Finite | 🚀 542 MB/s | Bulk encryption |
-| **H** | Kelvin-Quantum³ | **Hybrid Stream** (V3+V2 XOR) | ✅ Optional | ≈Unlimited | 🚀 512 MB/s | Best all-around |
+| **V2** | Kelvin-Chaos | **Per-Step Stream** (SHAKE256 XOR) | ✅ Default | ≈Limited⁴ (1B-step Verlet cap; Euler 100M) | 🐌 34 MB/s | Streaming, real-time |
+| **V3** | Kelvin-Photon | **Batch Stream** (HKDF→SHAKE256 XOR) | ✅ Default | Finite | 🚀 542 MB/s | Bulk encryption |
+| **H** | Kelvin-Quantum³ | **Hybrid Stream** (V3+V2 XOR) | ✅ Default | Finite (100k-reseed chain) | 🚀 512 MB/s | Best all-around |
 | **—** | Kelvin-Prism | **HE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | Stream key generation for HE |
 | **—** | Kelvin-Split | **Split Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | XOR key splitting for HE |
 | **—** | Kelvin-Flare | **FHE Stream** (HKDF→SHAKE256) | ❌ | Finite | 🚀 ~542 MB/s | FHE secret key generation |
 
 
 > ³ The name "Quantum" refers to the hybrid V2+V3 architecture, not quantum-mechanical properties. The security of all Kelvin modes derives from classical chaotic n-body dynamics and standardized cryptographic primitives (SHAKE256, HKDF-SHA512), not from quantum mechanics.
-> ⁴ V2 keystream is bounded by the simulation safety limit (1 billion steps) — see the Finite Precision Analysis in proof_of_concept.md for periodicity considerations. All finite-state chaotic systems eventually cycle; the practical limit is determined by the step count.
+> ⁴ V2 keystream is bounded by the simulation safety limit (1 billion Verlet steps, 100M Euler) — see the Finite Precision Analysis in proof_of_concept.md for periodicity considerations. All finite-state chaotic systems eventually cycle; the practical limit is determined by the step count.
 
 
 ## What Makes Kelvin Novel
@@ -231,11 +231,12 @@ stream.encrypt(&mut data).unwrap();
 # Generate a random configuration
 kelvin keygen --output my-key.json
 
-# Encrypt a file
+# Encrypt a file (prints a fresh session nonce — store it)
 kelvin encrypt --config my-key.json --input secret.txt --output secret.enc
+# Generated session nonce: 9f2c…
 
-# Decrypt a file
-kelvin decrypt --config my-key.json --input secret.enc --output secret.txt
+# Decrypt a file (same nonce is required)
+kelvin decrypt --config my-key.json --input secret.enc --output secret.txt --nonce 9f2c…
 
 # Analyze chaos quality
 kelvin analyze --config my-key.json

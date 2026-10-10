@@ -9,7 +9,7 @@ REM
 REM Exit code is 0 only if ALL steps pass.
 REM
 REM Usage:
-REM   scripts\test-all.bat
+REM   scripts\test_all.bat
 REM ==============================================================================
 
 setlocal enabledelayedexpansion

@@ -48,7 +48,7 @@ Jawad (2025) proposed DUff-skg, a chaotic FHE key generator using a 2-DOF Duffin
 
 ### 3.1 Q32.64 Fixed-Point Arithmetic for Chaotic Simulation
 
-The simulation uses a custom Q32.64 fixed-point representation on i128 (64 fractional bits, 32 integer bits, 32 guard bits). All operations — addition, multiplication, division, and square root — are defined by integer arithmetic:
+The simulation uses a custom Q32.64 fixed-point representation on i128 (64 fractional bits, 32 integer bits; the upper 32 bits are unused sign extension, not guard bits). All operations — addition, multiplication, division, and square root — are defined by integer arithmetic:
 
 ```
 Addition/Subtraction: Exact on i128
@@ -59,8 +59,8 @@ Square root:         Binary digit-by-digit, 64 iterations
 
 This approach has the following properties:
 
-- **No floating-point anywhere in the simulation engine.** No transcendental functions, no rounding modes, no FMA contraction.
-- **Verified bit-identical across platforms.** 18 determinism tests confirm that simulation output matches golden hashes on SSE2, AVX, AVX2, and aarch64 NEON.
+- **No floating-point in the simulation engine itself** (keygen sampling and display helpers use f64 outside the deterministic path). No transcendental functions, no rounding modes, no FMA contraction in the core loop.
+- **Bit-identical on the tested toolchain.** 18 determinism tests (golden hashes + intra-process repeatability) pass; SSE2/AVX/AVX2/NEON matrix coverage is asserted by design, not automated.
 - **Verified constant-time.** dudect-bencher (Welch's t-test) confirms |t| < 5 for all operations in tests/constant_time_bench/.
 
 **Limitation:** Constant-time verification covers arithmetic primitives but not the full encrypt/decrypt pipeline. Higher-level operations (mode selection branching, authentication tag comparison) are not yet verified.
@@ -104,12 +104,12 @@ The 30-DOF model does not provide a formal security guarantee — the relationsh
 
 The system defines 7 distinct operational modes, each isolated by a cryptographic domain separator in the SHAKE256 extraction step:
 
-| Mode | Domain Separator | Purpose |
+| Mode | Keystream Domain Separator | Purpose |
 |------|-----------------|---------|
-| V1 Secure | DOMSEP_ORBITAL_STATE_V1 | ChaCha20Poly1305 AEAD |
-| V2 Chaos | DOMSEP_STREAMING_MAC_KEY_V1 | Per-step streaming stream cipher |
+| V1 Secure | DOMSEP_ORBITAL_STATE_V1 (seed extraction; AEAD cipher) | ChaCha20Poly1305 AEAD |
+| V2 Chaos | `kelvin-streaming-v2-v1-000000000` (+ `DOMSEP_STREAMING_MAC_KEY_V1` for the auth tag key) | Per-step streaming stream cipher |
 | V3 Photon | DOMSEP_PHOTON_KEYSTREAM_V1 | HKDF→SHAKE256 batch stream cipher |
-| H Quantum | DOMSEP_QUANTUM_CACHE_V1 | Hybrid cache with orbital reseeding |
+| H Quantum | DOMSEP_QUANTUM_KEYSTREAM (+ perturb/reseed/cache domains) | Hybrid cache with orbital reseeding |
 | Prism | DOMSEP_PRISM_KEYSTREAM_V1 | HE key generation |
 | Split | DOMSEP_SPLIT_KEYSTREAM_V1 | XOR key splitting |
 | Flare | DOMSEP_FLARE_KEYSTREAM_V1 | FHE secret key generation |

@@ -33,6 +33,11 @@ cargo run -p constant_time_bench -- --continuous mul
 | `bench_fixed_sqrt_clamp` | Values below vs. above clamping threshold |
 | `bench_fixed_sqrt_edge` | Zero/negative (early return) vs. positive (validation) |
 | `bench_compute_accelerations` | Small vs. large masses (same position magnitudes) |
+| `bench_verlet_step` | Verlet step timing across inputs |
+| `bench_euler_step` | Euler step timing across inputs |
+| `bench_simulate` | Full simulation timing across inputs |
+| `bench_extract_seed` | Seed extraction timing across inputs |
+| `bench_key_schedule` | Key schedule timing across inputs |
 
 ## References
 

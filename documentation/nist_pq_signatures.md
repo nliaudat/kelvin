@@ -339,7 +339,7 @@ impl KelvinQuantumAuthenticated {
 | Algorithm | Family | Key Feature | Signature Size | Potential for Kelvin |
 |-----------|--------|-------------|----------------|---------------------|
 | **HAWK** | Lattice | Fast, small signatures | 555–1221 B | **Excellent** — modular integration for non-repudiation |
-| **SNOVA** | Lattice (UOV variant) | Efficient, balanced | 124–576 B | Good — similar to HAWK, but NIST security concerns |
+| **SNOVA** | Multivariate (UOV) | Efficient, balanced | 124–576 B | Good — similar to HAWK, but NIST security concerns |
 | **FAEST** | Code-based (AES-based) | Conservative security | ~5–10 KB | Moderate — larger signatures |
 | **SQIsign** | Isogeny | Smallest signatures | ~112 B | Poor — computationally very slow |
 | **MAYO** | Multivariate | Niche optimizations | ~500 B | Unlikely — too specialized |

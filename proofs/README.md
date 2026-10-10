@@ -3,6 +3,13 @@
 This directory contains formal verification artifacts for the Kelvin cryptosystem,
 following Apple's corecrypto formal verification blueprint.
 
+> **Staleness warning (2026-10-10):** `proofs/kani/` is maintained and matches
+> the code. `proofs/specs/` is a stale early-design snapshot — struct shapes
+> (`OrbitalState` with f64 fields, `OrbitalConfig` with `method`/`domain`),
+> constants (ranges, defaults, separators), and API names throughout `specs/`
+> do not match the implementation. Do not quote `specs/` without checking the
+> code; a rewrite is open work.
+
 See [`documentation/formal_verification.md`](../documentation/formal_verification.md)
 for the full proof architecture, strategy, and references.
 

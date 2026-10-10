@@ -24,7 +24,7 @@ The Sun mass is randomized in the range **[0.75, 1.25] solar masses** ($\pm 25\%
 | **Uniqueness** | **100.00% (1000/1000)** |
 
 ### 1.2 Planet Parameters
-For 4 planets per configuration (4,000 total bodies sampled):
+For 4 planets per configuration (4,000 total bodies sampled in this 5-body-era run; current standard keygen emits 7 planets):
 
 | Variable | Uniqueness | Range (Raw Units) |
 |---|---|---|
@@ -48,14 +48,14 @@ Given that uniqueness was 100% for all parameters, the generator is successfully
 - **Detected Collisions**: 0
 - **Overlap Rate**: 0.00%
 
-Even at the Sun mass level (the most constrained variable), no two keys shared the same mass value. This indicates that the 256-bit ChaCha12 RNG seed is effectively spreading the configurations across the available expression space.
+Even at the Sun mass level (the most constrained variable), no two keys shared the same mass value. This indicates that the OS-seeded RNG (`rand::thread_rng`, not ChaCha12 as an earlier draft stated) is effectively spreading the configurations across the available expression space.
 
 ---
 
 ## 3. Physical Binding Verification
 
 The analysis confirms that the "Physical Binding" hardening measures are active:
-1.  **Constants**: All 1,000 keys utilize identical $G$, `softening`, and `dt` constants, which are now part of the hash chain.
+1.  **Constants**: All 1,000 keys utilize identical $G$ and `softening` constants, which are part of the hash chain (`extractor.rs` feeds `g` and `softening`; `dt` is not hashed).
 2.  **Forces**: The 3D velocity and position diversity ensures that the instantaneous force vectors (accelerations) included in the hash chain will be unique for every key.
 
 ## 4. Conclusion
@@ -63,4 +63,4 @@ The analysis confirms that the "Physical Binding" hardening measures are active:
 The Kelvin orbital generator is cryptographically sound for 256-bit security. The $\pm 25\%$ Sun mass randomization provides a robust anchor for the chaotic simulation without compromising orbital stability. The empirical results match the theoretical predictions in `keyspace_analysis.md`.
 
 ---
-*Audit conducted using `tests/entropy_analysis/entropy_test.py`.*
+*Audit conducted using `tests/entropy_analysis/src/main.rs` (earlier drafts cited a `.py` path that does not exist). Historical run parameters (5-body configs) are preserved as measured.*
