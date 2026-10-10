@@ -19,17 +19,23 @@ list_harnesses() {
     echo " KELVIN FORMAL VERIFICATION — Available Proof Harnesses"
     echo "==============================================================================="
     echo ""
-    echo " fixed_equivalence.rs (5) — Q32.64 arithmetic functional equivalence:"
-    echo "   verify_fixed_add_commutative"
-    echo "   verify_fixed_add_associative"
-    echo "   verify_fixed_mul_commutative"
-    echo "   verify_fixed_mul_associative"
-    echo "   verify_fixed_sub_self_zero"
+    echo " fixed_equivalence.rs (9) — Q32.64 arithmetic functional equivalence:"
+    echo "   verify_add_functional_equivalence"
+    echo "   verify_sub_functional_equivalence"
+    echo "   verify_mul_commutative"
+    echo "   verify_mul_identity"
+    echo "   verify_mul_zero"
+    echo "   verify_div_inverse"
+    echo "   verify_sqrt_inverse"
+    echo "   verify_vec3_dot_equivalence"
+    echo "   verify_vec3_length_squared_equivalence"
     echo ""
-    echo " acceleration_proofs.rs (3) — compute_accelerations composite proofs:"
-    echo "   verify_acceleration_single_body"
-    echo "   verify_acceleration_two_body"
-    echo "   verify_acceleration_newton_third"
+    echo " acceleration_proofs.rs (5) — compute_accelerations composite proofs:"
+    echo "   verify_acceleration_action_reaction"
+    echo "   verify_acceleration_direction"
+    echo "   verify_single_body_zero_acceleration"
+    echo "   verify_three_body_symmetry"
+    echo "   verify_acceleration_proportional_to_mass"
     echo ""
     echo " vec3_proofs.rs (18) — Vec3 vector operation proofs:"
     echo "   verify_vec3_add_commutative"
@@ -104,14 +110,16 @@ list_harnesses() {
 
 run_fast() {
     echo "==============================================================================="
-    echo " KELVIN FORMAL VERIFICATION — Fast mode (5 fixed_equivalence proofs)"
+    echo " KELVIN FORMAL VERIFICATION — Fast mode (9 fixed_equivalence proofs)"
     echo "==============================================================================="
     echo ""
-    cargo kani -p kelvin-core --harness verify_fixed_add_commutative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_add_associative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_mul_commutative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_mul_associative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_sub_self_zero $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_add_functional_equivalence $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_sub_functional_equivalence $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_mul_commutative $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_mul_identity $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_mul_zero $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_div_inverse $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_sqrt_inverse $KANI_ARGS
     echo "  ✓ Fast proofs passed"
 }
 
@@ -123,18 +131,22 @@ run_full() {
     echo ""
 
     echo "[1/9] fixed_equivalence.rs — Q32.64 arithmetic functional equivalence"
-    cargo kani -p kelvin-core --harness verify_fixed_add_commutative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_add_associative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_mul_commutative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_mul_associative $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_fixed_sub_self_zero $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_add_functional_equivalence $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_sub_functional_equivalence $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_mul_commutative $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_mul_identity $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_mul_zero $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_div_inverse $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_sqrt_inverse $KANI_ARGS
     echo "  ✓ fixed_equivalence.rs passed"
     echo ""
 
     echo "[2/9] acceleration_proofs.rs — compute_accelerations composite proofs"
-    cargo kani -p kelvin-core --harness verify_acceleration_single_body $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_acceleration_two_body $KANI_ARGS
-    cargo kani -p kelvin-core --harness verify_acceleration_newton_third $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_acceleration_action_reaction $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_acceleration_direction $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_single_body_zero_acceleration $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_three_body_symmetry $KANI_ARGS
+    cargo kani -p kelvin-core --harness verify_acceleration_proportional_to_mass $KANI_ARGS
     echo "  ✓ acceleration_proofs.rs passed"
     echo ""
 

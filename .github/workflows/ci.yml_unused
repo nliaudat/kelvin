@@ -55,9 +55,6 @@ jobs:
       - name: Build V2 Streaming example
         run: cargo build --example simple_streaming -p kelvin
 
-      - name: Build kelvin-demo binaries
-        run: cargo build -p kelvin-demo
-
   # ---------------------------------------------------------------------------
   # Lint — clippy + rustfmt
   # ---------------------------------------------------------------------------
@@ -133,6 +130,12 @@ jobs:
 
       - name: Full pipeline integration tests (V1 + V2 Streaming)
         run: cargo test -p kelvin --test full_pipeline
+
+      - name: Mode integration tests (photon, quantum, streaming_api, authenticated, prism, flare, split, test_vectors)
+        run: cargo test --release -p kelvin --test photon --test quantum --test streaming_api --test authenticated --test prism --test flare --test split --test test_vectors
+
+      - name: Determinism (cross-platform golden hash)
+        run: cargo test --release -p kelvin-core --test determinism
 
       - name: Chaos test (Lyapunov estimation)
         run: cargo test -p kelvin-kdf --test chaos_test

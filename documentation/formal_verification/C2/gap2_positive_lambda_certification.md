@@ -3,6 +3,14 @@
 > **Status:** ✅ RESOLVED
 > **Date:** 2026-05-31
 > **Conjecture:** C2 — Finite-Precision Lyapunov Exponent Certification
+>
+> > **Erratum (2026-10-10):** the estimator's hardcoded `ln(10)` constant was
+> > `2.152` instead of `2.302585` (`kelvin-kdf/src/lyapunov.rs`), underestimating
+> > λ by ~6.5% per decade of the divergence ratio and inflating chaos horizons
+> > (this broke `test_vector_kelvin_v1`: horizon 271 > 200 steps). Fixed to
+> > `0x4D763776AAA2C000`. Empirical λ values below predate the fix and should
+> > be re-measured with `cargo run -p lyapunov_certification`; the λ ≥ 0.4 lower
+> > bound is unaffected (underestimation only ever shrank λ).
 
 ## 1. Theorem Statement
 

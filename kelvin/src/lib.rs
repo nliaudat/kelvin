@@ -100,7 +100,8 @@ pub mod streaming;
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 pub use kelvin_kdf::{
-    extract_seed, extract_shake256, extract_shake256_into, AsymmetricError, KeySchedule,
+    extract_seed, extract_seed_with_nonce, extract_shake256, extract_shake256_into,
+    extract_shake256_into_with_nonce, extract_shake256_with_nonce, AsymmetricError, KeySchedule,
     OrbitalConfig, OrbitalKeyPair, OrbitalState, ScheduleState,
 };
 pub use kelvin_stream::{ChaChaStream, StreamCipher};
@@ -174,6 +175,9 @@ struct LyapunovResult {
 /// * `config` — Configuration parameters (dt, softening, G, stability thresholds).
 /// * `steps` — Total simulation steps.
 /// * `method` — Integration method (Verlet or Euler).
+/// * `nonce` — Public per-instance session value bound into seed extraction.
+///   Distinct nonces yield independent keystreams from the same config;
+///   an empty nonce reproduces the legacy (pre-nonce) output.
 ///
 /// # Returns
 /// `SimulationResult` containing the simulated bodies, extracted seed,
@@ -183,6 +187,7 @@ fn run_simulation_pipeline(
     config: &OrbitalConfig,
     steps: u64,
     method: IntegrationMethod,
+    nonce: &[u8],
 ) -> Result<SimulationResult, KelvinError> {
     // Estimate Lyapunov time
     let lyapunov = LyapunovEstimator::new(&bodies, config.dt, config.softening, config.g, method);
@@ -226,12 +231,13 @@ fn run_simulation_pipeline(
     // Extract initial orbital seed (using SHAKE256 XOF) directly into
     // a fixed-size array — avoids an unnecessary Vec allocation.
     let mut seed = [0u8; ORBITAL_SEED_SIZE];
-    extract_shake256_into(
+    extract_shake256_into_with_nonce(
         &bodies,
         steps,
         config.g,
         config.softening,
         DOMSEP_ORBITAL_STATE_V1,
+        nonce,
         &mut seed,
     );
 
@@ -262,6 +268,29 @@ pub fn simulate_and_extract_seed_with_method(
     config: &OrbitalConfig,
     method: IntegrationMethod,
 ) -> Result<([u8; ORBITAL_SEED_SIZE], Vec<OrbitalBody>), KelvinError> {
+    simulate_and_extract_seed_with_method_and_nonce(config, method, &[])
+}
+
+/// Run the orbital simulation pipeline with a session `nonce` bound into
+/// seed extraction (default integration method).
+///
+/// Two callers sharing one `OrbitalConfig` but passing different nonces
+/// obtain independent seeds/keystreams. Pass an empty nonce for the legacy
+/// behavior (identical output to [`simulate_and_extract_seed`]).
+pub fn simulate_and_extract_seed_with_nonce(
+    config: &OrbitalConfig,
+    nonce: &[u8],
+) -> Result<([u8; ORBITAL_SEED_SIZE], Vec<OrbitalBody>), KelvinError> {
+    simulate_and_extract_seed_with_method_and_nonce(config, IntegrationMethod::default(), nonce)
+}
+
+/// Like [`simulate_and_extract_seed_with_method`] with a session `nonce`
+/// bound into seed extraction.
+pub fn simulate_and_extract_seed_with_method_and_nonce(
+    config: &OrbitalConfig,
+    method: IntegrationMethod,
+    nonce: &[u8],
+) -> Result<([u8; ORBITAL_SEED_SIZE], Vec<OrbitalBody>), KelvinError> {
     // Validate config
     config.validate()?;
 
@@ -269,7 +298,7 @@ pub fn simulate_and_extract_seed_with_method(
     let bodies = config.bodies.clone();
 
     // Run the shared pipeline
-    let result = run_simulation_pipeline(bodies, config, config.total_steps, method)?;
+    let result = run_simulation_pipeline(bodies, config, config.total_steps, method, nonce)?;
 
     Ok((result.seed, result.bodies))
 }
@@ -311,13 +340,19 @@ impl Kelvin {
     fn init_with_method(
         config: OrbitalConfig,
         method: IntegrationMethod,
+        nonce: &[u8],
     ) -> Result<InitState, KelvinError> {
         // Validate config
         config.validate()?;
 
         // Delegate to the shared simulation pipeline
-        let result =
-            run_simulation_pipeline(config.bodies.clone(), &config, config.total_steps, method)?;
+        let result = run_simulation_pipeline(
+            config.bodies.clone(),
+            &config,
+            config.total_steps,
+            method,
+            nonce,
+        )?;
 
         // Apply expansion factor to safe_steps
         let safe_steps =
@@ -353,7 +388,29 @@ impl Kelvin {
         config: OrbitalConfig,
         method: IntegrationMethod,
     ) -> Result<Self, KelvinError> {
-        let mut state = Self::init_with_method(config, method)?;
+        Self::new_with_method_and_nonce(config, method, &[])
+    }
+
+    /// Create a new Kelvin instance bound to a session `nonce`.
+    ///
+    /// The nonce is mixed into seed extraction, so two instances sharing one
+    /// `OrbitalConfig` but using different nonces produce independent
+    /// keystreams. This is the guardrail against config-reuse two-time-pad
+    /// (see `bad.md` §3): every deployment of a config must use a unique
+    /// nonce. The nonce is public and must be communicated to the decrypting
+    /// party alongside the config. An empty nonce reproduces legacy output.
+    pub fn new_with_nonce(config: OrbitalConfig, nonce: &[u8]) -> Result<Self, KelvinError> {
+        Self::new_with_method_and_nonce(config, IntegrationMethod::default(), nonce)
+    }
+
+    /// Like [`new_with_method`](Self::new_with_method) with a session `nonce`
+    /// bound into seed extraction.
+    pub fn new_with_method_and_nonce(
+        config: OrbitalConfig,
+        method: IntegrationMethod,
+        nonce: &[u8],
+    ) -> Result<Self, KelvinError> {
+        let mut state = Self::init_with_method(config, method, nonce)?;
 
         // Get first key
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
@@ -387,7 +444,7 @@ impl Kelvin {
         config: OrbitalConfig,
         method: IntegrationMethod,
     ) -> Result<Self, KelvinError> {
-        let mut state = Self::init_with_method(config, method)?;
+        let mut state = Self::init_with_method(config, method, &[])?;
 
         // Get first key
         let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
@@ -521,6 +578,11 @@ pub struct KelvinStreaming {
     bytes_processed: u64,
     /// Domain separator for SHAKE256 extraction.
     domain_separator: [u8; 32],
+    /// Session nonce bound into per-step extraction (empty = legacy output).
+    ///
+    /// Gives each config deployment an independent keystream, addressing
+    /// config-reuse two-time-pad (see `bad.md` §3).
+    nonce: Vec<u8>,
     /// Reusable keystream buffer to avoid repeated allocations.
     keystream_buf: Vec<u8>,
     /// Integration method (Verlet or Euler).
@@ -551,6 +613,30 @@ impl KelvinStreaming {
         bytes_per_step: u64,
         method: IntegrationMethod,
     ) -> Result<Self, KelvinError> {
+        Self::new_with_method_and_nonce(config, bytes_per_step, method, &[])
+    }
+
+    /// Create a streaming instance bound to a session `nonce`.
+    ///
+    /// See [`Kelvin::new_with_nonce`] for the rationale: distinct nonces
+    /// yield independent keystreams from the same config. An empty nonce
+    /// reproduces the legacy keystream.
+    pub fn new_with_nonce(
+        config: OrbitalConfig,
+        bytes_per_step: u64,
+        nonce: &[u8],
+    ) -> Result<Self, KelvinError> {
+        Self::new_with_method_and_nonce(config, bytes_per_step, IntegrationMethod::default(), nonce)
+    }
+
+    /// Like [`new_with_method`](Self::new_with_method) with a session `nonce`
+    /// bound into per-step extraction.
+    pub fn new_with_method_and_nonce(
+        config: OrbitalConfig,
+        bytes_per_step: u64,
+        method: IntegrationMethod,
+        nonce: &[u8],
+    ) -> Result<Self, KelvinError> {
         // Validate config
         config.validate()?;
 
@@ -570,6 +656,7 @@ impl KelvinStreaming {
             bytes_per_step: bps as u64,
             bytes_processed: 0,
             domain_separator,
+            nonce: nonce.to_vec(),
             keystream_buf: vec![0u8; bps],
             integration_method: method,
         })
@@ -673,12 +760,13 @@ impl KelvinStreaming {
 
             // 2. Extract keystream into the reusable buffer via SHAKE256 XOF
             //    This avoids allocating a new Vec<u8> for every chunk iteration.
-            extract_shake256_into(
+            extract_shake256_into_with_nonce(
                 &self.bodies,
                 self.step,
                 self.g,
                 self.softening,
                 &self.domain_separator,
+                &self.nonce,
                 &mut self.keystream_buf,
             );
 

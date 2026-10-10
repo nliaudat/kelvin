@@ -75,11 +75,11 @@ Five proof harnesses in `proofs/kani/acceleration_proofs.rs`:
 
 | Harness | Property | Assertion |
 |---------|----------|-----------|
-| `verify_action_reaction` | Newton's Third Law | `m1*a_01 == -m2*a_10` (force-based) |
+| `verify_acceleration_action_reaction` | Newton's Third Law | `m1*a_01 == -m2*a_10` (force-based) |
 | `verify_acceleration_direction` | Direction | `a_ij` points from i toward j |
-| `verify_single_body_zero` | No self-interaction | Single body has zero acceleration |
+| `verify_single_body_zero_acceleration` | No self-interaction | Single body has zero acceleration |
 | `verify_three_body_symmetry` | Net force zero | `Σ m_i * a_i == 0` |
-| `verify_mass_proportionality` | Mass scaling | `|a_01| / |a_10| == m2 / m1` |
+| `verify_acceleration_proportional_to_mass` | Mass scaling | `|a_01| / |a_10| == m2 / m1` |
 
 ---
 

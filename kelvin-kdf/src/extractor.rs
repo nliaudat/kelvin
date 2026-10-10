@@ -27,9 +27,20 @@ fn feed_orbital_state(
     g: kelvin_core::Fixed,
     softening: kelvin_core::Fixed,
     domain_separator: &[u8],
+    nonce: &[u8],
 ) {
     // Domain separation
     sha3::digest::Update::update(hasher, domain_separator);
+
+    // Session nonce (public per-instance uniqueness value).
+    //
+    // Binds the extracted seed to a single cipher instance so that two
+    // instances sharing one OrbitalConfig but using different nonces derive
+    // independent keystreams. An empty nonce reproduces the legacy output
+    // (pre-nonce golden vectors remain valid). The length prefix keeps
+    // `(domain_separator, nonce)` pairs unambiguous.
+    sha3::digest::Update::update(hasher, &(nonce.len() as u64).to_le_bytes());
+    sha3::digest::Update::update(hasher, nonce);
 
     // Physical constants
     sha3::digest::Update::update(hasher, &g.to_raw().to_le_bytes());
@@ -67,6 +78,10 @@ fn feed_orbital_state(
 /// consistency with the SHAKE256 extraction path.
 ///
 /// This ensures that different simulation states produce different seeds.
+///
+/// A session `nonce` may be bound into the extraction via
+/// [`extract_seed_with_nonce`]; this function is equivalent to calling it
+/// with an empty nonce.
 pub fn extract_seed(
     bodies: &[OrbitalBody],
     step: u64,
@@ -74,8 +89,27 @@ pub fn extract_seed(
     softening: kelvin_core::Fixed,
     domain_separator: &[u8],
 ) -> [u8; 64] {
+    extract_seed_with_nonce(bodies, step, g, softening, domain_separator, &[])
+}
+
+/// Extract a 64-byte seed like [`extract_seed`], additionally bound to a
+/// session `nonce`.
+///
+/// Two instances sharing an `OrbitalConfig` but using different nonces derive
+/// independent seeds, which defeats the two-time-pad keystream reuse that
+/// otherwise follows from config reuse. The nonce is public (it must be
+/// communicated to the decrypting party, like a salt); it adds no secrecy,
+/// only instance separation.
+pub fn extract_seed_with_nonce(
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
+    domain_separator: &[u8],
+    nonce: &[u8],
+) -> [u8; 64] {
     let mut hasher = Sha3_512::new();
-    feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator);
+    feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator, nonce);
     let result = hasher.finalize();
     let mut seed = [0u8; 64];
     seed.copy_from_slice(&result);
@@ -87,6 +121,8 @@ pub fn extract_seed(
 /// SHAKE256 is an Extendable-Output Function that can produce a deterministic
 /// stream of bits of any length. This is used to derive large entropy pools
 /// (e.g., 2048 bytes) from the orbital state.
+///
+/// Equivalent to [`extract_shake256_with_nonce`] with an empty nonce.
 pub fn extract_shake256(
     bodies: &[OrbitalBody],
     step: u64,
@@ -95,12 +131,38 @@ pub fn extract_shake256(
     domain_separator: &[u8],
     output_len: usize,
 ) -> Vec<u8> {
+    extract_shake256_with_nonce(bodies, step, g, softening, domain_separator, &[], output_len)
+}
+
+/// Extract arbitrary-length SHAKE256 output bound to a session `nonce`.
+///
+/// See [`extract_seed_with_nonce`] for the security rationale: distinct
+/// nonces yield independent keystreams from the same orbital state.
+pub fn extract_shake256_with_nonce(
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
+    domain_separator: &[u8],
+    nonce: &[u8],
+    output_len: usize,
+) -> Vec<u8> {
     let mut output = vec![0u8; output_len];
-    extract_shake256_into(bodies, step, g, softening, domain_separator, &mut output);
+    extract_shake256_into_with_nonce(
+        bodies,
+        step,
+        g,
+        softening,
+        domain_separator,
+        nonce,
+        &mut output,
+    );
     output
 }
 
 /// Extract SHAKE256 entropy directly into a pre-allocated buffer.
+///
+/// Equivalent to [`extract_shake256_into_with_nonce`] with an empty nonce.
 ///
 /// This avoids the allocation overhead of [`extract_shake256`] when processing
 /// data in chunks, such as in streaming encryption where the same buffer size
@@ -113,12 +175,28 @@ pub fn extract_shake256_into(
     domain_separator: &[u8],
     output: &mut [u8],
 ) {
+    extract_shake256_into_with_nonce(bodies, step, g, softening, domain_separator, &[], output);
+}
+
+/// Extract SHAKE256 entropy into a buffer, bound to a session `nonce`.
+///
+/// See [`extract_seed_with_nonce`] for the security rationale: distinct
+/// nonces yield independent keystreams from the same orbital state.
+pub fn extract_shake256_into_with_nonce(
+    bodies: &[OrbitalBody],
+    step: u64,
+    g: kelvin_core::Fixed,
+    softening: kelvin_core::Fixed,
+    domain_separator: &[u8],
+    nonce: &[u8],
+    output: &mut [u8],
+) {
     #[cfg(feature = "failpoints")]
     fail::fail_point!("shake256-extract");
     let mut hasher = Shake256::default();
 
     // Feed all orbital state into the XOF hasher
-    feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator);
+    feed_orbital_state(&mut hasher, bodies, step, g, softening, domain_separator, nonce);
 
     let mut reader = hasher.finalize_xof();
     XofReader::read(&mut reader, output);
@@ -336,5 +414,74 @@ mod tests {
 
         // Should have roughly half the bits different (avalanche effect)
         assert!(diff_bits > 200, "Too few differing bits: {}", diff_bits);
+    }
+
+    #[test]
+    fn test_nonce_empty_matches_legacy() {
+        // Empty nonce must reproduce the pre-nonce output exactly,
+        // so existing golden vectors stay valid.
+        let bodies = test_bodies();
+        let legacy = extract_shake256(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", 128);
+        let with_empty =
+            extract_shake256_with_nonce(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", &[], 128);
+        assert_eq!(legacy, with_empty);
+
+        let legacy64 = extract_seed(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test");
+        let with_empty64 =
+            extract_seed_with_nonce(&bodies, 0, Fixed::ONE, Fixed::ONE, b"test", &[]);
+        assert_eq!(legacy64, with_empty64);
+    }
+
+    #[test]
+    fn test_nonce_deterministic() {
+        let bodies = test_bodies();
+        let a = extract_shake256_with_nonce(
+            &bodies,
+            7,
+            Fixed::ONE,
+            Fixed::ONE,
+            b"test",
+            b"session-1",
+            64,
+        );
+        let b = extract_shake256_with_nonce(
+            &bodies,
+            7,
+            Fixed::ONE,
+            Fixed::ONE,
+            b"test",
+            b"session-1",
+            64,
+        );
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_nonce_separates_instances() {
+        // Same orbital state, different nonces -> independent keystream.
+        // This is the guardrail against config-reuse two-time-pad (bad.md §3).
+        let bodies = test_bodies();
+        let a = extract_shake256_with_nonce(
+            &bodies,
+            7,
+            Fixed::ONE,
+            Fixed::ONE,
+            b"test",
+            b"session-1",
+            64,
+        );
+        let b = extract_shake256_with_nonce(
+            &bodies,
+            7,
+            Fixed::ONE,
+            Fixed::ONE,
+            b"test",
+            b"session-2",
+            64,
+        );
+        assert_ne!(a, b);
+
+        let diff_bits: u32 = a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum();
+        assert!(diff_bits > 200, "Nonce separation too weak: {} bits", diff_bits);
     }
 }

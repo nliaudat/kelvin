@@ -101,7 +101,7 @@ Kelvin's V2 (Chaos), V3 (Photon), H (Quantum), Prism, Split, and Flare modes are
 
 In a standard nonce-based stream cipher, encrypting the same data twice under the same key with different nonces produces different ciphertexts. Kelvin achieves this differently: the orbital configuration acts as both key and context — each instance consumes its keystream sequentially through key schedule reseeding, so two different messages encrypted with the same config at different step counts produce different keystream segments.
 
-> ⚠️ **Important caveat**: The absence of a nonce means there is no built-in defense against config reuse between instances. Loading the same orbital configuration into two separate `Kelvin` instances and encrypting different data with each produces identical keystream prefixes — this is the two-time pad problem. Users MUST ensure each orbital configuration is used by at most one `Kelvin` instance.
+> ⚠️ **Important caveat**: The absence of a wire nonce means there is no built-in defense against config reuse between instances *unless you use session nonces*. Loading the same orbital configuration into two separate `Kelvin` instances with the same (or empty) nonce and encrypting different data with each produces identical keystream prefixes — this is the two-time pad problem. Users MUST either ensure each orbital configuration is used by at most one `Kelvin` instance, or pass a unique session nonce per instance (`Kelvin::new_with_nonce`, `KelvinStreaming::new_with_nonce`, CLI `--nonce <hex>`). Same config + different nonces = independent keystreams.
 
 Unlike block ciphers (AES) or nonce-based stream ciphers (ChaCha20), Kelvin modes have:
 

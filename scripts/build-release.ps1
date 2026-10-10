@@ -18,8 +18,8 @@
 #     simple_streaming.exe    — Streaming demo
 #     orbital_visualizer.html — 3D orbital simulation visualizer
 #     sample_key.json         — Sample orbital config
-#     test-all.ps1            — Windows test script
-#     test-all.sh             — Linux test script
+#     test_all.bat            — Windows test script
+#     test_all.sh             — Linux test script
 #     README.txt              — Quick-start guide
 # ==============================================================================
 
@@ -107,11 +107,11 @@ if (Test-Path $HTML_SRC) {
 # ---------------------------------------------------------------------------
 Write-Step "4/5: Copying test scripts and sample config"
 
-# Test scripts
-Copy-Item (Join-Path $PSScriptRoot "test-all.ps1") (Join-Path $DEMO_DIR "test-all.ps1") -Force
-Write-Host "  [OK] test-all.ps1"
-Copy-Item (Join-Path $PSScriptRoot "test-all.sh") (Join-Path $DEMO_DIR "test-all.sh") -Force
-Write-Host "  [OK] test-all.sh"
+# Test scripts (Windows: .bat, Linux/macOS: .sh)
+Copy-Item (Join-Path $PSScriptRoot "test_all.bat") (Join-Path $DEMO_DIR "test_all.bat") -Force
+Write-Host "  [OK] test_all.bat"
+Copy-Item (Join-Path $PSScriptRoot "test_all.sh") (Join-Path $DEMO_DIR "test_all.sh") -Force
+Write-Host "  [OK] test_all.sh"
 
 # Sample config
 $SAMPLE_JSON = Join-Path $ROOT "sample_key.json"

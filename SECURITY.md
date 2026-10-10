@@ -11,7 +11,7 @@ Currently, only the latest version of Kelvin is supported for security updates.
 
 ## Reporting a Vulnerability
 
-**EXPERIMENTAL STATUS**: Kelvin is currently in an experimental phase. While we take security seriously, it should not be used for production data until the "Production Readiness Plan" is fully executed.
+**EXPERIMENTAL STATUS**: Kelvin is currently in an experimental phase. While we take security seriously, it should not be used for production data. See [THREAT_MODEL.md](THREAT_MODEL.md) for the current threat model and known limitations.
 
 To report a vulnerability, please open a [GitHub Security Advisory](https://github.com/nliaudat/kelvin/security/advisories/new) or email the maintainer directly. We aim to acknowledge receipt within 48 hours and provide a fix timeline within 5 business days.
 
@@ -48,7 +48,7 @@ When the key schedule reseeds, the new key is derived from the original seed via
 The Q32.64 fixed-point arithmetic used in the n-body simulation is implemented without secret-dependent branches or variable-time operations.
 
 - **Validation**: dudect-bencher t-test passes (|t| < 5) for all individual arithmetic operations
-- **Risk**: A timing leak in the simulation could reveal orbital state information. The `compute_accelerations` function passes independently; the `verlet_step` timing variation is a benchmark artifact (see production readiness plan §1.3).
+- **Risk**: A timing leak in the simulation could reveal orbital state information. The `compute_accelerations` function passes independently; `verlet_step` timing variation is under investigation (see [THREAT_MODEL.md](THREAT_MODEL.md)).
 
 ## Limitations
 
@@ -60,8 +60,8 @@ The V1 (ChaCha20Poly1305) mode uses Poly1305 with a 256-bit ChaCha20-derived key
 
 Kelvin is a symmetric-only cryptosystem. It does not provide public-key encryption or key exchange. To establish a shared secret between two parties, you must use an external KEM (e.g., ML-KEM/FIPS 203, X25519).
 
-- **Mitigation**: A hybrid PQ + stream cipher KEM wrapper is planned for Phase V
-- **Alternative**: Use the `OrbitalKeyPair` asymmetric key derivation for identity-based key agreement
+- **Mitigation**: ML-KEM-768 / ML-DSA-65 primitives are already integrated via `kelvin-kdf` (`ml-kem`, `ml-dsa` dependencies) for identity flows; there is no separate KEM wrapper around the symmetric modes.
+- **Alternative**: `OrbitalKeyPair` derives X25519/Ed25519 key material from orbital state for key derivation use cases — it is not an identity-based key-agreement protocol.
 
 ## Disclosure Plan
 

@@ -47,7 +47,7 @@ use crate::parameters::{
 use crate::photon::KelvinPhoton;
 use crate::quantum::KelvinQuantum;
 use kelvin_core::{Fixed, OrbitalBody};
-use kelvin_kdf::{extract_shake256_into, OrbitalConfig};
+use kelvin_kdf::{extract_shake256_into_with_nonce, OrbitalConfig};
 
 /// Size of the KMAC128 tag in bytes.
 const TAG_LEN: usize = AUTH_TAG_LEN;
@@ -391,14 +391,16 @@ fn derive_mac_key_from_bodies(
     step: u64,
     g: Fixed,
     softening: Fixed,
+    nonce: &[u8],
 ) -> [u8; MAC_KEY_SIZE] {
     let mut extract_buf = [0u8; EXTRACT_BUF_SIZE];
-    extract_shake256_into(
+    extract_shake256_into_with_nonce(
         bodies,
         step,
         g,
         softening,
         DOMSEP_STREAMING_MAC_KEY_V1,
+        nonce,
         &mut extract_buf,
     );
 
@@ -415,18 +417,32 @@ impl KelvinStreamingAuthenticated {
     /// `config` is the shared orbital configuration.
     /// `bytes_per_step` is how many keystream bytes each simulation step produces.
     pub fn new(config: OrbitalConfig, bytes_per_step: u64) -> Result<Self, KelvinError> {
+        Self::new_with_nonce(config, bytes_per_step, &[])
+    }
+
+    /// Create an authenticated streaming instance bound to a session `nonce`.
+    ///
+    /// The nonce is bound into both the keystream and the KMAC128 key, so
+    /// nonce-separated instances are fully independent. See
+    /// [`crate::KelvinStreaming::new_with_nonce`].
+    pub fn new_with_nonce(
+        config: OrbitalConfig,
+        bytes_per_step: u64,
+        nonce: &[u8],
+    ) -> Result<Self, KelvinError> {
         // We need the initial bodies to derive the MAC key.
         // Clone them from the config before creating the streaming instance.
         let bodies = config.bodies.clone();
 
-        let inner = crate::KelvinStreaming::new(config, bytes_per_step)?;
+        let inner = crate::KelvinStreaming::new_with_nonce(config, bytes_per_step, nonce)?;
 
-        // Derive MAC key from initial bodies (step 0)
+        // Derive MAC key from initial bodies (step 0), bound to the nonce
         let mac_key = derive_mac_key_from_bodies(
             &bodies,
             0,
             kelvin_core::DEFAULT_G,
             kelvin_core::SOFTENING_FACTOR,
+            nonce,
         );
 
         Ok(KelvinStreamingAuthenticated { inner, mac_key, tag_buf: [0u8; TAG_LEN] })

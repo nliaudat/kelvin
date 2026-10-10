@@ -87,6 +87,26 @@ kelvin decrypt --mode quantum --config my_secret.json --input file.enc --output 
 
 > **Note:** The `--auth` flag is ignored in `secure` mode (V1 ChaCha20Poly1305 AEAD has built-in authentication).
 
+### Session Nonces (`--nonce`)
+
+By default, the same config always yields the same keystream — deploying one
+config in two instances reuses keystream (two-time pad, see `bad.md` §3).
+Pass a unique hex nonce per deployment to derive independent keystreams from
+the same config. The nonce is public and must be identical at decrypt time
+(transport it alongside the config, like a salt).
+
+```bash
+# Two deployments of the same config, independent keystreams
+kelvin encrypt --config my_secret.json --input a.txt --output a.enc --nonce 01
+kelvin encrypt --config my_secret.json --input b.txt --output b.enc --nonce 02
+
+kelvin decrypt --config my_secret.json --input a.enc --output a.txt --nonce 01
+```
+
+An empty `--nonce` (default) reproduces the legacy keystream. Reusing a
+config *with the same nonce* still reuses keystream — generate a fresh
+random nonce (e.g. 16 bytes from your OS CSPRNG, hex-encoded) per instance.
+
 ### Analyze Configuration Quality
 Verify that a configuration has sufficient chaos and sensitivity to initial conditions.
 ```bash
