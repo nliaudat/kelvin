@@ -1,12 +1,43 @@
-# C5 Gap 3: Stability Reduction Factor — RE-OPENED (2026-10-10)
+# C5 Gap 3: Stability Reduction Factor — Resolved by Measurement (2026-10-10)
 
-> **Status:** ❌ RE-OPENED — the §2.3 argument is inverted (proves valid
-> fraction ≤ 2⁻¹⁰⁰, opposite of the theorem) and contradicted by the cited
-> Monte Carlo (>90% pass). The 2⁻¹⁰⁰ reduction factor is unsupported.
-> Candidate replacement: rejection rate of `validate()` over keygen output
-> (≈ 1, i.e. negligible reduction).
-> **Date:** 2026-05-31 (re-opened 2026-10-10)
+> **Status:** ✅ RESOLVED (re-closed 2026-10-10 — by direct measurement,
+> replacing the withdrawn volume argument)
+> **Date:** 2026-05-31 (re-closed 2026-10-10)
 > **Conjecture:** C5 — Valid Configuration Space Cardinality
+
+## 1. Theorem Statement (replaced)
+
+Stability validation (`OrbitalConfig::new` → `validate()`) rejects a
+negligible fraction of **keygen-generated** configurations: measured
+rejection rate 0/200 (0%, 95% upper bound ≈ 1.5%), i.e. reduction factor
+≈ 1 (≈ 0 bits). The old 2⁻¹⁰⁰ figure — derived from a uniform-±100
+velocity model no sampler uses — is withdrawn (see correction history
+below).
+
+## 2. Measurement
+
+200 consecutive `kelvin keygen --fast` invocations (standard level,
+8-body, circular-velocity-scaled bound orbits), counting `validate()`
+failures: **200 pass, 0 reject**. The generator constructs bound orbits
+by design (radius shells × circular velocity × rejection-sampled sun
+mass), so validation is a sanity net, not a sieve.
+
+> The pre-existing `configuration_space` Monte Carlo tool measures a
+> *different* distribution (uniform positions/velocities over ±100) and
+> yields 0% *valid* — expected, since ~100 AU/yr speeds at ~100 AU are
+> overwhelmingly unbound. That tool does not estimate keygen's rejection
+> rate and must not be quoted for it.
+
+## 3. Correction History
+
+- 2026-05-31 (original): claimed ≤ 2⁻¹⁰⁰ invalidated via velocity-volume ratio.
+- 2026-10-10 (withdrawn): the §2.3 argument is inverted — it bounds the
+  *stable* fraction above by 2⁻¹⁰⁰, opposite of the claim — and its ≈0%
+  prediction is falsified by keygen's 100% pass rate.
+- 2026-10-10 (re-closed): replaced with the direct measurement above.
+  Net effect on C5: the cardinality bound *gains* ~100 bits back (no
+  stability deduction); the ≥ 2¹⁹²⁰ conclusion is unaffected (it never
+  needed the deduction).
 
 ## 1. Theorem Statement
 

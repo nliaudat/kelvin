@@ -78,6 +78,27 @@ understates the worst case by ~2^17.6).
 > from the `den²/C` width. The empirical ~0.99 bits/op measurement stands
 > independently.
 
+### 2.2a Corrected Average-Case Rate (2026-10-10, computed)
+
+Under the doc's own uniform-input assumption over `[MIN, MAX]`, the
+per-division Shannon loss is `E[log₂ width(den)]` with `width = den²/C`:
+
+- `E[log₂ width] ≈ 37.67 bits/op` (closed-form integral, reproducible:
+  `E[2·log₂u − log₂C]` over the range where `den² ≥ C`)
+- i.e. `k_step ≈ 40 × 37.67 ≈ 1500 bits/step` for N=5 Verlet — saturating
+  the usable state in ~2 steps, not 96.
+
+This does **not** contradict the empirical ~0.99 bits/op: that statistic
+measures *local* LSB sensitivity (neighbor divergence), while 37.67 bits
+is the *global* Shannon contraction per division. They are different
+quantities — the doc's error was multiplying the local figure into a
+rate (`40 × 0.99 ≈ 40 bits/step`). Honest accounting: saturation is
+*stronger* than claimed (near-immediate under uniform input), but the
+"40 bits/step over 96 steps" schedule is withdrawn. What weakness this
+exposes instead: everything now hinges on the *input distribution* —
+real trajectories concentrate `den` where widths are small, and no
+measured distribution replaces the uniform assumption yet.
+
 ### 2.3 The LSB Entropy Principle
 
 The key insight is that the discarded remainder `r` depends on the **least significant

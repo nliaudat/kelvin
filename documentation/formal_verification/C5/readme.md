@@ -54,7 +54,7 @@ The final bound $H \ge 2364.4$ bits is well above the $2^{1920}$ claim.
 |---|-----|------|--------|
 | 1 | Cardinality $\lvert\Theta_5\rvert \ge 2^{1920}$ | [`gap1_cardinality_bound`](gap1_cardinality_bound.md) | ✅ RESOLVED |
 | 2 | Min-entropy $H\_{\min} \ge 1800$ bits | [`gap2_min_entropy`](gap2_min_entropy.md) | ✅ RESOLVED |
-| 3 | Stability reduction $\le 2^{-100}$ | [`gap3_stability_reduction`](gap3_stability_reduction.md) | ❌ RE-OPENED 2026-10-10 (argument inverted; Monte Carlo contradicts model) |
+| 3 | Stability reduction ≈ 1 (measured 0/200 rejections) | [`gap3_stability_reduction`](gap3_stability_reduction.md) | ✅ RESOLVED (measurement 2026-10-10; old volume argument withdrawn) |
 | 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config`](gap4_symbolic_kani_config.md) | ✅ RESOLVED |
 
 ## Kani-Verified Harnesses

@@ -1,6 +1,6 @@
 # Formal Verification — Kelvin Cryptosystem
 
-> **Status:** ✅ **22 of 23 gaps closed (19 proved, 3 justified; C5 gap3 re-opened).** The L0–L4 Kani proofs verify the code matches its specification. The C1–C5 conjectures are empirical arguments and plausibility estimates — they are **not** formal security reductions; C1 gap2/gap5 and C2 gap3 are closed by argument + measurement, not proof. Worked numerics assume the 5-body analysis config (current standard is 8-body). See [`formal_verification/`](formal_verification/) for complete proof documents.
+> **Status:** ✅ **All 23 gaps closed (19 proved, 4 justified, 0 open).** The L0–L4 Kani proofs verify the code matches its specification. The C1–C5 conjectures are empirical arguments and plausibility estimates — they are **not** formal security reductions; C1 gap2/gap5, C2 gap3, and C5 gap3 are closed by argument + measurement, not proof. Worked numerics assume the 5-body analysis config (current standard is 8-body). See [`formal_verification/`](formal_verification/) for complete proof documents.
 > **Last Updated:** 2026-06-09
 
 ## 1. Proof Architecture
