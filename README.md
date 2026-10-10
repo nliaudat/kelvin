@@ -1,8 +1,9 @@
 # Kelvin — Quantum-Resistant Chaotic-Entropy Stream Cipher
 
-[![Build Status](https://github.com/nliaudat/kelvin/actions/workflows/rust.yml/badge.svg)](https://github.com/nliaudat/kelvin/actions/workflows/rust.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue)](licence.md)
 [![Crates.io](https://img.shields.io/crates/v/kelvin.svg)](https://crates.io/crates/kelvin)
+
+> **Note:** CI badges omitted — automated workflows are currently disabled (see `.github/workflows/`); the release gate (`scripts/test_all.bat`) was green 2026-10-10.
 
 > **Project Name:** kelvin — **K**ey derivation from n-body **E**lliptic **L**yapunov **V**ortex **IN**stability
 > *A chaotic 3D n-body gravitational key derivation system*
@@ -15,7 +16,7 @@ The core insight: the n-body problem has no closed-form solution for N ≥ 3. Un
 
 > ⚠️ **Important caveat**: Like any stream cipher, known plaintext reveals the keystream for that session. With known plaintext, the n-body layer is bypassed and the attacker directly attacks SHAKE256 preimage resistance (256-bit classical, 128-bit quantum). The computational asymmetry protects the **KDF** (making brute-force config search expensive), not the **stream cipher** (which is bounded by SHAKE256 resistance).
 
-Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers or nonce-based stream ciphers: there is no nonce, no IV, no algebraic round function. No known attack is faster than brute force — and the effective security is 128-bit post-quantum (SHAKE256 bound).
+Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) produce a **quantum-resistant keystream** — data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard). These modes (and V1 ChaCha20Poly1305 AEAD for authenticated bulk encryption) are structurally different from block ciphers: there is no algebraic round function. Instance separation comes from session nonces (see below), not wire nonces. No known attack is faster than brute force — and the effective security is 128-bit post-quantum (SHAKE256 bound).
 
 ![Orbital simulation demo](documentation/demo_video/orbital_demo.gif)
 
@@ -25,11 +26,11 @@ Kelvin's XOR-based modes (V2 Chaos, V3 Photon, H Quantum, Prism, Split, Flare) p
 # Generate a random orbital configuration
 cargo run -p kelvin-cli -- keygen --output key.json
 
-# Encrypt a file
+# Encrypt a file (prints a fresh session nonce — store it)
 cargo run -p kelvin-cli -- encrypt --config key.json --input plaintext.txt --output ciphertext.bin
 
-# Decrypt a file
-cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --output decrypted.txt
+# Decrypt a file (same nonce is required)
+cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --output decrypted.txt --nonce <printed-nonce>
 ```
 
 ## Mode Comparison
@@ -53,7 +54,7 @@ cargo run -p kelvin-cli -- decrypt --config key.json --input ciphertext.bin --ou
 
 Kelvin derives cryptographic keys from the **fixed-point gravitational n-body simulation** — a novel approach to key derivation that differs from traditional KDFs (algebraic hardness, memory-hard functions) and from other chaos-based cryptosystems.
 
-> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Kwong et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 8-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (cross-platform deterministic), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review/patent_review_3.md) for full analysis.
+> ⚠️ **Known Prior Art:** The broad concept of "n-body chaotic cryptography" was previously described by Kwong et al. (2025) using a restricted four-body memristor system for image encryption. Kelvin distinguishes itself via: (1) full gravitational 8-body simulation (not restricted), (2) Q32.64 fixed-point arithmetic (deterministic by integer-only design), (3) general-purpose multi-mode architecture (not image-specific). See [Patent Review #3](documentation/patent_review/patent_review_3.md) for full analysis.
 
 
 ## How It Works
@@ -66,7 +67,7 @@ OrbitalConfig (masses, positions, velocities, G, ε)
     ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  Phase 1: Orbital Simulation (Verlet/Euler)                   │
-│  • Simulate N-body gravitational dynamics (30 DOF chaos)      │
+│  • Simulate N-body gravitational dynamics (48 DOF chaos at standard)      │
 │  • Monitor for stability (Lyapunov, ejections, collapses)     │
 │  • Run for total_steps iterations (chaotic regime enforced)   │
 └──────────────────────────┬───────────────────────────────────┘
@@ -82,7 +83,7 @@ OrbitalConfig (masses, positions, velocities, G, ε)
                            ▼
 ┌──────────────────────────────────────────────────────────────┐
 │  Phase 3: Key Schedule (HKDF-SHA512 + BLAKE3)                 │
-│  • Derive keystream: key ≥ plaintext, no nonce, no IV         │
+│  • Derive keystream: key ≥ plaintext, bound to the session nonce         │
 │  • Reseed pool after each key (forward secrecy — no reuse)    │
 │  • Exhausted after max_keys (each key used exactly once)      │
 └──────────────────────────┬───────────────────────────────────┘
@@ -97,7 +98,7 @@ The resulting keystream is used as a **quantum-resistant stream cipher**: data i
 
 ## Why a Stream Cipher Without Nonces?
 
-Kelvin's V2 (Chaos), V3 (Photon), H (Quantum), Prism, Split, and Flare modes are all **XOR-based stream ciphers**. Unlike traditional stream ciphers (ChaCha20, AES-CTR) that require a nonce/IV, Kelvin derives its keystream entirely from the orbital configuration — there is no nonce to manage, rotate, or accidentally reuse.
+Kelvin's V2 (Chaos), V3 (Photon), H (Quantum), Prism, Split, and Flare modes are all **XOR-based stream ciphers**. Unlike traditional stream ciphers (ChaCha20, AES-CTR) that carry a wire nonce/IV, Kelvin binds a **session nonce** into seed extraction — same config + different nonces = independent keystreams, managed by the caller (the CLI generates one by default).
 
 In a standard nonce-based stream cipher, encrypting the same data twice under the same key with different nonces produces different ciphertexts. Kelvin achieves this differently: the orbital configuration acts as both key and context — each instance consumes its keystream sequentially through key schedule reseeding, so two different messages encrypted with the same config at different step counts produce different keystream segments.
 
@@ -105,11 +106,11 @@ In a standard nonce-based stream cipher, encrypting the same data twice under th
 
 Unlike block ciphers (AES) or nonce-based stream ciphers (ChaCha20), Kelvin modes have:
 
-- **No nonce to manage** — uniqueness is achieved through per-instance key schedule consumption (see caveat above)
-- **No padding or IV** — ciphertext length = plaintext length
+- **Session nonce for instance separation** — uniqueness comes from a per-deployment nonce (`Kelvin::new_with_nonce`, CLI `--nonce`, auto-generated by default) plus per-instance key schedule consumption (see caveat above)
+- **No padding or IV** — ciphertext length = plaintext length (plus 33-byte auth tag when `--auth` is on, default)
 - **No algebraic structure** — nothing for Shor's algorithm to factor or lattice reduction to exploit (this is true of all symmetric stream ciphers, not unique to Kelvin)
 - **Quantum-resistant foundation** — SHAKE256 (NIST PQC) has no known quantum shortcut beyond Grover's (128-bit effective)
-- **Malleability is the only attack** — use `--auth` (KMAC128) to defeat it
+- **Malleability is the only attack** — KMAC128 authentication is on by default (opt out with `--no-auth`)
 
 See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.md) for the full security argument.
 
@@ -119,27 +120,26 @@ See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.m
 
 ### What Kelvin Provides
 
-- **Stream cipher architecture**: V2/V3/H/Prism/Split/Flare all use XOR-based stream ciphers with SHAKE256 keystream — quantum-resistant, no nonce, no key reuse risk
-- **Deterministic KDF**: Same orbital configuration → same keystream (verified by 18 determinism tests)
-- **Chaotic divergence**: Lyapunov exponent λ ≈ 0.693 (positive → chaotic regime)
+- **Stream cipher architecture**: V2/V3/H/Prism/Split/Flare all use XOR-based stream ciphers with SHAKE256 keystream — quantum-resistant; instance separation via session nonce (same config + same nonce reuses keystream: two-time pad)
+- **Deterministic KDF**: Same (config, nonce) → same keystream (verified by 18 determinism tests on the tested toolchain)
+- **Chaotic divergence**: Lyapunov exponent λ ≈ 0.7/yr (positive → chaotic regime; pre-`ln(10)`-fix literature quotes 0.693)
 - **Key derivation chaining** (labeled "forward secrecy"): BLAKE3 reseeding prevents past key recovery from future state, but this is NOT Perfect Forward Secrecy — if the orbital config is compromised, all past and future keys can be recomputed. True PFS would require ephemeral key material.
-- **Constant-time operations**: All fixed-point arithmetic verified via dudect-bencher (|t| < 5)
+- **Constant-time operations**: Integer-only arithmetic; dudect-bencher (|t| < 5) on 12 primitive-level benches (full pipeline not covered — see COMPLIANCE.md §5)
 - **Memory safety**: `#![forbid(unsafe_code)]` across all crates
 - **Zeroization**: All secret material cleared on drop (verified by runtime read-back test)
 - **Formal verification**: Kani proofs L0–L4 (safety, functional equivalence, composite correctness, pipeline integrity, determinism) — see [Formal Verification](#formal-verification) section
 - **NIST SP 800-90B compliance**: Built-in health tests (repetition, adaptive proportion, runs, longest run, Shannon entropy, chi-square, correlation)
-- **NIST SP 800-22 compliance**: All 15 statistical tests pass on orbital keystream
+- **NIST SP 800-22 compliance**: 13–15 of 15 statistical tests pass on orbital keystream depending on mode (Random Excursions inapplicable on some 1-MB samples; see `nist_test_anomalies.md`)
 - **Post-quantum identity**: ML-DSA-65 (FIPS 204) signatures + ML-KEM-768 (FIPS 203) key encapsulation
 - **⚠️ Reseeding note**: The SHAKE256 reseeding is a deterministic transformation — it cannot break finite-precision periodicity in the orbital simulation. See [Finite Precision Analysis](documentation/proof_of_concept.md#48-finite-precision-periodicity-analysis-cang-et-al-2021--unsolved-concern).
 
 ### What Kelvin Does NOT Provide
 
-- **Reduction to a standard hard problem**: No reduction to lattices, discrete log, or similar. Security estimates (C1–C5: information loss, Lyapunov certification, quantum hardness Ω(2⁹⁶⁰), keystream indistinguishability, configuration space ≥ 2¹⁹²⁰) are derived from physical chaos assumptions rather than algebraic hardness. These are plausibility arguments based on chaotic dynamics and SHAKE256 indistinguishability — not formal security reductions.
-  - The ≥ 2¹⁹²⁰ config space figure is an estimate (≈ 40 effective bits × ~48 independent fields). See [Stream Cipher Security Analysis](documentation/stream_cipher_security.md) for the full derivation context.
+- **Reduction to a standard hard problem**: No reduction to lattices, discrete log, or similar. Security estimates (C1–C5) are plausibility arguments based on chaotic dynamics and SHAKE256 indistinguishability — not formal security reductions. Quoted figures (e.g. representable-space combinatorics) describe bounds on paper models, not operational security, which is 128-bit PQ via SHAKE256 (see COMPLIANCE.md §1).
 - **Effective security bound**: All security levels (Standard/Paranoid/Maximum) are bounded by SHAKE256's 128-bit post-quantum effective security. Additional simulation steps increase setup cost but do not raise this bound.
 - **Key exchange**: OrbitalConfig must be established out-of-band
-- **Memory hardness**: Not a memory-hard KDF (no large memory requirements). The n-body simulation is inherently sequential (each step depends on prior state), preventing GPU/ASIC speedup within a single run. Brute-force parallelism across independent guesses is possible, but the computational asymmetry and ≥ 2¹⁹²⁰ keyspace bound make this infeasible.
-- **Information-theoretic security**: Kelvin's XOR modes are computational stream ciphers — keystream indistinguishability is bounded by C4 (Adv(A) ≤ negl(n) + 2⁻⁹⁶⁰). True information-theoretic security requires statistically perfect key randomness equal to message length, which no practical cryptosystem provides. For any real-world adversary, computational indistinguishability via SHAKE256 (NIST FIPS 202) is cryptographically equivalent. See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.md) for the full argument.
+- **Memory hardness**: Not a memory-hard KDF (no large memory requirements). The n-body simulation is inherently sequential (each step depends on prior state), preventing GPU/ASIC speedup within a single run. Brute-force parallelism across independent guesses is possible — and the *generated* keyspace is capped by OS CSPRNG entropy (2²⁵⁶), not by representable-space combinatorics.
+- **Information-theoretic security**: Kelvin's XOR modes are computational stream ciphers — keystream indistinguishability rests on SHAKE256 (128-bit PQ), not on any information-theoretic argument. See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.md) for the full argument.
 
 
 ## Architecture
@@ -198,21 +198,26 @@ cargo add kelvin
 ```rust
 use kelvin::{Kelvin, OrbitalConfig};
 
-// Generate a random 5-body orbital configuration
-let config = OrbitalConfig::chaotic_default();
+// Load a keygen-produced configuration (CLI: kelvin keygen --output key.json)
+let config = OrbitalConfig::from_json(&std::fs::read_to_string("my-key.json")?)?;
+
+// Session nonce: unique per deployment (same config + same nonce = same keystream)
+let nonce = b"deployment-01";
 
 // Create encryption instance (runs simulation)
-let mut alice = Kelvin::new(config.clone()).expect("Kelvin::new");
+let mut alice = Kelvin::new_with_nonce(config.clone(), nonce)?;
 
-// Encrypt data (in-place)
+// Encrypt data in-place (V1 Secure is AEAD: buffer needs 16 extra bytes for the tag)
 let mut plaintext = b"Hello, Kelvin!".to_vec();
-alice.encrypt(&mut plaintext).unwrap();
+plaintext.extend_from_slice(&[0u8; 16]);
+alice.encrypt(&mut plaintext)?;
 
-// Create decryption instance (separate instance, same config)
-let mut bob = Kelvin::new(config).expect("Kelvin::new");
-bob.decrypt(&mut plaintext).unwrap();
+// Create decryption instance (separate instance, same config + nonce)
+let mut bob = Kelvin::new_with_nonce(config, nonce)?;
+bob.decrypt(&mut plaintext)?;
 
-assert_eq!(&plaintext, b"Hello, Kelvin!");
+// V1 decrypt verifies the tag in place; strip the 16 tag bytes to compare
+assert_eq!(&plaintext[..plaintext.len() - 16], b"Hello, Kelvin!");
 ```
 
 ### Streaming Mode (V2)
@@ -250,8 +255,8 @@ kelvin analyze --config my-key.json
 | V2 Chaos (per-step SHAKE256 XOR) | **34 MB/s** | ~48 MB/s |
 | V3 Photon (HKDF→SHAKE256 XOR) | **542 MB/s** | ~48 MB/s |
 | H Quantum (hybrid V3+V2 XOR) | **512 MB/s** | ~48 MB/s |
-| Setup + Keygen (5 bodies, 1M steps) | ~1.1s | — |
-| Setup + Keygen (5 bodies, 10M steps) | ~12.5s | — |
+| Setup + Keygen (8 bodies, 1M steps) | ~1.1s | — |
+| Setup + Keygen (8 bodies, 10M steps) | ~12.5s | — |
 
 > **Note:** All crypto throughput is measured on an AMD Ryzen 5 5600 with 1 GB buffers (in-memory, no file I/O). For 1 MiB buffers (smaller/fresh data), throughput is lower (e.g., KelvinQuantum H: 438 MB/s) — see [Comparative Benchmarks](documentation/bench_comparative.md). File-based benchmarks are bottlenecked by disk I/O (~48 MB/s) regardless of mode. See the [SHAKE256 Benchmark Analysis](documentation/shake256_benchmark_analysis.md) for details.
 
@@ -265,7 +270,7 @@ Kelvin follows Apple's corecrypto blueprint for formal verification using the Ka
 | L1: Functional Equivalence | Arithmetic ops match mathematical spec within dynamically scaled error bounds | ✅ Done |
 | L2: Composite Correctness | `compute_accelerations` matches Newtonian gravity via force-based assertions | ✅ Done |
 | L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ✅ Done |
-| L4: Determinism | Bit-identical results across platforms (SSE2, AVX, AVX2, NEON) | ✅ Done |
+| L4: Determinism | Bit-identical results on the tested toolchain (golden hashes; cross-arch matrix not automated) | ✅ Done |
 
 See [formal_verification.md](documentation/formal_verification.md) for details.
 
