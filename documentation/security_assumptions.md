@@ -1,7 +1,7 @@
 # Security Assumptions — Kelvin Cryptosystem
 
-> **Document Status:** Final
-> **Last Updated:** 2026-05-29
+> **Document Status:** Living document (corrected as needed; see git history)
+> **Last Updated:** 2026-10-10
 
 This document codifies the formal security assumptions underlying the Kelvin
 cryptosystem. Each assumption includes:
@@ -74,9 +74,11 @@ SHAKE256 directly.
 
 ### Statement
 
-Q32.64 fixed-point arithmetic produces identical simulation results across
-all platforms and architectures, including x86_64, aarch64, riscv64, and
-wasm32.
+Q32.64 fixed-point arithmetic produces identical simulation results on any
+platform executing the same integer operations (by design — no floating
+point in the core loop). Multi-architecture coverage (x86_64, aarch64,
+riscv64, wasm32) is asserted by integer-only design and single-toolchain
+golden-hash tests, not by a cross-platform CI matrix.
 
 ### Rationale
 
@@ -98,7 +100,8 @@ implementations, or NaN propagation rules.
   (integer-only arithmetic), not automated — the "pass identically on
   SSE2, AVX, AVX2" phrasing in earlier revisions overstated this.
 - **Architecture-agnostic golden hashes**: Golden hashes are captured on
-  x86_64 and validated across all execution contexts.
+  x86_64; bit-identity elsewhere follows from integer-only arithmetic by
+  design (not measured per-architecture).
 
 ### Violation Consequence
 
@@ -123,7 +126,8 @@ other's messages.
 
 SHAKE256 (NIST FIPS 202) is a cryptographically secure extendable-output
 function (XOF) with:
-- **256-bit classical security** against collision attacks
+- **256-bit classical security** against preimage attacks (collision bound
+  is output-length dependent: 2^{L/2} for L-bit output)
 - **128-bit quantum security** (Grover's algorithm reduces effective security
   by at most half)
 - Computational indistinguishability from random for any polynomial-time
@@ -150,9 +154,10 @@ distinguishing attacks exist against SHAKE256 at the time of writing.
 ### Violation Consequence
 
 A break of SHAKE256 would compromise all stream cipher modes (V2, V3, H, Prism, Split,
-Flare) and the entropy extraction pipeline. However, the orbital chaos layer
-provides a second line of defense — an attacker would also need to invert the
-N-body simulation.
+Flare) and the entropy extraction pipeline. Note the limit of the "second line of
+defense" framing: the n-body layer only protects *config recovery* (guessing the
+shared secret). Against keystream recovery (known plaintext), the attacker
+bypasses the simulation entirely and attacks SHAKE256 directly.
 
 ### Supporting Evidence
 
@@ -250,6 +255,32 @@ entropy pool (requiring SHAKE256 inversion) and invert the n-body simulation.
 
 ---
 
+## Assumption 8: Session Uniqueness (Config, Nonce)
+
+### Statement
+
+Each cipher instance must use a unique (config, nonce) pair. The nonce is
+mixed into every seed extraction, so distinct nonces yield independent
+keystreams from one config — but reusing a pair reuses keystream
+(two-time pad), with no further defense.
+
+### Enforcement
+
+- **Extraction binding** (`kelvin-kdf/src/extractor.rs`): length-prefixed
+  nonce hashed after the domain separator in `feed_orbital_state`.
+- **CLI defaults** (`kelvin-cli/src/main.rs`): encrypt generates a fresh
+  16-byte nonce and prints it; decrypt requires `--nonce` (`--nonce=`
+  selects legacy output explicitly).
+
+### Violation Consequence
+
+Same-pair reuse produces identical keystream prefixes across instances;
+decryption of one instance's traffic with another's stream is trivially
+breakable. This is a caller-discipline requirement, enforced by defaults
+but overridable.
+
+---
+
 ## Summary Table
 
 | # | Assumption | Enforcement Location | Risk if Violated |
@@ -261,6 +292,7 @@ entropy pool (requiring SHAKE256 inversion) and invert the n-body simulation.
 | 5 | HKDF-SHA512 security | `schedule.rs`, `authenticated.rs` | Key schedule compromise |
 | 6 | Secret zeroization | `Drop` impls (`schedule.rs`, `lib.rs`, flare/prism/split, `Zeroizing` buffers; verified by `zeroize_verify`) | Cold-boot / memory-disclosure recovery |
 | 7 | OS CSPRNG seeding | `keygen.rs` (`rand::thread_rng`) | Generated keyspace capped at OS entropy (2²⁵⁶); weak RNG collapses it |
+| 8 | Session uniqueness | Nonce bound into extraction (`extractor.rs`, `new_with_nonce`, CLI `--nonce`) | Same-(config, nonce) reuse reuses keystream (two-time pad) |
 
 ---
 
@@ -277,6 +309,8 @@ entropy pool (requiring SHAKE256 inversion) and invert the n-body simulation.
   Permutation-Based Hash and Extendable-Output Functions." FIPS PUB 202.
 - Poincaré, H. (1889). "Sur le problème des trois corps et les équations
   de la dynamique." *Acta Mathematica*, 13, 1–270.
+- Poincaré, H. (1899). *Les Méthodes Nouvelles de la Mécanique Céleste*,
+  Vol. 3. Gauthier-Villars. (Non-integrability proof cited in §A1 rationale.)
 - Wolf, A., Swift, J. B., Swinney, H. L., & Vastano, J. A. (1985).
   "Determining Lyapunov Exponents from a Time Series." *Physica D*, 16(3),
   285–317.
