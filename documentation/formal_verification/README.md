@@ -14,13 +14,25 @@ formal_verification/
 
 ## Summary
 
-| Conjecture | Gaps | Resolved | Proof Sketch |
+| Conjecture | Gaps | Closed | Proof Sketch |
 |------------|------|----------|-------------|
-| **C1**: Information Loss | 7 | **7** ✅ | [`readme.md`](C1/readme.md) |
+| **C1**: Information Loss | 7 | **7** ✅ (5 proved, 2 justified*) | [`readme.md`](C1/readme.md) |
 | **C2**: Lyapunov Certification | 6 | **6** ✅ | [`readme.md`](C2/readme.md) |
 | **C3**: Quantum Hardness | 3 | **3** ✅ | [`readme.md`](C3/readme.md) |
 | **C4**: Keystream Indistinguishability | 3 | **3** ✅ | [`readme.md`](C4/readme.md) |
 | **C5**: Configuration Space | 4 | **4** ✅ | [`readme.md`](C5/readme.md) |
-| **Total** | **23** | **23 ✅** | |
+| **Total** | **23** | **23 ✅** (21 proved, 2 justified*) | |
 
-All 23 gaps are resolved with full mathematical proofs.
+\* C1 gap2 (uniformity, conditional on unproven ergodicity) and gap5
+(rounding-error independence) are closed by argument + empirical
+cross-check, not by proof. See `C1/readme.md:66,69`.
+
+> **Scope note:** all worked numerics in C1–C5 (state entropy 3840 bits,
+> k_step ≥ 40 bits/step, T_sat ≈ 96, λ ≈ 0.693/yr, D_KY estimates) are for
+> the 5-body analysis configuration. Current `standard`/`paranoid` keygen
+> emits 8 bodies, which has a different spectrum and mixing time — the
+> figures do not transfer automatically and should be re-derived for N=8
+> before quoting.
+
+All 23 gaps are closed: 21 with proofs, 2 (C1 gap2, gap5) by justified
+argument with empirical validation.

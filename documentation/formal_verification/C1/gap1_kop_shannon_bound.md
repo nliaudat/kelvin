@@ -148,7 +148,7 @@ The empirical validation in `tests/information_loss/` confirms:
 |-------------|-------|----------|
 | K-S p-value for `dist_cubed` uniformity | > 0.05 | Uniform distribution supported |
 | Max preimage count | ≤ 8,000,000 | C1 ε-bound verified |
-| `k_op` empirical estimate | ~0.99 bits | Consistent with ≥ 1 bound |
+| `k_op` empirical estimate | ~0.99 bits | Consistent with the ≥ 0.98 ε-bound (gap4); the ≥ 1 statement in §6 overclaims by ~0.01 |
 
 ---
 
