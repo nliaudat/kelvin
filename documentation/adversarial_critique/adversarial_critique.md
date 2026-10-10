@@ -462,9 +462,9 @@ Furthermore, in V2 mode:
 
 ---
 
-## 20. [ADDRESSED] "No Nonce" Is a Liability Masquerading as a Feature
+## 20. [ADDRESSED — SUPERSEDED BY GUARDRAIL] "No Nonce" Is a Liability Masquerading as a Feature
 
-**Status: ADDRESSED** — `README.md` now includes an explicit warning (line 104): "⚠️ Important caveat: The absence of a nonce means there is no built-in defense against config reuse between instances. Loading the same orbital configuration into two separate Kelvin instances produces identical keystream prefixes — this is the two-time pad problem. Users MUST ensure each orbital configuration is used by at most one Kelvin instance."
+**Status: ADDRESSED, then SUPERSEDED (2026-10-10)** — The original resolution added a documented warning (single-instance-per-config). Session nonces (`--nonce`, `new_with_nonce`, bound into every seed extraction; see `bad.md` §3) have since replaced the warning-only posture with a protocol guardrail: same config + distinct nonces = independent keystreams. Reusing a config *with the same nonce* (or empty nonce) still reuses keystream, so the two-time-pad warning survives in narrowed form — the rule is now "one (config, nonce) pair per instance".
 
 **Source documents:** `README.md` §"Why a Stream Cipher Without Nonces?", `stream_cipher_security.md` §7
 

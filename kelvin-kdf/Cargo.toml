@@ -22,7 +22,7 @@ signature = "2.2"
 thiserror = "1.0"
 zeroize = { version = "1.6", features = ["zeroize_derive"] }
 ml-kem = { version = "0.3", default-features = false, features = ["alloc"] }
-ml-dsa = { version = "0.1.0-rc.4", default-features = false }
+ml-dsa = { version = "0.1", default-features = false }
 serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0", optional = true }
 fail = { version = "0.5", optional = true }

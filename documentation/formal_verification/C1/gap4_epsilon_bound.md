@@ -46,11 +46,15 @@ When the quotient `q` is zero or near-zero (which occurs when `dist_cubed_raw > 
 
 When `q` is large (which occurs when `dist_cubed_raw` is near MIN), the quotient **resolves** the LSB of `dist_cubed` — the division acts more like a one-to-one mapping and the information loss is less than 1 bit.
 
-The fraction of the input range where `q` is large enough to resolve the LSB is:
+The fraction of the input range where `q` is large enough to resolve the LSB is treated heuristically as:
 
 $$\text{leakage fraction} = \frac{\text{range where } q \text{ resolves LSB}}{\text{total range}} \approx \frac{1}{\log_2(\text{MAX} / \text{MIN})}$$
 
-This is because the quotient `q` takes approximately `log₂(MAX/MIN)` distinct values across the input range, and only the smallest quotient values (approximately the first 1 out of log₂(MAX/MIN) distinct values) are in the "resolving" regime.
+> **Status:** this is an asserted ansatz, not a derived bound — the quotient
+> takes far more than `log₂(MAX/MIN)` distinct values across the range, so
+> the "first 1 out of log₂(MAX/MIN) values are resolving" step does not
+> follow. It is retained as a conservative heuristic (its prediction,
+> k_op ≥ 0.98, sits below the empirical ~0.99), not as a theorem.
 
 ### 2.4 Explicit Computation
 
@@ -66,17 +70,20 @@ For the physical range:
 
 ### 2.5 Comparison with Kani-Verified Bound
 
-The Kani harness `verify_c1_epsilon_bound` proves that the worst-case preimage count per division is bounded by 8,000,000 values. This corresponds to:
+The Kani harness `verify_c1_epsilon_bound` proves that the worst-case preimage count per division is bounded by 8,000,000 values. As a Hartley (worst-case) figure that is `log₂(8M) ≈ 22.9` bits of ambiguity per division — a different quantity from the average-case Shannon bound, not directly comparable:
 
-$$k_{op} \geq \log_2(8,000,000) / \log_2(\text{MAX/MIN}) \times 1 \text{ bit} \approx 0.992 \text{ bits}$$
-
-The analytical bound (0.980 bits) is slightly more conservative than the Kani-verified bound (0.992 bits), confirming consistency.
+> **Correction (2026-10-10):** the previous revision claimed this "corresponds to
+> `log₂(8,000,000) / log₂(MAX/MIN) ≈ 0.992` bits", which is arithmetically
+> false (`22.93 / 50.93 ≈ 0.45`) and conceptually muddled (a worst-case count
+> is not a per-operation Shannon rate). The Kani bound stands on its own as a
+> worst-case preimage cap; the Shannon rate rests on the analytical ε-bound
+> (§2.4) and the empirical ~0.99 measurement.
 
 | Bound | `k_op` | Source |
 |-------|------|--------|
 | Worst-case (softening limit) | 0.98 bits | Analytical ε-bound |
 | Average (empirical) | ~0.99 bits | `tests/information_loss/` |
-| Preimage bound (Kani) | ≤ 8M values | `verify_c1_epsilon_bound` |
+| Preimage cap (Kani) | ≤ 8M values (≈22.9 Hartley bits, worst case) | `verify_c1_epsilon_bound` |
 | ε | 0.0197 | 1 / log₂(MAX/MIN) |
 
 ---
@@ -93,13 +100,13 @@ $$\varepsilon \approx \frac{1}{22.9 + 28} = \frac{1}{50.9} \approx 0.0197$$
 
 ### 3.2 Sensitivity Analysis
 
-If the physical bounds were tighter (e.g., MAX = 10 AU instead of 100 AU), ε would increase:
+If the physical bounds were tighter (e.g., MAX = 10 AU instead of 100 AU), ε would increase. Note MAX ∝ (max separation)³, so each 10× in distance shrinks the log-range by `log₂(1000) ≈ 9.97` bits (not `log₂(10)`):
 
 | MAX (AU) | log₂(MAX/MIN) | ε | `k_op` ≥ |
 |----------|---------------|---|--------|
 | 100 | 50.9 | 0.0197 | 0.980 |
-| 10 | 47.9 | 0.0209 | 0.979 |
-| 1 | 44.9 | 0.0223 | 0.978 |
+| 10 | 41.0 | 0.0244 | 0.976 |
+| 1 | 31.0 | 0.0323 | 0.968 |
 | Softening only (2^36) | 0 | 1.0 | 0.0 |
 
 The bound becomes trivial (`k_op` ≥ 0) only when MAX = MIN, which never occurs in practice.

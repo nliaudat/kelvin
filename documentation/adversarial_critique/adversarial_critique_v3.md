@@ -105,7 +105,7 @@ The documentation is substantially more honest and precise. These are real impro
 
 ### 🟠 12. [ADDRESSED] The Poincaré Year Is Still Inconsistent Across Documents
 
-**Resolution:** `security_assumptions.md` references consolidated to 1899 (*Les Méthodes Nouvelles*, Vol. 3). The reference to the 1889 Acta Mathematica paper removed.
+**Resolution:** `security_assumptions.md` body cites 1899 (*Les Méthodes Nouvelles*, Vol. 3); the References section retains 1889 (Acta Mathematica) as a *distinct* publication. (Correction 2026-10-10: an earlier draft of this note said the 1889 reference was removed — it was not; v4#12 records the correct final state.)
 
 ---
 
