@@ -258,7 +258,7 @@ The most important distinction for patent purposes:
 | Kelvin Feature | OrBIT-KDF | Why It Matters |
 |---------------|-----------|----------------|
 | **N-body gravitational simulation** | Chirikov map + Julia set | Fundamentally different dynamical system |
-| **30 DOF (10 bodies × 3D)** | 2D map + complex plane | Higher-dimensional chaos space |
+| **48 DOF (8 bodies × 6D)** | 2D map + complex plane | Higher-dimensional chaos space |
 | **Fixed-point arithmetic** | Floating-point | Cross-platform determinism |
 | **Lyapunov exponent monitoring** | Not present | Security parameter, collapse/ejection detection |
 | **SHAKE256 XOF** | SHA-512 | Extendable output, NIST-standard |
@@ -309,7 +309,7 @@ The most important distinction for patent purposes:
 
 Based on the new findings, patent claims should emphasize:
 
-1. **N-body gravitational simulation specifically** — Not "chaotic dynamics" broadly. The n-body problem has specific properties (gravitational force law, symplectic structure, 30 DOF) that distinguish it from Chirikov maps, Julia sets, logistic maps, etc.
+1. **N-body gravitational simulation specifically** — Not "chaotic dynamics" broadly. The n-body problem has specific properties (gravitational force law, symplectic structure, 48 DOF at standard) that distinguish it from Chirikov maps, Julia sets, logistic maps, etc.
 
 2. **Fixed-point arithmetic** — The Q32.64 fixed-point solution for cross-platform determinism is a specific technical contribution not found in any prior art.
 

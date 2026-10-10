@@ -106,20 +106,20 @@ All unit tests pass across the core crates:
 
 ### 4.1 Chaotic Divergence
 
-The Lyapunov estimator confirms that the n-body system is chaotic. For a 3-body Standard configuration:
+The Lyapunov estimator confirms that the n-body system is chaotic. For the 5-body analysis configuration:
 
-- **Largest Lyapunov exponent**: ~0.693 (positive → chaotic)
-- **Lyapunov time**: ~1,000 steps (horizon of predictability)
+- **Largest Lyapunov exponent**: ~0.7/yr (positive → chaotic; pre-`ln(10)`-fix literature quotes 0.693)
+- **Lyapunov time**: ~1.44 yr (~1443 steps at dt ≈ 0.001; horizon varies by config — measured 254 steps for the test-vector config)
 - **Shadow orbit divergence**: Exponential growth confirmed
 
-This proves that the orbital simulation operates in the chaotic regime, where small differences in initial conditions produce exponentially diverging trajectories.
+This is empirical evidence (not proof) that the orbital simulation operates in the chaotic regime, where small differences in initial conditions produce exponentially diverging trajectories.
 
 ### 4.2 No Shortcut Attacks
 
 The n-body integrator (Verlet or Euler) is inherently sequential — step N+1 requires the output of step N. This means:
 
-- **No closed-form solution**: The n-body problem ($N \ge 3$) has no known analytical solution. Kelvin strictly enforces $N \ge 3$ to prevent integration of predictable 2-body orbits.
-- **No precomputation advantage**: Each `OrbitalConfig` produces a unique keystream; precomputed tables are useless due to the dynamic gravitational constant ($G$) and large state space.
+- **No closed-form solution**: The n-body problem ($N \ge 3$) has no known analytical solution. Kelvin enforces a default minimum of 5 bodies (`MIN_BODIES`), keeping all deployments in the chaotic N ≥ 3 regime.
+- **No precomputation advantage**: Each `OrbitalConfig` produces a unique keystream; precomputed tables are useless due to the large state space and per-config physical parameters ($G$, softening).
 
 ### 4.4 Hybrid Post-Quantum Identity Verification
 The asymmetric layer provides **Hybrid Post-Quantum Identity Verification**, combining classical and quantum-resistant primitives:
@@ -169,7 +169,7 @@ The KDF pipeline operates in two distinct time domains:
 ```
 ┌─────────────────────────────────────────────────────┐
 │                    REAL TIME                         │
-│  simulate_with_monitoring(bodies, total_steps=200)   │
+│  simulate_with_monitoring(bodies, total_steps=1000)  │
 │  ↓ output: final orbital state                       │
 │  ↓ extract_seed(state) → 2048-byte seed              │
 └────────────────────┬────────────────────────────────┘
@@ -177,11 +177,13 @@ The KDF pipeline operates in two distinct time domains:
                      ▼
 ┌─────────────────────────────────────────────────────┐
 │                  VIRTUAL TIME                        │
-│  KeySchedule::new(seed, total=200, interval=10,     │
-│                   safe=73)                           │
-│  ↓ max_keys = 7                                      │
+│  (illustrative numbers; horizons are config-dependent│
+│   — e.g. min_chaos ≈ 254 steps for the test config)  │
+│  KeySchedule::new(seed, total=1000, interval=10,     │
+│                   safe=254)                          │
+│  ↓ max_keys = 25                                     │
 │  ↓ Each next_key() increments step by 10             │
-│  ↓ Exhausted at step 70 (7 keys × 10; safe_steps=73)  │
+│  ↓ Exhausted at step 250 (25 keys × 10; safe=254)    │
 │  ↓ Each key provides 4 GiB of safe encryption        │
 └─────────────────────────────────────────────────────┘
 ```
@@ -211,11 +213,11 @@ Kelvin already addresses finite precision degradation through several architectu
 | State refresh | Scrambling post-processing | Reseeding via SHAKE256 (see caveat below) |
 | Entropy extraction | Binary quantization | 2048-byte domain-separated hash of full orbital state |
 | Forward secrecy | None | BLAKE3 reseed per key |
-| State space | 3 variables × f64 | 30 variables × Q32.64 fixed-point |
+| State space | 3 variables × f64 | 48 variables × Q32.64 fixed-point (8-body standard; 30 at N=5) |
 
 > ⚠️ **Important caveat on reseeding**: The reseeding operation is a deterministic transformation of deterministic state. SHAKE256 is a function, not an entropy source — it produces the same output from the same input every time. If the orbital state becomes periodic (repeats), the SHAKE256 input repeats, and the reseeding output repeats. **Reseeding cannot break deterministic periodicity** — it only makes cycle detection harder, not the cycle shorter. The actual period of the Q32.64 n-body simulation remains a genuine unsolved concern regardless of reseeding. The primary defense against periodicity is the large state space (~2^64 states per variable), not the reseeding mechanism.
 
-**Lyapunov horizon enforcement** provides a secondary defense. Kelvin rejects configurations where the simulation runs beyond the Lyapunov time (~1,000 steps for standard configurations). This ensures that key material is extracted only from the chaotic regime, before any finite-precision periodicity could manifest.
+**Lyapunov horizon enforcement** provides a secondary defense. Kelvin rejects configurations where the step count falls below the measured chaos horizon (config-dependent — e.g. ~254 steps for the test-vector config, up to ~100k scale for standard configs). This ensures that key material is extracted only from the chaotic regime, before any finite-precision periodicity could manifest.
 
 ### Recommended Additions
 
@@ -230,7 +232,7 @@ Following the Cang et al. methodology, Kelvin should adopt:
 
 ### Conservative Chaos Validation
 
-The Sprott-A system is conservative (Hamiltonian), preserving phase-space volume — the same mathematical class as n-body gravitational dynamics. The paper's successful PRNG design validates Kelvin's core premise: conservative chaotic systems produce high-quality pseudo-random sequences suitable for cryptographic applications. Kelvin's n-body approach extends this principle to a higher-dimensional (30 DOF vs. 3 DOF), physically-grounded system with stronger security properties.
+The Sprott-A system is conservative (Hamiltonian), preserving phase-space volume — the same mathematical class as n-body gravitational dynamics. The paper's successful PRNG design validates Kelvin's core premise: conservative chaotic systems produce high-quality pseudo-random sequences suitable for cryptographic applications. Kelvin's n-body approach extends this principle to a higher-dimensional (48 DOF at standard 8-body vs. 3 DOF), physically-grounded system.
 
 ---
 
@@ -299,7 +301,7 @@ benchmark rate, ETA math).
 - **Experimental status**: Kelvin has not undergone formal cryptanalysis. The security claims are based on physical reasoning (chaotic dynamics) rather than mathematical proof.
 - **Key exchange**: Kelvin does not define a key exchange protocol. The `OrbitalConfig` must be established through an out-of-band mechanism.
 - **Memory hardness**: Unlike Argon2, Kelvin is not memory-hard. An attacker with sufficient RAM faces no memory constraint.
-- **Quantum resistance**: Full quantum resistance is achieved through the integration of **ML-DSA** and **ML-KEM**. The stream cipher (ChaCha20) remains vulnerable to Grover's algorithm but maintains 128-bit PQ security.
+- **Quantum resistance**: ML-DSA and ML-KEM provide post-quantum identity (signatures, encapsulation). The symmetric stream cipher modes rely on SHAKE256/ChaCha20 with 128-bit PQ security (Grover); they are quantum-*resistant*, not quantum-*immune*, like all symmetric crypto.
 
 ---
 
@@ -363,8 +365,10 @@ final implementation.
 
 ### Analysis
 
-All 7 benchmarks pass with `|t| < 5`, confirming that the Q32.64 fixed-point arithmetic
-operations in `kelvin-core` are constant-time with respect to input values.
+All 12 benchmarks pass with `|t| < 5`, confirming no detected timing
+difference across the Q32.64 fixed-point arithmetic operations in
+`kelvin-core` plus simulate/extract/schedule coverage (see
+`tests/constant_time_bench/README.md` for the bench list).
 
 #### ✅ PASS: Multiplication (`bench_fixed_mul`)
 
@@ -407,7 +411,7 @@ operations ensure that the composite computation has no measurable timing variat
 1. ✅ **Done — sqrt constant-time fix:** Replaced Newton's method with binary digit-by-digit algorithm. `|t|` went from -1209 to -1.33.
 2. ✅ **Done — division constant-time fix:** Replaced hybrid hardware/software division with fully constant-time 192-iteration restoring division. Eliminated timing variation from `__udivti3`.
 3. ✅ **Done — acceleration benchmark redesign:** Redesigned test classes to use same position magnitudes for both classes, isolating mass variation as the only difference.
-4. ✅ **All 7 benchmarks pass:** The entire fixed-point arithmetic stack is now verified constant-time.
+4. ✅ **All 12 benchmarks pass:** the primitive-level arithmetic plus simulate/extract/schedule coverage shows no detected timing difference (see bench list above; historical "7" counts predate the added coverage).
 
 ### Limitations of the Methodology
 
@@ -480,14 +484,16 @@ The test suite is located in `tests/nist_tests/` and implements all 15 NIST SP 8
 # Run the NIST test suite
 cargo run -p nist_tests
 
-# Expected output:
+# Expected output (per-mode pass counts vary: 13–15/15 — Random
+# Excursions reports inapplicable on some 1-MB samples; see
+# nist_test_anomalies.md):
 # === NIST SP 800-22 Statistical Test Suite for Kelvin ===
 # Keystream size: 1048576 bytes = 8388608 bits
 #   [PASS] Frequency (Monobit) Test
 #   [PASS] Block Frequency Test (M=128)
 #   [PASS] Runs Test
-#   ... (all 15 tests)
-# === Results: 15/15 tests passed ===
+#   ... (remaining tests; excursions may report inapplicable)
+# === Results: 13-15/15 tests passed (mode-dependent) ===
 ```
 
 The test generates a 1MB keystream from a deterministic orbital configuration and exports it to `keystream.bin` for external validation using the official NIST STS software package.
@@ -518,7 +524,7 @@ For random data, $r \approx 0$. CryptoChaos measured this to verify the absence 
 
 ```bash
 # Run entropy analysis with keystream metrics
-python tests/entropy_analysis/entropy_test.py --keystream
+cargo run --release -p entropy_analysis -- --keystream
 ```
 
 ---

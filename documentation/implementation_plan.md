@@ -1,5 +1,12 @@
 # Implementation Plan — Resolving Remaining v4 Critique Gaps
 
+> **Status (2026-10-10):** historical proposal — partially executed.
+> Done: Poincaré 1899 standardization, C5 CSPRNG-cap note, formal-verification
+> caveats. Open: C3/C4 operational restatement to 2⁻¹²⁸ (tracked in
+> C4/readme scope note), OTP-terminology removal from `lib.rs`/`photon.rs`/
+> `quantum.rs` (still pervasive — tracked, not started). Do not treat
+> unchecked items below as complete.
+
 This plan outlines the changes needed to fully address the mathematical, logical, and terminological gaps identified in [adversarial_critique_v4.md](adversarial_critique/adversarial_critique_v4.md).
 
 ## User Review Required

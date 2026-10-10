@@ -62,7 +62,12 @@ flowchart TD
 
 ---
 
-## Secure Mode — ChaCha20 + BLAKE3 Keyed Authentication
+## Secure Streaming Mode — ChaCha20 + BLAKE3 Keyed Authentication
+
+> **Scope:** this section documents the `SecureEncryptor`/`SecureDecryptor`
+> *streaming* API (`kelvin/src/streaming.rs`), which pairs ChaCha20 with a
+> 32-byte BLAKE3 keyed tag. It is distinct from V1 Secure AEAD
+> (ChaCha20Poly1305, 16-byte tag) used by `Kelvin` — see the overview table.
 
 ### Architecture
 
@@ -310,7 +315,7 @@ key, using only 0.27% of HKDF's capacity. V3 uses HKDF's full capacity to
 derive a SHAKE256 XOF seed, then produces arbitrary-length keystream:
 
 ```
-2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited keystream
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → keystream (reseeded every 64 MiB; bounded by max_reseeds)
 ```
 
 A persistent SHAKE256 XOF reader is kept alive across chunks, only re-created
@@ -580,10 +585,10 @@ sequenceDiagram
 
 ## Mode Comparison
 
-| Feature | Secure | Chaos | Photon | Quantum | Prism |
+| Feature | Secure (streaming API) | Chaos | Photon | Quantum | Prism |
 |---------|--------|-------|--------|---------|-------|
 | **Encryption** | ChaCha20 stream | SHAKE256 XOR | HKDF→SHAKE256 XOR | Cache+XOR + orbital reseed | OTP key generator |
-| **Authentication** | BLAKE3 keyed hash (32B) | None | None | None | None |
+| **Authentication** | BLAKE3 keyed hash (32B) | None in type (CLI: KMAC128 default) | None in type (CLI: KMAC128 default) | None in type (CLI: KMAC128 default) | None |
 | **Keystream source** | ChaCha20 | Orbital simulation | HKDF→SHAKE256 | BLAKE3→SHAKE256 + orbital | HKDF→SHAKE256 (isolated) |
 | **Forward secrecy** | ❌ | ✅ (per step) | ✅ (per 64 MiB) | ✅ (per reseed interval) | ✅ (per 64 MiB) |
 | **Quantum resistant** | ❌ (128-bit) | ✅ | ✅ | ✅ | ✅ |
@@ -603,7 +608,7 @@ internally but uses distinct domain separators to ensure Prism-generated OTP
 keys are cryptographically isolated from normal V3 Photon keystream.
 
 ```
-2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → unlimited OTP keys
+2048B seed → HKDF-SHA512 → 64B XOF seed → SHAKE256 → OTP keys (bounded by max_reseeds)
 ```
 
 Each reseed derives a fresh 2048-byte pool via BLAKE3 for forward secrecy.

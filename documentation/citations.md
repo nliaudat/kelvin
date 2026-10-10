@@ -97,8 +97,8 @@ The design rationale for the Salsa20 family, including ChaCha20's improvements. 
 CryptoChaos combines four discrete chaotic maps (Logistic, Chebyshev, Tent, Henon) with X25519 Diffie-Hellman, SHA3-256, HKDF, and AES-GCM. The framework achieves near-maximal Shannon entropy and passes NIST SP 800-22 statistical tests. Quantum analysis estimates Grover's attack requires ~2.1 × 10⁹ T-gates.
 
 Kelvin differs in several respects:
-- **Chaos source:** Physical n-body orbital dynamics (30 DOF) vs. discrete maps (4D)
-- **Authentication:** Optional KMAC vs. built-in AES-GCM
+- **Chaos source:** Physical n-body orbital dynamics (48 DOF standard) vs. discrete maps (4D)
+- **Authentication:** KMAC on by default (CLI) vs. built-in AES-GCM
 - **Forward secrecy:** BLAKE3 reseeding (CryptoChaos does not specify)
 - **Zeroization:** Explicit SecureZeroize trait (CryptoChaos does not mention)
 - **Performance:** Benchmarked at ~500MB/s (CryptoChaos does not report)
@@ -112,7 +112,7 @@ Cang et al. proposed a pseudo-random number generator based on a generalized con
 
 **Conservative Chaos Validation.** The Sprott-A system is conservative (Hamiltonian), meaning it preserves phase-space volume — the same mathematical class as n-body gravitational dynamics. The paper demonstrates that conservative chaotic systems produce high-quality pseudo-random sequences suitable for cryptographic applications. This validates Kelvin's core premise: n-body orbital mechanics (a 30-dimensional Hamiltonian system) is an appropriate foundation for a KDF.
 
-**Finite Precision Degradation (FPPC).** The paper identifies a critical problem: when chaotic systems are implemented on digital computers with finite precision, *dynamical degradation* occurs — periodicity appears and security is compromised. They propose a Finite Precision Period Calculation (FPPC) algorithm to measure repetition periods. This is directly relevant to Kelvin's Q32.64 fixed-point arithmetic: while fixed-point guarantees cross-platform determinism, it also imposes a finite state space (~2^64 states per variable) that could theoretically lead to periodicity. Kelvin mitigates this through continuous reseeding (SHAKE256 XOF + BLAKE3), which refreshes the entropy pool before any period could manifest.
+**Finite Precision Degradation (FPPC).** The paper identifies a critical problem: when chaotic systems are implemented on digital computers with finite precision, *dynamical degradation* occurs — periodicity appears and security is compromised. They propose a Finite Precision Period Calculation (FPPC) algorithm to measure repetition periods. This is directly relevant to Kelvin's Q32.64 fixed-point arithmetic: while fixed-point gives deterministic single-toolchain behavior, it also imposes a finite state space (~2^64 states per variable) that could theoretically lead to periodicity. Kelvin does **not** mitigate this by reseeding — reseeding is deterministic and cannot break periodicity (see proof_of_concept.md §4.8); no runtime period detector exists yet.
 
 **NIST SP 800-22 Test Suite.** The paper validates its PRNG against all 15 NIST statistical tests (frequency, block frequency, runs, longest run, rank, FFT, linear complexity, etc.). Kelvin should adopt the same standard for validating its orbital keystream quality.
 

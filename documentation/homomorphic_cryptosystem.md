@@ -29,14 +29,20 @@ Encrypt(a) ⊗ Encrypt(b) = Encrypt(a ⊗ b)   (multiplicative homomorphic)
 
 ---
 
-## 2. Kelvin's Position: OTP is NOT Homomorphic
+## 2. Kelvin's Position: Computational Stream Ciphers Are NOT Homomorphic
+(information-theoretic OTP properties below describe textbook OTP, which
+Kelvin's *computational* modes do not inherit — see note after the table)
 
-| Property | OTP (Kelvin's Core) | Homomorphic Encryption |
-|----------|---------------------|------------------------|
+| Property | Textbook OTP | Homomorphic Encryption |
+|----------|-------------|------------------------|
 | Operation | XOR (⊕) only | Addition AND multiplication |
 | Key property | Same key for encryption/decryption | Public/private key or symmetric with evaluation key |
 | Multiple operations | ❌ No (key changes each time) | ✅ Yes (unlimited on same ciphertext) |
 | Perfect secrecy | ✅ Yes (information-theoretic) | ❌ No (computational security) |
+
+> Kelvin's XOR modes are computational stream ciphers, not textbook OTPs:
+> they do **not** inherit information-theoretic perfect secrecy (see
+> COMPLIANCE-adjacent discussion in `stream_cipher_security.md` §2).
 
 **The fundamental limitation:** OTP keys can only be used once. After performing one XOR operation on ciphertexts, the result's security depends entirely on whether keys are reused.
 
@@ -63,7 +69,7 @@ recrypt_one_time_pad(otp_key, ciphertext)
 4. After FHE decryption, the owner of `k` gets `m ⊕ k`
 5. Final XOR with `k` reveals `m`
 
-**Kelvin's role:** Generate the one-time pad keys `k` using your orbital entropy source. This gives you information-theoretic security for the OTP layer while the FHE layer provides homomorphic computation.
+**Kelvin's role:** Generate the one-time pad keys `k` using your orbital entropy source. This gives you computational (SHAKE256-bounded, 128-bit PQ) security for the OTP layer — *not* information-theoretic secrecy, since `k` is pseudorandom, not truly random — while the FHE layer provides homomorphic computation.
 
 #### Using `Prism mode` for Recryption
 
@@ -155,7 +161,7 @@ Key features of `KelvinFlare`:
 
 - **Scheme-specific domain separation**: Keys for BFV, CKKS, and TFHE are
   cryptographically isolated via scheme-specific domain suffixes.
-- **Higher-dimensional chaos**: 30 DOF vs 2 DOF (Duffing) provides richer
+- **Higher-dimensional chaos**: 48 DOF at standard (30 at N=5) vs 2 DOF (Duffing) provides richer
   entropy for FHE secret keys.
 - **Forward secrecy**: BLAKE3 reseeding ensures past keys are not recoverable
   from future state.
@@ -325,7 +331,7 @@ preventing related-key attacks when multiple modes are used in the same system.
 
 Kelvin is **not** a homomorphic encryption system. But it can be a powerful component in hybrid systems:
 
-> "Kelvin provides the information-theoretic OTP layer. FHE libraries provide homomorphic computation. Together, you get the best of both worlds: unconditional security for the OTP component plus full homomorphic capabilities for computation."
+> "Kelvin provides the computational OTP layer. FHE libraries provide homomorphic computation. Together, you get prudent defense-in-depth: SHAKE256-bounded secrecy for the OTP component plus full homomorphic capabilities for computation."
 
 For a production implementation, integrate Kelvin with existing FHE frameworks like Microsoft SEAL, IBM HElib, or TFHE, using Kelvin's orbital chaos to generate keys for the recryption layer or as a high-entropy source for FHE key generation.
 

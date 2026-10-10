@@ -109,7 +109,7 @@ This third review incorporates results from a systematic **IEEE Xplore** digital
 | Distinction | Kwong et al. (2025) | Kelvin |
 |-------------|-------------------|--------|
 | **N-body type** | Restricted four-body (constrained) | Full 8-body gravitational simulation (standard; 10 maximum) |
-| **Dimensionality** | 7D chaotic system | 30 DOF (10 bodies × 3D) |
+| **Dimensionality** | 7D chaotic system | 48 DOF (8 bodies × 6D; 30 at N=5) |
 | **Arithmetic** | Floating-point (presumed) | Q32.64 fixed-point |
 | **Application** | Image encryption only | General-purpose encryption (7 modes) |
 | **Extraction** | Not specified | SHAKE256 XOF with domain separation |

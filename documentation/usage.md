@@ -156,21 +156,24 @@ fn main() -> anyhow::Result<()> {
     let config_json = fs::read_to_string("my_secret.json")?;
     let config = OrbitalConfig::from_json(&config_json)?;
 
-    // 2. Initialize Kelvin (Runs Lyapunov estimation and initial simulation)
-    let mut k = Kelvin::new(config)?;
+    // 2. Initialize Kelvin with a unique session nonce (runs Lyapunov
+    //    estimation and initial simulation)
+    let nonce = b"deployment-01";
+    let mut k = Kelvin::new_with_nonce(config.clone(), nonce)?;
 
-    // 3. Encrypt data in-place
+    // 3. Encrypt data in-place (V1 is AEAD: reserve 16 bytes for the tag)
     let mut data = b"Hello Kelvin Chaos!".to_vec();
+    data.extend_from_slice(&[0u8; 16]);
     k.encrypt(&mut data)?;
-    
+
     println!("Encrypted: {:02x?}", data);
 
-    // 4. Decrypt (requires a fresh instance with the same config)
-    let config = OrbitalConfig::from_json(&config_json)?;
-    let mut k2 = Kelvin::new(config)?;
+    // 4. Decrypt (requires a new instance with the SAME config + nonce;
+    //    tag occupies the last 16 bytes and is verified, not returned)
+    let mut k2 = Kelvin::new_with_nonce(config, nonce)?;
     k2.decrypt(&mut data)?;
 
-    assert_eq!(&data, b"Hello Kelvin Chaos!");
+    assert_eq!(&data[..data.len() - 16], b"Hello Kelvin Chaos!");
     Ok(())
 }
 ```
@@ -280,9 +283,10 @@ Kelvin automatically reseeds the keystream by advancing through the **key schedu
 > [!CAUTION]
 > V2 (Chaos), V3 (Photon), and H (Quantum) modes are **pure XOR stream ciphers** — they do not provide built-in message authentication. Without authentication, an attacker can flip ciphertext bits and cause predictable plaintext changes (malleability).
 >
-> **Use `--auth`** to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability. The tag is verified in constant time during decryption.
+> KMAC128 authentication is on by default for these modes (opt out with
+> `--no-auth`). The tag is verified in constant time during decryption.
 >
-> V1 (Secure) mode uses ChaCha20Poly1305 AEAD and has built-in authentication — the `--auth` flag is ignored for this mode.
+> V1 (Secure) mode uses ChaCha20Poly1305 AEAD and has built-in authentication — both flags are ignored for this mode.
 
 ---
 
@@ -339,17 +343,16 @@ The Lyapunov estimator computes `min_chaos_steps` — the minimum simulation ste
 ### 5.4 Practical Example
 
 ```
-Configuration:
-  total_steps = 200        (real simulation runs 200 steps)
+Configuration (illustrative; horizons are config-dependent):
+  total_steps = 1000       (real simulation runs 1000 steps)
   reseed_interval = 10     (each key consumes 10 virtual steps)
-  min_chaos_steps = 73     (from Lyapunov estimation)
+  min_chaos_steps = 254    (from Lyapunov estimation, test-vector config)
 
-Key Schedule:
-  max_keys = 73 / 10 = 7   (integer division)
-  Key 1:  step=10,  keys=1,  ~28 GiB remaining
-  Key 2:  step=20,  keys=2,  ~24 GiB remaining
+Key Schedule (safe_steps = 254 × expansion_factor; shown with factor 1):
+  max_keys = 254 / 10 = 25  (integer division)
+  Key 1:  step=10,  keys=1
   ...
-  Key 7:  step=70,  keys=7,  ~0  GiB remaining → EXHAUSTED
+  Key 25: step=250, keys=25 → EXHAUSTED at step 250 (safe_steps=254)
 ```
 
 ### 5.5 Checking Remaining Capacity
@@ -375,7 +378,7 @@ V2 Streaming (`KelvinStreaming`) is a **per-step stream cipher** mode that repla
 | Keystream | Finite (key schedule) | Bounded by 1B-step cap (practically unlimited) |
 | Setup time | Seconds to minutes | Instant |
 | Cipher | ChaCha20Poly1305 AEAD | XOR with SHAKE256 XOF |
-| Authentication | AEAD tag | None (XOR only) |
+| Authentication | AEAD tag | None in the raw type (CLI wraps with KMAC128 by default) |
 | Key rotation | Automatic via schedule | N/A (each step is unique) |
 
 ### Rust API
@@ -454,11 +457,11 @@ The demo kit includes a 3D orbital visualizer (`kelvin-demo/orbital_visualizer.h
 
 ### Security Notes
 
-- **V2 is a pure XOR stream cipher** — no authentication. Use a MAC for integrity.
+- **V2 is a pure XOR stream cipher at the type level** — no authentication in `KelvinStreaming` itself; the CLI enables KMAC128 by default (use an external MAC if you drive the type directly).
 - Each step produces `bytes_per_step` bytes of keystream from SHAKE256 XOF.
 - The domain separator `b"kelvin-streaming-v2-v1-000000000"` ensures domain separation from V1.
 - **Deterministic**: same config + same step count = same keystream, regardless of how the caller chunks the data (as long as total bytes processed is the same).
-- **Unlimited keystream**: Unlike V1's finite key schedule, V2 can keep simulating indefinitely — there is no `SeedExhausted` error.
+- **Long but bounded keystream**: Unlike V1's finite key schedule, V2 can keep simulating up to the 1B-step safety cap (100M Euler) — there is no `SeedExhausted` error within that bound.
 
 ---
 
@@ -471,8 +474,8 @@ material that can be plugged into any FHE library (SEAL, HElib, TFHE, etc.).
 > ⚠️ **Known Prior Art:** Chaotic key generation for FHE was previously proposed
 > by Jawad (2025) [DUff-skg] using a Duffing oscillator (2-DOF) with RK4
 > floating-point integration. Kelvin-Flare provides an alternative approach
-> using 30-DOF n-body gravitational dynamics with fixed-point arithmetic and
-> full analysis.
+> using 48-DOF n-body gravitational dynamics at standard (30-DOF in the
+> 5-body analysis config) with fixed-point arithmetic and full analysis.
 
 
 ### Architecture
@@ -614,8 +617,9 @@ assert_eq!(&data, b"Secret message");
 `KelvinFlare` is a domain-separated keystream generator designed specifically
 for generating **chaotic FHE secret keys**. Inspired by the DUff-skg paper
 (Jawad, 2025) which uses Duffing oscillators for FHE key generation,
-Kelvin-Flare replaces the 2-DOF Duffing system with Kelvin's 5-body orbital
-chaos (30 DOF) for even higher-quality key material.
+Kelvin-Flare replaces the 2-DOF Duffing system with Kelvin's orbital
+chaos (48 DOF at standard; 30 DOF in the 5-body analysis config) for
+even higher-quality key material.
 
 ### Architecture
 
@@ -639,7 +643,7 @@ ensure cryptographic isolation from Split, Prism, and V3 Photon.
 
 | Aspect | DUff-skg (Jawad, 2025) | Kelvin-Flare |
 |--------|------------------------|--------------|
-| Chaos source | Duffing oscillator (2 DOF) | 5-body orbital simulation (30 DOF) |
+| Chaos source | Duffing oscillator (2 DOF) | Orbital simulation (48 DOF standard; 30 DOF at N=5) |
 | Key size | 2³²⁵ bits | 2¹⁹²⁰ bits (even larger) |
 | NIST tests | ✅ Passed | ✅ Passed (Kelvin's own tests) |
 | Integration | BFV, CKKS, TFHE | Same standards |
@@ -688,7 +692,7 @@ let tfhe_key = flare.generate_fhe_key(FlareScheme::Tfhe, 256)?;
 ### Use Cases
 
 1. **Chaotic FHE key generation**: Generate secret keys for BFV, CKKS, and
-   TFHE schemes using 30-DOF n-body gravitational chaos.
+   TFHE schemes using high-DOF n-body gravitational chaos.
 2. **Raw secret key generation**: Use `generate_secret_key()` to produce
    high-entropy key material for custom FHE implementations.
 3. **Hybrid systems**: Combine with `KelvinPrism` and `KelvinSplit` for

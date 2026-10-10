@@ -1,5 +1,13 @@
 # NIST SP 800-22 Test Anomalies
 
+> **Run snapshot:** this analysis describes a 6-variant run (V1×2, V2×2,
+> V3, H — 90 invocations). The current suite adds Prism (7 variants).
+> Per-run anomalies move between runs (expected: ~0.9 false positives at
+> α = 0.01); consult the latest `test_all` output for current figures —
+> e.g. 2026-10-10 saw V1-Euler and H-Quantum 15/15 with V3 excursions
+> borderline. The interpretation below (inapplicable ≠ failed) stands
+> regardless of which variant shows it.
+
 ## Overview
 
 The Kelvin test suite runs all 15 NIST SP 800-22 statistical tests across 6
