@@ -343,3 +343,13 @@ at your option.
 Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 **Security issues**: Report via the [SECURITY.md](SECURITY.md) process.
+
+## Formal Verification
+
+The Kelvin cryptosystem is accompanied by a full formal‑verification suite.
+
+- 📚 **Documentation:** [documentation/formal_verification/README.md](documentation/formal_verification/README.md)
+- 🧪 **Kani proofs:** `cargo kani -p kelvin-core` (run locally)
+- ✅ **CI status:** [![Verification status](https://github.com/nliaudat/kelvin/actions/workflows/verify.yml/badge.svg)](https://github.com/nliaudat/kelvin/actions/workflows/verify.yml)
+
+The verification hierarchy (L0‑L4) and the empirical security conjectures (C1‑C5) are described in the linked docs.
