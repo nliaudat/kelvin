@@ -13,7 +13,9 @@
 //! The implementation is generic enough to be used both in production code
 //! and in a Kani harness.
 
-use blake3::Hasher;
+#[allow(dead_code, unused_imports, unused_variables, unused_assignments)]
+
+
 
 // Stub definitions for compilation without the full simulation crate.
 #[derive(Clone, Debug, Default)]
