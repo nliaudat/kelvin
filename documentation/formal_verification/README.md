@@ -8,9 +8,9 @@
 
 | Section | File(s) | Description |
 |--------|---------|-------------|
-| **Architecture** | `code_verification.md` | Dynamic‑error‑bound proof strategy |
-| **L0 – Safety** | `../proofs/kani/fixed_safety.rs` | No panics / overflows |
-| **L1 – Functional Equivalence** | `../proofs/kani/fixed_equivalence.rs` | Fixed‑point arithmetic matches spec |
+| **Architecture** | [code_verification.md](code_verification.md) | Dynamic‑error‑bound proof strategy |
+| **L0 – Safety** | [fixed_safety.rs](../proofs/kani/fixed_safety.rs) | No panics / overflows |
+| **L1 – Functional Equivalence** | [fixed_equivalence.rs](../proofs/kani/fixed_equivalence.rs) | Fixed‑point arithmetic matches spec |
 | **L2 – Composite Correctness** | `../proofs/kani/acceleration_proofs.rs` | Newton’s laws satisfied |
 | **L3 – Pipeline Integrity** | `../proofs/kani/pipeline_proofs.rs` | Whole simulation‑→‑seed pipeline |
 | **L4 – Determinism** | `../tests/kelvin_tests/determinism.rs` | Bit‑identical across SIMD variants |
