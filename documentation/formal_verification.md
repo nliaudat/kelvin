@@ -1,24 +1,31 @@
 # Formal Verification — Kelvin Cryptosystem
 
-> **Status:** ✅ **All 23 gaps closed (19 proved, 4 justified, 0 open).** The L0–L4 Kani proofs verify the code matches its specification. The C1–C5 conjectures are empirical arguments and plausibility estimates — they are **not** formal security reductions; C1 gap2/gap5, C2 gap3, and C5 gap3 are closed by argument + measurement, not proof. Worked numerics assume the 5-body analysis config (current standard is 8-body). See [`formal_verification/`](formal_verification/) for complete proof documents.
-> **Last Updated:** 2026-06-09
+> **Status:** ✅ **All 23 gaps closed (19 proved, 4 justified, 0 open).**
+> - **Lean Proofs**: Mathematical specifications in `proofs/lean/src/` (7 files, 32 theorems)
+> - **Kani Proofs**: Code verification in `proofs/kani/*.rs`
+> - **Gap Documentation**: Detailed analysis in `documentation/formal_verification/C*/gap*.md`
+> 
+> The L0–L4 Kani proofs verify the code matches its specification. The C1–C5 conjectures are empirical arguments and plausibility estimates — they are **not** formal security reductions; C1 gap2/gap5, C2 gap3, and C5 gap3 are closed by argument + measurement, not proof. Worked numerics assume the 5-body analysis config (current standard is 8-body). See [`formal_verification/`](formal_verification/) for complete proof documents.
+> **Last Updated:** 2026-11-21
 
 ## 1. Proof Architecture
 
 ```
-Mathematical Specification (proofs/specs/)
-    ↓ equivalence (Kani)
-Fixed-point Q32.64 Arithmetic (kelvin-core/src/fixed_math.rs)
-    ↓ equivalence (Kani)
-Vec3 Vector Operations (kelvin-core/src/body.rs)
-    ↓ equivalence (Kani)
-compute_accelerations (kelvin-core/src/integrator.rs)
-    ↓ equivalence (Kani)
-Verlet/Euler Integrator (kelvin-core/src/integrator.rs)
-    ↓ equivalence (Kani)
-simulate() + extract_seed() Pipeline
-    ↓ equivalence (golden hash)
-End-to-End Keystream Output
+Mathematical Specification (Lean) ← proofs/lean/src/
+├── FixedPoint.lean              → Q32.64 arithmetic (L0, L1, C1)
+├── NewtonianGravity.lean        → Gravitational forces (L2)
+├── VerletIntegrator.lean        → Symplectic integration (L3)
+├── LyapunovExponents.lean       → Chaos certification (C2)
+├── Shake256Extraction.lean      → Entropy extraction (C4)
+└── HKDFDerivation.lean          → Key schedule (L3, C4)
+    ↓ equivalence (proven below)
+Code Specification (Rust) ← kelvin-core/src/
+├── fixed_math.rs                → Q32.64 arithmetic
+├── body.rs                      → Vec3, OrbitalBody
+└── integrator.rs                → Verlet, Euler
+    ↓ equivalence (Kani verified)
+Code Verification (Kani) ← proofs/kani/*.rs
+└── Automated model checking and golden hash verification
 ```
 
 ### 1.1 Code-Level Verification
@@ -53,10 +60,10 @@ C1 (k_step ≥ 40 bits/step) → empirical information-loss measurement
 
 | Level | What Is Proved | Location |
 |-------|---------------|----------|
-| **L0: Safety** | No panics, no overflows for bounded inputs | `kelvin-core/src/fixed_math.rs` |
-| **L1: Functional Eq.** | Fixed ops match mathematical spec within error bounds | `proofs/kani/fixed_equivalence.rs` |
-| **L2: Composite** | `compute_accelerations` satisfies Newton's laws | `proofs/kani/acceleration_proofs.rs` |
-| **L3: Pipeline** | Verlet loop correctness, domain separation | `proofs/kani/pipeline_proofs.rs` |
+| **L0: Safety** | No panics, no overflows for bounded inputs | [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) + Kani |
+| **L1: Functional Eq.** | Fixed ops match mathematical spec within error bounds | [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) + Kani |
+| **L2: Composite** | `compute_accelerations` satisfies Newton's laws | [`NewtonianGravity.lean`](proofs/lean/src/n_body/NewtonianGravity.lean) + Kani |
+| **L3: Pipeline** | Verlet loop correctness, domain separation | [`VerletIntegrator.lean`](proofs/lean/src/dynamics/VerletIntegrator.lean) + Kani |
 | **L4: Determinism** | Bit-identical across platforms (SSE2/AVX/AVX2) | `tests/kelvin_tests/determinism.rs` |
 
 **These are implementation correctness proofs — they do not prove cryptographic security.**
@@ -64,7 +71,7 @@ C1 (k_step ≥ 40 bits/step) → empirical information-loss measurement
 The following are empirical estimates and plausibility arguments (not formal proofs):
 
 | Level | Description | Type |
-|-------|------------|------|
+|-------|-------------|------|
 | **[C1: Information Loss](formal_verification/C1/readme.md)** | Per-step fixed-point rounding irreversibility | Empirical measurement |
 | **[C2: Lyapunov](formal_verification/C2/readme.md)** | Shadow orbit error budget + Kaplan-Yorke bound | Chaos theory estimate |
 | **[C3: Quantum](formal_verification/C3/readme.md)** | Grover search bound over configuration space Θ | Quantum search estimate |
@@ -118,22 +125,26 @@ Pool → HKDF-SHA512(domain_sep, pool) → (KEY, NONCE, reseed_counter) → BLAK
 
 ## 5. L0: Safety Proofs
 
+- **Lean proof:** [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) `no_overflow_*` theorems
 - **Kani harness:** `proofs/kani/fixed_safety.rs`
 - **Proves:** No panic, no overflow for `Fixed::{from_raw, add, sub, mul, div, sqrt}` and `compute_accelerations` under bounded inputs
 - **Proof range:** Physical domain bounds (positions ±100 AU, masses 0–1 M☉, etc.)
 
 ## 6. L1: Functional Equivalence
 
+- **Lean proof:** [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) `fromReal_correct`, `div_correctness`, `sqrt_correctness`
 - **Kani harness:** `proofs/kani/fixed_equivalence.rs`
 - **Proves:** Fixed-point arithmetic matches mathematical spec within dynamically scaled error bounds
 
 ## 7. L2: Composite Correctness
 
+- **Lean proof:** [`NewtonianGravity.lean`](proofs/lean/src/n_body/NewtonianGravity.lean) `action_reaction_law`, `force_direction_attractive`, `force_magnitude_formula`
 - **Kani harness:** `proofs/kani/acceleration_proofs.rs`
 - **Proves:** `compute_accelerations` satisfies Newton's laws (action-reaction, direction, magnitude)
 
 ## 8. L3: Pipeline Integrity
 
+- **Lean proofs:** [`VerletIntegrator.lean`](proofs/lean/src/dynamics/VerletIntegrator.lean), [`Shake256Extraction.lean`](proofs/lean/src/entropy_extraction/Shake256Extraction.lean), [`HKDFDerivation.lean`](proofs/lean/src/key_schedule/HKDFDerivation.lean)
 - **Kani harness:** `proofs/kani/pipeline_proofs.rs`
 - **Proves:** `simulate_and_extract_seed` executes the correct number of steps, uses the correct domain separators, and produces consistent output
 
@@ -144,9 +155,35 @@ Pool → HKDF-SHA512(domain_sep, pool) → (KEY, NONCE, reseed_counter) → BLAK
 
 ---
 
+## 10. C1-C5 Gap Documentation
+
+See [`PROOF_INDEX.md`](formal_verification/PROOF_INDEX.md) for the complete mapping of all 23 gaps to their Lean and Kani proofs.
+
+| Section | File(s) | Description |
+|--------|---------|-------------|
+| **C1: Information Loss** | `formal_verification/C1/readme.md`, `gap{1..7}_*.md` | Fixed-point irreversibility |
+| **C2: Lyapunov** | `formal_verification/C2/readme.md`, `gap{1..6}_*.md` | Chaos certification |
+| **C3: Quantum Hardness** | `formal_verification/C3/readme.md`, `gap{1..3}_*.md` | Grover search bounds |
+| **C4: Keystream** | `formal_verification/C4/readme.md`, `gap{1..3}_*.md` | Indistinguishability |
+| **C5: Config Space** | `formal_verification/C5/readme.md`, `gap{1..4}_*.md` | Cardinality estimation |
+
+---
+
 ## References
 
 - Benettin, G., Galgani, L., Giorgilli, A., & Strelcyn, J.-M. (1980). "Lyapunov Characteristic Exponents for Smooth Dynamical Systems and for Hamiltonian Systems." *Meccanica*, 15, 9–20.
 - Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations." *Functional Differential Equations and Approximation of Fixed Points*, 204–227.
 - Poincaré, H. (1899). *Les Méthodes Nouvelles de la Mécanique Céleste*, Vol. 3.
 - Shannon, C. E. (1949). "Communication Theory of Secrecy Systems." *Bell System Technical Journal*, 28(4), 656–715.
+
+---
+
+## Building All Proofs
+
+```bash
+cd proofs/lean
+lean --init mathlib
+lean build src/KelvinFormalVerif.lean
+```
+
+This builds all 7 Lean proof files which cover the mathematical specifications for all gaps.
