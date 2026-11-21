@@ -50,6 +50,10 @@
 #![warn(missing_docs, missing_debug_implementations)]
 
 mod body;
+mod reference;
+mod period_detection;
+mod information_loss;
+mod quantum;
 mod constants;
 mod fixed_math;
 mod integrator;
@@ -79,10 +83,11 @@ pub use constants::{
 };
 pub use fixed_math::Fixed;
 pub use integrator::{compute_accelerations, euler_step, simulate, verlet_step};
-pub use stability::{
-    detect_collapse, gravitational_potential, is_body_ejected, simulate_with_monitoring,
-    simulate_with_monitoring_euler, StabilityError,
-};
+pub use information_loss::{per_step_loss,total_loss};
+pub use quantum::{quantum_oracle, QUANTUM_QUERY_LOWER_BOUND};
+pub use reference::compute_lyapunov_high_prec;
+pub use stability::{detect_collapse, gravitational_potential, is_body_ejected, simulate_with_monitoring,
+    simulate_with_monitoring_euler, StabilityError};
 
 #[cfg(test)]
 mod tests {

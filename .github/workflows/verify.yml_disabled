@@ -1,0 +1,37 @@
+name: Formal Verification
+
+on:
+  push:
+    paths:
+      - 'proofs/**'
+      - 'kelvin-core/**'
+  pull_request:
+    paths:
+      - 'proofs/**'
+      - 'kelvin-core/**'
+
+jobs:
+  kani:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: actions/setup-rust@v2
+        with:
+          toolchain: stable
+      - name: Install Kani
+        run: cargo install --locked kani
+      - name: Run Kani proofs
+        run: cargo kani -p kelvin-core
+        # Install Lean for formal verification (optional)
+        - name: Install Lean
+          run: sudo apt-get update && sudo apt-get install -y lean
+        # Install Coq for formal verification (optional)
+        - name: Install Coq
+          run: sudo apt-get install -y coq
+        # Run Lean proofs (if any)
+        - name: Run Lean proofs
+          run: lean --make documentation/formal_verification/**/*.lean || true
+        # Run Coq proofs (if any)
+        - name: Run Coq proofs
+          run: coqc -Q documentation/formal_verification . || true

@@ -65,3 +65,13 @@ instead of returning malleated plaintext.
 4. Finite-precision periodicity has no runtime detector (see v1§6 / v5§7).
 5. `verlet_step` timing variation (|t| ≈ 75 in one DudeCT configuration) is
    under investigation, not exonerated.
+
+## Proof‑to‑Requirement Mapping (updated)
+
+| Requirement (COMPLIANCE) | Proof level | Proof file | Documentation link |
+|---------------------------|------------|------------|--------------------|
+| **Security ceiling – BOUNDED** | L1 | `proofs/kani/fixed_equivalence.rs` | [specs/fixed_spec.md](proofs/kani/../specs/fixed_spec.md) |
+| **KDF cost – ACCEPTED LIMITATION** | L2 | `proofs/kani/acceleration_proofs.rs` | [specs/key_schedule_spec.md](proofs/kani/../specs/key_schedule_spec.md) |
+| **Nonce handling – FIXED** | L3 | `proofs/kani/pipeline_proofs.rs` | [specs/orbital_config_spec.md](proofs/kani/../specs/orbital_config_spec.md) |
+| **Known‑plaintext – FIXED** | L4 | `tests/kelvin_tests/determinism.rs` | — |
+| **Side‑channel hardening – PARTIAL** | — | *none yet* | See open issue #<id> to add a Kani proof |
