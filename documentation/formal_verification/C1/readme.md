@@ -73,11 +73,12 @@ $$\log_2(A) \leq D_{KY} = j + \frac{\sum_{i=1}^j \lambda_i}{|\lambda_{j+1}|}$$
 
 ## Kani-Verified Harnesses
 
-| Harness | What It Proves |
-|---------|----------------|
-| `verify_c1_preimage_bound` | Local preimage ≤ 9 at softening limit |
-| `verify_c1_epsilon_bound` | Global preimage ≤ 8,000,000 worst-case |
-| `verify_c1_division_remainder` | Division remainder $0 \leq r < \text{den}$ |
+| Harness | What It Proves | Status |
+|---------|----------------|--------|
+| `verify_c1_preimage_bound` | Local preimage ≤ 9 at softening limit | ✅ Verified |
+| `verify_c1_epsilon_bound` | Global preimage ≤ 8,000,000 worst-case | ✅ Verified |
+| `verify_c1_division_remainder` | Division remainder $0 \leq r < \text{den}$ | ✅ Verified |
+| `verify_information_loss_total` | Total loss = min(S * k_step, H_max) | ⏳ In Progress |
 
 ## References
 

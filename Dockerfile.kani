@@ -1,0 +1,18 @@
+FROM rust:1.75-bookworm
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Kani using official installer script (latest version)
+RUN curl --proto '=https' --tlsv1.2 -LsSf https://github.com/model-checking/kani/releases/download/kani-1.5.1/kani-installer.sh | bash
+
+# Verify installation
+RUN cargo --version && kani --version
+
+# Copy project
+COPY . /app/kelvin
+WORKDIR /app/kelvin

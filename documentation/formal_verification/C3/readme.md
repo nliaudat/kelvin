@@ -46,10 +46,11 @@ $$\boxed{Q(\Phi^S) \ge \Omega\left(\sqrt{|\Theta|}\right) = \Omega(2^{960}) \tex
 
 ## Kani-Verified Harnesses
 
-| Harness | What It Proves |
-|---------|----------------|
-| `verify_c3_step_non_injective` | 1 ULP difference ≤ 10 ULPs after 1 step |
-| `verify_c3_two_step_preimage_growth` | Preimage convergence after 2 steps |
+| Harness | What It Proves | Status |
+|---------|----------------|--------|
+| `verify_c3_step_non_injective` | 1 ULP difference ≤ 10 ULPs after 1 step | ✅ Verified |
+| `verify_c3_two_step_preimage_growth` | Preimage convergence after 2 steps | ✅ Verified |
+| `verify_c3_quantum_reduction` | Quantum lower bound Ω(2^960) queries | ⏳ In Progress |
 
 ## References
 

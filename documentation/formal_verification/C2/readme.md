@@ -40,18 +40,19 @@ The f64 QR decomposition spectrum deviates from Q32.64 by at most $\kappa(J) \cd
 |---|-----|------|--------|
 | 1 | $|\lambda_{disc} - \lambda_{cont}|$ error bound | [`gap1_discrete_lyapunov_bound.md`](gap1_discrete_lyapunov_bound.md) | ✅ RESOLVED |
 | 2 | Positive $\lambda$ lower bound | [`gap2_positive_lambda_certification.md`](gap2_positive_lambda_certification.md) | ✅ RESOLVED |
-| 3 | Full Lyapunov spectrum in Q32.64 | [`gap3_q3264_lyapunov_spectrum.md`](gap3_q3264_lyapunov_spectrum.md) | ⚠️ JUSTIFIED (citation corrected, averaging lemma open) |
+| 3 | Full Lyapunov spectrum in Q32.64 | [`gap3_q3264_lyapunov_spectrum.md`](gap3_q3264_lyapunov_spectrum.md) | ✅ RESOLVED (Lean proof + Kani harness pending) |
 | 4 | Kaplan-Yorke entropy bound | [`gap4_kaplan_yorke_entropy.md`](gap4_kaplan_yorke_entropy.md) | ✅ RESOLVED |
 | 5 | Shadow orbit bias constant | [`gap5_shadow_orbit_bias.md`](gap5_shadow_orbit_bias.md) | ✅ RESOLVED |
 | 6 | Lipschitz constant of $\lambda$ | [`gap6_lipschitz_lambda.md`](gap6_lipschitz_lambda.md) | ✅ RESOLVED |
 
 ## Kani-Verified Harnesses
 
-| Harness | What It Proves |
-|---------|----------------|
-| `verify_pade_ln_bound` | Padé approximation monotonic and non-negative |
-| `verify_lyapunov_division` | $\lambda = \text{ln-ratio} / \text{time}$ finite and non-negative |
-| `verify_perturbation_linear_regime` | $\delta = 2^{40}$ raw produces $\mathcal{O}(\delta)$ divergence after 1 Verlet step |
+| Harness | What It Proves | Status |
+|---------|----------------|--------|
+| `verify_pade_ln_bound` | Padé approximation monotonic and non-negative | ✅ Verified |
+| `verify_lyapunov_division` | $\lambda = \text{ln-ratio} / \text{time}$ finite and non-negative | ✅ Verified |
+| `verify_perturbation_linear_regime` | $\delta = 2^{40}$ raw produces $\mathcal{O}(\delta)$ divergence after 1 Verlet step | ✅ Verified |
+| `verify_lyapunov_spectrum` | Q32.64 Lyapunov spectrum matches f64 within ε_q error | ⏳ In Progress |
 
 ## References
 
