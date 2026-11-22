@@ -95,8 +95,17 @@ This gap builds on:
 
 ## References
 
-1. Naor, M., & Reingold, O. (2004). "On the Security of Universal Hash Families."
-2. `kelvin-kdf/src/extractor.rs` (Kani harnesses)
-3. `proofs/lean/src/entropy_extraction/Shake256Extraction.lean` (Lean proof)
+- [`../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean`](../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean) (Lean proof)
+- [`../../proofs/lean/src/key_schedule/HKDFDerivation.lean`](../../proofs/lean/src/key_schedule/HKDFDerivation.lean) (Lean proof)
+- `kelvin-kdf/src/extractor.rs` (Kani harnesses)
+- [`../readme.md`](../readme.md) (C4 overview)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C4 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-

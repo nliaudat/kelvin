@@ -68,8 +68,16 @@ $$L_{\text{total}}(S) = \min(S \cdot k_{\text{step}},\; H_{\max} - \log_2(A))$$
 
 ## References
 
-1. `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
-2. `proofs/lean/src/fixed_point/FixedPoint.lean` (Lean proof)
-3. Shannon, C. E. (1949). "Communication Theory of Secrecy Systems."
+- [`../../proofs/lean/src/fixed_point/FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean) (Lean proof)
+- `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
+- [`../readme.md`](../readme.md) (C1 overview)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-

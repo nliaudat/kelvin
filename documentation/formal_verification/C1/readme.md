@@ -2,6 +2,7 @@
 
 > **Results:** `proofs/kani/results/c1_validation.log`
 > **Gap documents:** [`gap{1..7}_*.md`](.)
+> **Last Updated:** 2026-11-21
 
 ---
 
@@ -40,13 +41,13 @@ Per-step rounding operation count:
 
 ## Per-Operation Information Loss
 
-The division discards the remainder $r = (g_{\text{raw}} \cdot 2^{64}) \bmod d^3_{\text{raw}}$, which depends on the LSB of $d^3$. For a uniformly distributed input, this LSB carries 1 bit of Shannon entropy, giving $k_{op} \ge 1$ bit per operation (with $\varepsilon$-bound $k_{op} \ge 0.98$).
+The division discards the remainder $r = (g_{\text{raw}} \cdot 2^{64}) \bmod d^3_{\text{raw}}$, which depends on the LSB of $d^3$. For a uniformly distributed input, this LSB carries 1 bit of Shannon entropy, giving $k_{op} \geq 1$ bit per operation (with $\varepsilon$-bound $k_{op} \geq 0.98$).
 
 ## Per-Step Cumulative Loss
 
-$$k_{\text{step}} = 2N(N-1) \times k_{\text{op}} \ge 2N(N-1) \text{ bits}$$
+$$k_{\text{step}} = 2N(N-1) \times k_{\text{op}} \geq 2N(N-1) \text{ bits}$$
 
-For $N = 5$: $k_{\text{step}} \ge 40$ bits per step.
+For $N = 5$: $k_{\text{step}} \geq 40$ bits per step.
 
 ## Saturation Model
 
@@ -56,24 +57,39 @@ Saturation occurs at $T_{\text{sat}} \approx 96$ steps for N=5 Verlet.
 
 ## Connection to C2 (Lyapunov Chaos)
 
-$$\log_2(A) \le D_{KY} = j + \frac{\sum_{i=1}^{j} \lambda_i}{|\lambda_{j+1}|}$$
+$$\log_2(A) \leq D_{KY} = j + \frac{\sum_{i=1}^j \lambda_i}{|\lambda_{j+1}|}$$
 
 ## All Gaps Resolved
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | $k_{op} \ge 1$ bit | [`gap1_kop_shannon_bound`](gap1_kop_shannon_bound.md) | ✅ RESOLVED |
-| 2 | Uniformity of $d^3$ | [`gap2_uniform_distribution`](gap2_uniform_distribution.md) | ✅ JUSTIFIED |
-| 3 | Cumulative loss saturation | [`gap3_saturation_bound`](gap3_saturation_bound.md) | ✅ RESOLVED |
-| 4 | $\varepsilon$-bound $k_{op} \ge 1 - \varepsilon$ | [`gap4_epsilon_bound`](gap4_epsilon_bound.md) | ✅ RESOLVED |
-| 5 | Rounding error independence (Lemma A3) | [`gap5_error_independence`](gap5_error_independence.md) | ✅ JUSTIFIED |
-| 6 | Hartley vs min-entropy | [`gap6_hartley_min_entropy`](gap6_hartley_min_entropy.md) | ✅ RESOLVED |
-| 7 | Verlet double-computation | [`gap7_verlet_double_effect`](gap7_verlet_double_effect.md) | ✅ VERIFIED |
+| 1 | $k_{op} \geq 1$ bit | [`gap1_kop_shannon_bound.md`](gap1_kop_shannon_bound.md) | ✅ RESOLVED |
+| 2 | Uniformity of $d^3$ | [`gap2_uniform_distribution.md`](gap2_uniform_distribution.md) | ✅ JUSTIFIED |
+| 3 | Cumulative loss saturation | [`gap3_saturation_bound.md`](gap3_saturation_bound.md) | ✅ RESOLVED |
+| 4 | $\varepsilon$-bound $k_{op} \geq 1 - \varepsilon$ | [`gap4_epsilon_bound.md`](gap4_epsilon_bound.md) | ✅ RESOLVED |
+| 5 | Rounding error independence (Lemma A3) | [`gap5_error_independence.md`](gap5_error_independence.md) | ✅ JUSTIFIED |
+| 6 | Hartley vs min-entropy | [`gap6_hartley_min_entropy.md`](gap6_hartley_min_entropy.md) | ✅ RESOLVED |
+| 7 | Verlet double-computation | [`gap7_verlet_double_effect.md`](gap7_verlet_double_effect.md) | ✅ VERIFIED |
 
 ## Kani-Verified Harnesses
 
 | Harness | What It Proves |
-|---------|---------------|
+|---------|----------------|
 | `verify_c1_preimage_bound` | Local preimage ≤ 9 at softening limit |
 | `verify_c1_epsilon_bound` | Global preimage ≤ 8,000,000 worst-case |
-| `verify_c1_division_remainder` | Division remainder 0 ≤ r < den |
+| `verify_c1_division_remainder` | Division remainder $0 \leq r < \text{den}$ |
+
+## References
+
+- [`../../proofs/lean/src/fixed_point/FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean) (Lean proofs)
+- [`../../proofs/lean/src/dynamics/VerletIntegrator.lean`](../../proofs/lean/src/dynamics/VerletIntegrator.lean) (Lean proofs)
+- `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
+- [`../formal_verification.md`](../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](readme.md)
+- [PROOF_INDEX.md](../PROOF_INDEX.md) (complete gap mapping)
+- [Lean Proofs](../../proofs/lean/src/) (mathematical specifications)

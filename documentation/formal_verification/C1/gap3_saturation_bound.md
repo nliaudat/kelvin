@@ -31,7 +31,6 @@ Saturation occurs at $T_{\text{sat}} \approx 96$ steps for N=5 Verlet.
 The proof is formalized in `proofs/lean/src/fixed_point/FixedPoint.lean` and `proofs/lean/src/dynamics/VerletIntegrator.lean`:
 
 ```lean
--- Cumulative loss model: L(S) = min(S * k_step, H_max - log2(A))
 theorem c1_saturation_bound (S : ℕ) (N : ℕ) :
   let k_step := 2 * N * (N - 1)  -- From gap1: 40 bits/step for N=5
   let H_max := 6 * N * 128       -- Total state space entropy
@@ -79,9 +78,18 @@ This gap builds on:
 
 ## References
 
-1. `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
-2. `proofs/lean/src/fixed_point/FixedPoint.lean` (Lean proof)
-3. C1 gap1_kop_shannon_bound.md (per-operation loss)
-4. C2 gap4_kaplan_yorke_entropy.md (attractor bound)
+- [`../../proofs/lean/src/fixed_point/FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean) (Lean proof)
+- [`../../proofs/lean/src/dynamics/VerletIntegrator.lean`](../../proofs/lean/src/dynamics/VerletIntegrator.lean) (Lean proof)
+- `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
+- [`../readme.md`](../readme.md) (C1 overview)
+- [`../../formal_verification/C2/readme.md`](../../formal_verification/C2/readme.md) (Kaplan-Yorke bound)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-

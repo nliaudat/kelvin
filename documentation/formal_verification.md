@@ -3,7 +3,7 @@
 > **Status:** ✅ **All 23 gaps closed (19 proved, 4 justified, 0 open).**
 > - **Lean Proofs**: Mathematical specifications in `proofs/lean/src/` (7 files, 32 theorems)
 > - **Kani Proofs**: Code verification in `proofs/kani/*.rs`
-> - **Gap Documentation**: Detailed analysis in `documentation/formal_verification/C*/gap*.md`
+> - **Gap Documentation**: Detailed analysis in `formal_verification/C*/gap*.md`
 > 
 > The L0–L4 Kani proofs verify the code matches its specification. The C1–C5 conjectures are empirical arguments and plausibility estimates — they are **not** formal security reductions; C1 gap2/gap5, C2 gap3, and C5 gap3 are closed by argument + measurement, not proof. Worked numerics assume the 5-body analysis config (current standard is 8-body). See [`formal_verification/`](formal_verification/) for complete proof documents.
 > **Last Updated:** 2026-11-21
@@ -49,7 +49,7 @@ C1 (k_step ≥ 40 bits/step) → empirical information-loss measurement
   → C2 (λ > 0, Kaplan-Yorke attractor bound) → Lyapunov certification
   → C3 (Ω(2^960) Grover bound via Θ search) → quantum search estimate over theoretical config space
   → C5 (|Θ₅| ≥ 2^1920) → theoretical config cardinality estimate
-  → C4 (Adv(A) ≤ negl(n) + 2^{-960}) → distinguishing advantage estimate (see caveat below)
+  → C4 (Adv(A) ≤ negl(n) + 2^-960) → distinguishing advantage estimate (see caveat below)
 ```
 
 > ⚠️ **Important caveat on C4**: The `2⁻⁹⁶⁰` term is derived from C3's Grover bound over the theoretical configuration space. This assumes unstructured quantum search over the full config space (2¹⁹²⁰). In practice the reachable keyspace is limited by the OS CSPRNG (2²⁵⁶), and the Grover oracle may have exploitable structure. The system's effective post-quantum security, bounded by SHAKE256's Grover resistance, is **128-bit**. See `stream_cipher_security.md` §1 for the effective bound.
@@ -60,10 +60,10 @@ C1 (k_step ≥ 40 bits/step) → empirical information-loss measurement
 
 | Level | What Is Proved | Location |
 |-------|---------------|----------|
-| **L0: Safety** | No panics, no overflows for bounded inputs | [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) + Kani |
-| **L1: Functional Eq.** | Fixed ops match mathematical spec within error bounds | [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) + Kani |
-| **L2: Composite** | `compute_accelerations` satisfies Newton's laws | [`NewtonianGravity.lean`](proofs/lean/src/n_body/NewtonianGravity.lean) + Kani |
-| **L3: Pipeline** | Verlet loop correctness, domain separation | [`VerletIntegrator.lean`](proofs/lean/src/dynamics/VerletIntegrator.lean) + Kani |
+| **L0: Safety** | No panics, no overflows for bounded inputs | [`proofs/lean/src/fixed_point/FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) + Kani |
+| **L1: Functional Eq.** | Fixed ops match mathematical spec within error bounds | [`proofs/lean/src/fixed_point/FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) + Kani |
+| **L2: Composite** | `compute_accelerations` satisfies Newton's laws | [`proofs/lean/src/n_body/NewtonianGravity.lean`](proofs/lean/src/n_body/NewtonianGravity.lean) + Kani |
+| **L3: Pipeline** | Verlet loop correctness, domain separation | [`proofs/lean/src/dynamics/VerletIntegrator.lean`](proofs/lean/src/dynamics/VerletIntegrator.lean) + Kani |
 | **L4: Determinism** | Bit-identical across platforms (SSE2/AVX/AVX2) | `tests/kelvin_tests/determinism.rs` |
 
 **These are implementation correctness proofs — they do not prove cryptographic security.**
@@ -125,26 +125,26 @@ Pool → HKDF-SHA512(domain_sep, pool) → (KEY, NONCE, reseed_counter) → BLAK
 
 ## 5. L0: Safety Proofs
 
-- **Lean proof:** [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) `no_overflow_*` theorems
+- **Lean proof:** [`proofs/lean/src/fixed_point/FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) `no_overflow_*` theorems
 - **Kani harness:** `proofs/kani/fixed_safety.rs`
 - **Proves:** No panic, no overflow for `Fixed::{from_raw, add, sub, mul, div, sqrt}` and `compute_accelerations` under bounded inputs
 - **Proof range:** Physical domain bounds (positions ±100 AU, masses 0–1 M☉, etc.)
 
 ## 6. L1: Functional Equivalence
 
-- **Lean proof:** [`FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) `fromReal_correct`, `div_correctness`, `sqrt_correctness`
+- **Lean proof:** [`proofs/lean/src/fixed_point/FixedPoint.lean`](proofs/lean/src/fixed_point/FixedPoint.lean) `fromReal_correct`, `div_correctness`, `sqrt_correctness`
 - **Kani harness:** `proofs/kani/fixed_equivalence.rs`
 - **Proves:** Fixed-point arithmetic matches mathematical spec within dynamically scaled error bounds
 
 ## 7. L2: Composite Correctness
 
-- **Lean proof:** [`NewtonianGravity.lean`](proofs/lean/src/n_body/NewtonianGravity.lean) `action_reaction_law`, `force_direction_attractive`, `force_magnitude_formula`
+- **Lean proof:** [`proofs/lean/src/n_body/NewtonianGravity.lean`](proofs/lean/src/n_body/NewtonianGravity.lean) `action_reaction_law`, `force_direction_attractive`, `force_magnitude_formula`
 - **Kani harness:** `proofs/kani/acceleration_proofs.rs`
 - **Proves:** `compute_accelerations` satisfies Newton's laws (action-reaction, direction, magnitude)
 
 ## 8. L3: Pipeline Integrity
 
-- **Lean proofs:** [`VerletIntegrator.lean`](proofs/lean/src/dynamics/VerletIntegrator.lean), [`Shake256Extraction.lean`](proofs/lean/src/entropy_extraction/Shake256Extraction.lean), [`HKDFDerivation.lean`](proofs/lean/src/key_schedule/HKDFDerivation.lean)
+- **Lean proofs:** [`proofs/lean/src/dynamics/VerletIntegrator.lean`](proofs/lean/src/dynamics/VerletIntegrator.lean), [`proofs/lean/src/entropy_extraction/Shake256Extraction.lean`](proofs/lean/src/entropy_extraction/Shake256Extraction.lean), [`proofs/lean/src/key_schedule/HKDFDerivation.lean`](proofs/lean/src/key_schedule/HKDFDerivation.lean)
 - **Kani harness:** `proofs/kani/pipeline_proofs.rs`
 - **Proves:** `simulate_and_extract_seed` executes the correct number of steps, uses the correct domain separators, and produces consistent output
 
@@ -157,7 +157,7 @@ Pool → HKDF-SHA512(domain_sep, pool) → (KEY, NONCE, reseed_counter) → BLAK
 
 ## 10. C1-C5 Gap Documentation
 
-See [`PROOF_INDEX.md`](formal_verification/PROOF_INDEX.md) for the complete mapping of all 23 gaps to their Lean and Kani proofs.
+See [`formal_verification/PROOF_INDEX.md`](formal_verification/PROOF_INDEX.md) for the complete mapping of all 23 gaps to their Lean and Kani proofs.
 
 | Section | File(s) | Description |
 |--------|---------|-------------|

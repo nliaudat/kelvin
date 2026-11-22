@@ -80,8 +80,16 @@ This gap builds on:
 
 ## References
 
-1. `kelvin-core/src/fixed_math.rs` (Kani harnesses)
-2. `proofs/lean/src/dynamics/LyapunovExponents.lean` (Lean proof)
-3. Benettin et al. (1980) "Lyapunov Characteristic Exponents for Smooth Dynamical Systems"
+- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proof)
+- `kelvin-core/src/fixed_math.rs` (Kani harnesses)
+- [`../readme.md`](../readme.md) (C2 overview)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C2 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-

@@ -83,8 +83,16 @@ This gap builds on:
 
 ## References
 
-1. Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations."
-2. `kelvin-core/src/fixed_math.rs` (Kani harnesses)
-3. `proofs/lean/src/dynamics/LyapunovExponents.lean` (Lean proof)
+- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proof)
+- Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations."
+- [`../readme.md`](../readme.md) (C2 overview)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C2 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-

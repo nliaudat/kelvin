@@ -80,9 +80,17 @@ The empirical measurement of ~0.99 bits/op is consistent with the 0.98-bit theor
 
 ## References
 
-1. `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
-2. `proofs/lean/src/fixed_point/FixedPoint.lean` (Lean proof)
-3. C1 gap1_kop_shannon_bound.md (ideal case)
-4. `tests/information_loss/src/main.rs` (empirical validation)
+- [`../../proofs/lean/src/fixed_point/FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean) (Lean proof)
+- `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
+- [`gap1_kop_shannon_bound.md`](gap1_kop_shannon_bound.md) (ideal case)
+- [`../../formal_verification/C1/readme.md`](../../formal_verification/C1/readme.md) (C1 overview)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C1 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-

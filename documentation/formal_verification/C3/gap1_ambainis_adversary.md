@@ -78,9 +78,17 @@ theorem quantum_query_lower_bound :
 
 ## References
 
-1. Ambainis, A. (2002). "Amplification by Adversary Method."
-2. Zalka, C. (1999). "Grover's Quantum Search Algorithm is Optimal."
-3. `kelvin-core/src/fixed_math.rs` (Kani harnesses)
-4. `proofs/lean/src/entropy_extraction/Shake256Extraction.lean` (Lean proof)
+- [`../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean`](../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean) (Lean proof)
+- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proof)
+- `kelvin-core/src/fixed_math.rs` (Kani harnesses)
+- [`../readme.md`](../readme.md) (C3 overview)
+- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
+
+---
+
+## See Also
+
+- [C3 Proof Sketch](../readme.md)
+- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
 
 /-
