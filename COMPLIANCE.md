@@ -70,8 +70,8 @@ instead of returning malleated plaintext.
 
 | Requirement (COMPLIANCE) | Proof level | Proof file | Documentation link |
 |---------------------------|------------|------------|--------------------|
-| **Security ceiling – BOUNDED** | L1 | `proofs/kani/fixed_equivalence.rs` | [specs/fixed_spec.md](proofs/kani/../specs/fixed_spec.md) |
-| **KDF cost – ACCEPTED LIMITATION** | L2 | `proofs/kani/acceleration_proofs.rs` | [specs/key_schedule_spec.md](proofs/kani/../specs/key_schedule_spec.md) |
-| **Nonce handling – FIXED** | L3 | `proofs/kani/pipeline_proofs.rs` | [specs/orbital_config_spec.md](proofs/kani/../specs/orbital_config_spec.md) |
-| **Known‑plaintext – FIXED** | L4 | `tests/kelvin_tests/determinism.rs` | — |
+| **Security ceiling – BOUNDED** | L1 | `proofs/kani/fixed_equivalence.rs` | [specs/fixed_spec.md](proofs/../specs/fixed_spec.md) |
+| **KDF cost – ACCEPTED LIMITATION** | — | *none yet* | See `documentation/formal_verification.md` §2 for measured setup costs |
+| **Nonce handling – FIXED** | L3 | `proofs/kani/pipeline_proofs.rs` | [specs/orbital_config_spec.md](proofs/../specs/orbital_config_spec.md) |
+| **Known‑plaintext – FIXED (default-auth)** | L4 | `tests/kelvin_tests/determinism.rs` | — |
 | **Side‑channel hardening – PARTIAL** | — | *none yet* | See open issue #<id> to add a Kani proof |
