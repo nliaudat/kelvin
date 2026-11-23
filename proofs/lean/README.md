@@ -1,221 +1,134 @@
-# Kelvin Cryptosystem Formal Verification (Lean)
+# Kelvin — Lean 4 proofs
 
-Formal mathematical proofs for the Kelvin cryptosystem using the [Lean Theorem Prover](https://lean-lang.org/).
+Machine-checked Lean 4 formalisation of the parts of Kelvin that can be stated
+as plain integer arithmetic.
 
-## Purpose
-
-This directory provides **mathematical specifications** and **formal proofs** that complement the Kani-based code verification. While Kani verifies that the Rust implementation matches its specification, Lean proves that the specification itself is mathematically sound.
-
-## Architecture
-
-```
-Kelvin Cryptosystem
-├── Mathematical Specification (Lean proofs) ← This directory
-│   ├── fixed_point/FixedPoint.lean       ← Q32.64 arithmetic
-│   ├── n_body/NewtonianGravity.lean      ← Gravitational forces
-│   ├── dynamics/VerletIntegrator.lean    ← Symplectic integration
-│   ├── dynamics/LyapunovExponents.lean   ← Chaos certification
-│   ├── entropy_extraction/Shake256Extraction.lean
-│   └── key_schedule/HKDFDerivation.lean
-│
-├── Rust Implementation (kelvin-core)
-│   ├── src/fixed_math.rs                  ← Q32.64 arithmetic
-│   ├── src/body.rs                        ← Vec3, OrbitalBody
-│   ├── src/integrator.rs                  ← Verlet, Euler
-│   └── ...
-│
-└── Code Verification (Kani proofs)
-    └── proofs/kani/*.rs                   ← Automated verification
-```
-
-## Installation
-
-### Prerequisites
-
-1. Install Lean 4:
-```bash
-lean --init mathlib
-```
-
-2. Navigate to the Lean proofs:
-```bash
-cd proofs/lean/src
-```
-
-## Building Proofs
-
-### Build All Files
+## Build
 
 ```bash
-lean build KelvinFormalVerif.lean
+cd proofs/lean
+lake build
 ```
 
-### Build Specific Component
+Requirements: `elan`/`lake` with the toolchain pinned in `lean-toolchain`
+(`leanprover/lean4:v4.36.0`). There are **no external dependencies** — in
+particular Mathlib is not required, so a clean build needs no multi-gigabyte
+download.
+
+A successful build ends with:
+
+```
+Build completed successfully (31 jobs).
+```
+
+Every theorem is closed with `omega`, `simp`, `decide`, or definitional
+equality. There are no `sorry`s, `admit`s, `axiom`s, or `native_decide` uses.
+
+## Checking the proofs (the "test" step)
+
+Lean has no separate runtime test layer: the kernel checks every proof while the
+module elaborates, so `lake build` *is* the test. Two scripts wrap that check and
+add a guard against escape hatches:
 
 ```bash
-# Fixed-point arithmetic
-lean build fixed_point/FixedPoint.lean
-
-# Newtonian gravity
-lean build n_body/NewtonianGravity.lean
-
-# Verlet integrator
-lean build dynamics/VerletIntegrator.lean
-
-# Lyapunov exponents
-lean build dynamics/LyapunovExponents.lean
-
-# Entropy extraction
-lean build entropy_extraction/Shake256Extraction.lean
-
-# Key schedule
-lean build key_schedule/HKDFDerivation.lean
+./check.sh          # POSIX shell / CI
+```
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\check.ps1   # Windows
 ```
 
-## Proof Status
+They run `lake build`, fail if `sorry` / `admit` / `axiom` / `native_decide`
+appears anywhere under `src/`, and print the theorem count.
 
-| Component | Mathematical Status | Corresponds to Kani |
-|-----------|-------------------|---------------------|
-| Fixed-Point Arithmetic | ✅ Fully Proved | L0, L1 |
-| Newtonian Gravity | ✅ Fully Proved | L2 |
-| Verlet Integrator | ✅ Fully Proved | L3 |
-| Lyapunov Exponents | ⚠️ Justified (measured) | C2 |
-| Entropy Extraction | ✅ Fully Proved | L3, C4 |
-| Key Schedule | ✅ Fully Proved | L3 |
+`src/Sanity.lean` adds kernel-checked `example` declarations for the constants
+the documentation quotes (`2^64`, `100 * 2^64`, `96 * 40 = 3840`,
+`2 * 960 = 1920`, `i128::MAX/MIN`), so a typo in the prose or a change to the
+model cannot silently contradict the numbers in the docs. These are checked by
+`lake build` like any theorem.
 
-## Understanding "Justified" vs "Proved"
+## Layout
 
-Some components are marked as **"justified"** rather than **"proved"** because they rely on:
+The library has two layers. The primary modules are under `KelvinProofs/`; the
+legacy paths (`fixed_point/`, `n_body/`, `dynamics/`, `entropy_extraction/`,
+`key_schedule/`) import them and restate the facts under the names the
+documentation historically used. Both layers build, so the old file paths in the
+docs are real.
 
-1. **Empirical Measurement**: Lyapunov exponent λ ≈ 0.7 yr⁻¹ is measured, not derived
-2. **Statistical Analysis**: NIST SP 800-90B test results are empirical
-3. **Plausibility Arguments**: Grover search bounds are theoretical estimates
+| File | Contents |
+|------|----------|
+| `src/KelvinFormalVerif.lean` | Entry point; imports both layers |
+| `src/Sanity.lean` | Kernel-checked constants quoted by the docs |
+| `src/KelvinProofs.lean` | Imports every primary module |
+| `src/KelvinProofs/FixedPoint.lean` | Q32.64 raw-integer arithmetic |
+| `src/KelvinProofs/Integrator.lean` | Velocity Verlet scheduling and reversibility |
+| `src/KelvinProofs/Gravity.lean` | Pairwise momentum cancellation |
+| `src/KelvinProofs/KeySchedule.lean` | Index encoding; conditional key uniqueness |
+| `src/KelvinProofs/Entropy.lean` | Domain-separated framing; conditional XOF separation |
+| `src/KelvinProofs/PeriodDetection.lean` | Floyd loop invariants |
+| `src/fixed_point/FixedPoint.lean` | Legacy adapter: bounds, division, sqrt postcondition |
+| `src/n_body/NewtonianGravity.lean` | Legacy adapter: dot product, action–reaction |
+| `src/dynamics/VerletIntegrator.lean` | Legacy adapter: schedule, reversibility |
+| `src/dynamics/LyapunovExponents.lean` | Legacy adapter: Kaplan–Yorke arithmetic only |
+| `src/entropy_extraction/Shake256Extraction.lean` | Legacy adapter: framing, conditional separation |
+| `src/key_schedule/HKDFDerivation.lean` | Legacy adapter: info-string injectivity |
 
-These components are still formally documented and verified through measurement, but the underlying values come from empirical data rather than pure mathematical derivation.
+50 theorems in total: 23 in the primary modules, 27 in the entry point and the
+legacy adapters.
 
-## Relationship to Kani Proofs
+## What is proved
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Mathematical Specification (Lean)                      │
-│  - Pure mathematics                                     │
-│  - Theoretical correctness                              │
-│  - Interactive proof development                        │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓ equivalence (proven)
-┌─────────────────────────────────────────────────────────┐
-│  Rust Implementation (kelvin-core)                       │
-│  - Q32.64 arithmetic                                   │
-│  - N-body simulation                                    │
-│  - Entropy extraction                                   │
-└──────────────────────┬──────────────────────────────────┘
-                       ↓ equivalence (Kani verified)
-┌─────────────────────────────────────────────────────────┐
-│  Code Verification (Kani proofs)                         │
-│  - Automated model checking                             │
-│  - Implementation bug detection                         │
-│  - Golden hash verification                             │
-└─────────────────────────────────────────────────────────┘
-```
+These are facts about the integer model, and each one is checked by the kernel:
 
-## How to Write Proofs in Lean
+- **`FixedPoint`** — bounded `Int` addition/subtraction cannot overflow `i128`
+  for physical-range inputs; Euclidean division satisfies
+  `a / b * b + a % b = a`; the remainder lies in `[0, b)`; the square-root
+  postcondition `q² ≤ n < (q+1)²` follows from a bounded remainder.
+- **`Integrator`** — the drift uses the post-kick velocity; both kicks use the
+  half timestep; the kick-drift-kick map is exactly reversible; `simulate` with
+  zero steps is the identity.
+- **`Gravity`** — the two acceleration contributions to a pair's momentum cancel
+  exactly for arbitrary masses; a massless body exerts no acceleration; the dot
+  product is symmetric and compatible with scaling.
+- **`KeySchedule`** — distinct indices produce distinct info strings; if the PRF
+  is injective in its index argument then distinct indices produce distinct
+  keys.
+- **`Entropy`** — distinct domain tags produce distinct framed inputs; if the
+  XOF is injective then distinct tags produce distinct outputs.
+- **`PeriodDetection`** — after `k` iterations the tortoise advanced `k` steps
+  and the hare `2k` steps.
+- **`LyapunovExponents` (legacy)** — the Kaplan–Yorke dimension `j + S/g` is at
+  least `j` and non-negative when `S ≥ 0` and `g > 0`. Nothing about the
+  measured exponent.
 
-### Basic Structure
+## What is *not* proved
 
-```lean
-/-- A theorem statement /-
-theorem my_theorem (args : Type) : conclusion := by
-  -- Proof goes here
-  intro h  -- Introduce hypotheses
-  rw [h]   -- Rewrite using hypothesis
-  exact ...  -- Provide the term
-```
+This is important, and it is the honest scope of the suite:
 
-### Common Tactics
+- **No cryptographic claim is machine-checked.** SHAKE256 preimage resistance,
+  HMAC-SHA512 PRF security, and the keystream indistinguishability bound
+  (`Adv ≤ negl(n) + 2^-128`) are **assumptions**, not theorems. The conditional
+  lemmas above make the assumptions explicit; they do not discharge them.
+- **No entropy accounting is proved.** The C1 "bits lost per step" bounds are
+  not derived here. `FixedPoint.div_rem_identity` is a division identity, not an
+  entropy statement.
+- **No Lyapunov / Kaplan–Yorke statement about Kelvin is proved.** The legacy
+  Lyapunov file proves one arithmetic inequality about the Kaplan–Yorke formula;
+  it does not show `λ > 0` or `D_KY ∈ [3,4]`.
+- **No quantum lower bound is proved.** The Grover/Ambainis argument remains an
+  informal argument in `documentation/formal_verification/C3/`.
+- **The model is not a refinement of the Rust code.** These files model the
+  update *schedules* and integer invariants. They do not extract or refine
+  `kelvin-core`; the link to the implementation is by inspection, not by a
+  verified translation.
 
-```lean
--- Introduction tactics
-intro h        -- Introduce hypothesis
-intros h1 h2   -- Introduce multiple hypotheses
+Anything not listed under "What is proved" should be treated as unproven.
 
--- Rewriting tactics
-rw [h]        -- Rewrite using equality
-simp [h]      -- Simplify using lemmas
-cases h       -- Case analysis on inductive type
+## History
 
--- Proof completion
-exact term    -- Provide the exact term
-trivial       -- For trivial goals
-apply lemma   -- Apply a lemma to reduce goal
-```
-
-### Mathematical Notation
-
-```lean
--- Real numbers and operations
-def x : ℝ := 3.14
-theorem add_comm (a b : ℝ) : a + b = b + a := by
-  ring        -- Algebraic simplification
-
--- Quantifiers
-theorem forall_example : ∀ n : ℕ, n + 0 = n := by
-  intro n     -- Introduce universal quantifier
-  rfl         -- Reflexivity
-
--- Existential quantifiers
-theorem exists_example : ∃ x : ℝ, x > 0 := by
-  use 1       -- Witness for existential
-  norm_num    -- Prove property of witness
-```
-
-## File Organization
-
-```
-proofs/lean/
-├── README.md                      ← This file
-└── src/
-    ├── KelvinFormalVerif.lean     ← Main entry point
-    ├── fixed_point/
-    │   └── FixedPoint.lean        ← Q32.64 arithmetic proofs
-    ├── n_body/
-    │   └── NewtonianGravity.lean  ← Gravitational force proofs
-    ├── dynamics/
-    │   ├── VerletIntegrator.lean   ← Integration algorithm proofs
-    │   └── LyapunovExponents.lean  ← Chaos certification
-    ├── entropy_extraction/
-    │   └── Shake256Extraction.lean ← Entropy pool extraction
-    └── key_schedule/
-        └── HKDFDerivation.lean     ← Key derivation proofs
-```
-
-## Contributing
-
-To add a new proof:
-
-1. Create a `.lean` file in the appropriate subdirectory
-2. Import necessary Mathlib modules at the top
-3. Define types and structures matching Kelvin's Rust implementation
-4. State theorems with clear documentation comments
-5. Provide proofs (complete or use `sorry` as placeholder)
-6. Add the new theorem to `KelvinFormalVerif.lean`
-
-## License
-
-This formal verification code is licensed under the same terms as Kelvin:
-- Apache License, Version 2.0
-- MIT license
-
-At your option.
-
-## References
-
-- [Lean Theorem Prover Documentation](https://leanprover-community.github.io/)
-- [Mathlib Library](https://github.com/leanprover-community/mathlib)
-- [Apple Corecrypto Formal Verification](https://security.apple.com/blog/formal-verification-corecrypto/)
-- Kelvin Cryptosystem: `documentation/formal_verification.md`
-
-## Additional Resources
-
-- [Lean 4 Tutorial](https://leanprover-community.github.io/tutorial/)
-- [Mathlib Cheat Sheet](https://github.com/leanprover-community/mathlib/blob/master/docs/CheatSheet.md)
-- [Lean Prover Zulip Chat](https://zulip.chat.leanprover-community.org/)
+An earlier revision of this directory contained seven files that (a) used a bare
+slash-dash opener where a comment terminator was required, so the entire file
+parsed as a comment, (b) imported Mathlib, which is not vendored, and (c) stated
+theorems that were false of their own definitions (for example a `simulate` that
+returned its input, a `derive_key` that ignored the key index, and a
+Kaplan–Yorke "theorem" discharged by `use 3.5`). Those files have been rewritten
+as the legacy adapters listed above; they now compile and state only what holds.

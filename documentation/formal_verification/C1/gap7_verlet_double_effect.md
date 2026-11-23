@@ -1,6 +1,11 @@
-# C1 Gap 7: Verlet Double-Computation Effect — Verified
+# C1 Gap 7: Verlet Double-Computation Effect
 
-> **Status:** ✅ VERIFIED BY CODE INSPECTION + KANI COUNTING
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Partial. The Verlet two-kick schedule is proved in Lean (`Integrator.lean`); the op-count accounting is not.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C1 — Fixed-Point Information Loss (Irreversibility)
 > **Kani Cross-Reference:** `verify_c1_rounding_op_count` (templated), code inspection of `kelvin-core/src/integrator.rs`
@@ -51,13 +56,22 @@ Each call to `compute_accelerations`:
 
 Two acceleration calls → each pair contributes **4 rounding operations** per Verlet step (2 sqrt + 2 div).
 
-### 2.2 Kani Counting Verification
+### 2.2 What is and is not checked
 
-The Kani harness `verify_c3_rounding_op_count` (templated in `proofs/kani/information_loss.rs`) verifies for N=2 that a single Verlet step executes without panic or overflow, confirming the counting is correct. For N=2:
+There is no runnable harness that counts rounding operations. The file
+`proofs/kani/information_loss.rs` mentions `verify_c3_rounding_op_count`, but it
+is a template: it is not included by `kelvin-core/src/kani_harnesses.rs` and has
+never been compiled.
 
-- N(N−1)/2 = 1 pair
-- 2 acceleration calls × 2 rounding ops per pair = 4 total rounding ops
-- This matches the formula: `k_step = (N(N−1)/2 pairs) × (2 ops/pair) × (2 accel calls) = 2N(N−1)`
+What *is* machine-checked is the schedule, in
+`proofs/lean/src/KelvinProofs/Integrator.lean`: `step_fst` shows the drift uses
+the post-kick velocity, and `step_snd` shows both kicks use the half timestep.
+The operation count itself is by inspection of `compute_accelerations`, and the
+conversion from operations to bits is not proved.
+
+For N=2: 1 pair, 2 acceleration calls, 2 rounding operations per pair per call,
+so 4 rounding operations per step. This matches the formula
+`k_step = (N(N−1)/2) × 2 × 2 = 2N(N−1)` *as a count of operations*.
 
 ### 2.3 Euler Comparison
 

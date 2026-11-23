@@ -1,94 +1,58 @@
-/-!
-# C3 Gap 1: Ambainis Adversary Method — PROVED
+# C3 Gap 1: Ambainis Adversary Method
 
-Formal proof that the Ambainis adversary method provides a lower bound on quantum query complexity for inverting the Kelvin simulation.
+**Status:** Open. The argument is prose; no artifact establishes a query lower
+bound.
 
-Status: ✅ PROVED (Lean) + ✅ VERIFIED (Kani)
-Date: 2026-11-21
-Conjecture: C3 — Sequential Quantum Hardness
-Kani Cross-Reference: verify_c3_step_non_injective in kelvin-core/src/fixed_math.rs
+**Claim:** any quantum algorithm distinguishing the Kelvin keystream from
+uniform requires
 
----
+$$Q(\Phi^S) \ge \Omega\!\left(\sqrt{|\Theta|}\right) = \Omega(2^{960})$$
 
-## Theorem Statement
+queries, where $|\Theta| \ge 2^{1920}$ (C5).
 
-**Theorem (Quantum Query Lower Bound via Adversary Method):**
-For any quantum algorithm $\mathcal{A}$ that distinguishes the Kelvin keystream from uniform random, the query complexity satisfies:
+## The argument, with its conditions restored
 
-$$Q(\Phi^S) \geq \Omega\left(\sqrt{|\Theta|}\right) = \Omega(2^{960})$$
+The reasoning is:
 
-Where $|\Theta| \geq 2^{1920}$ is the configuration space cardinality (from C5).
+1. The attacker sees only $K = \text{SHAKE256}(\Phi^S(C))$.
+2. Finding $C$ means searching $\Theta$.
+3. Grover's algorithm is optimal for unstructured search: $\Omega(\sqrt N)$
+   queries over $N$ items.
+4. With $N = 2^{1920}$ this gives $\Omega(2^{960})$.
 
----
+Conditions that must be stated, and are not discharged:
 
-## Proof (Lean Formalization)
+| Condition | Status |
+|-----------|--------|
+| Grover optimality (Zalka 1999) | Literature theorem; applies to unstructured search with a **unique** marked element |
+| $|\Theta| \ge 2^{1920}$ | **Open** (C5) |
+| The keystream predicate has a unique preimage | **False in general** — several configurations may map to the same keystream; with $t$ matches the bound becomes $\Omega(\sqrt{N/t})$ |
+| The code is unknown to the attacker | **False** — Kelvin is open source; Grover's model assumes an otherwise unknown oracle |
+| "Constant success probability" ⇒ "advantage bound" | Needs a separate argument for a fixed query budget |
 
-The proof is formalized in `proofs/lean/src/entropy_extraction/Shake256Extraction.lean` and `proofs/lean/src/dynamics/LyapunovExponents.lean`:
+So the bound cannot be claimed "for any algorithm that distinguishes the
+keystream". It is a conditional statement: *if* the keystream predicate behaves
+like an unstructured oracle with few preimages over a space of size $2^{1920}$,
+*then* a constant-success search needs $\Omega(2^{960})$ queries.
 
-```lean
-theorem extraction_preimage_resistant 
-  (pool : List Byte) :
-  ¬∃ config : OrbitalConfig, 
-    extract_entropy_pool (simulate config) "v2" = pool := by
-  -- Proof sketch:
-  -- 1. Orbital configuration space has |Θ₅| ≥ 2^1920 elements (C5)
-  -- 2. SHAKE256 has 256-bit preimage resistance classically, 128-bit quantum
-  -- 3. Grover search over 2^1920 requires O(2^960) queries
-  -- 4. This is computationally infeasible
-  
-  intro h_exists
-  rcases h_exists with ⟨config⟩
-  have h_same : extract_entropy_pool (simulate config) "v2" = pool := h_exists
-  -- SHAKE256 preimage resistance prevents this
-  trivial
+## Why the earlier "proof" was removed
 
--- Quantum query complexity lower bound
-theorem quantum_query_lower_bound :
-  ∀ A : QuantumAdversary,
-    query_complexity A ≥ Real.sqrt (configuration_space_cardinality) := by
-  intro A
-  -- Ambainis adversary method provides tight lower bounds
-  -- For unstructured search over N elements: Ω(√N) queries
-  have h_card : configuration_space_cardinality ≥ 2^1920 := c5_gap1_cardinality_bound
-  rw [h_card]
-  <;> norm_num
-```
+An earlier revision quoted Lean theorems `extraction_preimage_resistant` and
+`quantum_query_lower_bound`. The first claimed that *no* configuration produces
+*any* supplied pool — an easily refuted statement (take the pool to be the
+output for any configuration). The second referenced
+`c5_gap1_cardinality_bound`, which does not exist. Neither theorem was in the
+sources.
 
-### Key Points:
+## What is proved nearby
 
-1. **Correct Attack Model**: The attacker sees only the keystream $K = \text{SHAKE256}(\Phi^S(C))$, not the orbital state. Finding $C$ requires searching $\Theta$.
-
-2. **Grover Optimality**: Zalka (1999) proved that Grover's algorithm is optimal for unstructured search, requiring $\Omega(\sqrt{N})$ queries.
-
-3. **Configuration Space**: From C5-Gap1, $|\Theta| \geq 2^{1920}$, so the quantum lower bound is $\Omega(2^{960})$.
-
-4. **Kani Verification**: The harness `verify_c3_step_non_injective` confirms that small input differences lead to bounded output divergence.
-
----
-
-## Why This Approach is Correct
-
-| Aspect | Previous (Flawed) | Current (Correct) |
-|--------|------------------|-------------------|
-| **Search space** | Preimage of $\Phi^S$ (shrinks with S) | Configuration space $\Theta$ (fixed, ≥ 2^1920) |
-| **Lower bound** | Needs Ambainis extension (open problem) | Standard Grover optimality (proven 1999) |
-| **Numerical value** | Ω(2^(S·k/2)) — decays with S | Ω(2^960) — constant |
-
----
+`Entropy.domain_separation` (Lean) proves that distinct domain tags produce
+distinct framed inputs. That is a framing lemma, not a query bound.
 
 ## References
 
-- [`../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean`](../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean) (Lean proof)
-- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proof)
-- `kelvin-core/src/fixed_math.rs` (Kani harnesses)
-- [`../readme.md`](../readme.md) (C3 overview)
-- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
-
----
-
-## See Also
-
-- [C3 Proof Sketch](../readme.md)
-- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
-
-/-
+- [C3 overview](readme.md)
+- [C3 gap 2](gap2_quantum_query_lower_bound.md)
+- [C5 gap 1](../C5/gap1_cardinality_bound.md)
+- Zalka, C. (1999). *Phys. Rev. A* 60, 2746.
+- [PROOF_INDEX.md](../PROOF_INDEX.md)

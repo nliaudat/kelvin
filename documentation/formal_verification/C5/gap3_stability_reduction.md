@@ -1,6 +1,11 @@
-# C5 Gap 3: Stability Reduction Factor — Resolved by Measurement (2026-10-10)
+# C5 Gap 3: Stability Reduction Factor
 
-> **Status:** ✅ RESOLVED (re-closed 2026-10-10 — by direct measurement,
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Empirical. 0/200 rejections measured on 2026-10-10.
+
 > replacing the withdrawn volume argument)
 > **Date:** 2026-05-31 (re-closed 2026-10-10)
 > **Conjecture:** C5 — Valid Configuration Space Cardinality

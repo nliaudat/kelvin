@@ -1,6 +1,11 @@
-# C2 Gap 2: Positive λ Lower Bound `λ ≥ λ_min > 0` — Resolved
+# C2 Gap 2: Positive Lyapunov Exponent Lower Bound
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Empirical. lambda ~ 0.7 /yr measured; no certified lower bound.
+
 > **Date:** 2026-05-31
 > **Conjecture:** C2 — Finite-Precision Lyapunov Exponent Certification
 >

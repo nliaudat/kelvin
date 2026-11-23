@@ -1,244 +1,92 @@
-# Kelvin Formal Verification Progress Report
-**Date:** 2026-11-22  
-**Status:** ✅ Significant Progress on Unresolved TODO Items
+# Kelvin Formal Verification — Progress Report (corrected)
 
----
+> **Correction (2026-11-23).** The original version of this file reported
+> "19/23 gaps resolved", three new Kani harnesses "created", 32 Lean theorems,
+> and `lean --init mathlib` as the build command. None of that was accurate: the
+> Lean files did not parse, the harnesses were never compiled, and the gap counts
+> were not derived from any artifact. The numbers below replace them.
 
-## Executive Summary
+## Current status
 
-Today we made substantial progress on the unresolved TODO items by:
-1. ✅ Creating 3 new Kani harnesses for pending proofs
-2. ✅ Updating all documentation with correct relative links
-3. ✅ Generating complete Lean proofs (32 theorems across 7 files)
-4. ✅ Refining gap status to reflect current state
+| Category | Total | Proved | Partial | Empirical | Open |
+|----------|-------|--------|---------|-----------|------|
+| C1 | 7 | 0 | 2 | 2 | 3 |
+| C2 | 6 | 0 | 0 | 2 | 4 |
+| C3 | 3 | 0 | 0 | 0 | 3 |
+| C4 | 3 | 0 | 1 | 0 | 2 |
+| C5 | 4 | 0 | 0 | 1 | 3 |
+| **Total** | **23** | **0** | **3** | **5** | **15** |
 
-**Overall Progress:** 19/23 gaps resolved, 3 in progress, 0 blockers
+No security gap is machine-checked. See
+[`documentation/formal_verification/PROOF_INDEX.md`](documentation/formal_verification/PROOF_INDEX.md).
 
----
+## What exists and runs
 
-## Work Completed Today (2026-11-22)
+### Lean (`proofs/lean`)
 
-### 1. Kani Harnesses Created
+Self-contained, no Mathlib:
 
-Three new Kani harnesses were created and updated to follow the project's pattern:
-
-#### ✅ `proofs/kani/C2_verify_lyapunov_spectrum.rs`
-- **Purpose:** Verify Q32.64 Lyapunov spectrum matches f64 computation
-- **Status:** Placeholder ready for refinement
-- **Next:** Implement full comparison with error bounds
-
-#### ✅ `proofs/kani/C1_verify_information_loss_total.rs`
-- **Purpose:** Prove total information loss = min(S * k_step, H_max)
-- **Status:** Complete placeholder with test cases
-- **Next:** Run with Kani to verify correctness
-
-#### ✅ `proofs/kani/C3_verify_quantum_reduction.rs`
-- **Purpose:** Verify quantum lower bound Ω(2^960) queries
-- **Status:** Complete with mathematical verification
-- **Next:** Connect to configuration space size from C5
-
-### 2. Documentation Updates
-
-All documentation now uses correct relative links:
-
-- ✅ `formal_verification.md` - Main documentation updated
-- ✅ `formal_verification/PROOF_INDEX.md` - Complete gap mapping
-- ✅ All C1-C5 readme files updated with new harness status
-- ✅ Gap tables reflect current progress
-
-### 3. TODO.md Updated
-
-- ✅ Status summary table reflects current state
-- ✅ Progress tracking for all 6 items
-- ✅ Completed items documented
-
----
-
-## Current Gap Status
-
-| Category | Total | Proved | Justified | In Progress |
-|----------|-------|--------|-----------|-------------|
-| **C1** | 7 | 6 | 1 | 0 |
-| **C2** | 6 | 4 | 0 | 1* |
-| **C3** | 3 | 3 | 0 | 1 |
-| **C4** | 3 | 3 | 0 | 1 |
-| **C5** | 4 | 3 | 1 | 0 |
-| **Total** | **23** | **19** | **3** | **3** |
-
-*\*C2-gap3 moved from Justified to In Progress*
-
----
-
-## Detailed Progress by TODO Item
-
-### ✅ Item 4: C1 – Information-Loss Aggregation (70% Complete)
-**Progress:**
-- ✅ Gap3 saturation bound proven
-- ✅ Per-step loss k_step ≥ 40 bits established
-- ✅ Kani harness `C1_verify_information_loss_total.rs` created
-- ⏳ Need to run and refine harness
-
-**Next Step:** Run `cargo kani proofs/kani/C1_verify_information_loss_total.rs`
-
-### ✅ Item 5: C3 – Quantum Reduction (60% Complete)
-**Progress:**
-- ✅ Gap1 Ambainis adversary method proven
-- ✅ Lean proofs in place
-- ✅ Kani harness `C3_verify_quantum_reduction.rs` created
-- ⏳ Need to run and refine harness
-
-**Next Step:** Run `cargo kani proofs/kani/C3_verify_quantum_reduction.rs`
-
-### ✅ Item 1: C2 – Lyapunov Spectrum (40% Complete)
-**Progress:**
-- ✅ Lean proof in place (`sqrt_correctness`)
-- ✅ Kani harness `C2_verify_lyapunov_spectrum.rs` created
-- ⏳ Need to implement full comparison
-
-**Next Step:** Implement Q32.64 vs f64 comparison in harness
-
-### ⏳ Item 2: C4 – Keystream Bound (30% Complete)
-**Progress:**
-- ✅ Gap1 game-based reduction proven
-- ⏳ Formal bound needs clarification
-- ⏳ Scope note needs final decision
-
-**Next Step:** Decide between 2^-128 vs 2^-960 bound
-
-### ❌ Item 3: C5 – Side-channel Hardening (0% Complete)
-**Progress:** None yet
-
-**Next Step:** Requires new implementation
-
-### ❌ Item 6: C6 – Periodicity Detection (0% Complete)
-**Progress:** None yet
-
-**Next Step:** New feature, not a security gap
-
----
-
-## Files Modified Today
-
-### Kani Harnesses (3 files)
-1. `proofs/kani/C2_verify_lyapunov_spectrum.rs`
-2. `proofs/kani/C1_verify_information_loss_total.rs`
-3. `proofs/kani/C3_verify_quantum_reduction.rs`
-
-### Documentation (7 files)
-1. `documentation/formal_verification.md`
-2. `documentation/formal_verification/PROOF_INDEX.md`
-3. `documentation/formal_verification/C1/readme.md`
-4. `documentation/formal_verification/C1/gap3_saturation_bound.md`
-5. `documentation/formal_verification/C1/gap4_epsilon_bound.md`
-6. `documentation/formal_verification/C2/readme.md`
-7. `documentation/formal_verification/C2/gap1_discrete_lyapunov_bound.md`
-8. `documentation/formal_verification/C2/gap4_kaplan_yorke_entropy.md`
-9. `documentation/formal_verification/C3/readme.md`
-10. `documentation/formal_verification/C3/gap1_ambainis_adversary.md`
-11. `documentation/formal_verification/C4/readme.md`
-12. `documentation/formal_verification/C4/gap1_game_based_reduction.md`
-13. `TODO.md`
-
-**Total: 13 files modified**
-
----
-
-## Next Steps (Priority Order)
-
-### High Priority (This Week)
-
-1. **Run Kani on C1 harness** - Verify information loss aggregation
-   ```bash
-   cd C:\dev\kelvin
-   cargo kani proofs/kani/C1_verify_information_loss_total.rs
-   ```
-
-2. **Run Kani on C3 harness** - Verify quantum reduction
-   ```bash
-   cargo kani proofs/kani/C3_verify_quantum_reduction.rs
-   ```
-
-3. **Implement C2 harness** - Complete Lyapunov spectrum verification
-   - Add proper Q32.64 vs f64 comparison
-   - Test with existing lyapunov_proofs.rs as reference
-
-### Medium Priority (Next Week)
-
-4. **Finalize C4 bound** - Decide between 2^-128 vs 2^-960
-   - Review cryptographic literature
-   - Update C4/readme.md scope note
-
-5. **Refine all harnesses** - Improve error bounds and test coverage
-
-### Low Priority (Next Month)
-
-6. **C5 Side-channel** - Requires new implementation
-7. **C6 Periodicity** - New feature, not urgent
-
----
-
-## Verification Commands
-
-### Build Lean Proofs
 ```bash
-cd C:\dev\kelvin\proofs\lean
-lean --init mathlib
-lean build src/KelvinFormalVerif.lean
+cd proofs/lean
+lake build
 ```
 
-### Run Kani Harnesses
-```bash
-cd C:\dev\kelvin
-cargo kani proofs/kani/C1_verify_information_loss_total.rs
-cargo kani proofs/kani/C2_verify_lyapunov_spectrum.rs
-cargo kani proofs/kani/C3_verify_quantum_reduction.rs
+50 theorems across the primary modules and the legacy adapters. Proved content
+is limited to integer arithmetic, the Verlet update schedule, pairwise momentum
+cancellation, framing injectivity, conditional key/XOF uniqueness, Kaplan–Yorke
+arithmetic, and Floyd loop invariants.
+
+### Kani (`kelvin-core`)
+
+37 harnesses: 8 in `kelvin-core/src/fixed_math.rs` and 29 in `proofs/kani/*.rs`,
+included by `kelvin-core/src/kani_harnesses.rs` under `#[cfg(kani)]`. Run
+`docker compose -f docker/docker-compose.yml run --rm kani --list` for the list.
+
+```
+verify_add_no_overflow
+verify_sub_no_overflow
+verify_mul_range
+verify_c1_preimage_bound
+verify_c1_epsilon_bound
+verify_c1_division_remainder
+verify_c3_step_non_injective
+verify_c3_two_step_preimage_growth
 ```
 
-### Run All Kani Proofs
 ```bash
-cargo kani --tests
+docker compose -f docker/docker-compose.yml build kani
+docker compose -f docker/docker-compose.yml run --rm kani --list
+docker compose -f docker/docker-compose.yml run --rm kani
 ```
 
----
+The `--proof NAME` flag now selects a single harness; previously it was parsed
+and ignored.
 
-## Success Metrics
+## Corrections applied
 
-### ✅ Completed
-- [x] All Lean proofs generated (32 theorems)
-- [x] All documentation links fixed
-- [x] 19/23 gaps resolved
-- [x] 3 Kani harnesses created
-- [x] TODO.md updated with accurate status
+- Rewrote the Lean tree whose doc blocks never closed and whose theorems were
+  false of their own definitions; it now builds with no external dependencies.
+- Rewrote eleven Kani files that were never in a Cargo target and asserted
+  locally chosen constants (`C1_verify_*`, `C2_verify_*`, `C3_verify_*`,
+  `C4_verify_*`, `C5_verify_*`, `C6_verify_*`, `verify_information_loss_total`,
+  `verify_lyapunov_spectrum`, `verify_side_channel`, `verify_periodicity`,
+  `verify_c3_quantum_reduction`), and included them from the crate so they run.
+- Fixed `docker/run-kani.sh` argument handling and added the two C3 harnesses
+  that were already integrated but missing from the run list.
+- Rewrote `TODO.md`, `KANI_VERIFICATION_RESULTS.md`,
+  `FINAL_SUMMARY_2026_11_22.md`, this file, and the whole of
+  `documentation/formal_verification/` to match what the artifacts establish.
 
-### ⏳ In Progress
-- [ ] Run and verify C1 harness
-- [ ] Run and verify C3 harness
-- [ ] Implement C2 harness
-- [ ] Finalize C4 security bound
+## Open work
 
-### ❌ Not Started
-- [ ] C5 side-channel implementation
-- [ ] C6 periodicity detection (low priority)
+1. **C4 bound.** Choose between `2^-128` (operational SHAKE256) and `2^-960`
+   (Grover over `Θ`), and state the assumption behind the chosen number.
+2. **C2 harness.** `lyapunov_proofs.rs` is a template. Move it into a Cargo
+   target under `#[cfg(kani)]` and run it, or drop the claim.
+3. **C1 accounting.** `kelvin-core/src/information_loss.rs` returns
+   `steps * 1.0`; it is a placeholder, not a bound.
+4. **C5 side-channel.** No implementation, no measurement, no proof.
+5. **C6 periodicity.** `kelvin-core/src/period_detection.rs` has a unit `State`
+   and a no-op step; the Lean Floyd invariants do not connect to it.
 
----
-
-## Risks and Mitigations
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Kani not installed | Cannot run harnesses | Install via apt or use Docker |
-| Harness compilation errors | Need to fix code | Review existing harnesses for patterns |
-| Proof complexity | May require more time | Break into smaller sub-proofs |
-
----
-
-## Conclusion
-
-**Significant progress made today!** The foundation is in place for completing the remaining proofs. The three Kani harnesses are ready to be refined and tested, and all documentation is up-to-date with correct links.
-
-**Next immediate action:** Install/run Kani to verify the new harnesses compile and work correctly.
-
----
-
-**Report generated:** 2026-11-22  
-**Next review:** After Kani verification complete
+**Last updated:** 2026-11-23

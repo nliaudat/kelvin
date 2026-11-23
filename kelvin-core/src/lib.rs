@@ -59,6 +59,12 @@ mod fixed_math;
 mod integrator;
 mod stability;
 
+/// Corrected Kani harnesses that live in `proofs/kani/*.rs`.
+///
+/// Only compiled when Kani sets `cfg(kani)`, so normal builds are unaffected.
+#[cfg(kani)]
+mod kani_harnesses;
+
 /// Integration method for the n-body gravitational simulation.
 ///
 /// - **Verlet** (default): Symplectic Velocity Verlet. Energy-conserving,

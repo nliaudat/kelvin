@@ -1,6 +1,11 @@
-# C2 Gap 3: Full Lyapunov Spectrum in Q32.64 — Justified (downgraded 2026-10-10)
+# C2 Gap 3: Q32.64 Lyapunov Spectrum
 
-> **Status:** ⚠️ JUSTIFIED (was: RESOLVED) — the perturbation argument
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Empirical. Spectrum measured; no proved agreement with a reference.
+
 > below misattributes the bound and the error-accumulation step is
 > unproved for chaotic flows. Retained on empirical agreement
 > (f64 vs Q32.64 spectra in `tests/lyapunov_certification/`).

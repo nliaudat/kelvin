@@ -1,6 +1,11 @@
-# C4 Gap 3: Advantage Bound Derivation `Adv(A) ≤ negl(n) + 2^{−S·k/2}` — Resolved
+# C4 Gap 3: Advantage Bound Derivation
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. No checked advantage bound.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C4 — Computational Indistinguishability of the Keystream
 

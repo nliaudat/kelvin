@@ -1,6 +1,11 @@
-# C5 Gap 2: Min-Entropy `H_min ≥ 1800` Bits — Resolved
+# C5 Gap 2: Min-Entropy Bound
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. No min-entropy derivation.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C5 — Valid Configuration Space Cardinality
 

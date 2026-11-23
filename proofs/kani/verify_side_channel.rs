@@ -1,46 +1,48 @@
 // verify_side_channel.rs
-//! Kani harness to verify constant‑time side‑channel resistance of the full pipeline.
-//! Executes encrypt and decrypt on random inputs and checks that execution time
-//! (measured via Kani's built‑in timing instrumentation) does not depend on
-//! secret data.
+//
+// Corrected 2026-11-23. The previous version wrote temp files, called
+// `Instant::now()` twice and asserted the two durations were within 10
+// microseconds. Kani cannot measure time, and the file was never compiled.
+//
+// SCOPE: functional correctness of 64-bit branch-free selection. Timing is not
+// verified; that needs dudect/ctgrind plus a source audit.
 
-#[cfg(kani)]
-mod harness {
-    use kani::cover;
-    use rand::Rng;
-    use std::time::Instant;
-    use kelvin_cli::commands::{encrypt, decrypt};
-    use kelvin_cli::Config;
+/// Branch-free select over `u64`: `a` when `bit & 1 == 0`, `b` otherwise.
+fn vsct_select_u64(bit: u64, a: u64, b: u64) -> u64 {
+    let mask = 0u64.wrapping_sub(bit & 1);
+    (a & !mask) | (b & mask)
+}
 
-    #[kani::proof]
-    fn verify_side_channel_hardening() {
-        // Generate random plaintext and a random orbital configuration (secret).
-        let mut rng = rand::thread_rng();
-        let plaintext: Vec<u8> = (0..1024).map(|_| rng.gen()).collect();
-        let config: Vec<u8> = (0..64).map(|_| rng.gen()).collect(); // secret key material
+#[kani::proof]
+fn verify_ct_select_u64() {
+    let bit: u64 = kani::any();
+    kani::assume(bit <= 1);
+    let a: u64 = kani::any();
+    let b: u64 = kani::any();
 
-        // Write temporary files (Kani runs in a sandbox; use in‑memory strings).
-        let input_path = "tmp_plain.txt";
-        let ciphertext_path = "tmp_cipher.bin";
-        let decrypted_path = "tmp_decrypted.txt";
-        std::fs::write(input_path, &plaintext).unwrap();
-        std::fs::write("config.json", &config).unwrap();
+    let out = vsct_select_u64(bit, a, b);
 
-        // Measure encrypt time.
-        let start_enc = Instant::now();
-        encrypt(&Config::new("config.json"), input_path, ciphertext_path);
-        let enc_dur = start_enc.elapsed();
-
-        // Measure decrypt time.
-        let start_dec = Instant::now();
-        decrypt(&Config::new("config.json"), ciphertext_path, decrypted_path);
-        let dec_dur = start_dec.elapsed();
-
-        // Simple assertion: durations must be equal (within a small epsilon).
-        // In real side‑channel analysis we would use statistical tests; here we
-        // provide a deterministic placeholder.
-        let eps = std::time::Duration::from_micros(10);
-        assert!(enc_dur <= dec_dur + eps && dec_dur <= enc_dur + eps);
-        cover!(true);
+    if bit == 0 {
+        kani::assert(out == a, "bit = 0 selects a");
+    } else {
+        kani::assert(out == b, "bit = 1 selects b");
     }
+}
+
+/// The result is always one of the two inputs, so the selection introduces no
+/// arithmetic on secret bits.
+#[kani::proof]
+fn verify_ct_select_u64_is_exact() {
+    let bit: u64 = kani::any();
+    kani::assume(bit <= 1);
+    let a: u64 = kani::any();
+    let b: u64 = kani::any();
+
+    let out = vsct_select_u64(bit, a, b);
+
+    kani::assert(out == a || out == b, "selection returns an input verbatim");
+    kani::assert(
+        out <= a.max(b) && out >= a.min(b),
+        "selection stays within the operand interval",
+    );
 }

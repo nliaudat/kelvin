@@ -1,82 +1,91 @@
-# C5: Configuration Space Cardinality — Proof Sketch
+# C5: Configuration Space Cardinality
 
-> **Results:** `proofs/kani/results/c5_validation.log`
-> **Gap documents:** [`gap{1..4}_*.md`](.)
-> **Last Updated:** 2026-11-21
+> **Status:** Open. The counting argument below is a sketch; no checked artifact
+> establishes $|\Theta| \ge 2^{1920}$.
+> **Gap documents:** `gap1`–`gap4` in this directory
+> **Last updated:** 2026-11-23
 
 ---
 
 ## Motivation
 
-The security of the Kelvin cryptosystem ultimately depends on the inability of an attacker to guess or enumerate valid orbital configurations. C5 quantifies the size of the configuration space $\Theta$.
+Kelvin's security is meant to rest on the difficulty of guessing or enumerating
+valid orbital configurations. C5 tries to quantify the size of the configuration
+space $\Theta$: a large space means Grover search needs $2^{H/2}$ operations,
+where $H = \log_2|\Theta|$.
 
-A large configuration space ensures that even a quantum adversary using Grover's algorithm requires $2^{H/2}$ operations for unstructured search, where $H = \log_2|\Theta|$ is the min-entropy.
+## Configuration space (as defined)
 
-## Configuration Space Definition
+For $N=5$ bodies:
 
-For $N = 5$ bodies:
+1. **Mass:** $m_i \in (0,1]$ M☉ → $2^{64}-1$ values each
+2. **Position:** $r_i \in [-100,100]^3$ AU → $(201 \cdot 2^{64})^3$ values
+3. **Velocity:** $v_i \in [-100,100]^3$ AU/yr → $(201 \cdot 2^{64})^3$ values
+4. **Non-collision:** $r_i \ne r_j$ for $i \ne j$
+5. **Minimum separation:** $|r_i - r_j| \ge$ min-separation
+6. **Bound orbit:** specific energy below the ejection threshold
+7. **Chaos horizon:** total steps ≥ min chaos steps
 
-1. **Mass**: $m\_i \in (0, 1]$ M☉ → $2^{64} - 1$ values each
-2. **Position**: $r\_i \in [-100, 100]^3$ AU → $(201 \times 2^{64})^3$ values
-3. **Velocity**: $v\_i \in [-100, 100]^3$ AU/yr → $(201 \times 2^{64})^3$ values
-4. **Non-collision**: $r\_i \neq r_j$ for $i \neq j$
-5. **Minimum separation**: $|r_i - r_j| \ge \text{min-separation}$
-6. **Bound orbit**: Specific energy $< \text{ejection-threshold}$
-7. **Chaos horizon**: $\text{total-steps} \ge \text{min-chaos-steps}$
-
-## Analytical Bound Derivation
-
-Each body contributes 7 bounded Q32.64 values. For N=5:
+## Counting sketch
 
 | Component | Per-axis bits | Per-body bits |
 |-----------|---------------|---------------|
-| Mass $m \in (0, 1]$ | — | 64 |
-| Position $p \in [-100, 100]^3$ | $64 + \log_2(201) \approx 71.6$ | $3 \times 71.6 \approx 214.9$ |
-| Velocity $v \in [-100, 100]^3$ | $64 + \log_2(201) \approx 71.6$ | $3 \times 71.6 \approx 214.9$ |
-| **Per body total** | | **$\approx 493.9$** |
+| Mass $m \in (0,1]$ | — | 64 |
+| Position | $64 + \log_2 201 \approx 71.6$ | $\approx 214.9$ |
+| Velocity | $64 + \log_2 201 \approx 71.6$ | $\approx 214.9$ |
+| **Per body** | | **$\approx 493.9$** |
 
-- Unconstrained for N=5: $5 \times 493.9 \approx 2469.5$ bits
+- Unconstrained, $N=5$: $5 \times 493.9 \approx 2469.5$ bits.
+- Constraint reductions: non-collision ≤ 0.1 bits, min separation ≤ 5 bits,
+  bound orbit ≤ 100 bits.
 
-Constraint reductions (from gap1):
+$$H \ge 2469.5 - 0.1 - 5 - 100 \approx 2364.4 \text{ bits} \ge 1920.$$
 
-| Constraint | Reduction (bits) |
-|------------|------------------|
-| Non-collision ($r_i \neq r_j$) | $\leq 0.1$ |
-| Min separation ($\|r_i - r_j\| \ge$ threshold) | $\leq 5$ |
-| Bound orbit ($E <$ ejection-threshold) | $\leq 100$ |
+**Why this is not a proof:**
 
-$$H \ge 2469.5 - 0.1 - 5 - 100 \approx 2364.4 \text{ bits} \ge 1920$$
+- "Constraint reduction ≤ $b$ bits" is asserted, not derived. A constraint
+  reduction is a statement about the *measure* of the admissible set, which
+  requires a distribution over configurations.
+- $\log_2|\Theta|$ is not min-entropy. Min-entropy is
+  $-\log_2 \max_x \Pr[X = x]$, which needs the sampling distribution.
+- The admissible set is defined by a dynamical condition ("bound orbit",
+  "chaos horizon"), so its size depends on the dynamics, not only on the box
+  bounds.
+- Reachability is not shown: the simulator may never visit most of $\Theta$.
 
-The final bound $H \ge 2364.4$ bits is well above the $2^{1920}$ claim.
-
-## All Gaps Resolved
+## Gap status
 
 | # | Gap | File | Status |
 |---|-----|------|--------|
-| 1 | Cardinality $|\Theta_5| \geq 2^{1920}$ | [`gap1_cardinality_bound.md`](gap1_cardinality_bound.md) | ✅ RESOLVED |
-| 2 | Min-entropy $H_{\min} \geq 1800$ bits | [`gap2_min_entropy.md`](gap2_min_entropy.md) | ✅ RESOLVED |
-| 3 | Stability reduction ≈ 1 (measured 0/200 rejections) | [`gap3_stability_reduction.md`](gap3_stability_reduction.md) | ✅ RESOLVED (measurement 2026-10-10; old volume argument withdrawn) |
-| 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config.md`](gap4_symbolic_kani_config.md) | ✅ RESOLVED |
+| 1 | Cardinality $\lvert\Theta_5\rvert \ge 2^{1920}$ | [`gap1_cardinality_bound.md`](gap1_cardinality_bound.md) | **Open** |
+| 2 | Min-entropy $H_{\min} \ge 1800$ bits | [`gap2_min_entropy.md`](gap2_min_entropy.md) | **Open** |
+| 3 | Stability reduction ≈ 1 | [`gap3_stability_reduction.md`](gap3_stability_reduction.md) | **Empirical** (0/200 rejections, 2026-10-10) |
+| 4 | Symbolic Kani config validation | [`gap4_symbolic_kani_config.md`](gap4_symbolic_kani_config.md) | **Open** |
 
-## Kani-Verified Harnesses
+## Kani harnesses
 
-| Harness | What It Proves |
-|---------|----------------|
-| `verify_c5_non_positive_mass` | Mass $\leq 0$ rejected |
-| `verify_c5_identical_positions` | Two bodies at same position rejected |
-| `verify_c5_too_few_bodies` | Empty configuration rejected |
+`proofs/kani/configuration_proofs.rs` contains sketches named
+`verify_c5_non_positive_mass`, `verify_c5_identical_positions`, and
+`verify_c5_too_few_bodies`. These are **templates**: not included by
+`kani_harnesses.rs` and never compiled.
+
+Even if integrated, they would check input validation, not cardinality. No Kani
+harness says anything about $|\Theta|$ or $H_{\min}$, and none is planned until
+the counting argument is made precise.
+
+The branch-free `ct_select` / `ct_ne` harnesses in `C5_verify_side_channel.rs`
+and `verify_side_channel.rs` belong to the separate side-channel item in
+`TODO.md`; they prove functional correctness of the selectors, not constant-time
+execution, and not anything about this configuration space.
 
 ## References
 
-- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proofs)
-- [`../../proofs/lean/src/fixed_point/FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean) (Lean proofs)
+- [`../../../proofs/lean/src/KelvinProofs/FixedPoint.lean`](../../../proofs/lean/src/KelvinProofs/FixedPoint.lean)
 - `kelvin-core/src/constants.rs` (physical bounds)
-- [`../formal_verification.md`](../formal_verification.md) (main documentation)
+- [`../PROOF_INDEX.md`](../PROOF_INDEX.md)
 
----
+## See also
 
-## See Also
-
-- [C5 Proof Sketch](readme.md)
-- [PROOF_INDEX.md](../PROOF_INDEX.md) (complete gap mapping)
-- [Lean Proofs](../../proofs/lean/src/) (mathematical specifications)
+- [PROOF_INDEX.md](../PROOF_INDEX.md)
+- [C5 gap documents](.)
+- [Lean proofs](../../../proofs/lean/README.md)

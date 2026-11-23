@@ -1,6 +1,11 @@
-# C2 Gap 6: Lipschitz Constant of λ w.r.t. Parameters — RE-OPENED (2026-10-10)
+# C2 Gap 6: Lipschitz Constant of the Lyapunov Estimate
 
-> **Status:** ❌ RE-OPENED — the numerical bound drops the theorem's own
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. The Lipschitz bound is not proved.
+
 > `1/δ` factor and the conclusion is false as stated (derivation below).
 > **Date:** 2026-05-31 (re-opened 2026-10-10)
 > **Conjecture:** C2 — Finite-Precision Lyapunov Exponent Certification

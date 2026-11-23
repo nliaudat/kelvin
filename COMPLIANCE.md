@@ -49,7 +49,7 @@ instead of returning malleated plaintext.
 
 | Hallmark | Status |
 |----------|--------|
-| Formal security reduction | ACCEPTED LIMITATION — none; C1–C5 are plausibility arguments (21 proved / 2 justified), not reductions |
+| Formal security reduction | ACCEPTED LIMITATION - none; C1-C5 are plausibility arguments (0 proved, 3 partial, 5 empirical, 15 open), not reductions |
 | Independent cryptanalysis | ACCEPTED LIMITATION — none to date; adversarial chain (v1–v5) is self-review, not independent audit |
 | Standardized primitives | MET where used — SHAKE256, ChaCha20Poly1305, HKDF-SHA512, BLAKE3, ML-KEM-768, ML-DSA-65 |
 | Side-channel hardening | PARTIAL — DudeCT \|\|t\| < 5 on arithmetic primitives + extract/simulate/schedule (12 benches, gated in `test_all.bat`); full encrypt/decrypt pipeline not covered |
@@ -66,12 +66,22 @@ instead of returning malleated plaintext.
 5. `verlet_step` timing variation (|t| ≈ 75 in one DudeCT configuration) is
    under investigation, not exonerated.
 
-## Proof‑to‑Requirement Mapping (updated)
+## Proof-to-Requirement Mapping
 
-| Requirement (COMPLIANCE) | Proof level | Proof file | Documentation link |
-|---------------------------|------------|------------|--------------------|
-| **Security ceiling – BOUNDED** | L1 | `proofs/kani/fixed_equivalence.rs` | [specs/fixed_spec.md](proofs/../specs/fixed_spec.md) |
-| **KDF cost – ACCEPTED LIMITATION** | — | *none yet* | See `documentation/formal_verification.md` §2 for measured setup costs |
-| **Nonce handling – FIXED** | L3 | `proofs/kani/pipeline_proofs.rs` | [specs/orbital_config_spec.md](proofs/../specs/orbital_config_spec.md) |
-| **Known‑plaintext – FIXED (default-auth)** | L4 | `tests/kelvin_tests/determinism.rs` | — |
-| **Side‑channel hardening – PARTIAL** | — | *none yet* | See open issue #<id> to add a Kani proof |
+None of the entries below is a security proof. "Runnable" artifacts are built by
+`lake build` or executed by `docker/run-kani.sh`; the two files at the end are
+templates and are **not** compiled.
+
+| Requirement | Runnable artifact | Status |
+|-------------|-------------------|--------|
+| Security ceiling - BOUNDED | Lean `FixedPoint` (`div_rem_identity`, `rem_bounds`); Kani `verify_c1_preimage_bound`, `verify_c1_epsilon_bound` | arithmetic and preimage bounds only |
+| KDF cost - ACCEPTED LIMITATION | none | no artifact; setup cost measured in `README` |
+| Nonce handling - FIXED | `tests/kelvin_tests/determinism.rs` | tested, not proved |
+| Known-plaintext - FIXED (default-auth) | `kelvin` crate tests | tested, not proved |
+| Side-channel hardening - PARTIAL | DudeCT benches (12 cases) | measurement only; full pipeline untested |
+| Verlet schedule | Lean `Integrator` (`step_fst`, `step_snd`, `step_reversible`) | proved |
+| Pairwise momentum | Lean `Gravity` (`pair_momentum_cancel`) | proved |
+| Domain framing | Lean `Entropy` (`domain_separation`) + Kani `verify_domain_separation` | proved (framing only) |
+
+`proofs/kani/fixed_equivalence.rs` and `proofs/kani/pipeline_proofs.rs` are
+templates outside every Cargo target. They are not cited as evidence.

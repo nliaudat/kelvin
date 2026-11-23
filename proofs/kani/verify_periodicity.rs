@@ -1,34 +1,36 @@
 // verify_periodicity.rs
-//! Kani harness to verify finite‑precision periodicity detection (C6).
-//! Runs the period detector on a random simulation state and asserts that no
-//! period is observed before `MIN_STEPS` (empirical guarantee).
+//
+// Corrected 2026-11-23. The previous version imported `rand`, `State::default()`
+// and `detect_period`, then asserted that the stub never finds a period within
+// 1,000,000 steps. The stub actually has period 1, so that assertion was false;
+// the file was also never compiled.
+//
+// SCOPE: properties of the current `period_detection` stub only. The stub's
+// step and hash are constant, so it is period 1 by construction. A real
+// simulator would need a different harness.
 
-#[cfg(kani)]
-mod harness {
-    use kani::cover;
-    use rand::Rng;
-    use kelvin_core::simulation::{State, simulate_step};
-    use kelvin_core::period_detection::detect_period;
+use crate::period_detection::{detect_period, State};
 
-    // Empirical lower bound for the period; chosen as 1_000_000 steps.
-    const MIN_STEPS: usize = 1_000_000;
+/// With a zero step budget, no iteration runs and no period is reported.
+#[kani::proof]
+#[kani::unwind(4)]
+fn verify_periodicity_no_steps() {
+    let period = detect_period(&State, 0);
+    kani::assert(period.is_none(), "a zero step budget reports no period");
+}
 
-    #[kani::proof]
-    fn verify_periodicity() {
-        // Initialise a random state. The concrete fields are mocked via the
-        // public constructor `State::random()` if available; otherwise we build
-        // a dummy state using zeroed memory (acceptable for the harness).
-        let mut rng = rand::thread_rng();
-        // Placeholder: create a state with random bytes.
-        let mut state = State::default();
-        // Optionally mutate the state to make it non‑trivial.
-        // (Assuming State implements a method `randomize(&mut self, &mut rng)`.)
-        // state.randomize(&mut rng);
+/// For a positive budget the stub reports a period of 1, and never more than the
+/// budget.
+#[kani::proof]
+#[kani::unwind(8)]
+fn verify_periodicity_min_period_bound() {
+    let n: usize = kani::any();
+    kani::assume(n >= 1);
+    kani::assume(n <= 4);
 
-        // Run the detector.
-        let period = detect_period(&state, MIN_STEPS);
-        // Expect no period detected within the bound.
-        assert!(period.is_none());
-        cover!(true);
-    }
+    let period = detect_period(&State, n);
+
+    kani::assert(period.is_some(), "the stub always finds a cycle");
+    kani::assert(period == Some(1), "the stub's cycle has length 1");
+    kani::assert(period.unwrap() <= n, "reported period does not exceed the budget");
 }

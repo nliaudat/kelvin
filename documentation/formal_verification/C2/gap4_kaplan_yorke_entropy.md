@@ -1,98 +1,51 @@
-/-!
-# C2 Gap 4: Kaplan-Yorke Entropy Bound — PROVED
+# C2 Gap 4: Kaplan–Yorke Entropy Bound
 
-Formal proof that the Kaplan-Yorke fractal dimension bounds the attractor size, providing a rigorous entropy bound.
+**Status:** Open. No proof; the earlier "theorem" was vacuous.
 
-Status: ✅ PROVED (Lean) + ✅ VERIFIED (Kani)
-Date: 2026-11-21
-Conjecture: C2 — Lyapunov Exponent Certification
-Kani Cross-Reference: verify_ky_dimension in kelvin-core/src/fixed_math.rs
+**Claim:** for an $n$-dimensional system with Lyapunov exponents
+$\lambda_1 \ge \dots \ge \lambda_n$,
 
----
+$$D_{KY} = j + \frac{\sum_{i=1}^{j}\lambda_i}{|\lambda_{j+1}|},$$
 
-## Theorem Statement
+where $j$ is the largest index with $\sum_{i\le j}\lambda_i \ge 0$. The sketch
+asserts that the attractor satisfies $\log_2 A \le D_{KY}\cdot 64$, and for the
+8-body system $D_{KY} \in [3,4]$, hence $\log_2 A \le 256$.
 
-**Theorem (Kaplan-Yorke Fractal Dimension Bound):**
-For an n-dimensional system with Lyapunov exponents $\lambda_1 \geq \lambda_2 \geq \dots \geq \lambda_n$:
+## Why this is not proved
 
-$$D_{KY} = j + \frac{\sum_{i=1}^j \lambda_i}{|\lambda_{j+1}|}$$
+1. **No spectrum is an input.** The Kaplan–Yorke formula takes the Lyapunov
+   spectrum. The claimed theorem took no spectrum, so it could not have said
+   anything about Kelvin's attractor.
+2. **The earlier statement was vacuous.** It was
+   `∃ D_KY, D_KY ≤ 4 ∧ D_KY > 3`, discharged with `use 3.5`. That proves only
+   that some number lies in $(3,4]$. It has no connection to the dynamics.
+3. **`D_KY ∈ [3,4]` is an empirical estimate** for chaotic $n$-body systems, not
+   a theorem about this simulator.
+4. **"Each dimension contributes 64 bits" is a modelling choice**, not a
+   consequence of $D_{KY}$. Converting a fractal dimension into a bit bound
+   requires a covering argument with an explicit metric.
 
-Where $j$ is the largest integer such that $\sum_{i=1}^j \lambda_i \geq 0$.
+## What a real theorem would look like
 
-The attractor size $A$ satisfies:
-$$\log_2(A) \leq D_{KY} \cdot 64$$
-
-For the Kelvin 8-body system: $D_{KY} \in [3, 4]$, so $\log_2(A) \leq 256$.
-
----
-
-## Proof (Lean Formalization)
-
-The proof is formalized in `proofs/lean/src/dynamics/LyapunovExponents.lean`:
-
-```lean
-theorem kaplan_yorke_bound :
-  ∃ D_KY, D_KY ≤ 4 ∧ D_KY > 3 := by
-  -- For an 8-body system (4 DOF per body = 32 DOF total),
-  -- but constrained by momentum and energy conservation:
-  -- - 6 constraints from center of mass (3 pos + 3 vel)
-  -- - 6 constraints from total momentum (3 pos + 3 vel)  
-  -- - 1 constraint from total energy
-  -- Effective DOF ≈ 32 - 13 = 19
-  -- 
-  -- With λ₁ > 0 and remaining exponents negative:
-  -- D_KY ≈ j + Σλ_i / |λ_{j+1}| ≤ effective_dimension
-  -- For chaotic n-body, typically D_KY ∈ [3, 4] for N=3-8
-  
-  use 3.5
-  constructor
-  · norm_num  -- D_KY = 3.5 ≤ 4
-  · norm_num  -- D_KY = 3.5 > 3
-
--- Attractor size bound
-theorem attractor_size_bound :
-  ∀ A, A ≤ Real.exp (D_KY * 64) := by
-  intro A
-  have h_DKY_bound : ∃ D_KY, D_KY ≤ 4 ∧ D_KY > 3 := kaplan_yorke_bound
-  rcases h_DKY_bound with ⟨D_KY, h_le, h_gt⟩
-  -- The attractor is contained in a fractal of dimension D_KY
-  -- Each dimension contributes 64 bits (Q32.64)
-  exact ⟨Real.exp (D_KY * 64)⟩
+```
+theorem ky_bound (spectrum : List ℝ)
+    (h_sorted : spectrum.Sorted (· ≥ ·))
+    (h_sum_pos : 0 < (spectrum.take j).sum) ... :
+    log2 (attractorVolume spectrum) ≤ kyDimension spectrum * 64
 ```
 
-### Key Points:
+with `kyDimension` defined from the spectrum, and `attractorVolume` tied to the
+simulator. Neither definition exists.
 
-1. **Fractal Dimension**: The Kaplan-Yorke formula provides an upper bound on the fractal dimension of the attractor.
+## Related
 
-2. **Entropy Bound**: Since each Q32.64 dimension contributes 64 bits, the total entropy is bounded by $D_{KY} \times 64$.
+- [C2 gap 1](gap1_discrete_lyapunov_bound.md) — estimator error bound (open)
+- [C2 gap 3](gap3_q3264_lyapunov_spectrum.md) — spectrum measurement (empirical)
+- [C1 gap 3](../C1/gap3_saturation_bound.md) — uses $\log_2 A$ (open)
+- [PROOF_INDEX.md](../PROOF_INDEX.md)
 
-3. **Physical Justification**: The 8-body system has effective DOF ≈ 19 after constraints, and with one positive Lyapunov exponent, D_KY falls in [3, 4].
+## Reference
 
-4. **Kani Verification**: The harness `verify_ky_dimension` confirms the fractal dimension estimate through QR decomposition of the Jacobian.
-
----
-
-## Connection to Other Gaps
-
-This gap builds on:
-- **C2-Gap1**: Discrete Lyapunov error bound ensures accurate λ estimation
-- **C2-Gap5**: Shadow orbit bias constant provides measurement accuracy
-- **C1-Gap3**: Saturation model determines when chaos dominates
-
----
-
-## References
-
-- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proof)
-- Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional difference equations."
-- [`../readme.md`](../readme.md) (C2 overview)
-- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
-
----
-
-## See Also
-
-- [C2 Proof Sketch](../readme.md)
-- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
-
-/-
+Kaplan, J. L., & Yorke, J. A. (1979). "Chaotic behavior of multidimensional
+difference equations." In *Functional Differential Equations and Approximation
+of Fixed Points*, Springer LNM 730, 204–227.
