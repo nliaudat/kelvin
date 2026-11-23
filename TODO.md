@@ -133,12 +133,14 @@ real simulator.
 - Remaining: write Kelvin-specific models for the handshake, domain tags, and
   orbital-state compromise. Smoke tests are not proofs.
 
-### 8. Dependency advisories (see `COMPLIANCE.md` §6)
-- `kelvin-pyo3` pins `pyo3 ^0.24.1`; upgrade to `>=0.29.0`
-  (RUSTSEC-2026-0176, RUSTSEC-2026-0177).
-- `kelvin-cli` uses `ml-dsa 0.0.4`; upgrade to `>=0.1.0-rc.3`
-  (RUSTSEC-2025-0144).
-- Re-run `cargo audit` and `cargo deny check advisories` after upgrading.
+### 8. Dependency advisories — resolved
+- `pyo3` bumped to 0.29.3 (`kelvin-pyo3`); `ml-dsa 0.0.4` removed as an unused
+  direct dependency of `kelvin-cli` (`kelvin-kdf` already used 0.1.2).
+- `kelvin-ffi` uses the maintained `pastey` instead of `paste`.
+- `cargo audit`: 0 vulnerabilities. `cargo deny check`: advisories, bans,
+  licences and sources all ok.
+- The remaining unmaintained dependencies are bench/test-only and are listed
+  with justification in `deny.toml`.
 
 ## Cleanup
 

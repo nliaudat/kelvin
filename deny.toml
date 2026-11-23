@@ -8,6 +8,13 @@
 # cargo-deny expects one of all|workspace|transitive|none.
 unmaintained = "all"
 yanked = "warn"
+ignore = [
+    # No fixed upgrade exists. All four reach the build only through
+    # benchmark/test tooling, never through kelvin-core or kelvin at runtime.
+    "RUSTSEC-2021-0139", # ansi_term: unmaintained, via dudect-bencher (bench)
+    "RUSTSEC-2024-0375", # atty: unmaintained, via dudect-bencher (bench)
+    "RUSTSEC-2024-0436", # paste: unmaintained, via nistrs->nalgebra (test crate)
+]
 
 [bans]
 multiple-versions = "warn"

@@ -34,8 +34,8 @@ Built and smoke-tested on 2026-11-23 (Windows, Docker Desktop, Linux containers)
 
 Beyond the version checks: `cargo miri test -p kelvin-core --lib` passes 61 tests
 with no UB, the four proptest targets in `fuzz/` pass, and `cargo audit` reports
-the advisories recorded in
-[`../../COMPLIANCE.md`](../../COMPLIANCE.md) §6.
+**0 vulnerabilities** (unmaintained bench/test dependencies are documented in
+[`../../COMPLIANCE.md`](../../COMPLIANCE.md) §6).
 
 ## Build
 
