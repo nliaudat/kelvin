@@ -168,8 +168,8 @@ Pool → HKDF-SHA512(domain_sep, pool) → (KEY, NONCE, reseed_counter) → BLAK
 ## 7. L2: Composite correctness
 
 - **Lean:** `Gravity.pair_momentum_cancel`, `accel_zero_mass`.
-- **Kani:** `verify_c3_step_non_injective`,
-  `verify_c3_two_step_preimage_growth` (one- and two-step numerical checks).
+- **Kani:** `verify_c3_step_damping`, `verify_c3_two_step_dispersion`
+  (division-rounding checks).
 - **Scope:** pairwise momentum cancellation. Newton's third law in full vector
   form, and the force magnitude, are not formalised.
 

@@ -1,0 +1,39 @@
+/*
+  Kelvin - fresh nonces: EXPECTED VERIFIED.
+
+  Same construction as nonce_reuse.spthy, but each message uses a fresh nonce,
+  so the keystreams h(config, n1) and h(config, n2) are independent.
+
+  Expected: lemma secret_m1 is verified.
+
+  The cryptographic strength of h is assumed. This shows the protocol-level
+  role of nonce freshness only.
+*/
+
+theory KelvinFreshNonce
+begin
+
+builtins: xor
+
+functions: h/2
+
+rule GenerateConfig:
+  [ Fr(~cfg) ] --> [ !Config(~cfg) ]
+
+rule GenerateSecret:
+  [ Fr(~m1) ] --[ Secret(~m1) ]-> [ !SecretMsg(~m1) ]
+
+rule EncryptSecret:
+  [ !Config(cfg), !SecretMsg(m1), Fr(~n1) ]
+  -->
+  [ Out(m1 XOR h(cfg, ~n1)) ]
+
+rule EncryptKnown:
+  [ !Config(cfg), Fr(~n2) ]
+  -->
+  [ Out('m2' XOR h(cfg, ~n2)) ]
+
+lemma secret_m1:
+  "All x #i. Secret(x) @ i ==> not (Ex #j. K(x) @ j)"
+
+end

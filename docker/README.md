@@ -1,72 +1,62 @@
-# Docker — Kani Formal Verification
+# Docker — verification and analysis environments
 
-This directory provides a **reproducible Docker environment** for running Kani
-model-checking proof harnesses in the Kelvin cryptosystem.
-The active proof suite covers L0 safety harnesses in `kelvin-core/src/fixed_math.rs`
-plus the full L1–L4 harnesses in `proofs/kani/` (counts verified 2026-10-10).
+Three independent setups:
 
-## Quick Start
+| Setup | Compose file | Contents |
+|-------|--------------|----------|
+| Kani + cross | [`docker-compose.yml`](docker-compose.yml) | Rust model checking, multi-arch builds |
+| Formal / analysis tools | [`docker-compose.formal.yml`](docker-compose.formal.yml) | ProVerif, Tamarin, CryptoVerif, EasyCrypt, Z3/CVC5, Rust analysis |
+| Details | [`formal/README.md`](formal/README.md) | Tool images, models, usage |
 
-```bash
-# Build the image
-docker compose -f docker/docker-compose.yml build
-
-# Run all proofs (full verification — ~45 minutes)
-docker compose -f docker/docker-compose.yml run kani
-
-# Fast mode (fixed_equivalence only — ~5 minutes)
-docker compose -f docker/docker-compose.yml run kani bash -c "./scripts/run_proofs.sh --fast"
-
-# List all proof harnesses
-docker compose -f docker/docker-compose.yml run kani bash -c "./scripts/run_proofs.sh --list"
-```
-
-## Proof Files
-
-| # | File | Harnesses | What is Proved |
-|:---:|:---|:---:|:---|
-| 1 | `fixed_math.rs` | 8 | L0 Safety: no panics, no overflows |
-| 2 | `fixed_equivalence.rs` | 9 | L1: Q32.64 arithmetic functional equivalence |
-| 3 | `acceleration_proofs.rs` | 5 | L2: Newtonian gravity invariants |
-| 4 | `pipeline_proofs.rs` | 3 | L3: Pipeline integrity (domain sep, loop equiv) |
-| 5 | `vec3_proofs.rs` | 18 | Vec3 vector operation proofs |
-| 6 | `integrator_proofs.rs` | 9 | Verlet + Euler integrator proofs |
-| 7 | `stability_proofs.rs` | 6 | Ejection + collapse detection proofs |
-| 8 | `extraction_proofs.rs` | 7 | Entropy extraction safety proofs |
-| 9 | `orbital_state_proofs.rs` | 8 | OrbitalState safety proofs |
-| 10 | `lyapunov_proofs.rs` | 3 | Lyapunov estimation proofs |
-| 11 | `information_loss.rs` | 4 | C1 information-loss bounds |
-
-## Manual Docker Commands
+## Kani
 
 ```bash
-# Build
-docker build -f docker/Dockerfile.kani -t kelvin-kani .
-
-# Run all proofs
-docker run --rm -v $(pwd):/kelvin -v kani-cargo:/root/.cargo kelvin-kani
-
-# Run fast mode
-docker run --rm -v $(pwd):/kelvin -v kani-cargo:/root/.cargo kelvin-kani --fast
-
-# List harnesses
-docker run --rm -v $(pwd):/kelvin kelvin-kani --list
+docker compose -f docker/docker-compose.yml build kani
+docker compose -f docker/docker-compose.yml run --rm kani --list
+docker compose -f docker/docker-compose.yml run --rm kani            # all 37
+docker compose -f docker/docker-compose.yml run --rm kani --proof verify_add_no_overflow
 ```
 
-## Resource Requirements
+37 harnesses are compiled into `kelvin-core`:
 
-| Resource | Minimum | Recommended |
+- **8** in `kelvin-core/src/fixed_math.rs` under `#[cfg(kani)]`
+  (`verify_add_no_overflow`, `verify_sub_no_overflow`, `verify_mul_range`,
+  `verify_c1_preimage_bound`, `verify_c1_epsilon_bound`,
+  `verify_c1_division_remainder`, `verify_c3_step_damping`,
+  `verify_c3_two_step_dispersion`);
+- **29** in `proofs/kani/*.rs`, included by
+  `kelvin-core/src/kani_harnesses.rs` under `#[cfg(kani)]`.
+
+The other `proofs/kani/*.rs` files (for example `fixed_equivalence.rs`,
+`pipeline_proofs.rs`, `acceleration_proofs.rs`) are **templates**: they are not
+in any Cargo target and are never compiled. Do not describe them as verified.
+
+What the harnesses do and do not constrain is documented in
+[`../documentation/formal_verification/HARNESS_REVIEW.md`](../documentation/formal_verification/HARNESS_REVIEW.md).
+
+## Formal and analysis tools
+
+```bash
+docker compose -f docker/docker-compose.formal.yml build
+docker compose -f docker/docker-compose.formal.yml run --rm proverif formal/proverif/kelvin_smoke.pv
+docker compose -f docker/docker-compose.formal.yml run --rm tamarin --prove formal/tamarin/kelvin_smoke.spthy
+```
+
+See [`formal/README.md`](formal/README.md) for the service table, image names
+and the Rust analysis tooling (`cargo-fuzz`, `miri`, `cargo-audit`,
+`cargo-deny`, `cargo-mutants`).
+
+## Resource requirements
+
+| Resource | Kani | Formal tools |
 |:---|:---:|:---:|
-| RAM | 8 GB | 32 GB |
-| CPUs | 4 | 16 |
-| Disk | 10 GB | 20 GB |
-| Time (full) | — | ~45 minutes |
-| Time (fast) | — | ~5 minutes |
+| RAM | 8 GB min, 32 GB recommended | 4 GB |
+| CPUs | 4 min, 16 recommended | 2 |
+| Disk | 10 GB | 6 GB (EasyCrypt is the largest) |
 
-## Platform Notes
+## Platform notes
 
-- **Linux**: Native support. Kani uses CBMC which runs directly.
-- **macOS**: Works via Docker Desktop. Performance is slightly slower than
-  native Linux due to Linux VM overhead.
-- **Windows**: Requires WSL2 backend for Docker Desktop. Use PowerShell
-  with `docker compose` (not `docker-compose`).
+- **Linux**: native support.
+- **macOS**: via Docker Desktop; slower due to the Linux VM.
+- **Windows**: Docker Desktop with WSL2. Use PowerShell and `docker compose`
+  (not `docker-compose`).

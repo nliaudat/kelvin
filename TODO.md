@@ -60,8 +60,8 @@ verify_mul_range
 verify_c1_preimage_bound
 verify_c1_epsilon_bound
 verify_c1_division_remainder
-verify_c3_step_non_injective
-verify_c3_two_step_preimage_growth
+verify_c3_step_damping
+verify_c3_two_step_dispersion
 
 # included from proofs/kani/
 verify_information_loss_total          verify_information_loss_monotone
@@ -124,6 +124,21 @@ real simulator.
 ### 6. C6 — Periodicity detection
 - `kelvin-core/src/period_detection.rs` defines a unit `State` and a no-op
   `simulate_step`. Implement it against the real simulator, or remove the module.
+
+### 7. Protocol-level proofs (tooling in place)
+- Images: `docker/docker-compose.formal.yml` (ProVerif, Tamarin, CryptoVerif,
+  EasyCrypt, Z3/CVC5, Rust analysis).
+- Smoke tests: `formal/` and `scripts/formal-tools.ps1`.
+- Tamarin nonce models: reuse is falsified (attack), fresh nonces verified.
+- Remaining: write Kelvin-specific models for the handshake, domain tags, and
+  orbital-state compromise. Smoke tests are not proofs.
+
+### 8. Dependency advisories (see `COMPLIANCE.md` §6)
+- `kelvin-pyo3` pins `pyo3 ^0.24.1`; upgrade to `>=0.29.0`
+  (RUSTSEC-2026-0176, RUSTSEC-2026-0177).
+- `kelvin-cli` uses `ml-dsa 0.0.4`; upgrade to `>=0.1.0-rc.3`
+  (RUSTSEC-2025-0144).
+- Re-run `cargo audit` and `cargo deny check advisories` after upgrading.
 
 ## Cleanup
 

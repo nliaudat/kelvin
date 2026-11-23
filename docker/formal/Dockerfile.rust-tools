@@ -1,0 +1,33 @@
+# Rust analysis and fuzzing tools.
+#
+# Nightly is required by cargo-fuzz and miri.
+FROM rustlang/rust:nightly-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        clang \
+        libclang-dev \
+        llvm-dev \
+        cmake \
+        git \
+        pkg-config \
+        libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# miri and the std sources it needs.
+RUN rustup component add miri rust-src
+
+# The tools are independent; installing them in one layer keeps the image small.
+RUN cargo install --locked \
+        cargo-fuzz \
+        cargo-audit \
+        cargo-deny \
+        cargo-mutants
+
+RUN rustc --version && cargo --version && cargo miri --version
+
+WORKDIR /work
+ENTRYPOINT ["cargo"]
+CMD ["--version"]

@@ -2,6 +2,7 @@
 name = "comparative-bench"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 description = "Comparative criterion benchmarks: Kelvin vs industry-standard crypto (ring, dalek)"
 
 [lib]

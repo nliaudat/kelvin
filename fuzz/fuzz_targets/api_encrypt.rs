@@ -13,7 +13,10 @@
 //! Run with: `cargo test -p kelvin-fuzz --test api_encrypt`
 //! Heavy run: `PROPTEST_CASES=100000 cargo test -p kelvin-fuzz --test api_encrypt`
 
-use kelvin::{KelvinPhoton, KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated};
+use kelvin::{
+    KelvinPhoton, KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated,
+    AUTH_OVERHEAD,
+};
 use proptest::prelude::*;
 
 /// Build a 2048-byte seed from a vector of bytes (padded/repeated as needed).
@@ -70,30 +73,39 @@ proptest! {
         if max_reseeds > 0 {
             let mut auth_photon = KelvinPhotonAuthenticated::new(seed, max_reseeds);
             let mut buf = data_bytes.clone();
-            let original = buf.clone();
+            // The last AUTH_OVERHEAD bytes are the version + tag area, which
+            // `encrypt` overwrites; only the plaintext prefix round-trips.
+            let plaintext_len = buf.len().saturating_sub(AUTH_OVERHEAD);
+            let original = buf[..plaintext_len].to_vec();
             if auth_photon.encrypt(&mut buf).is_ok() {
                 // Authenticated decrypt verifies tag, then strips it
                 // Use a new instance (same seed = same keystream + same MAC key)
                 let mut auth_photon2 = KelvinPhotonAuthenticated::new(seed, max_reseeds);
                 auth_photon2.decrypt(&mut buf).expect("Authenticated decryption failed");
-                assert_eq!(buf, original, "Round-trip data mismatch for KelvinPhotonAuthenticated");
+                assert_eq!(
+                    &buf[..plaintext_len],
+                    &original[..],
+                    "Round-trip data mismatch for KelvinPhotonAuthenticated"
+                );
             }
         }
 
         // ── KelvinQuantumAuthenticated ──
-        // with_config returns Err if max_reseeds == 0
-        if let Ok(mut auth_quantum) = KelvinQuantumAuthenticated::with_config(
-            seed, max_reseeds, 1024, 100, 1024,
-        ) {
+        // `new` assumes max_reseeds > 0 (the old `with_config` returned Err).
+        if max_reseeds > 0 {
+            let mut auth_quantum = KelvinQuantumAuthenticated::new(seed, max_reseeds);
             let mut buf = data_bytes.clone();
-            let original = buf.clone();
+            let plaintext_len = buf.len().saturating_sub(AUTH_OVERHEAD);
+            let original = buf[..plaintext_len].to_vec();
             if auth_quantum.encrypt(&mut buf).is_ok() {
                 // Round-trip: decrypt with a new instance (same seed = same keystream + same MAC key)
-                let mut auth_quantum2 = KelvinQuantumAuthenticated::with_config(
-                    seed, max_reseeds, 1024, 100, 1024,
-                ).expect("Second instance creation should succeed");
+                let mut auth_quantum2 = KelvinQuantumAuthenticated::new(seed, max_reseeds);
                 auth_quantum2.decrypt(&mut buf).expect("Authenticated decryption failed");
-                assert_eq!(buf, original, "Round-trip data mismatch for KelvinQuantumAuthenticated");
+                assert_eq!(
+                    &buf[..plaintext_len],
+                    &original[..],
+                    "Round-trip data mismatch for KelvinQuantumAuthenticated"
+                );
             }
         }
     }

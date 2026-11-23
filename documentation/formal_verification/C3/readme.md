@@ -65,19 +65,22 @@ None of the four items above is currently discharged by a checked artifact.
 
 | Harness | What it checks |
 |---------|----------------|
-| `verify_c3_step_non_injective` | a 1-ULP perturbation is damped to ≤ 10 ULPs after one Verlet step |
-| `verify_c3_two_step_preimage_growth` | four 1-ULP-perturbed states converge within tolerance after two steps |
+| `verify_c3_step_damping` | for 6 concrete large denominators, a 1-ULP divisor change moves the quotient by at most 1 ULP |
+| `verify_c3_two_step_dispersion` | a 1-ULP stage-1 quotient difference does not grow through a second division |
 | `verify_c3_quantum_reduction` | halving an exponent gives a value at most the original |
 | `verify_c3_exponent_arithmetic` | $\sqrt{2^{1920}}$ has exponent 960, above 128 |
-| `verify_c3_exponent_law` | $2^a \cdot 2^b = 2^{a+b}$ for $a,b \le 32$ |
+| `verify_c3_exponent_law` | $2^a \cdot 2^b = 2^{a+b}$ for $a,b \le 16$ |
 | `verify_c3_contraction_arithmetic` | non-expanding steps cannot widen a window |
 
-The last four are **exponent and contraction arithmetic only**. Together with the
-first two they are one- and two-step numerical statements about the simulator,
-not a quantum lower bound. Run them with:
+The two damping/dispersion harnesses check `Fixed::div` on **concrete**
+denominators. They replace the earlier `verlet_step` harnesses, which were
+intractable for CBMC (a fully symbolic position produced a 3.5M-variable
+instance with no termination). They are arithmetic statements about rounding
+being many-to-one, not universal claims about the simulator, and none of the six
+is a quantum lower bound. Run them with:
 
 ```bash
-docker compose -f docker/docker-compose.yml run --rm kani --proof verify_c3_step_non_injective
+docker compose -f docker/docker-compose.yml run --rm kani --proof verify_c3_step_damping
 ```
 
 ## References

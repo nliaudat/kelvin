@@ -34,12 +34,14 @@ cryptosystem.
 | Kani harnesses (in-crate) | `kelvin-core/src/fixed_math.rs` (`#[cfg(kani)]`) | `docker compose -f docker/docker-compose.yml run --rm kani` |
 | Kani harnesses (included from `proofs/kani/`) | `kelvin-core/src/kani_harnesses.rs` | same; `--list` names all 37 |
 | Kani harness templates (not compiled) | other `proofs/kani/*.rs` files | n/a — templates only |
+| Protocol proof tooling (no Kelvin models yet) | [`docker/formal/`](../../docker/formal/README.md), [`formal/`](../../formal/README.md) | `docker compose -f docker/docker-compose.formal.yml run --rm proverif ...` |
 
 ## Quick links
 
 | Document | Description |
 |----------|-------------|
 | [`PROOF_INDEX.md`](PROOF_INDEX.md) | Gap-by-gap mapping to artifacts |
+| [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) | What each of the 37 harnesses actually constrains |
 | [`../formal_verification.md`](../formal_verification.md) | Architecture and threat model |
 | [`code_verification.md`](code_verification.md) | Dynamic error-bound strategy |
 

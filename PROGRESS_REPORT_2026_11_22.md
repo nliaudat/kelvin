@@ -49,8 +49,8 @@ verify_mul_range
 verify_c1_preimage_bound
 verify_c1_epsilon_bound
 verify_c1_division_remainder
-verify_c3_step_non_injective
-verify_c3_two_step_preimage_growth
+verify_c3_step_damping
+verify_c3_two_step_dispersion
 ```
 
 ```bash

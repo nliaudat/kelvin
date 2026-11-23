@@ -190,9 +190,9 @@ run_proofs() {
         "verify_shadow_orbit_bias:bias budget below accumulated time"
         "verify_perturbation_in_range:shadow perturbation fits in Q32.64"
 
-        # C3: perturbation damping and exponent arithmetic
-        "verify_c3_step_non_injective:1-ULP perturbation is damped by one step"
-        "verify_c3_two_step_preimage_growth:preimage set does not shrink over 2 steps"
+        # C3: division-rounding damping and exponent arithmetic
+        "verify_c3_step_damping:1-ULP divisor change moves the quotient by <= 1 ULP"
+        "verify_c3_two_step_dispersion:1-ULP quotient difference does not grow through a second division"
         "verify_c3_quantum_reduction:halved exponent does not exceed original"
         "verify_c3_exponent_arithmetic:sqrt(2^1920) has exponent 960"
         "verify_c3_exponent_law:2^a * 2^b = 2^(a+b)"
@@ -294,8 +294,8 @@ list_harnesses() {
         verify_lyapunov_quantization \
         verify_shadow_orbit_bias \
         verify_perturbation_in_range \
-        verify_c3_step_non_injective \
-        verify_c3_two_step_preimage_growth \
+        verify_c3_step_damping \
+        verify_c3_two_step_dispersion \
         verify_c3_quantum_reduction \
         verify_c3_exponent_arithmetic \
         verify_c3_exponent_law \

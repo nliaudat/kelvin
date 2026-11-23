@@ -46,8 +46,8 @@ Per-harness logs land in `proofs/kani/results/`.
 | `verify_c1_preimage_bound` | preimage size of the division near the softening limit |
 | `verify_c1_epsilon_bound` | preimage bound for the implemented division |
 | `verify_c1_division_remainder` | `0 ≤ remainder < denominator` |
-| `verify_c3_step_non_injective` | a 1-ULP perturbation stays within 10 ULPs after one Verlet step |
-| `verify_c3_two_step_preimage_growth` | four 1-ULP-perturbed states stay within tolerance after two steps |
+| `verify_c3_step_damping` | for 6 concrete large denominators, a 1-ULP divisor change moves the quotient by at most 1 ULP |
+| `verify_c3_two_step_dispersion` | a 1-ULP stage-1 quotient difference does not grow through a second division |
 
 ### Saturation model (C1)
 

@@ -2,6 +2,7 @@
 name = "keystream_indistinguishability"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
 description = "Empirical validation of C4: keystream indistinguishability for the Kelvin cryptosystem"
 
 [dependencies]

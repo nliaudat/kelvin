@@ -1,10 +1,13 @@
 # cargo-deny configuration for Kelvin cryptosystem
+#
+# Schema for cargo-deny >= 0.16: vulnerabilities are always an error, so the
+# obsolete `vulnerability`/`notice` keys are gone; licenses use an allow-list
+# (anything not allowed is denied), so the explicit `deny` list is unnecessary.
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
+# cargo-deny expects one of all|workspace|transitive|none.
+unmaintained = "all"
 yanked = "warn"
-notice = "warn"
 
 [bans]
 multiple-versions = "warn"
@@ -24,9 +27,5 @@ allow = [
     "ISC",
     "Unicode-3.0",
     "Zlib",
-]
-deny = [
-    "AGPL-3.0",
-    "CC-BY-ND-4.0",
 ]
 confidence-threshold = 0.8

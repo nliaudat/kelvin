@@ -1,0 +1,18 @@
+(* Kelvin - ProVerif smoke test.
+
+   This is a TOOLCHAIN smoke test, not a proof about Kelvin. It models a keyed
+   hash with a private tag and asks ProVerif whether the key can be derived.
+
+   Expected output: "RESULT not attacker(key[]) is true."
+*)
+
+free c: channel.
+free key: bitstring [private].
+free tag: bitstring [private].
+
+fun h(bitstring): bitstring.
+
+query attacker(key).
+
+process
+  out(c, h(key))

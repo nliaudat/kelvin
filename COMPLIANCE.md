@@ -66,6 +66,78 @@ instead of returning malleated plaintext.
 5. `verlet_step` timing variation (|t| ≈ 75 in one DudeCT configuration) is
    under investigation, not exonerated.
 
+## 6. Dependency advisories — 2026-11-23
+
+Run with `cargo-audit 0.23.0` and `cargo-deny 0.22.0` from the
+`kelvin-rust-tools` image:
+
+```bash
+docker compose -f docker/docker-compose.formal.yml run --rm --entrypoint cargo rust-tools audit
+docker compose -f docker/docker-compose.formal.yml run --rm --entrypoint cargo rust-tools deny check
+```
+
+### Vulnerabilities (3)
+
+| Crate | Version | Advisory | Fixed in | Blocker |
+|-------|---------|----------|----------|---------|
+| `ml-dsa` | 0.0.4 | RUSTSEC-2025-0144 | >= 0.1.0-rc.3 | API change |
+| `pyo3` | 0.24.2 | RUSTSEC-2026-0176 (out-of-bounds read in `nth`/`nth_back`) | >= 0.29.0 | `kelvin-pyo3` pins `^0.24.1`; pyo3 API changes |
+| `pyo3` | 0.24.2 | RUSTSEC-2026-0177 (missing `Sync` bound) | >= 0.29.0 | same |
+
+`kelvin-core` does not link `pyo3`; the Python bindings do. The advisories are
+not known to be reachable from the core encryption path, but they must be
+resolved before any binding is distributed.
+
+Dependents in this workspace:
+
+- `ml-dsa 0.0.4` is used only by `kelvin-cli`.
+- `pyo3 0.24.2` is used only by `kelvin-pyo3` (`libs/python/kelvin_pyo3`).
+
+Neither `kelvin-core` nor `kelvin` links them.
+
+### Warnings (4, no fixed upgrade available)
+
+| Crate | Version | Advisory | Status |
+|-------|---------|----------|--------|
+| `ansi_term` | 0.12.1 | RUSTSEC-2021-0139 | unmaintained |
+| `atty` | 0.2.14 | RUSTSEC-2024-0375 | unmaintained |
+| `atty` | 0.2.14 | RUSTSEC-2021-0145 | unsound (unaligned read) |
+| `paste` | 1.0.15 | RUSTSEC-2024-0436 | unmaintained |
+
+These arrive through dev/benchmark dependencies (criterion and transitive
+dependencies), not the `kelvin-core` runtime.
+
+### Licences
+
+`cargo deny check licenses` failed because 11 internal crates under `tests/` had
+no `license` field. They now declare `MIT OR Apache-2.0`, matching the project.
+`deny.toml` was updated to the cargo-deny >= 0.16 schema (`unmaintained = "all"`;
+the obsolete `vulnerability`, `notice` and licenses `deny` keys were removed).
+
+Result: `licenses ok`, `bans ok`, `sources ok`; `advisories FAILED` on the three
+items above.
+
+### Property tests (`fuzz/`)
+
+`cargo test --manifest-path fuzz/Cargo.toml` now passes all four proptest
+targets: `api_encrypt`, `deserialize_config`, `differential_accel` and
+`simulate_state`.
+
+Two defects in the suite itself were fixed on 2026-11-23:
+
+- `api_encrypt` called `KelvinQuantumAuthenticated::with_config`, which no longer
+  exists; it now uses `new(seed, max_reseeds)` guarded by `max_reseeds > 0`.
+- The authenticated round-trip assertions compared the whole buffer, including
+  the 33-byte version + tag area that `encrypt` deliberately overwrites. They now
+  compare the plaintext prefix, which is what `decrypt` restores.
+
+The suite had evidently not been run since those APIs changed.
+
+### Miri
+
+`cargo miri test -p kelvin-core --lib` reports **61 passed, 0 failed** (254 s)
+with no undefined behaviour.
+
 ## Proof-to-Requirement Mapping
 
 None of the entries below is a security proof. "Runnable" artifacts are built by

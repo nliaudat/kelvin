@@ -7,6 +7,18 @@
 target/
 **/target/
 
+# Lean build artifacts
+.lake/
+**/.lake/
+*.olean
+*.ilean
+
+# Kani run logs
+proofs/kani/results/
+
+# CI and docs are not needed in tool images
+.github/
+
 # Git history
 .git/
 .gitattributes

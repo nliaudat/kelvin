@@ -30,8 +30,8 @@ Status legend:
 
 **K-CORE (8):** `verify_add_no_overflow`, `verify_sub_no_overflow`,
 `verify_mul_range`, `verify_c1_preimage_bound`, `verify_c1_epsilon_bound`,
-`verify_c1_division_remainder`, `verify_c3_step_non_injective`,
-`verify_c3_two_step_preimage_growth`.
+`verify_c1_division_remainder`, `verify_c3_step_damping`,
+`verify_c3_two_step_dispersion`.
 
 **K-INC (29):** `verify_information_loss_total`,
 `verify_information_loss_monotone`, `verify_saturation_point`,
@@ -52,6 +52,8 @@ Status legend:
 All 37 are listed by `docker compose -f docker/docker-compose.yml run --rm kani --list`
 and run by the same command without arguments. They check arithmetic, scheduling,
 framing and loop invariants; **none of them establishes a C1–C5 security gap.**
+See [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) for what each one actually
+constrains, which ones exercise the crate, and the mutation results.
 
 ## C1 — Information loss
 
@@ -84,10 +86,12 @@ framing and loop invariants; **none of them establishes a C1–C5 security gap.*
 | [C3/gap2](C3/gap2_quantum_query_lower_bound.md) | Query lower bound | — | Open |
 | [C3/gap3](C3/gap3_c1_c3_link.md) | Link to C1 $\varepsilon$ | — | Open |
 
-K-CORE contains `verify_c3_step_non_injective` and
-`verify_c3_two_step_preimage_growth`, which check one-step damping of a 1-ULP
-perturbation. That is **not** a quantum lower bound. The K-INC exponent and
-contraction harnesses are arithmetic only.
+K-CORE contains `verify_c3_step_damping` and
+`verify_c3_two_step_dispersion`. On concrete large denominators they check that
+a 1-ULP divisor change moves the quotient by at most 1 ULP, and that this does
+not grow through a second division. These are statements about `Fixed::div`
+rounding, **not** about a Verlet step and **not** a quantum lower bound. The
+K-INC exponent and contraction harnesses are arithmetic only.
 
 ## C4 — Keystream indistinguishability
 

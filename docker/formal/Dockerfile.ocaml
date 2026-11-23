@@ -1,0 +1,97 @@
+# OCaml-based provers: ProVerif, CryptoVerif, EasyCrypt.
+#
+# One base layer (opam + a system-compiler switch) shared by all targets, so
+# building several tools reuses the same layers:
+#
+#   docker build -f docker/formal/Dockerfile.ocaml --target proverif    -t kelvin-proverif    .
+#   docker build -f docker/formal/Dockerfile.ocaml --target cryptoverif -t kelvin-cryptoverif .
+#   docker build -f docker/formal/Dockerfile.ocaml --target easycrypt   -t kelvin-easycrypt   .
+#
+# Compose builds these via `target:` in docker/docker-compose.formal.yml.
+FROM debian:bookworm AS base
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    OPAMYES=1 \
+    OPAMROOT=/root/.opam \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        m4 \
+        build-essential \
+        pkg-config \
+        libgmp-dev \
+        opam \
+        ocaml-nox \
+        ocaml-findlib \
+        zlib1g-dev \
+        libpcre2-dev \
+        graphviz \
+    && rm -rf /var/lib/apt/lists/*
+
+# EasyCrypt r2026.10 uses `Sys.ocaml_release`, which exists only from OCaml
+# 4.14. Debian bookworm ships 4.13, so build a 4.14.2 switch instead of using
+# `ocaml-system`. This costs a few minutes once and is shared by all targets.
+RUN opam init --disable-sandboxing --bare -y \
+    && opam switch create default ocaml-base-compiler.4.14.2
+
+ENV PATH=/root/.opam/default/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ENV CAML_LD_LIBRARY_PATH=/root/.opam/default/lib/stublibs
+
+WORKDIR /work
+
+# ── ProVerif ────────────────────────────────────────────────────────────
+FROM base AS proverif
+
+# ProVerif's opam package pulls `conf-gtk2` (its GUI), so the GTK2 headers and
+# expat must be present for opam's depext check to succeed.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libexpat1-dev \
+        libgtk2.0-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN opam install -y proverif \
+    && proverif -help >/dev/null
+
+ENTRYPOINT ["proverif"]
+CMD ["-help"]
+
+# ── CryptoVerif ─────────────────────────────────────────────────────────
+FROM base AS cryptoverif
+
+RUN opam install -y cryptoverif \
+    && cryptoverif -help >/dev/null
+
+ENTRYPOINT ["cryptoverif"]
+CMD ["-help"]
+
+# ── EasyCrypt ───────────────────────────────────────────────────────────
+#
+# Pinned to the r2026.10 release. Stages are split so the (slow) dependency
+# build is cached independently of the EasyCrypt build itself.
+#
+# Why3 1.9.x and Alt-Ergo 2.6.0 are the supported versions for this release.
+FROM base AS easycrypt
+
+# Extra SMT backends for Why3, in addition to the Alt-Ergo installed below.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        z3 \
+        cvc5 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN opam pin add -yn easycrypt "https://github.com/EasyCrypt/easycrypt.git#r2026.10" \
+    && opam install -y --deps-only easycrypt
+
+RUN opam install -y easycrypt
+
+RUN opam install -y alt-ergo.2.6.0
+
+# Why3 configuration is per-user and is generated on first use. Doing it at
+# build time is unnecessary; `easycrypt why3config` can be run in the container
+# (see docker/formal/README.md).
+
+ENTRYPOINT ["easycrypt"]
+CMD ["-h"]
