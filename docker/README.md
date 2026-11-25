@@ -2,8 +2,9 @@
 
 This directory provides a **reproducible Docker environment** for running Kani
 model-checking proof harnesses in the Kelvin cryptosystem.
-The active proof suite covers L0 safety harnesses in `kelvin-core/src/fixed_math.rs`
-plus the full L1–L4 harnesses in `proofs/kani/` (counts verified 2026-10-10).
+The active proof suite is 37 harnesses: 8 in `kelvin-core/src/fixed_math.rs` plus 29
+in `proofs/kani/` included by `kelvin-core/src/kani_harnesses.rs`. Other files in
+`proofs/kani/` are uncompiled templates. See `documentation/formal_verification.md`.
 
 ## Quick Start
 
@@ -23,19 +24,14 @@ docker compose -f docker/docker-compose.yml run kani bash -c "./scripts/run_proo
 
 ## Proof Files
 
-| # | File | Harnesses | What is Proved |
+| # | File | Harnesses | Status |
 |:---:|:---|:---:|:---|
-| 1 | `fixed_math.rs` | 8 | L0 Safety: no panics, no overflows |
-| 2 | `fixed_equivalence.rs` | 9 | L1: Q32.64 arithmetic functional equivalence |
-| 3 | `acceleration_proofs.rs` | 5 | L2: Newtonian gravity invariants |
-| 4 | `pipeline_proofs.rs` | 3 | L3: Pipeline integrity (domain sep, loop equiv) |
-| 5 | `vec3_proofs.rs` | 18 | Vec3 vector operation proofs |
-| 6 | `integrator_proofs.rs` | 9 | Verlet + Euler integrator proofs |
-| 7 | `stability_proofs.rs` | 6 | Ejection + collapse detection proofs |
-| 8 | `extraction_proofs.rs` | 7 | Entropy extraction safety proofs |
-| 9 | `orbital_state_proofs.rs` | 8 | OrbitalState safety proofs |
-| 10 | `lyapunov_proofs.rs` | 3 | Lyapunov estimation proofs |
-| 11 | `information_loss.rs` | 4 | C1 information-loss bounds |
+| 1 | `kelvin-core/src/fixed_math.rs` | 8 | Compiled: add/sub/mul range, C1/C3 arithmetic facts |
+| 2 | `C1_…`, `C2_…`, `C3_…`, `C4_…`, `C5_…`, `C6_…` (`proofs/kani/`) | 18 | Compiled via `kani_harnesses.rs` |
+| 3 | `verify_*.rs` legacy copies (`proofs/kani/`) | 11 | Compiled via `kani_harnesses.rs` |
+| 4 | `fixed_equivalence`, `acceleration_proofs`, `vec3_proofs`, `integrator_proofs`, `stability_proofs`, `extraction_proofs`, `orbital_state_proofs`, `pipeline_proofs`, `lyapunov_proofs`, `information_loss`, `fixed_safety` | — | **Not compiled** — templates |
+
+These harnesses check arithmetic, framing and loop invariants. They do not establish the C1–C5 security claims.
 
 ## Manual Docker Commands
 

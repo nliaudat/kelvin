@@ -22,7 +22,8 @@ fn verify_periodicity_no_steps() {
 /// For a positive budget the stub reports a period of 1, and never more than the
 /// budget.
 #[kani::proof]
-#[kani::unwind(8)]
+// 40 > 32: the stub compares 32-byte hashes via memcmp, which needs 33 unwindings.
+#[kani::unwind(40)]
 fn verify_periodicity_min_period_bound() {
     let n: usize = kani::any();
     kani::assume(n >= 1);

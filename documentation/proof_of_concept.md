@@ -78,7 +78,7 @@ All tests PASSED -- platform is deterministic with server.
 
 **What this proves:**
 - **Cross-platform determinism**: The Q32.64 fixed-point arithmetic produces bit-identical results on any platform. The same `OrbitalConfig` produces the same ciphertext everywhere.
-- **Reproducibility**: Following Gent (2017)'s Recomputation Manifesto, anyone can verify that their platform produces identical results.
+- **Reproducibility**: Following Gent (2013)'s Recomputation Manifesto, anyone can verify that their platform produces identical results.
 
 ---
 
@@ -446,7 +446,7 @@ cargo run -p constant_time_bench -- --continuous mul
 
 ### References
 
-- Reparaz, O., Balasch, J., & Verbauwhede, I. (2017). "Dude, is my code constant time?" *Design, Automation & Test in Europe Conference (DATE)*. doi:10.23919/DATE.2017.7927267
+- Reparaz, O., Balasch, J., & Verbauwhede, I. (2017). "Dude, is my code constant time?" *Design, Automation & Test in Europe Conference (DATE)*. [doi:10.23919/DATE.2017.7927267](https://doi.org/10.23919/DATE.2017.7927267)
 - Bernstein, D. J. (2005). "Cache-timing attacks on AES."
 - Kocher, P. (1996). "Timing attacks on implementations of Diffie-Hellman, RSA, DSS, and other systems." *CRYPTO '96*.
 
@@ -454,7 +454,7 @@ cargo run -p constant_time_bench -- --continuous mul
 
 ## 9. NIST SP 800-22 Statistical Test Suite
 
-Following the methodology of Song et al. (2025) [CryptoChaos, arXiv:2504.08618] and Cang, Kang & Wang (2021) [doi:10.1007/s11071-021-06310-9], Kelvin includes a built-in NIST SP 800-22 statistical test suite for validating the randomness quality of the orbital keystream.
+Following the methodology of Song et al. (2025) [CryptoChaos, [arXiv:2504.08618](https://arxiv.org/abs/2504.08618)] and Cang, Kang & Wang (2021) [[doi:10.1007/s11071-021-06310-9](https://doi.org/10.1007/s11071-021-06310-9)], Kelvin includes a built-in NIST SP 800-22 statistical test suite for validating the randomness quality of the orbital keystream.
 
 ### Test Implementation
 

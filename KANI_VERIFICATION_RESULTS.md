@@ -115,3 +115,13 @@ empirical, 15 open. See
 [`documentation/formal_verification/PROOF_INDEX.md`](documentation/formal_verification/PROOF_INDEX.md).
 
 **Last updated:** 2026-11-23
+
+## Run log, 2026-11-25 (Docker, Kani 0.67.0)
+
+Run individually with `--proof`:
+
+- `verify_floyd_cycle_detection`, `verify_hare_leads`, `verify_periodicity_no_steps`: successful.
+- `verify_periodicity_detection` and `verify_periodicity_min_period_bound`: **failed** on `origin/dev` because the stub compares 32-byte hashes with `memcmp` and the harnesses set `#[kani::unwind(8)]`. Raised to `unwind(40)`; both now succeed.
+- Full suite: the first 12 harnesses succeeded. `verify_lyapunov_division` (13th) had not finished after more than 20 minutes (128-bit division is expensive for the SAT backend) and the run was stopped. Harnesses 14-37 were not run in that pass, except the three periodicity harnesses above. Treat them as unconfirmed on this toolchain until re-run.
+
+`kelvin-core::find_cycle` / `detect_orbital_period` (a real Floyd detector for the Verlet simulation) now exist; they are unit-tested but **not** covered by any Kani harness, which still targets the stub.
