@@ -27,6 +27,8 @@ docker compose -f docker/docker-compose.yml run --rm kani --proof verify_add_no_
 - **29** in `proofs/kani/*.rs`, included by
   `kelvin-core/src/kani_harnesses.rs` under `#[cfg(kani)]`.
 
+These harnesses check arithmetic, framing and loop invariants. They do not establish the C1–C5 security claims.
+
 The other `proofs/kani/*.rs` files (for example `fixed_equivalence.rs`,
 `pipeline_proofs.rs`, `acceleration_proofs.rs`) are **templates**: they are not
 in any Cargo target and are never compiled. Do not describe them as verified.

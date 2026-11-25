@@ -28,23 +28,23 @@ This review updates the initial patent landscape analysis (Patent Review #1, 202
 
 **Critical findings:**
 
-1. **OrBIT-KDF** (GitHub, created 2026-01-30) — A directly similar project using Chirikov standard map + Julia set iteration for key derivation. This is the closest known prior art to Kelvin. Licensed under Apache-2.0.
+1. **[OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF)** (GitHub, created 2026-01-30) — A directly similar project using Chirikov standard map + Julia set iteration for key derivation. This is the closest known prior art to Kelvin. Licensed under Apache-2.0.
 
-2. **CryptoChaos** (arXiv:2504.08618, 2025) — A hybrid chaos-based cryptographic framework combining four discrete chaotic maps with X25519 and AES-GCM. Demonstrates that hybrid chaos-crypto frameworks are an active research area.
+2. **CryptoChaos** ([arXiv:2504.08618](https://arxiv.org/abs/2504.08618), 2025) — A hybrid chaos-based cryptographic framework combining four discrete chaotic maps with X25519 and AES-GCM. Demonstrates that hybrid chaos-crypto frameworks are an active research area.
 
 3. **No new blocking patents found** — All patent searches returned zero results for queries related to n-body cryptography, gravitational key derivation, orbital key generation, chaotic KDF, simulation-based key generation, and celestial mechanics encryption.
 
 4. **No IACR ePrint papers found** — Searches for "gravitational", "n-body", "orbital", "chaos key derivation", and "physical simulation cryptography" returned zero results on IACR ePrint.
 
-5. **Existing patent status confirmed** — All four previously identified patents (Apple US 6,587,559, Toshiba US 6,014,445, CN102360488B, Nantes US 8,781,124) remain expired or lapsed.
+5. **Existing patent status confirmed** — All four previously identified patents (Apple US 6,587,563, Toshiba US 6,014,445, CN102360488B, Nantes US 8,781,124) remain expired or lapsed.
 
 ### 1.2 Updated Landscape Summary
 
 | Category | Status | Key Risk |
 |----------|--------|----------|
-| **N-body chaotic KDF** (broad concept) | ❌ **Blocked** — Apple US 6,587,559 (expired) + OrBIT-KDF prior art | Highest risk |
+| **N-body chaotic KDF** (broad concept) | ❌ **Blocked** — Apple US 6,587,563 (expired) + [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) prior art | Highest risk |
 | **Chaotic stream cipher** (general method) | ❌ **Blocked** — Toshiba US 6,014,445 (expired) | High risk |
-| **Chirikov map + Julia set KDF** | ⚠️ **Prior art exists** — OrBIT-KDF (2026-01-30) | Moderate risk |
+| **Chirikov map + Julia set KDF** | ⚠️ **Prior art exists** — [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) (2026-01-30) | Moderate risk |
 | **Hybrid multi-map chaotic framework** | ⚠️ **Prior art exists** — CryptoChaos (2025) | Moderate risk |
 | **Kelvin's specific architecture** (fixed-point n-body, Lyapunov, multi-mode, HE integration) | ✅ **Potentially novel** | Low risk |
 
@@ -67,7 +67,7 @@ This review updates the initial patent landscape analysis (Patent Review #1, 202
 
 #### Architecture
 
-OrBIT-KDF uses a **Chirikov standard map** on the torus combined with a **Julia iteration** in the complex plane:
+[OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) uses a **Chirikov standard map** on the torus combined with a **Julia iteration** in the complex plane:
 
 1. **Username → Chirikov state**: SHA-512(username) → initial (x₀, p₀) in T²
 2. **Chirikov dynamics**: pₙ₊₁ = pₙ + K·sin(xₙ) (mod 2π), xₙ₊₁ = xₙ + pₙ₊₁ (mod 2π)
@@ -86,7 +86,7 @@ OrBIT-KDF uses a **Chirikov standard map** on the torus combined with a **Julia 
 
 #### Comparison with Kelvin
 
-| Aspect | OrBIT-KDF | Kelvin |
+| Aspect | [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) | Kelvin |
 |--------|-----------|--------|
 | **Core dynamics** | Chirikov standard map + Julia set | N-body gravitational simulation (Verlet/Euler) |
 | **Chaos source** | 2D area-preserving map + complex iteration | 30-DOF (10 bodies × 3 dimensions) gravitational dynamics |
@@ -102,7 +102,7 @@ OrBIT-KDF uses a **Chirikov standard map** on the torus combined with a **Julia 
 
 #### Risk Assessment
 
-**Low risk.** OrBIT-KDF is a small experimental project (1 star, 119 KB, last updated February 2026) that uses fundamentally different chaotic dynamics (Chirikov map + Julia set) compared to Kelvin's n-body gravitational simulation. The architecture, extraction method, and security mechanisms are distinct. However, it establishes prior art for the general concept of "chaotic map + cryptographic hash = KDF" and specifically for "Chirikov map + Julia set" combinations.
+**Low risk.** [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) is a small experimental project (1 star, 119 KB, last updated February 2026) that uses fundamentally different chaotic dynamics (Chirikov map + Julia set) compared to Kelvin's n-body gravitational simulation. The architecture, extraction method, and security mechanisms are distinct. However, it establishes prior art for the general concept of "chaotic map + cryptographic hash = KDF" and specifically for "Chirikov map + Julia set" combinations.
 
 ---
 
@@ -160,13 +160,13 @@ The following papers were found through systematic arXiv searches and are releva
 
 | Paper | Date | Relevance to Kelvin |
 |-------|------|---------------------|
-| **Chaotic flux cipher based on random cubic family** (arXiv:2603.20937) | 2026-03 | Symmetric stream cipher using random cubic mappings in complex plane. Related: uses complex dynamics for keystream generation, similar in spirit to Kelvin's chaos-based approach but different mathematical foundation. |
-| **CryptoChaos** (arXiv:2504.08618) | 2025-04 | Hybrid chaos-crypto framework (see Section 2.2). |
-| **Chaos in violent relaxation dynamics** (arXiv:2503.22479) | 2025-03 | N-body simulation chaos analysis. Not cryptographic, but relevant to understanding chaotic properties of n-body systems. |
-| **Partial suppression of chaos in relativistic three-body problems** (arXiv:2410.15410) | 2024-10 | Studies chaos in gravitational n-body (3 ≤ N ≤ 10³). Relevant to understanding chaos properties of Kelvin's core dynamics. |
-| **CS-PRNG using Robust Chaotic Tent Map** (arXiv:2408.05580) | 2024-08 | Chaotic PRNG design. General prior art for chaos-based RNG. |
-| **Stability analysis via second-order Rényi entropy** (arXiv:2210.09417) | 2022-10 | N-body stability analysis using entropy. Relevant to Kelvin's stability monitoring. |
-| **WHFast symplectic integrator** (arXiv:1506.01084) | 2015-06 | Fast Wisdom-Holman integrator for gravitational simulations. Relevant to Kelvin's integrator choices. |
+| **Chaotic flux cipher based on random cubic family** ([arXiv:2603.20937](https://arxiv.org/abs/2603.20937)) | 2026-03 | Symmetric stream cipher using random cubic mappings in complex plane. Related: uses complex dynamics for keystream generation, similar in spirit to Kelvin's chaos-based approach but different mathematical foundation. |
+| **CryptoChaos** ([arXiv:2504.08618](https://arxiv.org/abs/2504.08618)) | 2025-04 | Hybrid chaos-crypto framework (see Section 2.2). |
+| **Chaos in violent relaxation dynamics** ([arXiv:2503.22479](https://arxiv.org/abs/2503.22479)) | 2025-03 | N-body simulation chaos analysis. Not cryptographic, but relevant to understanding chaotic properties of n-body systems. |
+| **Partial suppression of chaos in relativistic three-body problems** ([arXiv:2410.15410](https://arxiv.org/abs/2410.15410)) | 2024-10 | Studies chaos in gravitational n-body (3 ≤ N ≤ 10³). Relevant to understanding chaos properties of Kelvin's core dynamics. |
+| **CS-PRNG using Robust Chaotic Tent Map** ([arXiv:2408.05580](https://arxiv.org/abs/2408.05580)) | 2024-08 | Chaotic PRNG design. General prior art for chaos-based RNG. |
+| **Stability analysis via second-order Rényi entropy** ([arXiv:2210.09417](https://arxiv.org/abs/2210.09417)) | 2022-10 | N-body stability analysis using entropy. Relevant to Kelvin's stability monitoring. |
+| **WHFast symplectic integrator** ([arXiv:1506.01084](https://arxiv.org/abs/1506.01084)) | 2015-06 | Fast Wisdom-Holman integrator for gravitational simulations. Relevant to Kelvin's integrator choices. |
 
 ### 3.2 IACR ePrint
 
@@ -178,9 +178,9 @@ The following papers were found through systematic arXiv searches and are releva
 |----------|------------------|
 | **N-body simulation for PRNG** | Halayka (2012) — proposed but found computationally expensive |
 | **N-body for proof-of-work** | Vuckovac (2021) — suggested but not implemented |
-| **Orbital positions for encryption** | Kraicha et al. (2025) — metaphorical, not simulated |
+| **Orbital positions for encryption** | Kraicha et al. (2025) — themed only: keyless alphabet shifts, no orbital computation (low-weight source) |
 | **Chaotic stream cipher (general)** | Extensive prior art (Toshiba '445, many academic papers) |
-| **Chirikov map + Julia set KDF** | OrBIT-KDF (2026) — direct prior art |
+| **Chirikov map + Julia set KDF** | [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) (2026) — direct prior art |
 | **Hybrid chaos-crypto framework** | CryptoChaos (2025) — prior art |
 | **Fixed-point n-body for crypto** | **No prior art found** — novel |
 | **Lyapunov exponent as crypto parameter** | **No prior art found** — novel |
@@ -197,7 +197,7 @@ All four previously identified patents were re-verified via Google Patents:
 
 | Patent | Previous Status | Current Status | Change? |
 |--------|----------------|----------------|---------|
-| Apple US 6,587,559 | Expired 2019-02-20 | Expired | ✅ Confirmed |
+| Apple US 6,587,563 | Expired 2017-02-15 | Expired | ✅ Confirmed |
 | Toshiba US 6,014,445 | Expired 2016-10-22 | Expired | ✅ Confirmed |
 | CN102360488B | Expired (fee related) | Expired | ✅ Confirmed |
 | Nantes US 8,781,124 | Lapsed 2022 | Lapsed | ✅ Confirmed |
@@ -224,7 +224,7 @@ Systematic searches on Google Patents for the following queries returned **zero 
 
 ### 4.3 OrBIT-KDF Patent Risk
 
-OrBIT-KDF is released under Apache-2.0 license and has no associated patent filings (based on repository inspection). It is a small experimental project with no commercial backing. **No patent risk from OrBIT-KDF.**
+[OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) is released under Apache-2.0 license and has no associated patent filings (based on repository inspection). It is a small experimental project with no commercial backing. **No patent risk from OrBIT-KDF.**
 
 ---
 
@@ -246,7 +246,7 @@ OrBIT-KDF is released under Apache-2.0 license and has no associated patent fili
 
 | Concept | Prior Art Source | Impact |
 |---------|-----------------|--------|
-| Chirikov map + Julia set KDF | OrBIT-KDF (2026) | ⚠️ Kelvin does not use Chirikov or Julia dynamics |
+| Chirikov map + Julia set KDF | [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) (2026) | ⚠️ Kelvin does not use Chirikov or Julia dynamics |
 | Hybrid chaos-crypto framework | CryptoChaos (2025) | ⚠️ Kelvin's architecture is fundamentally different |
 | Chaotic stream cipher (general) | Toshiba '445 + academic papers | ⚠️ Already known, Kelvin's V2 mode is exposed |
 | N-body for PRNG (general concept) | Halayka (2012) | ⚠️ Already known, Apple '559 covers this |
@@ -255,7 +255,7 @@ OrBIT-KDF is released under Apache-2.0 license and has no associated patent fili
 
 The most important distinction for patent purposes:
 
-| Kelvin Feature | OrBIT-KDF | Why It Matters |
+| Kelvin Feature | [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) | Why It Matters |
 |---------------|-----------|----------------|
 | **N-body gravitational simulation** | Chirikov map + Julia set | Fundamentally different dynamical system |
 | **48 DOF (8 bodies × 6D)** | 2D map + complex plane | Higher-dimensional chaos space |
@@ -276,7 +276,7 @@ The most important distinction for patent purposes:
 | Risk | Level | Mitigation |
 |------|-------|------------|
 | Apple '559 prior art blocking broad n-body claims | 🔴 **High** | Narrow claims to specific implementation details |
-| OrBIT-KDF prior art for "chaotic map + hash = KDF" | 🟡 **Moderate** | Kelvin uses n-body, not Chirikov/Julia |
+| [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) prior art for "chaotic map + hash = KDF" | 🟡 **Moderate** | Kelvin uses n-body, not Chirikov/Julia |
 | CryptoChaos prior art for "hybrid chaos-crypto" | 🟡 **Moderate** | Kelvin's architecture is distinct |
 | Toshiba '445 prior art for chaotic stream cipher | 🟡 **Moderate** | V2 mode exposed; patent expired |
 | No prior art for fixed-point n-body crypto | 🟢 **Low** | Strong patent position |
@@ -285,11 +285,11 @@ The most important distinction for patent purposes:
 
 ### 6.2 Updated Warning Flags
 
-1. **⚠️ OrBIT-KDF establishes prior art for "chaotic map + hash = KDF"** — While Kelvin uses n-body instead of Chirikov/Julia, a patent examiner could argue that the general concept of "iterating a chaotic system and hashing the result to produce a key" is obvious in light of OrBIT-KDF + Apple '559. Claims must be narrowly tailored to n-body gravitational dynamics specifically.
+1. **⚠️ [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) establishes prior art for "chaotic map + hash = KDF"** — While Kelvin uses n-body instead of Chirikov/Julia, a patent examiner could argue that the general concept of "iterating a chaotic system and hashing the result to produce a key" is obvious in light of OrBIT-KDF + Apple '559. Claims must be narrowly tailored to n-body gravitational dynamics specifically.
 
 2. **⚠️ CryptoChaos establishes prior art for "hybrid chaos-crypto"** — Kelvin's multi-mode architecture could be seen as an obvious extension of the hybrid approach. Emphasize that Kelvin's modes are integrated (shared seed derivation, domain separation) rather than separate systems.
 
-3. **⚠️ No new blocking patents, but the field is active** — The existence of OrBIT-KDF (created January 2026) and CryptoChaos (April 2025) shows that chaos-based cryptography is gaining attention. File the provisional patent application promptly to establish priority.
+3. **⚠️ No new blocking patents, but the field is active** — The existence of [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) (created January 2026) and CryptoChaos (April 2025) shows that chaos-based cryptography is gaining attention. File the provisional patent application promptly to establish priority.
 
 ---
 
@@ -319,10 +319,10 @@ Based on the new findings, patent claims should emphasize:
 
 ### 7.3 What to Avoid in Claims
 
-1. **"Chaotic map" or "chaotic dynamics" broadly** — Too broad, covered by Apple '559 and OrBIT-KDF prior art
+1. **"Chaotic map" or "chaotic dynamics" broadly** — Too broad, covered by Apple '559 and [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF) prior art
 2. **"Chaotic stream cipher" broadly** — Covered by Toshiba '445
 3. **"Hybrid chaos-cryptography framework"** — Covered by CryptoChaos
-4. **"Key derivation using chaotic system"** — Covered by OrBIT-KDF
+4. **"Key derivation using chaotic system"** — Covered by [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF)
 
 ### 7.4 Recommended Next Steps (Updated)
 
@@ -331,7 +331,7 @@ Based on the new findings, patent claims should emphasize:
 3. 🔲 **Professional prior art search** — Pay a patent attorney for a formal prior art search ($2,000–$5,000)
 4. 🔲 **Freedom-to-operate opinion** — Legal opinion on commercialization
 5. 🔲 **Provisional patent application** — Draft and file within 6 months
-6. 🔲 **Defensive publication** — Consider publishing non-patentable innovations on arXiv or GitHub to establish prior art against competitors (especially relevant given OrBIT-KDF's existence)
+6. 🔲 **Defensive publication** — Consider publishing non-patentable innovations on arXiv or GitHub to establish prior art against competitors (especially relevant given [OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF)'s existence)
 
 ---
 
@@ -340,22 +340,22 @@ Based on the new findings, patent claims should emphasize:
 ### Newly Identified References
 
 1. **OrBIT-KDF** (2026). GitHub: cozmobaut-hub/OrBIT-KDF. [https://github.com/cozmobaut-hub/OrBIT-KDF](https://github.com/cozmobaut-hub/OrBIT-KDF)
-2. **Song et al.** (2025). "A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications." arXiv:2504.08618.
-3. **Chaotic flux cipher** (2026). "A chaotic flux cipher based on the random cubic family." arXiv:2603.20937.
-4. **Chaos in violent relaxation** (2025). arXiv:2503.22479.
-5. **Relativistic three-body chaos** (2024). arXiv:2410.15410.
-6. **CS-PRNG using Robust Chaotic Tent Map** (2024). arXiv:2408.05580.
-7. **WHFast symplectic integrator** (2015). arXiv:1506.01084.
+2. **Song et al.** (2025). "A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications." [arXiv:2504.08618](https://arxiv.org/abs/2504.08618).
+3. **Chaotic flux cipher** (2026). "A chaotic flux cipher based on the random cubic family." [arXiv:2603.20937](https://arxiv.org/abs/2603.20937).
+4. **Chaos in violent relaxation** (2025). [arXiv:2503.22479](https://arxiv.org/abs/2503.22479).
+5. **Relativistic three-body chaos** (2024). [arXiv:2410.15410](https://arxiv.org/abs/2410.15410).
+6. **CS-PRNG using Robust Chaotic Tent Map** (2024). [arXiv:2408.05580](https://arxiv.org/abs/2408.05580).
+7. **WHFast symplectic integrator** (2015). [arXiv:1506.01084](https://arxiv.org/abs/1506.01084).
 
 ### Previously Identified References (from Patent Review #1)
 
-8. **US 6,587,559** — Apple Inc. "Cryptographic System Using Chaotic Dynamics" (expired 2019)
-9. **US 6,014,445** — Toshiba. "Stream Cipher Using Chaos" (expired 2016)
+8. **US 6,587,563** — Apple Inc. "Cryptographic System Using Chaotic Dynamics" (expired 2017)
+9. **US 6,014,445** — Toshiba. "Enciphering/deciphering apparatus and method incorporating random variable and keystream generation" (expired 2016)
 10. **CN102360488B** — "Image Encryption Based on Chaotic Orbit Perturbation" (lapsed)
 11. **US 8,781,124** — Université de Nantes. "Chaotic Sequence Generator" (lapsed 2022)
 12. **Halayka** (2012). "N-body dynamics for PRNG." viXra.
 13. **Vuckovac** (2021). "Cryptographic Puzzles and Complex Systems." Complex Systems.
-14. **Kraicha et al.** (2025). "Orbital-Inspired Encryption Using Phobos and Deimos." JISA.
+14. **Kraicha et al.** (2025). "Hybrid Cryptography Based on Planets: Phobos & Deimos." *E3S Web of Conferences* 601, 00092. [doi:10.1051/e3sconf/202560100092](https://doi.org/10.1051/e3sconf/202560100092)
 15. **Cang, Kang & Wang** (2021). "Conservative Sprott-A PRNG." Nonlinear Dynamics.
 
 ---

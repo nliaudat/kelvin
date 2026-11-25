@@ -67,7 +67,8 @@ fn verify_hare_leads() {
 /// The current stub (`simulate_step` is a no-op, `hash_state` is constant) is
 /// detected as a period-1 cycle after a single iteration.
 #[kani::proof]
-#[kani::unwind(8)]
+// 40 > 32: the stub compares 32-byte hashes via memcmp, which needs 33 unwindings.
+#[kani::unwind(40)]
 fn verify_periodicity_detection() {
     let n: usize = kani::any();
     kani::assume(n >= 1);

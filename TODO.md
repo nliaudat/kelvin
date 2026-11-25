@@ -26,7 +26,7 @@ Status vocabulary:
 | 3 | C5 — Side-channel hardening | **Open** | Not implemented, not measured, not proved. |
 | 4 | C1 — Information-loss aggregation | **Partial** | `FixedPoint.div_rem_identity` / `rem_bounds` are proved; no entropy accounting. |
 | 5 | C3 — Quantum reduction | **Open** | Informal Grover/Ambainis argument only. |
-| 6 | C6 — Periodicity detection | **Partial** | Floyd loop invariants proved in `PeriodDetection.lean`; `kelvin-core/src/period_detection.rs` is still a stub. |
+| 6 | C6 — Periodicity detection | **Partial** | Floyd loop invariants proved in `PeriodDetection.lean`; `kelvin-core::find_cycle` / `detect_orbital_period` now implement exact-equality Floyd on the real Verlet simulator (unit-tested on toy maps; not Kani/Lean-proved). The legacy `detect_period` stub remains for the existing harnesses. |
 
 ## Machine-checked artifacts (2026-11-23)
 
@@ -122,8 +122,10 @@ real simulator.
   configuration-space size, neither of which is formalised.
 
 ### 6. C6 — Periodicity detection
-- `kelvin-core/src/period_detection.rs` defines a unit `State` and a no-op
-  `simulate_step`. Implement it against the real simulator, or remove the module.
+- Done: `find_cycle` / `detect_orbital_period` run Floyd on the real simulator.
+- Remaining: repoint the Kani harnesses at `find_cycle` and drop the unit-`State` stub
+  (`detect_period`); run `detect_orbital_period` on real configurations and
+  document the observed periods.
 
 ### 7. Protocol-level proofs (tooling in place)
 - Images: `docker/docker-compose.formal.yml` (ProVerif, Tamarin, CryptoVerif,

@@ -8,7 +8,7 @@ Kelvin is an orbital-chaos-based **quantum-resistant stream cipher** and Key Der
 ## 1. Getting Started
 
 ### Prerequisites
-- [Rust](https://rustup.rs/) (1.70 or later)
+- [Rust](https://rustup.rs/) (1.80 or later; `kelvin-kdf` declares `rust-version = "1.80"`)
 - Git
 
 ### Build the CLI
@@ -32,7 +32,7 @@ kelvin keygen --level standard --output my_secret.json
 ```
 
 ### Encrypt a File
-Kelvin uses the orbital simulation to generate a **quantum-resistant stream cipher keystream** for encryption. Data is XOR-encrypted byte-by-byte with keystream derived from SHAKE256 (NIST PQC standard).
+The default mode (`--mode secure`, V1) derives a key from the orbital simulation and encrypts with ChaCha20-Poly1305 (AEAD). The `chaos`, `photon` and `quantum` modes instead XOR the data with a keystream derived from SHAKE256 (see *Authenticated Encryption* below).
 
 
 ```bash
@@ -44,7 +44,7 @@ kelvin encrypt --config my_secret.json --input database.tar --output database.ta
 ```
 
 ### Decrypt a File
-Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config and integration method must be used.
+Decryption is the exact inverse of encryption, using the same **Orbital Keystream**. The same config and integration method must be used. `encrypt` without `--nonce` prints a fresh session nonce, and `decrypt` requires it (add `--nonce <hex>` to the commands below; see *Session Nonces*).
 
 ```bash
 # Default: Verlet integration (symplectic, energy-conserving)
@@ -68,24 +68,20 @@ kelvin identify --config my_secret.json --all
 kelvin identify --config my_secret.json --ecc --kem
 ```
 
-### Authenticated Encryption (`--auth`)
-V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. Append `--auth` to append a 32-byte KMAC128 tag (NIST SP 800-185) to the ciphertext, defeating malleability.
+### Authenticated Encryption (`--auth`, on by default)
+V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. The CLI therefore appends a version byte plus a 32-byte KMAC128 tag (NIST SP 800-185; 33 bytes in total) to the ciphertext by default, defeating malleability. Pass `--no-auth` to opt out.
 
 ```bash
-# Chaos mode with authentication
-kelvin encrypt --mode chaos --config my_secret.json --input file.txt --output file.enc --auth
-kelvin decrypt --mode chaos --config my_secret.json --input file.enc --output file.txt --auth
+# Chaos mode (authenticated by default)
+kelvin encrypt --mode chaos --config my_secret.json --input file.txt --output file.enc --nonce 01
+kelvin decrypt --mode chaos --config my_secret.json --input file.enc --output file.txt --nonce 01
 
-# Photon mode with authentication
-kelvin encrypt --mode photon --config my_secret.json --input file.txt --output file.enc --auth
-kelvin decrypt --mode photon --config my_secret.json --input file.enc --output file.txt --auth
-
-# Quantum mode with authentication
-kelvin encrypt --mode quantum --config my_secret.json --input file.txt --output file.enc --auth
-kelvin decrypt --mode quantum --config my_secret.json --input file.enc --output file.txt --auth
+# Photon and quantum modes work the same way
+kelvin encrypt --mode photon  --config my_secret.json --input file.txt --output file.enc --nonce 01
+kelvin encrypt --mode quantum --config my_secret.json --input file.txt --output file.enc --nonce 01
 ```
 
-> **Note:** The `--auth` flag is ignored in `secure` mode (V1 ChaCha20Poly1305 AEAD has built-in authentication).
+> **Note:** `secure` mode (V1 ChaCha20-Poly1305 AEAD) is always authenticated and ignores `--auth` / `--no-auth`.
 
 ### Session Nonces (`--nonce`)
 
@@ -111,19 +107,12 @@ Pass `--nonce=` explicitly for pre-nonce legacy files (same keystream as
 before nonces existed). Reusing a config *with the same nonce* still reuses
 keystream — never do that.
 
-### Authentication (`--auth`, on by default)
-
-Chaos/photon/quantum modes append a KMAC128 tag unless `--no-auth` is given.
-`secure` mode ignores both flags (ChaCha20Poly1305 AEAD is always
-authenticated).
-
 ### Analyze Configuration Quality
 Verify that a configuration has sufficient chaos and sensitivity to initial conditions.
 ```bash
 kelvin analyze --config my_secret.json
 ```
-This performs a bit-flip on the Sun mass and measures the **Avalanche Effect** on the resulting cryptographic identity.
-```
+This performs a bit-flip on the Sun mass and measures the **Avalanche Effect** on the resulting Curve25519 identity.
 
 ---
 
@@ -209,7 +198,7 @@ ks.encrypt(&mut data)?;
 
 ### Authenticated Encryption (V2/V3/H + KMAC128)
 
-For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a 32-byte KMAC128 tag (NIST SP 800-185):
+For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the engine in its authenticated variant to append a KMAC128 tag (32-byte tag plus a 1-byte format version; NIST SP 800-185):
 
 ```rust
 use kelvin::{
@@ -221,7 +210,7 @@ use kelvin::{
 let config = OrbitalConfig::from_json(&config_json)?;
 let mut ks = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
 let mut data = b"Hello authenticated streaming!".to_vec();
-ks.encrypt(&mut data)?; // ciphertext + 32-byte tag appended
+ks.encrypt(&mut data)?; // ciphertext + version byte + 32-byte tag appended
 
 // V3 Photon + KMAC128
 let (seed, _bodies) = kelvin::simulate_and_extract_seed_with_method(
@@ -240,7 +229,7 @@ let mut data = b"Hello authenticated quantum!".to_vec();
 quantum.encrypt(&mut data)?;
 ```
 
-> **Important:** The authenticated wrappers append a 32-byte KMAC128 tag to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
+> **Important:** The authenticated wrappers append a version byte and a 32-byte KMAC128 tag (`AUTH_OVERHEAD` = 33 bytes) to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
 
 ### Accessing Asymmetric Keys
 ```rust

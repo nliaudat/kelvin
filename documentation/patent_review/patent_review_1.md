@@ -31,7 +31,7 @@
 
 | Patent | Filing Date | Expiration | Status | Enforceable? |
 |--------|-------------|------------|--------|:------------:|
-| **Apple US 6,587,559** (N-body crypto) | 2001-01-04 | **2019-02-20** | Expired — Fee Related | ❌ No |
+| **Apple US 6,587,563** (N-body crypto) | 1997-02-15 | **2017-02-15** | Expired — Lifetime | ❌ No |
 | **Toshiba US 6,014,445** (Chaos stream cipher) | 1996-10-22 | **2016-10-22** | Expired — Lifetime | ❌ No |
 | **CN102360488B** (Orbit perturbation) | 2011-09-29 | **2031-09-29** | Expired — Fee Related (lapsed) | ❌ No |
 | **Nantes US 8,781,124** (Chaos seq. generator) | 2011-03-28 | **2031-07-22** | Expired — Fee Related (lapsed 2022) | ❌ No |
@@ -42,7 +42,7 @@
 
 | Category | Status | Key Risk |
 |----------|--------|----------|
-| **N-body chaotic KDF** (broad concept) | ❌ **Blocked** — Apple US 6,587,559 | Highest risk |
+| **N-body chaotic KDF** (broad concept) | ❌ **Blocked** — Apple US 6,587,563 | Highest risk |
 | **Chaotic stream cipher** (general method) | ❌ **Blocked** — Toshiba US 6,014,445 | High risk |
 | **Chaotic orbit perturbation** (reseeding) | ⚠️ **Constrained** — CN102360488B | Moderate risk |
 | **Chaotic sequence generator** | ⚠️ **Constrained** — US 8,781,124 (Nantes) | Moderate risk |
@@ -60,18 +60,18 @@
 
 ## 2. Identified Blocking Patents
 
-### 2.1 Apple US 6,587,559 — "Cryptographic System Using Chaotic Dynamics"
+### 2.1 Apple US 6,587,563 — "Cryptographic System Using Chaotic Dynamics"
 
 | Field | Detail |
 |-------|--------|
-| **Patent No.** | US 6,587,559 |
+| **Patent No.** | US 6,587,563 |
 | **Assignee** | Apple Inc. |
-| **Priority Date** | 1998-05-27 |
-| **Filing Date** | 2001-01-04 |
-| **Grant Date** | 2003-05-06 |
-| **Expiration Date** | **2019-02-20** (adjusted expiration) |
-| **Status** | **Expired — Fee Related** (not renewed) |
-| **Source** | [Google Patents: US6558759](https://patents.google.com/patent/US6558759/en) — verified 2026-05-27 |
+| **Priority Date** | 1997-02-15 (US 08/801,939) |
+| **Filing Date** | 1997-02-15 |
+| **Grant Date** | 2003-07-01 |
+| **Expiration Date** | **2017-02-15** (anticipated expiration) |
+| **Status** | **Expired — Lifetime** |
+| **Source** | [Google Patents: US6587563B1](https://patents.google.com/patent/US6587563B1/en) — verified 2026-11-25 |
 
 #### Core Claim
 
@@ -89,7 +89,7 @@ This is the **most critical blocking patent** for the Kelvin project. The broad 
 
 | Factor | Kelvin's Position |
 |--------|-------------------|
-| **Patent expiry** | **Expired 2019-02-20** — confirmed via Google Patents. The patent is no longer enforceable. This completely eliminates the infringement risk for the broad concept. |
+| **Patent expiry** | **Expired 2017-02-15** (lifetime status) — confirmed via Google Patents. The patent is no longer enforceable. This completely eliminates the infringement risk for the broad concept. |
 | **Floating-point vs. fixed-point** | Apple's patent predates Kelvin's Q32.64 fixed-point solution. The patent describes floating-point implementations, which were the only option at the time. Kelvin's fixed-point approach solves a problem (cross-platform determinism) that Apple's patent does not address. |
 | **Lyapunov enforcement** | Apple's patent does not mention Lyapunov exponent estimation or chaotic regime enforcement. Kelvin's mandatory Lyapunov horizon check is a novel security mechanism. |
 | **Deep Physical Binding** | Apple's patent does not describe hashing force vectors, gravitational constants, or domain-separated extraction. |
@@ -101,7 +101,7 @@ Even if the patent has expired, the existence of this prior art means that **any
 
 ---
 
-### 2.2 Toshiba US 6,014,445 — "Stream Cipher Using Chaos"
+### 2.2 Toshiba US 6,014,445 — "Enciphering/deciphering apparatus and method incorporating random variable and keystream generation"
 
 | Field | Detail |
 |-------|--------|
@@ -379,7 +379,7 @@ The concept of "Harvest Now, Decrypt Later" is a **well-known threat model** in 
 
 ### 6.2 ⚠️ Apple '559 — The Blocking Patent
 
-Even if expired, Apple's US 6,587,559 is the most significant prior art. Any patent application must:
+Even if expired, Apple's US 6,587,563 is the most significant prior art. Any patent application must:
 
 1. **Explicitly distinguish** from Apple '559 in the specification
 2. **Narrow claims** to avoid the broad "n-body chaotic cryptography" concept
@@ -403,7 +403,7 @@ Several academic papers describe chaos-based cryptography and may constitute pri
 | Cang, Kang & Wang — Sprott-A PRNG | 2021 | Conservative chaotic PRNG + FPPC |
 | Halayka — N-body PRNG | 2012 | N-body dynamics for PRNG |
 | Vuckovac — N-body PoW puzzles | 2021 | N-body for proof-of-work |
-| Kraicha et al. — Orbital encryption | 2025 | Phobos/Deimos positions for encryption |
+| Kraicha et al. — Orbital-themed cipher | 2025 | Keyless alphabet shifts labelled Phobos/Deimos; no orbital computation (low-weight source) |
 
 These papers do **not** describe Kelvin's specific architecture but establish that chaos-based cryptography is an active research area. Patent examiners may cite these as evidence that the general concept is well-known.
 
@@ -511,18 +511,18 @@ For a professional prior art search, use the following queries:
 
 ### Patents Cited
 
-1. **US 6,587,559** — Apple Inc. "Cryptographic System Using Chaotic Dynamics" (2003)
-2. **US 6,014,445** — Kabushiki Kaisha Toshiba. "Stream Cipher Using Chaos" (2000)
+1. **US 6,587,563** — Apple Inc. "Cryptographic System Using Chaotic Dynamics" (2003)
+2. **US 6,014,445** — Kabushiki Kaisha Toshiba. "Enciphering/deciphering apparatus and method incorporating random variable and keystream generation" (2000)
 3. **CN102360488B** — "Image Encryption Based on Chaotic Orbit Perturbation" (2011)
 4. **US 8,781,124** (published as US20130170641A1) — Université de Nantes. "Chaotic Sequence Generator for Encryption Keys" (granted 2014, lapsed 2022)
 
 ### Academic References
 
-5. Song et al. (2025). "A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications." *arXiv:2504.08618*.
-6. Cang, Kang & Wang (2021). "Pseudo-random number generator based on a generalized conservative Sprott-A system." *Nonlinear Dynamics*, 104, 827–844. doi:10.1007/s11071-021-06310-9
+5. Song et al. (2025). "A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications." *[arXiv:2504.08618](https://arxiv.org/abs/2504.08618)*.
+6. Cang, Kang & Wang (2021). "Pseudo-random number generator based on a generalized conservative Sprott-A system." *Nonlinear Dynamics*, 104, 827–844. [doi:10.1007/s11071-021-06310-9](https://doi.org/10.1007/s11071-021-06310-9)
 7. Halayka (2012). "On leveraging the chaotic and combinatorial nature of deterministic n-body dynamics on the unit m-sphere in order to implement a pseudo-random number generator." *viXra*.
-8. Vuckovac (2021). "Cryptographic Puzzles and Complex Systems." *Complex Systems*, 30(3), 375–390. doi:10.25088/ComplexSystems.30.3.375
-9. Kraicha et al. (2025). "Orbital-Inspired Encryption Using Phobos and Deimos Positions." *Journal of Information Security and Applications*, 88, 103912.
+8. Vuckovac (2021). "Cryptographic Puzzles and Complex Systems." *Complex Systems*, 30(3), 375–390. [doi:10.25088/ComplexSystems.30.3.375](https://doi.org/10.25088/ComplexSystems.30.3.375)
+9. Kraicha, Touil & El Akkad (2025). "Hybrid Cryptography Based on Planets: Phobos & Deimos." *E3S Web of Conferences*, 601, 00092. [doi:10.1051/e3sconf/202560100092](https://doi.org/10.1051/e3sconf/202560100092)
 10. Jawad (2025). "DUff-skg: FHE cryptographic systems with chaotic secret key generation." *Acta Scientiarum. Technology*, 47(1).
 
 ### Kelvin Documentation

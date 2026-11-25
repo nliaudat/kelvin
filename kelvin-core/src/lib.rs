@@ -89,6 +89,7 @@ pub use constants::{
 };
 pub use fixed_math::Fixed;
 pub use integrator::{compute_accelerations, euler_step, simulate, verlet_step};
+pub use period_detection::{detect_orbital_period, find_cycle, Cycle};
 pub use information_loss::{per_step_loss,total_loss};
 pub use quantum::{quantum_oracle, QUANTUM_QUERY_LOWER_BOUND};
 pub use reference::compute_lyapunov_high_prec;
