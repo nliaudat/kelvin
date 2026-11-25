@@ -152,3 +152,16 @@
 ---
 
 **Final status:** All pending TODO items resolved. The Kelvin cryptosystem formal verification is now complete! 🎉
+
+---
+
+## 🔧 Follow-up (2026-11-25): test-suite repair
+
+`cargo test --workspace` (default features and `--all-features`) now passes. Fixed:
+
+- `fuzz/api_encrypt`: used removed `with_config` for `KelvinQuantumAuthenticated`; authenticated round-trip now accounts for the 33-byte tag overhead.
+- `golden_hash`: hash re-captured after the intentional pipeline changes (nonces, Lyapunov fix, extractor).
+- `kelvin-core::reference`: `f64::powi` is unavailable in `no_std`; replaced with a multiply (broke `cargo test -p kelvin`).
+- `fault_resilience`: the `fail` crate's own `failpoints` feature was never enabled, and the fail points sat in infallible functions. They now live at the fallible call sites in `kelvin/src/lib.rs`; the test is gated with `required-features = ["failpoints"]` and uses a 5-body config.
+
+Still open: `cargo fmt --check` diff in `kelvin-core/src/lib.rs`; Kani harness results in this file could not be re-run here (`kani` not installed), so the "VERIFIED" claims are unconfirmed in this environment.

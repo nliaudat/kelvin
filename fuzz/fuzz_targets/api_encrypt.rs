@@ -70,30 +70,30 @@ proptest! {
         if max_reseeds > 0 {
             let mut auth_photon = KelvinPhotonAuthenticated::new(seed, max_reseeds);
             let mut buf = data_bytes.clone();
+            buf.extend_from_slice(&[0u8; 33]);
             let original = buf.clone();
             if auth_photon.encrypt(&mut buf).is_ok() {
                 // Authenticated decrypt verifies tag, then strips it
                 // Use a new instance (same seed = same keystream + same MAC key)
                 let mut auth_photon2 = KelvinPhotonAuthenticated::new(seed, max_reseeds);
                 auth_photon2.decrypt(&mut buf).expect("Authenticated decryption failed");
-                assert_eq!(buf, original, "Round-trip data mismatch for KelvinPhotonAuthenticated");
+                let n = original.len() - 33;
+                assert_eq!(buf[..n], original[..n], "Round-trip data mismatch for KelvinPhotonAuthenticated");
             }
         }
 
         // ── KelvinQuantumAuthenticated ──
-        // with_config returns Err if max_reseeds == 0
-        if let Ok(mut auth_quantum) = KelvinQuantumAuthenticated::with_config(
-            seed, max_reseeds, 1024, 100, 1024,
-        ) {
+        if max_reseeds > 0 {
+            let mut auth_quantum = KelvinQuantumAuthenticated::new(seed, max_reseeds);
             let mut buf = data_bytes.clone();
+            buf.extend_from_slice(&[0u8; 33]);
             let original = buf.clone();
             if auth_quantum.encrypt(&mut buf).is_ok() {
                 // Round-trip: decrypt with a new instance (same seed = same keystream + same MAC key)
-                let mut auth_quantum2 = KelvinQuantumAuthenticated::with_config(
-                    seed, max_reseeds, 1024, 100, 1024,
-                ).expect("Second instance creation should succeed");
+                let mut auth_quantum2 = KelvinQuantumAuthenticated::new(seed, max_reseeds);
                 auth_quantum2.decrypt(&mut buf).expect("Authenticated decryption failed");
-                assert_eq!(buf, original, "Round-trip data mismatch for KelvinQuantumAuthenticated");
+                let n = original.len() - 33;
+                assert_eq!(buf[..n], original[..n], "Round-trip data mismatch for KelvinQuantumAuthenticated");
             }
         }
     }
