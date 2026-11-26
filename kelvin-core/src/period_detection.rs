@@ -12,12 +12,15 @@
 //!
 //! The implementation is generic enough to be used both in production code
 //! and in a Kani harness.
+//!
+//! `detect_period` operates on a unit-`State` stub kept only for the legacy
+//! Kani harnesses; use `find_cycle` / `detect_orbital_period` for real runs.
+#![allow(dead_code)]
 
 
 
 
 
-#[allow(dead_code, unused_imports, unused_variables, unused_assignments)]
 // Stub definitions for compilation without the full simulation crate.
 #[derive(Clone, Debug, Default)]
 pub struct State;
@@ -49,12 +52,10 @@ pub fn detect_period(init: &State, max_steps: usize) -> Option<usize> {
 
         if hash_state(&tortoise) == hash_state(&hare) {
             // Cycle detected – now find the start of the cycle.
-            let mut mu = 0usize;
             let mut tortoise2 = init.clone();
             while hash_state(&tortoise) != hash_state(&tortoise2) {
                 simulate_step(&mut tortoise);
                 simulate_step(&mut tortoise2);
-                mu += 1;
             }
             // Find the length of the cycle.
             let mut lam = 1usize;
