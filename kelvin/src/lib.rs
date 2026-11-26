@@ -200,6 +200,9 @@ fn run_simulation_pipeline(
         });
     }
 
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("verlet-step", |_| Err(KelvinError::OrbitalTimeExhausted { step: 0 }));
+
     // Run initial simulation with stability monitoring (Verlet or Euler)
     match method {
         IntegrationMethod::Verlet => {
@@ -230,6 +233,8 @@ fn run_simulation_pipeline(
 
     // Extract initial orbital seed (using SHAKE256 XOF) directly into
     // a fixed-size array — avoids an unnecessary Vec allocation.
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("shake256-extract", |_| Err(KelvinError::SeedExhausted));
     let mut seed = [0u8; ORBITAL_SEED_SIZE];
     extract_shake256_into_with_nonce(
         &bodies,
@@ -246,6 +251,20 @@ fn run_simulation_pipeline(
         bodies,
         lyapunov: LyapunovResult { min_chaos_steps: result.min_chaos_steps },
     })
+}
+
+/// Fallible wrapper around [`KeySchedule::next_key`] (also hosts the
+/// `key-schedule-exhaust` fail point used by the fault-resilience tests).
+trait NextKeyChecked {
+    fn next_key_checked(&mut self) -> Result<([u8; 32], [u8; 12]), KelvinError>;
+}
+
+impl NextKeyChecked for KeySchedule {
+    fn next_key_checked(&mut self) -> Result<([u8; 32], [u8; 12]), KelvinError> {
+        #[cfg(feature = "failpoints")]
+        fail::fail_point!("key-schedule-exhaust", |_| Err(KelvinError::SeedExhausted));
+        self.next_key().ok_or(KelvinError::SeedExhausted)
+    }
 }
 
 /// Run the full orbital simulation pipeline and extract an orbital seed.
@@ -413,7 +432,7 @@ impl Kelvin {
         let mut state = Self::init_with_method(config, method, nonce)?;
 
         // Get first key
-        let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = state.schedule.next_key_checked()?;
 
         // Create stream cipher with configurable byte limit
         let stream =
@@ -447,7 +466,7 @@ impl Kelvin {
         let mut state = Self::init_with_method(config, method, &[])?;
 
         // Get first key
-        let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = state.schedule.next_key_checked()?;
 
         // Create AES-256-GCM stream cipher with configurable byte limit
         let stream =
@@ -509,7 +528,7 @@ impl Kelvin {
     /// Called automatically when the current key approaches its maximum safe
     /// byte limit. This prevents nonce reuse and provides forward secrecy.
     fn rotate_key(&mut self) -> Result<(), KelvinError> {
-        let (key, nonce) = self.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = self.schedule.next_key_checked()?;
         // Rekey the existing stream in-place to preserve the cipher variant
         // (ChaCha20Poly1305 vs AES-256-GCM) chosen at construction time.
         self.stream.rekey(key, nonce);
@@ -672,6 +691,10 @@ impl KelvinStreaming {
     ///
     /// If either condition is detected, returns `KelvinError::StabilityError`.
     fn advance_step(&mut self) -> Result<(), KelvinError> {
+        #[cfg(feature = "failpoints")]
+        fail::fail_point!("verlet-step", |_| Err(KelvinError::OrbitalTimeExhausted {
+            step: self.step
+        }));
         match self.integration_method {
             IntegrationMethod::Verlet => {
                 kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);

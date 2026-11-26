@@ -39,23 +39,10 @@ fn test_config() -> OrbitalConfig {
         .expect("valid test config")
 }
 
-/// Helper: create a 3-body system that requires fewer steps for streaming tests.
+/// Helper: streaming configuration. Uses the same (minimum 5-body, safe-default
+/// compliant) system as `test_config`, with a smaller monitoring interval.
 fn streaming_config() -> OrbitalConfig {
-    let bodies = vec![
-        OrbitalBody::new(Fixed::ONE, Vec3::ZERO, Vec3::ZERO),
-        OrbitalBody::new(
-            Fixed::from_raw(1 << 54),
-            Vec3::new(Fixed::ONE, Fixed::ZERO, Fixed::ZERO),
-            Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-        ),
-        OrbitalBody::new(
-            Fixed::from_raw(1 << 53),
-            Vec3::new(Fixed::ZERO, Fixed::from_int(2), Fixed::ZERO),
-            Vec3::new(Fixed::from_int(-4), Fixed::ZERO, Fixed::ZERO),
-        ),
-    ];
-    OrbitalConfig::new(bodies, 100, 10, DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G)
-        .expect("valid stream config")
+    test_config()
 }
 
 // ============================================================================
