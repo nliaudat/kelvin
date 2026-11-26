@@ -67,10 +67,12 @@ fn test_golden_hash_pipeline() {
     if hash_bytes != GOLDEN_HASH {
         eprintln!();
         eprintln!("GOLDEN HASH CAPTURE");
-        eprintln!("const GOLDEN_HASH: [u8; 32] = [
-    0x82, 0x25, 0x72, 0xdf, 0xc8, 0xb2, 0x60, 0x88, 0xab, 0xf1, 0xa0, 0x4e, 0x91, 0x67, 0x8a, 0x97,
-    0x9d, 0x66, 0xcc, 0x91, 0x49, 0xc2, 0x8d, 0x06, 0xcb, 0xa3, 0xa2, 0xee, 0xc3, 0xb5, 0x51, 0x2e,
-];");
+        eprintln!("const GOLDEN_HASH: [u8; 32] = [");
+        for chunk in hash_bytes.chunks(16) {
+            let row: Vec<String> = chunk.iter().map(|b| format!("0x{:02x},", b)).collect();
+            eprintln!("    {}", row.join(" "));
+        }
+        eprintln!("];");
         eprintln!(
             "// hex: {}",
             hash_bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>()
