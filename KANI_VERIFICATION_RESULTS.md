@@ -125,3 +125,5 @@ Run individually with `--proof`:
 - Full suite: the first 12 harnesses succeeded. `verify_lyapunov_division` (13th) had not finished after more than 20 minutes (128-bit division is expensive for the SAT backend) and the run was stopped. Harnesses 14-37 were not run in that pass, except the three periodicity harnesses above. Treat them as unconfirmed on this toolchain until re-run.
 
 `kelvin-core::find_cycle` / `detect_orbital_period` (a real Floyd detector for the Verlet simulation) now exist; they are unit-tested but **not** covered by any Kani harness, which still targets the stub.
+
+Update, 2026-11-26: all 37 harnesses now on `dev` have a SUCCESSFUL verdict, collected over three separate runs rather than one `--all` pass. Details, source commits and the two replaced C3 harnesses are in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md).
