@@ -19,10 +19,12 @@ use sha3::{Digest, Sha3_256};
 
 // The golden SHA3-256 hash of the orbital seed produced by
 // simulate_and_extract_seed() with the deterministic config below.
-// Initial capture: 2026-05-29, 5-body, 500 steps, Verlet, DEFAULT_DT
+// Initial capture: 2026-05-29; re-captured 2026-11-25 after intentional pipeline
+// changes (session nonces, Lyapunov ln(10) fix, extractor updates).
+// 5-body, 500 steps, Verlet, DEFAULT_DT
 const GOLDEN_HASH: [u8; 32] = [
-    0x65, 0x2e, 0xa8, 0x9e, 0xc3, 0x71, 0x62, 0x26, 0x52, 0x29, 0x47, 0x79, 0xf2, 0x4a, 0xb8, 0xcb,
-    0x15, 0xd5, 0x2a, 0xe8, 0xee, 0x56, 0x38, 0x2e, 0x20, 0x2e, 0xa4, 0x14, 0x5b, 0xee, 0x07, 0x9e,
+    0x82, 0x25, 0x72, 0xdf, 0xc8, 0xb2, 0x60, 0x88, 0xab, 0xf1, 0xa0, 0x4e, 0x91, 0x67, 0x8a, 0x97,
+    0x9d, 0x66, 0xcc, 0x91, 0x49, 0xc2, 0x8d, 0x06, 0xcb, 0xa3, 0xa2, 0xee, 0xc3, 0xb5, 0x51, 0x2e,
 ];
 
 fn golden_hash_config() -> OrbitalConfig {
@@ -66,12 +68,9 @@ fn test_golden_hash_pipeline() {
         eprintln!();
         eprintln!("GOLDEN HASH CAPTURE");
         eprintln!("const GOLDEN_HASH: [u8; 32] = [");
-        for chunk in hash_bytes.chunks(8) {
-            eprint!("    ");
-            for b in chunk {
-                eprint!("0x{:02x}, ", b);
-            }
-            eprintln!();
+        for chunk in hash_bytes.chunks(16) {
+            let row: Vec<String> = chunk.iter().map(|b| format!("0x{:02x},", b)).collect();
+            eprintln!("    {}", row.join(" "));
         }
         eprintln!("];");
         eprintln!(
