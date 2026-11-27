@@ -89,7 +89,7 @@ are included from `proofs/kani/` by `kelvin-core/src/kani_harnesses.rs`:
 
 | Harness | What it checks |
 |---------|----------------|
-| `verify_c1_preimage_bound` | local preimage size at the softening limit |
+| `verify_c1_preimage_bound` | the 1026 smallest divisors give pairwise distinct quotients |
 | `verify_c1_epsilon_bound` | preimage bound for the implemented division |
 | `verify_c1_division_remainder` | $0 \le r < \text{den}$ |
 | `verify_information_loss_total` | model loss never exceeds $H_{\max}$ |

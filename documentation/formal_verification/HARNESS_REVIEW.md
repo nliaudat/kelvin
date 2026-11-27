@@ -40,7 +40,7 @@ This distinction is not visible from `VERIFICATION:- SUCCESSFUL`.
 | `verify_add_no_overflow` | result in `[-200,200]` AU and equals `a+b` for inputs in `[-100,100]` | anything beyond that range | yes |
 | `verify_sub_no_overflow` | same for subtraction | — | yes |
 | `verify_mul_range` | product in `[-16,16]` for inputs in `[-4,4]` | algebraic correctness, rounding, sign | yes |
-| `verify_c1_preimage_bound` | ≤ 9 consecutive divisors near the softening limit share a quotient | entropy, distribution, global bound | yes |
+| `verify_c1_preimage_bound` | adjacent divisors in a 1026-value window at the softening limit give strictly decreasing quotients | entropy, distribution, global bound | yes |
 | `verify_c1_epsilon_bound` | `⌈den/2^64⌉ ≤ 8,000,000` and `≥ 1` | **does not call `Fixed::div`** — pure `i128` shift arithmetic | **no** |
 | `verify_c1_division_remainder` | `0 ≤ r < den` for `r = (G<<64) % den` | **does not call `Fixed::div`**; says nothing about the implementation | **no** |
 | `verify_c3_step_damping` | for 6 concrete large denominators, a 1-ULP divisor change moves the quotient by ≤ 1 ULP | universal quantification, a Verlet step, a preimage set | yes |

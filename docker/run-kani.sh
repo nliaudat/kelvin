@@ -186,7 +186,7 @@ run_proofs() {
         "verify_mul_range:mul range safety for [-4, 4] AU"
 
         # C1: Information loss arithmetic (fixed_math.rs + proofs/kani)
-        "verify_c1_preimage_bound:preimage bound at softening limit"
+        "verify_c1_preimage_bound:distinct quotients near the softening limit"
         "verify_c1_epsilon_bound:epsilon-bound on the implemented division"
         "verify_c1_division_remainder:division remainder 0 <= r < den"
         "verify_information_loss_total:saturation model never exceeds H_max"

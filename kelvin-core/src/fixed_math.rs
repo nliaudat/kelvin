@@ -773,7 +773,7 @@ mod kani_proofs {
     // bounds from the C1 proof sketch (see formal_verification.md §L1').
     //
     // They verify:
-    //   1. Preimage size bound at the softening limit
+    //   1. Distinct quotients for adjacent divisors at the softening limit
     //   2. ε-bound on per-operation Shannon entropy loss
     //   3. Division remainder range
     //   4. Rounding operation count for Verlet (N=2)
@@ -788,45 +788,31 @@ mod kani_proofs {
 
     // ── Harness: Preimage Size at Softening Limit ──────────────────────
     //
-    // Prove: At the minimum physically-possible denominator (softening limit),
-    // the division g / dist_cubed maps at most 9 consecutive input values
-    // to the same output (local bound). The global bound is ≤ 2^32.
+    // Prove: for every dist_cubed in [C1_MIN_DC, C1_MIN_DC + 1024], the
+    // quotient g / dist_cubed is strictly greater than the quotient for the
+    // next divisor. By transitivity the quotients of the 1026 divisors in
+    // [C1_MIN_DC, C1_MIN_DC + 1025] are pairwise distinct: the division
+    // merges no two of them (preimage size 1).
+    //
+    // This says nothing about larger divisors, where quotients do collide.
     #[kani::proof]
     #[kani::unwind(4096)]
     fn verify_c1_preimage_bound() {
-        // Symbolic dist_cubed_raw near the softening limit
         let dist_cubed_raw: i128 = kani::any();
         kani::assume(dist_cubed_raw >= C1_MIN_DC);
         kani::assume(dist_cubed_raw <= C1_MIN_DC + 1024);
 
         let g = Fixed::from_raw(C1_G_RAW);
-        let dist_cubed = Fixed::from_raw(dist_cubed_raw);
-        let factor = g / dist_cubed;
-        let factor_raw = factor.to_raw();
+        let factor = g / Fixed::from_raw(dist_cubed_raw);
+        let next_factor = g / Fixed::from_raw(dist_cubed_raw + 1);
 
-        // Count preimages in a local window of 9 values
-        let mut preimage_count: u64 = 0;
-        for delta in 0..=8 {
-            let candidate_raw = dist_cubed_raw + delta;
-            if candidate_raw >= C1_MIN_DC && candidate_raw <= C1_MAX_DC {
-                let candidate = Fixed::from_raw(candidate_raw);
-                let candidate_factor = g / candidate;
-                if candidate_factor.to_raw() == factor_raw {
-                    preimage_count += 1;
-                }
-            }
-        }
-
-        kani::assert(preimage_count <= 9, "C1: local preimage count at softening limit ≤ 9");
-
-        kani::cover(
-            preimage_count == 0,
-            "C1-cover: zero preimages (neighbors produce different factor_raw)",
+        kani::assert(
+            factor.to_raw() > next_factor.to_raw(),
+            "C1: adjacent divisors near the softening limit give distinct quotients",
         );
-        kani::cover(
-            preimage_count > 0,
-            "C1-cover: at least one neighbor shares the same factor_raw",
-        );
+
+        kani::cover(dist_cubed_raw == C1_MIN_DC, "C1-cover: lower end of the window");
+        kani::cover(dist_cubed_raw == C1_MIN_DC + 1024, "C1-cover: upper end of the window");
     }
 
     // ── Harness: ε-Bound on Preimage Size (Full Range) ─────────────────

@@ -44,7 +44,7 @@ Per-harness logs land in `proofs/kani/results/`.
 | `verify_add_no_overflow` | `i128` addition is in range for physical-domain inputs |
 | `verify_sub_no_overflow` | `i128` subtraction is in range for physical-domain inputs |
 | `verify_mul_range` | the fixed-point multiply stays within its documented range |
-| `verify_c1_preimage_bound` | preimage size of the division near the softening limit |
+| `verify_c1_preimage_bound` | the division merges no two of the 1026 smallest divisors (rewritten 2026-11-27) |
 | `verify_c1_epsilon_bound` | preimage bound for the implemented division |
 | `verify_c1_division_remainder` | `0 ≤ remainder < denominator` |
 | `verify_c3_step_damping` | for 6 concrete large denominators, a 1-ULP divisor change moves the quotient by at most 1 ULP |
@@ -152,3 +152,5 @@ Update, 2026-11-27 (later): the three stub harnesses (`verify_periodicity_*`) an
 Update, 2026-11-27: the six `kelvin-kdf` harnesses were added and run individually; all succeeded (the slowest, `verify_extraction_header_injective`, in about 2.5 minutes), and a planted bug made each fail. A full `--all` run of the 43 followed (next entry).
 
 Update, 2026-11-27: a single `--all` run on `dev` at `326c911` passed all 43 harnesses (about 1 h 25 min); details in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md). One of them is weak: `verify_c1_preimage_bound` asserts that at most 9 of 9 compared values match, which cannot fail.
+
+Update, 2026-11-27: `verify_c1_preimage_bound` was rewritten to assert that adjacent divisors in the window give distinct quotients. Run individually: successful (45 s); it fails when the division result is truncated.

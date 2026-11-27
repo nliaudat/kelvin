@@ -53,7 +53,8 @@ kani::assert(error.to_raw() <= max_error,
 ```
 
 Integrated harnesses: `verify_c1_division_remainder` (remainder range),
-`verify_c1_preimage_bound`, `verify_c1_epsilon_bound` (preimage size).
+`verify_c1_preimage_bound` (distinct quotients near the softening limit),
+`verify_c1_epsilon_bound` (preimage size).
 
 **This is not an entropy statement.** Bounding a remainder does not bound
 information loss; C1 remains open. See
