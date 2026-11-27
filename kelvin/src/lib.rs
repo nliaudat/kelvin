@@ -84,6 +84,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
+mod atomic_output;
 mod authenticated;
 mod decrypt;
 mod encrypt;
@@ -97,6 +98,7 @@ mod quantum;
 mod split;
 pub mod streaming;
 
+pub use atomic_output::write_atomically;
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 pub use kelvin_kdf::{
@@ -330,7 +332,6 @@ pub fn simulate_and_extract_seed_with_method_and_nonce(
 /// 3. Run orbital simulation
 /// 4. Extract seeds via SHA3-512
 /// 5. Generate keystream via ChaCha20Poly1305 AEAD
-#[derive(Debug)]
 pub struct Kelvin {
     #[allow(dead_code)]
     config: OrbitalConfig,
@@ -339,6 +340,15 @@ pub struct Kelvin {
     schedule: KeySchedule,
     stream: Box<dyn StreamCipher>,
     bytes_processed: u64,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for Kelvin {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Kelvin")
+            .field("bytes_processed", &self.bytes_processed)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Shared state produced by the initialization pipeline.
@@ -581,7 +591,6 @@ impl Drop for Kelvin {
 /// ks.decrypt(&mut data)?;
 /// assert_eq!(&data, b"Hello, world!");
 /// ```
-#[derive(Debug)]
 pub struct KelvinStreaming {
     /// Current orbital bodies (simulation state).
     bodies: Vec<OrbitalBody>,
@@ -606,6 +615,18 @@ pub struct KelvinStreaming {
     keystream_buf: Vec<u8>,
     /// Integration method (Verlet or Euler).
     integration_method: IntegrationMethod,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KelvinStreaming {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KelvinStreaming")
+            .field("step", &self.step)
+            .field("bytes_per_step", &self.bytes_per_step)
+            .field("bytes_processed", &self.bytes_processed)
+            .field("integration_method", &self.integration_method)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KelvinStreaming {

@@ -58,7 +58,7 @@ use crate::parameters::{
 };
 use crate::photon::KelvinPhoton;
 use crate::quantum::KelvinQuantum;
-use kelvin_core::{Fixed, OrbitalBody};
+use kelvin_core::{Fixed, IntegrationMethod, OrbitalBody};
 use kelvin_kdf::{extract_shake256_into_with_nonce, OrbitalConfig};
 
 /// Size of the KMAC128 tag in bytes.
@@ -210,7 +210,6 @@ fn open_chunk(
 /// receiver.decrypt_final(&mut data)?; // a second instance
 /// assert_eq!(&data[..data.len() - AUTH_OVERHEAD], b"Secret message");
 /// ```
-#[derive(Debug)]
 pub struct KelvinPhotonAuthenticated {
     /// Inner Photon instance for keystream generation.
     inner: KelvinPhoton,
@@ -220,6 +219,16 @@ pub struct KelvinPhotonAuthenticated {
     tag_buf: [u8; TAG_LEN],
     /// Chunk counter and final-chunk state bound into each tag.
     chunks: ChunkState,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KelvinPhotonAuthenticated {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KelvinPhotonAuthenticated")
+            .field("inner", &self.inner)
+            .field("chunks", &self.chunks)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KelvinPhotonAuthenticated {
@@ -340,7 +349,6 @@ impl Drop for KelvinPhotonAuthenticated {
 /// receiver.decrypt_final(&mut data)?; // a second instance
 /// assert_eq!(&data[..data.len() - AUTH_OVERHEAD], b"Secret message");
 /// ```
-#[derive(Debug)]
 pub struct KelvinQuantumAuthenticated {
     /// Inner Quantum instance for keystream generation.
     inner: KelvinQuantum,
@@ -350,6 +358,16 @@ pub struct KelvinQuantumAuthenticated {
     tag_buf: [u8; TAG_LEN],
     /// Chunk counter and final-chunk state bound into each tag.
     chunks: ChunkState,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KelvinQuantumAuthenticated {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KelvinQuantumAuthenticated")
+            .field("inner", &self.inner)
+            .field("chunks", &self.chunks)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KelvinQuantumAuthenticated {
@@ -471,7 +489,6 @@ impl Drop for KelvinQuantumAuthenticated {
 /// receiver.decrypt_final(&mut data)?; // a second instance
 /// assert_eq!(&data[..data.len() - AUTH_OVERHEAD], b"Secret message");
 /// ```
-#[derive(Debug)]
 pub struct KelvinStreamingAuthenticated {
     /// Inner streaming instance for keystream generation.
     inner: crate::KelvinStreaming,
@@ -483,16 +500,34 @@ pub struct KelvinStreamingAuthenticated {
     chunks: ChunkState,
 }
 
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KelvinStreamingAuthenticated {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KelvinStreamingAuthenticated")
+            .field("inner", &self.inner)
+            .field("chunks", &self.chunks)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Derive a MAC key from the initial orbital bodies for V2 streaming mode.
 ///
 /// Uses SHAKE256 to extract entropy from the bodies, then HKDF-SHA512 to
 /// derive the 32-byte KMAC128 key.
+///
+/// The tag covers ciphertext, so a receiver whose settings produce a different
+/// keystream must also get a different MAC key; otherwise it would accept the
+/// chunk and return garbage. The integration method, time step and bytes per
+/// step are therefore part of the HKDF info.
 fn derive_mac_key_from_bodies(
     bodies: &[OrbitalBody],
     step: u64,
     g: Fixed,
     softening: Fixed,
     nonce: &[u8],
+    method: IntegrationMethod,
+    dt: Fixed,
+    bytes_per_step: u64,
 ) -> [u8; MAC_KEY_SIZE] {
     let mut extract_buf = [0u8; EXTRACT_BUF_SIZE];
     extract_shake256_into_with_nonce(
@@ -507,7 +542,17 @@ fn derive_mac_key_from_bodies(
 
     let hk = Hkdf::<Sha3_512>::new(None, &extract_buf);
     let mut mac_key = [0u8; MAC_KEY_SIZE];
-    hk.expand(b"kelvin-streaming-mac-key-v1", &mut mac_key)
+    let method_id: u8 = match method {
+        IntegrationMethod::Verlet => 0,
+        IntegrationMethod::Euler => 1,
+    };
+    let info: [&[u8]; 4] = [
+        b"kelvin-streaming-mac-key-v2",
+        &[method_id],
+        &dt.to_raw().to_le_bytes(),
+        &bytes_per_step.to_le_bytes(),
+    ];
+    hk.expand_multi_info(&info, &mut mac_key)
         .expect("HKDF expand with 32-byte output should never fail");
     mac_key
 }
@@ -531,19 +576,39 @@ impl KelvinStreamingAuthenticated {
         bytes_per_step: u64,
         nonce: &[u8],
     ) -> Result<Self, KelvinError> {
+        Self::new_with_method_and_nonce(config, bytes_per_step, IntegrationMethod::default(), nonce)
+    }
+
+    /// Like [`new_with_nonce`](Self::new_with_nonce) with a configurable
+    /// integration method. Both parties must use the same method.
+    pub fn new_with_method_and_nonce(
+        config: OrbitalConfig,
+        bytes_per_step: u64,
+        method: IntegrationMethod,
+        nonce: &[u8],
+    ) -> Result<Self, KelvinError> {
         // We need the initial bodies to derive the MAC key.
         // Clone them from the config before creating the streaming instance.
         let bodies = config.bodies.clone();
+        let (g, softening, dt) = (config.g, config.softening, config.dt);
 
-        let inner = crate::KelvinStreaming::new_with_nonce(config, bytes_per_step, nonce)?;
+        let inner = crate::KelvinStreaming::new_with_method_and_nonce(
+            config,
+            bytes_per_step,
+            method,
+            nonce,
+        )?;
 
         // Derive MAC key from initial bodies (step 0), bound to the nonce
         let mac_key = derive_mac_key_from_bodies(
             &bodies,
             0,
-            kelvin_core::DEFAULT_G,
-            kelvin_core::SOFTENING_FACTOR,
+            g,
+            softening,
             nonce,
+            method,
+            dt,
+            inner.bytes_per_step(),
         );
 
         Ok(KelvinStreamingAuthenticated {

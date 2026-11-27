@@ -107,11 +107,17 @@ pub trait StreamDecrypt {
 /// Wraps [`KelvinPhoton`] and provides the [`StreamEncrypt`] interface.
 /// No authentication tag is produced — use with external MAC or in
 /// environments where malleability is acceptable.
-#[derive(Debug)]
 pub struct PhotonEncryptor {
     inner: KelvinPhoton,
     /// Reusable keystream buffer to avoid per-update allocations.
     keystream_buf: Vec<u8>,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for PhotonEncryptor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("PhotonEncryptor").field("inner", &self.inner).finish_non_exhaustive()
+    }
 }
 
 impl PhotonEncryptor {
@@ -195,11 +201,17 @@ impl StreamDecrypt for PhotonDecryptor {
 /// Streaming encryptor for H Quantum mode (hybrid cache+XOR + orbital reseed).
 ///
 /// Wraps [`KelvinQuantum`] and provides the [`StreamEncrypt`] interface.
-#[derive(Debug)]
 pub struct QuantumEncryptor {
     inner: KelvinQuantum,
     /// Reusable keystream buffer to avoid per-update allocations.
     keystream_buf: Vec<u8>,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for QuantumEncryptor {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("QuantumEncryptor").field("inner", &self.inner).finish_non_exhaustive()
+    }
 }
 
 impl QuantumEncryptor {
@@ -405,23 +417,23 @@ impl StreamDecrypt for ChaosDecryptor {
 /// The authentication key is derived from the ChaCha20 key and nonce using
 /// BLAKE3 key derivation, ensuring the tag is cryptographically bound to the
 /// encryption key.
+///
+/// The tag is computed incrementally, so memory use does not grow with the
+/// length of the stream.
 pub struct SecureEncryptor {
     /// ChaCha20 stream cipher for encryption.
     cipher: ChaCha20,
-    /// Buffer of all plaintext for final tag computation.
-    plaintext_buf: Vec<u8>,
+    /// Running keyed hash over the plaintext.
+    mac: blake3::Hasher,
     /// Whether finalize has been called.
     finalized: bool,
-    /// Authentication key derived from ChaCha20 key+nonce.
-    auth_key: [u8; 32],
 }
 
 impl std::fmt::Debug for SecureEncryptor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SecureEncryptor")
-            .field("plaintext_buf_len", &self.plaintext_buf.len())
             .field("finalized", &self.finalized)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -434,11 +446,13 @@ impl SecureEncryptor {
         let cipher = ChaCha20::new_from_slices(&key, &nonce)
             .expect("ChaCha20 key and nonce sizes are valid");
         // Derive authentication key from the ChaCha20 key and nonce using BLAKE3
-        let auth_key =
+        let mut auth_key =
             blake3::keyed_hash(&key, &[b"Kelvin Secure Streaming Auth Key", &nonce[..]].concat())
                 .as_bytes()
                 .to_owned();
-        SecureEncryptor { cipher, plaintext_buf: Vec::new(), finalized: false, auth_key }
+        let mac = blake3::Hasher::new_keyed(&auth_key);
+        auth_key.zeroize();
+        SecureEncryptor { cipher, mac, finalized: false }
     }
 }
 
@@ -451,8 +465,8 @@ impl StreamEncrypt for SecureEncryptor {
             return Err(KelvinError::AeadError("SecureEncryptor already finalized".into()));
         }
 
-        // Buffer plaintext for final tag computation
-        self.plaintext_buf.extend_from_slice(plaintext);
+        // Absorb the plaintext for final tag computation
+        self.mac.update(plaintext);
 
         // Encrypt by XORing with ChaCha20 keystream
         let start = output.len();
@@ -468,10 +482,10 @@ impl StreamEncrypt for SecureEncryptor {
         }
         self.finalized = true;
 
-        // Compute authentication tag using BLAKE3 keyed hash over the plaintext.
+        // The authentication tag is a BLAKE3 keyed hash over the plaintext.
         // The key is derived from the ChaCha20 key and nonce, making this a
         // proper keyed MAC rather than an unkeyed hash.
-        let tag = blake3::keyed_hash(&self.auth_key, &self.plaintext_buf);
+        let tag = self.mac.finalize();
 
         Ok(tag.as_bytes().to_vec())
     }
@@ -479,39 +493,38 @@ impl StreamEncrypt for SecureEncryptor {
 
 impl Drop for SecureEncryptor {
     fn drop(&mut self) {
-        self.plaintext_buf.zeroize();
-        self.auth_key.zeroize();
+        self.mac.zeroize();
     }
 }
 
 /// Streaming decryptor for V1 Secure mode.
 ///
 /// Uses ChaCha20 stream cipher for decryption and BLAKE3 keyed hash for
-/// authentication tag verification.
+/// authentication tag verification. The tag is computed over the **plaintext**
+/// (same as the encryptor).
 ///
-/// The tag is computed over the **plaintext** (same as the encryptor).
-/// To prevent unverified plaintext from being exposed to the caller before
-/// tag verification, the decryptor buffers decrypted plaintext internally
-/// and only releases it to the caller's output buffer after `finalize()`
-/// succeeds.
+/// ## Unverified plaintext
+///
+/// [`update`](StreamDecrypt::update) appends plaintext to `output` **before**
+/// it has been authenticated: the single tag can only be checked once the whole
+/// stream has been seen. The caller must not use, display or commit that data
+/// until [`finalize`](StreamDecrypt::finalize) succeeds, and must discard it if
+/// `finalize` fails. [`decrypt_file_streaming`] does this for files: it only
+/// creates the output file after the tag has been verified.
 pub struct SecureDecryptor {
     /// ChaCha20 stream cipher for decryption.
     cipher: ChaCha20,
-    /// Buffer of decrypted plaintext for final tag verification.
-    /// Plaintext is withheld from the caller until finalize() succeeds.
-    plaintext_buf: Vec<u8>,
+    /// Running keyed hash over the decrypted (not yet verified) plaintext.
+    mac: blake3::Hasher,
     /// Whether finalize has been called.
     finalized: bool,
-    /// Authentication key derived from ChaCha20 key+nonce.
-    auth_key: [u8; 32],
 }
 
 impl std::fmt::Debug for SecureDecryptor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SecureDecryptor")
-            .field("plaintext_buf_len", &self.plaintext_buf.len())
             .field("finalized", &self.finalized)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -525,11 +538,13 @@ impl SecureDecryptor {
             .expect("ChaCha20 key and nonce sizes are valid");
         // Derive authentication key from the ChaCha20 key and nonce using BLAKE3
         // (same derivation as SecureEncryptor)
-        let auth_key =
+        let mut auth_key =
             blake3::keyed_hash(&key, &[b"Kelvin Secure Streaming Auth Key", &nonce[..]].concat())
                 .as_bytes()
                 .to_owned();
-        SecureDecryptor { cipher, plaintext_buf: Vec::new(), finalized: false, auth_key }
+        let mac = blake3::Hasher::new_keyed(&auth_key);
+        auth_key.zeroize();
+        SecureDecryptor { cipher, mac, finalized: false }
     }
 }
 
@@ -547,11 +562,9 @@ impl StreamDecrypt for SecureDecryptor {
         output.extend_from_slice(ciphertext);
         self.cipher.apply_keystream(&mut output[start..]);
 
-        // Buffer decrypted plaintext for final tag verification.
-        // Note: The caller receives decrypted data in `output` immediately,
-        // but MUST NOT trust/commit it until finalize() succeeds.
-        // On authentication failure, the internal buffer is zeroized.
-        self.plaintext_buf.extend_from_slice(&output[start..]);
+        // Absorb for tag verification. The data in `output` is unverified
+        // until `finalize` succeeds.
+        self.mac.update(&output[start..]);
 
         Ok(())
     }
@@ -562,9 +575,9 @@ impl StreamDecrypt for SecureDecryptor {
         }
         self.finalized = true;
 
-        // Compute expected tag using BLAKE3 keyed hash over the decrypted plaintext
-        // (same as encryptor which computes over the plaintext)
-        let expected_tag = blake3::keyed_hash(&self.auth_key, &self.plaintext_buf);
+        // Expected tag: keyed hash over the decrypted plaintext (as in the
+        // encryptor)
+        let expected_tag = self.mac.finalize();
 
         let expected_bytes = expected_tag.as_bytes();
 
@@ -579,8 +592,6 @@ impl StreamDecrypt for SecureDecryptor {
         if expected_bytes.ct_eq(tag).into() {
             Ok(())
         } else {
-            // Zeroize the buffered plaintext on authentication failure
-            self.plaintext_buf.zeroize();
             Err(KelvinError::AeadError(
                 "SecureDecryptor::finalize: invalid authentication tag".into(),
             ))
@@ -590,8 +601,7 @@ impl StreamDecrypt for SecureDecryptor {
 
 impl Drop for SecureDecryptor {
     fn drop(&mut self) {
-        self.plaintext_buf.zeroize();
-        self.auth_key.zeroize();
+        self.mac.zeroize();
     }
 }
 
@@ -606,6 +616,10 @@ impl Drop for SecureDecryptor {
 ///
 /// After all chunks are processed, calls `encryptor.finalize()` and appends
 /// the authentication tag (if any) to the output.
+///
+/// The output is written with [`write_atomically`](crate::write_atomically):
+/// it appears only if the whole operation succeeds, and it may not be the input
+/// file. `buffer_size` must not be zero.
 ///
 /// ## Memory
 ///
@@ -631,27 +645,30 @@ pub fn encrypt_file_streaming(
     use std::fs::File;
     use std::io::{Read, Write};
 
-    let mut input = File::open(input_path)?;
-    let mut output = File::create(output_path)?;
-    let mut buffer = vec![0u8; buffer_size];
-    let mut encrypted = Vec::new();
+    check_buffer_size(buffer_size)?;
+    crate::write_atomically(input_path, output_path, |temporary| {
+        let mut input = File::open(input_path)?;
+        let mut output = File::create(temporary)?;
+        let mut buffer = vec![0u8; buffer_size];
+        let mut encrypted = Vec::new();
 
-    loop {
-        let n = input.read(&mut buffer)?;
-        if n == 0 {
-            break;
+        loop {
+            let n = input.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+            encrypted.clear();
+            encryptor.update(&buffer[..n], &mut encrypted)?;
+            output.write_all(&encrypted)?;
         }
-        encrypted.clear();
-        encryptor.update(&buffer[..n], &mut encrypted)?;
-        output.write_all(&encrypted)?;
-    }
 
-    let tag = encryptor.finalize()?;
-    if !tag.is_empty() {
-        output.write_all(&tag)?;
-    }
+        let tag = encryptor.finalize()?;
+        if !tag.is_empty() {
+            output.write_all(&tag)?;
+        }
 
-    Ok(())
+        Ok(())
+    })
 }
 
 /// Decrypt a file using streaming mode with bounded memory.
@@ -661,6 +678,11 @@ pub fn encrypt_file_streaming(
 ///
 /// For AEAD modes, the last `tag_len` bytes of the input file are the
 /// authentication tag, which is passed to `decryptor.finalize()`.
+///
+/// The plaintext is written to a temporary file that becomes `output_path` only
+/// after `finalize` succeeds, so a failed verification leaves no output (see
+/// [`write_atomically`](crate::write_atomically)). `output_path` may not be the
+/// input file and `buffer_size` must not be zero.
 ///
 /// ## Memory
 ///
@@ -675,39 +697,50 @@ pub fn decrypt_file_streaming(
     use std::fs::File;
     use std::io::{Read, Write};
 
-    let file_len = std::fs::metadata(input_path)?.len() as usize;
-    let ciphertext_len =
-        if tag_len > 0 && file_len >= tag_len { file_len - tag_len } else { file_len };
+    check_buffer_size(buffer_size)?;
+    crate::write_atomically(input_path, output_path, |temporary| {
+        let file_len = std::fs::metadata(input_path)?.len() as usize;
+        let ciphertext_len =
+            if tag_len > 0 && file_len >= tag_len { file_len - tag_len } else { file_len };
 
-    let mut input = File::open(input_path)?;
-    let mut output = File::create(output_path)?;
-    let mut buffer = vec![0u8; buffer_size];
-    let mut decrypted = Vec::new();
-    let mut bytes_read_total = 0usize;
+        let mut input = File::open(input_path)?;
+        let mut output = File::create(temporary)?;
+        let mut buffer = vec![0u8; buffer_size];
+        let mut decrypted = Vec::new();
+        let mut bytes_read_total = 0usize;
 
-    loop {
-        let max_read = std::cmp::min(buffer_size, ciphertext_len - bytes_read_total);
-        if max_read == 0 {
-            break;
+        loop {
+            let max_read = std::cmp::min(buffer_size, ciphertext_len - bytes_read_total);
+            if max_read == 0 {
+                break;
+            }
+            let n = input.read(&mut buffer[..max_read])?;
+            if n == 0 {
+                break;
+            }
+            bytes_read_total += n;
+            decrypted.clear();
+            decryptor.update(&buffer[..n], &mut decrypted)?;
+            output.write_all(&decrypted)?;
         }
-        let n = input.read(&mut buffer[..max_read])?;
-        if n == 0 {
-            break;
+
+        // Read and verify the authentication tag (if any)
+        if tag_len > 0 {
+            let mut tag = vec![0u8; tag_len];
+            input.read_exact(&mut tag)?;
+            decryptor.finalize(&tag)?;
+        } else {
+            decryptor.finalize(&[])?;
         }
-        bytes_read_total += n;
-        decrypted.clear();
-        decryptor.update(&buffer[..n], &mut decrypted)?;
-        output.write_all(&decrypted)?;
-    }
 
-    // Read and verify the authentication tag (if any)
-    if tag_len > 0 {
-        let mut tag = vec![0u8; tag_len];
-        input.read_exact(&mut tag)?;
-        decryptor.finalize(&tag)?;
-    } else {
-        decryptor.finalize(&[])?;
-    }
+        Ok(())
+    })
+}
 
+/// A zero-sized buffer would read nothing and report an empty result as success.
+fn check_buffer_size(buffer_size: usize) -> Result<(), KelvinError> {
+    if buffer_size == 0 {
+        return Err(KelvinError::InvalidConfig("buffer_size must not be zero".into()));
+    }
     Ok(())
 }

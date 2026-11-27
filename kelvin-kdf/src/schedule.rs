@@ -56,7 +56,7 @@ pub enum ScheduleState {
 ///
 /// The seed is KEY_SCHEDULE_SEED_SIZE bytes, providing a large entropy pool
 /// for long-term forward secrecy. Each reseed derives a fresh pool via BLAKE3.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct KeySchedule {
     /// Current seed material (KEY_SCHEDULE_SEED_SIZE bytes).
     seed: [u8; KEY_SCHEDULE_SEED_SIZE],
@@ -76,6 +76,19 @@ pub struct KeySchedule {
     max_keys: u64,
     /// Maximum safe bytes per key (configurable).
     max_bytes_per_key: u64,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KeySchedule {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KeySchedule")
+            .field("step", &self.step)
+            .field("total_steps", &self.total_steps)
+            .field("keys_generated", &self.keys_generated)
+            .field("max_keys", &self.max_keys)
+            .field("state", &self.state)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KeySchedule {

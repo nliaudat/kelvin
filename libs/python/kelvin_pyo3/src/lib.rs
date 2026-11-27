@@ -4,8 +4,8 @@
 //! - `Kelvin` — V1 AEAD encrypt/decrypt (ChaCha20Poly1305)
 //! - `KelvinPhoton` — V3 fast stream cipher (XOR-only)
 //! - `KelvinQuantum` — H quantum-resistant stream cipher (XOR + reseeding)
-//! - `KelvinPhotonAuthenticated` — V3 + BLAKE3-keyed MAC tag
-//! - `KelvinQuantumAuthenticated` — H + BLAKE3-keyed MAC tag
+//! - `KelvinPhotonAuthenticated` — V3 + KMAC128 tag
+//! - `KelvinQuantumAuthenticated` — H + KMAC128 tag
 //! - `KelvinStreaming` — V2 streaming mode (one step per chunk)
 //! - `generate_config` — helper to create a fixed example orbital configuration
 //!
@@ -42,7 +42,7 @@ use kelvin::{
     KelvinPhoton as KelvinPhotonRust, KelvinPhotonAuthenticated as KelvinPhotonAuthRust,
     KelvinPrism as KelvinPrismRust, KelvinQuantum as KelvinQuantumRust,
     KelvinQuantumAuthenticated as KelvinQuantumAuthRust, KelvinSplit as KelvinSplitRust,
-    KelvinStreaming as KelvinStreamingRust, OrbitalConfig, PHOTON_BASE_SEED_SIZE,
+    KelvinStreaming as KelvinStreamingRust, OrbitalConfig, AUTH_OVERHEAD, PHOTON_BASE_SEED_SIZE,
     QUANTUM_BASE_SEED_SIZE,
 };
 
@@ -107,6 +107,40 @@ fn generate_config() -> String {
 fn parse_config(config_json: &str) -> PyResult<OrbitalConfig> {
     serde_json::from_str(config_json)
         .map_err(|e| PyValueError::new_err(format!("Invalid orbital config: {}", e)))
+}
+
+// ============================================================================
+// Helpers: authenticated buffers
+// ============================================================================
+
+/// Replace the contents of a `bytearray`, resizing it as needed.
+fn set_contents(data: &Bound<'_, PyByteArray>, contents: &[u8]) -> PyResult<()> {
+    data.resize(contents.len())?;
+    get_mut_slice(data).copy_from_slice(contents);
+    Ok(())
+}
+
+/// Seal `data`, growing it by the version byte and tag.
+fn seal_in_python(
+    data: &Bound<'_, PyByteArray>,
+    seal: impl FnOnce(&mut [u8]) -> Result<(), KelvinError>,
+) -> PyResult<()> {
+    let mut buf = data.to_vec();
+    buf.resize(buf.len() + AUTH_OVERHEAD, 0);
+    seal(&mut buf).map_err(map_error)?;
+    set_contents(data, &buf)
+}
+
+/// Verify and open `data`, removing the version byte and tag. `data` is left
+/// unchanged on failure.
+fn open_in_python(
+    data: &Bound<'_, PyByteArray>,
+    open: impl FnOnce(&mut [u8]) -> Result<(), KelvinError>,
+) -> PyResult<()> {
+    let mut buf = data.to_vec();
+    open(&mut buf).map_err(map_error)?;
+    buf.truncate(buf.len() - AUTH_OVERHEAD);
+    set_contents(data, &buf)
 }
 
 // ============================================================================
@@ -292,20 +326,24 @@ impl KelvinQuantum {
 }
 
 // ============================================================================
-// V3 Photon Authenticated — + BLAKE3-keyed MAC
+// V3 Photon Authenticated — + KMAC128
 // ============================================================================
 
-/// V3 Photon with BLAKE3-keyed MAC authentication.
+/// V3 Photon with KMAC128 authentication.
 ///
-/// Appends a 32-byte MAC tag to the ciphertext on encryption,
-/// and verifies it in constant time before decryption.
+/// Encryption appends a version byte and a 32-byte tag to the buffer;
+/// decryption verifies the tag in constant time and removes both.
 ///
 /// ```python
 /// a = kelvin_pyo3.KelvinPhotonAuthenticated(seed_bytes, max_reseeds=1000)
+/// b = kelvin_pyo3.KelvinPhotonAuthenticated(seed_bytes, max_reseeds=1000)
 /// data = bytearray(b"secret")
-/// a.encrypt(data)  # data is now ciphertext (6 bytes) + MAC tag (32 bytes)
-/// a.decrypt(data)  # tag verified and stripped; data is back to b"secret"
+/// a.encrypt_final(data)  # ciphertext (6 bytes) + version (1) + tag (32)
+/// b.decrypt_final(data)  # verified and stripped; data is b"secret" again
 /// ```
+///
+/// Use `encrypt` / `decrypt` for every chunk but the last of a stream, and the
+/// `_final` methods for the last one.
 #[pyclass(unsendable)]
 struct KelvinPhotonAuthenticated {
     inner: KelvinPhotonAuthRust,
@@ -329,35 +367,19 @@ impl KelvinPhotonAuthenticated {
     }
 
     fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.encrypt(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
-    }
-
-    fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.decrypt(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
+        seal_in_python(data, |buf| self.inner.encrypt(buf))
     }
 
     fn encrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.encrypt_final(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
+        seal_in_python(data, |buf| self.inner.encrypt_final(buf))
+    }
+
+    fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        open_in_python(data, |buf| self.inner.decrypt(buf))
     }
 
     fn decrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.decrypt_final(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
+        open_in_python(data, |buf| self.inner.decrypt_final(buf))
     }
 
     fn bytes_processed(&self) -> u64 {
@@ -374,20 +396,24 @@ impl KelvinPhotonAuthenticated {
 }
 
 // ============================================================================
-// H Quantum Authenticated — + BLAKE3-keyed MAC
+// H Quantum Authenticated — + KMAC128
 // ============================================================================
 
-/// H Quantum with BLAKE3-keyed MAC authentication.
+/// H Quantum with KMAC128 authentication.
 ///
-/// Appends a 32-byte MAC tag to the ciphertext on encryption,
-/// and verifies it in constant time before decryption.
+/// Encryption appends a version byte and a 32-byte tag to the buffer;
+/// decryption verifies the tag in constant time and removes both.
 ///
 /// ```python
 /// a = kelvin_pyo3.KelvinQuantumAuthenticated(seed_bytes, max_reseeds=1000)
+/// b = kelvin_pyo3.KelvinQuantumAuthenticated(seed_bytes, max_reseeds=1000)
 /// data = bytearray(b"secret")
-/// a.encrypt(data)  # data is now ciphertext (6 bytes) + MAC tag (32 bytes)
-/// a.decrypt(data)  # tag verified and stripped; data is back to b"secret"
+/// a.encrypt_final(data)  # ciphertext (6 bytes) + version (1) + tag (32)
+/// b.decrypt_final(data)  # verified and stripped; data is b"secret" again
 /// ```
+///
+/// Use `encrypt` / `decrypt` for every chunk but the last of a stream, and the
+/// `_final` methods for the last one.
 #[pyclass(unsendable)]
 struct KelvinQuantumAuthenticated {
     inner: KelvinQuantumAuthRust,
@@ -411,35 +437,19 @@ impl KelvinQuantumAuthenticated {
     }
 
     fn encrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.encrypt(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
-    }
-
-    fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.decrypt(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
+        seal_in_python(data, |buf| self.inner.encrypt(buf))
     }
 
     fn encrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.encrypt_final(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
+        seal_in_python(data, |buf| self.inner.encrypt_final(buf))
+    }
+
+    fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        open_in_python(data, |buf| self.inner.decrypt(buf))
     }
 
     fn decrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
-        let mut buf = data.to_vec();
-        self.inner.decrypt_final(&mut buf).map_err(map_error)?;
-        data.resize(buf.len())?;
-        get_mut_slice(data).copy_from_slice(&buf);
-        Ok(())
+        open_in_python(data, |buf| self.inner.decrypt_final(buf))
     }
 
     fn bytes_processed(&self) -> u64 {

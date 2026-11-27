@@ -7,13 +7,13 @@
 
 use anyhow::{Context, Result};
 use kelvin::{
-    simulate_and_extract_seed_with_method_and_nonce, IntegrationMethod, Kelvin, KelvinPhoton,
-    KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated, KelvinStreaming,
-    KelvinStreamingAuthenticated, OrbitalConfig, AUTH_OVERHEAD, PHOTON_DEFAULT_MAX_RESEEDS,
-    STREAMING_CHUNK_SIZE,
+    simulate_and_extract_seed_with_method_and_nonce, write_atomically, IntegrationMethod, Kelvin,
+    KelvinPhoton, KelvinPhotonAuthenticated, KelvinQuantum, KelvinQuantumAuthenticated,
+    KelvinStreaming, KelvinStreamingAuthenticated, OrbitalConfig, AUTH_OVERHEAD,
+    PHOTON_DEFAULT_MAX_RESEEDS, STREAMING_CHUNK_SIZE,
 };
 use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::CryptoMode;
 
@@ -52,92 +52,45 @@ pub fn process_file_mode(
     auth: bool,
     nonce: &[u8],
 ) -> Result<()> {
-    write_atomically(input_path, output_path, |output_path| match mode {
-        CryptoMode::Secure => {
-            process_file_secure(config_path, input_path, output_path, encrypt, method, nonce)
-        },
-        CryptoMode::Chaos => process_file_chaos(
-            config_path,
-            input_path,
-            output_path,
-            encrypt,
-            bytes_per_step,
-            method,
-            auth,
-            nonce,
-        ),
-        CryptoMode::Photon => process_file_photon(
-            config_path,
-            input_path,
-            output_path,
-            encrypt,
-            method,
-            auth,
-            bytes_per_step,
-            nonce,
-        ),
-        CryptoMode::Quantum => process_file_quantum(
-            config_path,
-            input_path,
-            output_path,
-            encrypt,
-            method,
-            auth,
-            bytes_per_step,
-            nonce,
-        ),
+    let (input, output) = (Path::new(input_path), Path::new(output_path));
+    write_atomically(input, output, |temporary| {
+        let output_path = temporary.to_str().context("Output path is not valid UTF-8")?;
+        match mode {
+            CryptoMode::Secure => {
+                process_file_secure(config_path, input_path, output_path, encrypt, method, nonce)
+            },
+            CryptoMode::Chaos => process_file_chaos(
+                config_path,
+                input_path,
+                output_path,
+                encrypt,
+                bytes_per_step,
+                method,
+                auth,
+                nonce,
+            ),
+            CryptoMode::Photon => process_file_photon(
+                config_path,
+                input_path,
+                output_path,
+                encrypt,
+                method,
+                auth,
+                bytes_per_step,
+                nonce,
+            ),
+            CryptoMode::Quantum => process_file_quantum(
+                config_path,
+                input_path,
+                output_path,
+                encrypt,
+                method,
+                auth,
+                bytes_per_step,
+                nonce,
+            ),
+        }
     })
-}
-
-/// Run `process` against a temporary file next to `output_path` and rename it
-/// into place only if it succeeds, so that a failed run (for example on a
-/// tampered or truncated ciphertext) leaves no partial output and keeps any
-/// existing file.
-///
-/// Rejects an output that is the input file. An existing output that is not a
-/// regular file (a device or pipe) cannot be renamed over and is written
-/// directly.
-fn write_atomically(
-    input_path: &str,
-    output_path: &str,
-    process: impl FnOnce(&str) -> Result<()>,
-) -> Result<()> {
-    let input = std::fs::canonicalize(input_path).context("Failed to open input file")?;
-    let mut target = PathBuf::from(output_path);
-    let mut permissions = None;
-    if let Ok(metadata) = std::fs::metadata(&target) {
-        if !metadata.is_file() {
-            return process(output_path);
-        }
-        // Resolve symlinks so the link's destination is replaced, not the link.
-        target = std::fs::canonicalize(&target).context("Failed to resolve output path")?;
-        if target == input {
-            anyhow::bail!("--output must not be the same file as --input");
-        }
-        permissions = Some(metadata.permissions());
-    }
-
-    let directory = match target.parent() {
-        Some(parent) if !parent.as_os_str().is_empty() => parent,
-        _ => Path::new("."),
-    };
-    // Removed automatically if dropped before `persist`.
-    let temporary = tempfile::Builder::new()
-        .prefix(".kelvin-")
-        .suffix(".tmp")
-        .tempfile_in(directory)
-        .context("Failed to create output file")?
-        .into_temp_path();
-    let temporary_name = temporary.to_str().context("Output path is not valid UTF-8")?;
-
-    process(temporary_name)?;
-
-    if let Some(permissions) = permissions {
-        std::fs::set_permissions(&temporary, permissions)
-            .context("Failed to set output permissions")?;
-    }
-    temporary.persist(&target).context("Failed to move output into place")?;
-    Ok(())
 }
 
 /// V1 Secure: ChaCha20Poly1305 AEAD (original Kelvin).
@@ -263,8 +216,13 @@ fn process_file_chaos(
     );
 
     if auth {
-        let mut ks = KelvinStreamingAuthenticated::new_with_nonce(config, bytes_per_step, nonce)
-            .context("Failed to initialize KelvinStreamingAuthenticated")?;
+        let mut ks = KelvinStreamingAuthenticated::new_with_method_and_nonce(
+            config,
+            bytes_per_step,
+            method,
+            nonce,
+        )
+        .context("Failed to initialize KelvinStreamingAuthenticated")?;
 
         let mut input_file =
             std::fs::File::open(input_path).context("Failed to open input file")?;

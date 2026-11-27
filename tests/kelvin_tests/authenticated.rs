@@ -300,6 +300,28 @@ macro_rules! chunk_binding_tests {
     };
 }
 
+#[test]
+fn test_streaming_auth_rejects_mismatched_settings() {
+    use kelvin::IntegrationMethod::{Euler, Verlet};
+    let new = |bytes_per_step, method| {
+        KelvinStreamingAuthenticated::new_with_method_and_nonce(
+            streaming_config(),
+            bytes_per_step,
+            method,
+            b"nonce",
+        )
+        .unwrap()
+    };
+    let mut chunk = vec![7u8; 64 + AUTH_OVERHEAD];
+    new(1024, Euler).encrypt_final(&mut chunk).unwrap();
+
+    for mut receiver in [new(1024, Verlet), new(512, Euler)] {
+        assert!(receiver.decrypt_final(&mut chunk.clone()).is_err());
+    }
+    new(1024, Euler).decrypt_final(&mut chunk).unwrap();
+    assert_eq!(&chunk[..64], &[7u8; 64]);
+}
+
 chunk_binding_tests!(
     photon_chunks,
     KelvinPhotonAuthenticated,

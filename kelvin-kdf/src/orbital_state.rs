@@ -100,7 +100,7 @@ impl std::error::Error for OrbitalError {}
 /// - M2: 0.000003        Earth-like
 /// - M3: 0.000000037     Moon-like
 /// - M4: 0.00000000001   Chaos dust (numerical noise amplifier)
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct OrbitalState {
     /// Masses of the 5 bodies.
     pub masses: [f64; 5],
@@ -116,6 +116,17 @@ pub struct OrbitalState {
     pub verlet_steps: u64,
     /// Estimated Lyapunov exponent (updated periodically).
     pub lyapunov_estimate: f64,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for OrbitalState {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("OrbitalState")
+            .field("step", &self.step)
+            .field("euler_steps", &self.euler_steps)
+            .field("verlet_steps", &self.verlet_steps)
+            .finish_non_exhaustive()
+    }
 }
 
 impl OrbitalState {

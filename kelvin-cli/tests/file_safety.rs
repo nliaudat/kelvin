@@ -123,6 +123,31 @@ fn quantum_mode_files() {
 }
 
 #[test]
+fn authenticated_chaos_mode_honours_euler() {
+    let workspace = Workspace::new("euler");
+    fs::write(workspace.path("plain"), plaintext(4096)).unwrap();
+    let config = workspace.path("config.json");
+    let input = workspace.path("plain");
+    let (verlet, euler) = (workspace.path("verlet"), workspace.path("euler"));
+    let decrypted = workspace.path("decrypted");
+
+    let base = ["--mode", "chaos", "--nonce", "00", "--config", &config];
+    let run = |command: &str, input: &str, output: &str, extra: &[&str]| {
+        let mut args = vec![command];
+        args.extend(base);
+        args.extend(["--input", input, "--output", output]);
+        args.extend(extra);
+        kelvin(&args)
+    };
+    assert!(run("encrypt", &input, &verlet, &[]));
+    assert!(run("encrypt", &input, &euler, &["--euler"]));
+    assert_ne!(fs::read(&verlet).unwrap(), fs::read(&euler).unwrap());
+    assert!(!run("decrypt", &euler, &decrypted, &[]));
+    assert!(run("decrypt", &euler, &decrypted, &["--euler"]));
+    assert_eq!(fs::read(&decrypted).unwrap(), plaintext(4096));
+}
+
+#[test]
 fn zero_bytes_per_step_is_rejected() {
     let workspace = Workspace::new("zero_step");
     fs::write(workspace.path("plain"), plaintext(100)).unwrap();
