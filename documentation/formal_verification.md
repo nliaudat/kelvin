@@ -35,7 +35,7 @@ Rust (kelvin-core/src)
 ├── information_loss.rs    → placeholder (returns steps * 1.0)
 ├── quantum.rs             → placeholder
 ├── reference.rs           → placeholder
-└── period_detection.rs    → stub (unit State, no-op step)
+└── period_detection.rs    → Floyd cycle finding (find_cycle)
 ```
 
 There is **no** verified translation from the Lean model to the Rust code. The

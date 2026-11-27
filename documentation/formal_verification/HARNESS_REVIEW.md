@@ -1,6 +1,6 @@
 # Harness Specification Review
 
-**Date:** 2026-11-23
+**Date:** 2026-11-23 (C6 updated 2026-11-27)
 **Scope:** the 37 Kani harnesses currently compiled into `kelvin-core`.
 
 A harness can be green and still prove nothing about the crate. This document
@@ -12,7 +12,7 @@ whether it calls into `kelvin-core` at all.
 Each harness was classified by reading its body:
 
 - **Crate** — the harness calls an exported `kelvin-core` function (`Fixed`
-  operators, `verlet_step`, `detect_period`, …). A regression in the crate can
+  operators, `verlet_step`, `find_cycle`, …). A regression in the crate can
   make it fail.
 - **Model** — the harness computes on values or helper functions declared in the
   harness file itself. It verifies arithmetic, but no change to the crate can
@@ -96,19 +96,19 @@ lower bound and do not reference the simulator.
 correctness of `ct_select`/`ct_ne` helpers declared in the harness. They do not
 prove constant-time execution, and no timing harness exists.
 
-### C6 — Floyd invariants (5; 2 model-only, 3 exercise a stub)
+### C6 — cycle detection (5; 2 model-only, 3 exercise the crate)
 
 | Harness | Asserts | Crate? |
 |---|---|---|
 | `verify_floyd_cycle_detection` | after `k` iterations tortoise `+k`, hare `+2k` | no |
 | `verify_hare_leads` | hare stays ahead given `t ≤ h` | no |
-| `verify_periodicity_detection` | the stub reports `Some(1)` for `1 ≤ n ≤ 4` | yes (stub) |
-| `verify_periodicity_no_steps` | `n = 0` reports `None` | yes (stub) |
-| `verify_periodicity_min_period_bound` | reported period is 1 and `≤ n` | yes (stub) |
+| `verify_find_cycle_is_complete_and_correct` | for every step map on 6 states and every start, `find_cycle` returns a cycle: it repeats, its period is minimal, `mu` is the first recurring state | yes |
+| `verify_find_cycle_is_sound_for_any_budget` | the same correctness for whatever is reported with a budget of 0 to 6 | yes |
+| `verify_find_cycle_zero_budget` | a zero budget calls the step function never and reports `None` | yes |
 
-The `period_detection` module has a no-op `simulate_step` and a constant
-`hash_state`, so its period is 1 by construction. These harnesses pin that
-behaviour; they say nothing about the real simulator.
+The last three run `kelvin_core::find_cycle`, bounded to 6 states (the zero
+budget one is independent of the state space). None runs the Verlet simulation,
+so they say nothing about the period of an orbital configuration.
 
 ## Findings
 
@@ -131,8 +131,9 @@ behaviour; they say nothing about the real simulator.
    lower bound.
 5. **C4 framing is tested against the harness's own model**, so it duplicates
    the Lean lemma rather than validating the Rust framing that actually runs.
-6. **C6 pins a stub.** A green result here should never be quoted as evidence
-   about periodicity of the real system.
+6. **C6 checks the algorithm, not the dynamics.** `find_cycle` is verified on
+   small state spaces. A green result is not evidence about periodicity of the
+   orbital simulation.
 
 ## Not covered in this pass
 
@@ -173,13 +174,13 @@ behaviour; they say nothing about the real simulator.
 ## Mutation check
 
 `scripts/mutation-check.ps1` copies the tree, injects one defect, and runs the
-target harness:
+target harness (the `find_cycle` row was re-checked in Docker on 2026-11-27):
 
 | Mutation | Harness | Expected | Observed |
 |----------|---------|----------|----------|
 | `Fixed::add` returns `a + b + 1` | `verify_add_no_overflow` | fail (caught) | **FAIL — caught** |
 | `Fixed::mul` returns product `+ 1` | `verify_mul_range` | pass (survives — range-only) | **FAIL — caught**, but only at the boundary `a = b = 4`, where `16 << 64 + 1` leaves the asserted interval |
-| `detect_period` returns `lam + 1` | `verify_periodicity_detection` | fail (caught) | **FAIL — caught** |
+| `find_cycle` returns `lambda + 1` | `verify_find_cycle_is_complete_and_correct` | fail (caught) | **FAIL — caught** |
 
 Interpretation: the harnesses do constrain the code. The `mul` result is a
 caution rather than a win — the mutation was detected by the range check, not by

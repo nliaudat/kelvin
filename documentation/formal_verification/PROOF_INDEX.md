@@ -46,8 +46,8 @@ Status legend:
 `verify_ct_select_i128`, `verify_ct_select_sign_bits`, `verify_ct_is_zero_u64`,
 `verify_ct_select_u64`, `verify_ct_select_u64_is_exact`,
 `verify_floyd_cycle_detection`, `verify_hare_leads`,
-`verify_periodicity_detection`, `verify_periodicity_no_steps`,
-`verify_periodicity_min_period_bound`.
+`verify_find_cycle_is_complete_and_correct`,
+`verify_find_cycle_is_sound_for_any_budget`, `verify_find_cycle_zero_budget`.
 
 All 37 are listed by `docker compose -f docker/docker-compose.yml run --rm kani --list`
 and run by the same command without arguments. They check arithmetic, scheduling,
@@ -193,16 +193,15 @@ stated and accepted:
 - **No refinement proof.** There is no verified translation from the Lean model
   to `kelvin-core`; the correspondence is by inspection.
 - **Placeholder modules.** `information_loss.rs` returns `steps * 1.0`;
-  `reference.rs`, `quantum.rs` and `period_detection.rs` are stubs. The last one
-  has period 1 by construction, which is why the C6 harnesses prove a period-1
-  cycle rather than anything about the real simulator.
+  `reference.rs` and `quantum.rs` are stubs.
 
 ### What is realistically provable next
 
 1. **C5 cardinality** — define the admissible set and its measure explicitly,
    then do a real counting proof. Most tractable of the five.
-2. **C6** — connect `detect_period` to the actual simulator; the Floyd
-   invariants are already proved.
+2. **C6** — `find_cycle` is verified on small state spaces; what remains is a
+   statement about the orbital simulation itself, which is out of reach for
+   bounded model checking.
 3. **C1 as a conditional theorem** — fix a distribution, then prove the entropy
    bound under stated independence assumptions.
 4. **C2 Padé error** — formalizable against a reference `ln`, but needs a

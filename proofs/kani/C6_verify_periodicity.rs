@@ -5,10 +5,12 @@
 // proves the loop invariant on an abstract model, and checks the behaviour of
 // the current `period_detection` stub.
 //
-// SCOPE: the Floyd invariant is proved. Nothing here says the *dynamics* have a
-// long period; the stub in kelvin-core/src/period_detection.rs has period 1 by
-// construction (its step and hash are constant), which the last harness makes
-// explicit rather than hiding.
+// Updated 2026-11-27: the harness that checked the old `period_detection` stub
+// is replaced by harnesses in verify_periodicity.rs that call the real
+// `find_cycle`; the stub was removed.
+//
+// SCOPE: the Floyd invariant is proved here on an abstract model. Nothing in
+// this file says the *dynamics* have a long period.
 
 /// One Floyd iteration: tortoise advances one state, hare two.
 fn c6_advance(tortoise: u32, hare: u32) -> (u32, u32) {
@@ -62,20 +64,4 @@ fn verify_hare_leads() {
     let (t2, h2) = c6_run(k, t, h);
 
     kani::assert(t2 <= h2, "hare never falls behind the tortoise");
-}
-
-/// The current stub (`simulate_step` is a no-op, `hash_state` is constant) is
-/// detected as a period-1 cycle after a single iteration.
-#[kani::proof]
-// 40 > 32: the stub compares 32-byte hashes via memcmp, which needs 33 unwindings.
-#[kani::unwind(40)]
-fn verify_periodicity_detection() {
-    let n: usize = kani::any();
-    kani::assume(n >= 1);
-    kani::assume(n <= 4);
-
-    let state = crate::period_detection::State;
-    let period = crate::period_detection::detect_period(&state, n);
-
-    kani::assert(period == Some(1), "the stub is detected as a period-1 cycle");
 }

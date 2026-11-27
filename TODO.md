@@ -26,7 +26,7 @@ Status vocabulary:
 | 3 | C5 — Side-channel hardening | **Open** | Not implemented, not measured, not proved. |
 | 4 | C1 — Information-loss aggregation | **Partial** | `FixedPoint.div_rem_identity` / `rem_bounds` are proved; no entropy accounting. |
 | 5 | C3 — Quantum reduction | **Open** | Informal Grover/Ambainis argument only. |
-| 6 | C6 — Periodicity detection | **Partial** | Floyd loop invariants proved in `PeriodDetection.lean`; `kelvin-core::find_cycle` / `detect_orbital_period` now implement exact-equality Floyd on the real Verlet simulator (unit-tested on toy maps; not Kani/Lean-proved). The legacy `detect_period` stub remains for the existing harnesses. |
+| 6 | C6 — Periodicity detection | **Partial** | Floyd loop invariants proved in `PeriodDetection.lean`; `kelvin-core::find_cycle` implements exact-equality Floyd; Kani proves it correct for every step map on 6 states. `detect_orbital_period` applies it to the Verlet simulation (not proved; no periods measured). |
 
 ## Machine-checked artifacts (2026-11-23)
 
@@ -77,8 +77,9 @@ verify_bound_is_min_of_two             verify_ct_select_i128
 verify_ct_select_sign_bits             verify_ct_is_zero_u64
 verify_ct_select_u64                   verify_ct_select_u64_is_exact
 verify_floyd_cycle_detection           verify_hare_leads
-verify_periodicity_detection           verify_periodicity_no_steps
-verify_periodicity_min_period_bound
+verify_find_cycle_is_complete_and_correct
+verify_find_cycle_is_sound_for_any_budget
+verify_find_cycle_zero_budget
 ```
 
 ```bash
@@ -123,9 +124,10 @@ real simulator.
 
 ### 6. C6 — Periodicity detection
 - Done: `find_cycle` / `detect_orbital_period` run Floyd on the real simulator.
-- Remaining: repoint the Kani harnesses at `find_cycle` and drop the unit-`State` stub
-  (`detect_period`); run `detect_orbital_period` on real configurations and
-  document the observed periods.
+- Done: the Kani harnesses call `find_cycle` (bounded to 6 states); the
+  unit-`State` stub is removed.
+- Remaining: run `detect_orbital_period` on real configurations and document the
+  observed periods.
 
 ### 7. Protocol-level proofs (tooling in place)
 - Images: `docker/docker-compose.formal.yml` (ProVerif, Tamarin, CryptoVerif,

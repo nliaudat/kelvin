@@ -85,11 +85,11 @@ $mutations = @(
     },
     @{
         Name    = 'period-plus-one'
-        Harness = 'verify_periodicity_detection'
-        What    = 'detect_period reports lam + 1 instead of lam'
+        Harness = 'verify_find_cycle_is_complete_and_correct'
+        What    = 'find_cycle reports lambda + 1 instead of lambda'
         Apply   = {
             Set-Text (Get-WorkFile 'kelvin-core\src\period_detection.rs') `
-                'return Some(lam);' 'return Some(lam + 1);'
+                'Some(Cycle { mu, lambda })' 'Some(Cycle { mu, lambda: lambda + 1 })'
         }
     }
 )

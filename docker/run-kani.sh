@@ -211,12 +211,12 @@ run_proofs() {
         "verify_ct_select_u64:64-bit ct_select returns the requested operand"
         "verify_ct_select_u64_is_exact:64-bit ct_select stays in the operand interval"
 
-        # C6: Floyd invariants and the current period_detection stub
+        # C6: Floyd invariants and the real find_cycle (bounded state space)
         "verify_floyd_cycle_detection:tortoise advances k, hare 2k"
         "verify_hare_leads:hare never falls behind the tortoise"
-        "verify_periodicity_detection:stub is detected as a period-1 cycle"
-        "verify_periodicity_no_steps:zero budget reports no period"
-        "verify_periodicity_min_period_bound:stub period is 1 and <= budget"
+        "verify_find_cycle_is_complete_and_correct:finds the true mu and lambda"
+        "verify_find_cycle_is_sound_for_any_budget:any reported cycle is correct"
+        "verify_find_cycle_zero_budget:zero budget takes no step"
     )
     local total=${#harnesses[@]}
     local current=0

@@ -82,11 +82,15 @@ value for every input.
 
 ### Floyd invariants (C6)
 
-`verify_floyd_cycle_detection`, `verify_hare_leads`,
-`verify_periodicity_detection`, `verify_periodicity_no_steps`,
-`verify_periodicity_min_period_bound`: after `k` iterations the tortoise
-advanced `k` and the hare `2k`; the current `period_detection` stub is detected
-as a period-1 cycle.
+`verify_floyd_cycle_detection`, `verify_hare_leads`: after `k` iterations of an
+abstract model the tortoise advanced `k` and the hare `2k`.
+
+`verify_find_cycle_is_complete_and_correct`,
+`verify_find_cycle_is_sound_for_any_budget`, `verify_find_cycle_zero_budget`:
+for every step map on 6 states and every start state,
+`kelvin_core::find_cycle` finds the true pre-period and minimal period within a
+budget of 6, never reports a wrong cycle with a smaller budget, and takes no
+step with a zero budget.
 
 ## What is *not* verified by Kani
 
@@ -96,7 +100,7 @@ as a period-1 cycle.
 - C4 keystream indistinguishability / advantage bound.
 - C5 configuration-space cardinality, and constant-time execution (only
   branch-free primitives are checked; timing needs dudect/ctgrind).
-- C6 period length of the real simulator (the stub has period 1).
+- C6 period length of the real simulator (`find_cycle` is checked on 6 states only).
 
 The remaining `proofs/kani/*.rs` files that are not in the list above
 (`acceleration_proofs.rs`, `lyapunov_proofs.rs`, `configuration_proofs.rs`,
@@ -129,3 +133,5 @@ Run individually with `--proof`:
 Update, 2026-11-26: all 37 harnesses now on `dev` have a SUCCESSFUL verdict, collected over three separate runs rather than one `--all` pass. Details, source commits and the two replaced C3 harnesses are in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md).
 
 Update, 2026-11-27: a single `--all` run on `dev` at `7ae03a9` passed all 37 harnesses (about 1 h 23 min).
+
+Update, 2026-11-27 (later): the three stub harnesses (`verify_periodicity_*`) and the stub were removed and replaced by the three `verify_find_cycle_*` harnesses above. The five C6 harnesses were run individually and succeeded; planted off-by-one errors in `find_cycle` made them fail. The other 32 harnesses were not re-run for this change.
