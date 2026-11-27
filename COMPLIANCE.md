@@ -45,6 +45,11 @@ is **on by default** for chaos/photon/quantum (`--no-auth` opts out);
 V1 Secure is AEAD. Decrypt verifies in constant time and rejects tampering
 instead of returning malleated plaintext.
 
+Each tag binds the chunk index and a final-chunk flag, and the CLI marks the end
+of `secure` files with a short final chunk, so reordered or truncated
+ciphertexts are rejected. Library users of `Kelvin` (V1) and of the streaming
+API must detect truncation in their own framing.
+
 ## 5. Production hallmarks — status per item
 
 | Hallmark | Status |

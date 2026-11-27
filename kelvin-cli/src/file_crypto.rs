@@ -13,6 +13,7 @@ use kelvin::{
     STREAMING_CHUNK_SIZE,
 };
 use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 use crate::CryptoMode;
 
@@ -51,7 +52,7 @@ pub fn process_file_mode(
     auth: bool,
     nonce: &[u8],
 ) -> Result<()> {
-    match mode {
+    write_atomically(input_path, output_path, |output_path| match mode {
         CryptoMode::Secure => {
             process_file_secure(config_path, input_path, output_path, encrypt, method, nonce)
         },
@@ -85,7 +86,58 @@ pub fn process_file_mode(
             bytes_per_step,
             nonce,
         ),
+    })
+}
+
+/// Run `process` against a temporary file next to `output_path` and rename it
+/// into place only if it succeeds, so that a failed run (for example on a
+/// tampered or truncated ciphertext) leaves no partial output and keeps any
+/// existing file.
+///
+/// Rejects an output that is the input file. An existing output that is not a
+/// regular file (a device or pipe) cannot be renamed over and is written
+/// directly.
+fn write_atomically(
+    input_path: &str,
+    output_path: &str,
+    process: impl FnOnce(&str) -> Result<()>,
+) -> Result<()> {
+    let input = std::fs::canonicalize(input_path).context("Failed to open input file")?;
+    let mut target = PathBuf::from(output_path);
+    let mut permissions = None;
+    if let Ok(metadata) = std::fs::metadata(&target) {
+        if !metadata.is_file() {
+            return process(output_path);
+        }
+        // Resolve symlinks so the link's destination is replaced, not the link.
+        target = std::fs::canonicalize(&target).context("Failed to resolve output path")?;
+        if target == input {
+            anyhow::bail!("--output must not be the same file as --input");
+        }
+        permissions = Some(metadata.permissions());
     }
+
+    let directory = match target.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent,
+        _ => Path::new("."),
+    };
+    // Removed automatically if dropped before `persist`.
+    let temporary = tempfile::Builder::new()
+        .prefix(".kelvin-")
+        .suffix(".tmp")
+        .tempfile_in(directory)
+        .context("Failed to create output file")?
+        .into_temp_path();
+    let temporary_name = temporary.to_str().context("Output path is not valid UTF-8")?;
+
+    process(temporary_name)?;
+
+    if let Some(permissions) = permissions {
+        std::fs::set_permissions(&temporary, permissions)
+            .context("Failed to set output permissions")?;
+    }
+    temporary.persist(&target).context("Failed to move output into place")?;
+    Ok(())
 }
 
 /// V1 Secure: ChaCha20Poly1305 AEAD (original Kelvin).
@@ -99,6 +151,11 @@ pub fn process_file_mode(
 /// 1. Read `STREAMING_CHUNK_SIZE` bytes of plaintext into buffer[..chunk]
 /// 2. `k.encrypt()` encrypts in-place, writing the 16-byte tag at buffer[chunk..chunk+16]
 /// 3. Write buffer[..chunk + 16] to output (plaintext + tag)
+///
+/// The last chunk is always shorter than `STREAMING_CHUNK_SIZE` (empty when
+/// the file length is an exact multiple). AEAD authenticates each chunk's
+/// length and the nonce counter fixes its position, so decryption can reject a
+/// file that was cut at a chunk boundary.
 ///
 /// **Decryption flow:**
 /// 1. Read `STREAMING_CHUNK_SIZE + 16` bytes of ciphertext+tag into buffer
@@ -141,23 +198,23 @@ fn process_file_secure(
             //    zeroed and receive the AEAD tag at position chunk..chunk+16
             // 3. Write buffer[..chunk + 16] to output (ciphertext + tag)
             let bytes_read = read_full(&mut input_file, &mut buffer[..STREAMING_CHUNK_SIZE])?;
-            if bytes_read == 0 {
-                break;
-            }
             // Zero the tag area to ensure clean state
             buffer[bytes_read..bytes_read + 16].fill(0);
             k.encrypt(&mut buffer[..bytes_read + 16])?;
             output_file.write_all(&buffer[..bytes_read + 16])?;
             total_processed += bytes_read as u64;
+            // A short (possibly empty) chunk marks the end of the file.
+            if bytes_read < STREAMING_CHUNK_SIZE {
+                break;
+            }
         } else {
             // Decryption:
             // 1. Read STREAMING_CHUNK_SIZE + 16 bytes of ciphertext+tag into buffer
             // 2. Call decrypt(&mut buffer[..bytes_read]) — verifies the tag
             // 3. Write buffer[..bytes_read - 16] to output (plaintext only)
             let bytes_read = read_full(&mut input_file, &mut buffer[..STREAMING_CHUNK_SIZE + 16])?;
-            if bytes_read == 0 {
-                break;
-            }
+            // Reaching the end without having seen the short final chunk means
+            // the file was cut at a chunk boundary.
             if bytes_read < 16 {
                 anyhow::bail!("Invalid ciphertext: truncated data at offset {}", total_processed);
             }
@@ -165,6 +222,9 @@ fn process_file_secure(
             k.decrypt(&mut buffer[..bytes_read])?;
             output_file.write_all(&buffer[..plaintext_len])?;
             total_processed += plaintext_len as u64;
+            if plaintext_len < STREAMING_CHUNK_SIZE {
+                break;
+            }
         }
 
         if total_processed.is_multiple_of(1024 * 1024) {
@@ -221,8 +281,11 @@ fn process_file_chaos(
         let mut total_processed = 0u64;
         loop {
             let bytes_read = read_full(&mut input_file, &mut buffer)?;
-            if bytes_read == 0 {
-                break;
+            // The final chunk is the one shorter than a full read (it may be
+            // empty). It carries the final flag, so a cut-off file is rejected.
+            let last = bytes_read < read_size;
+            if !encrypt && bytes_read < AUTH_OVERHEAD {
+                anyhow::bail!("Invalid ciphertext: truncated data at offset {}", total_processed);
             }
 
             chunk.clear();
@@ -230,14 +293,25 @@ fn process_file_chaos(
             if encrypt {
                 // Reserve room for the version byte + KMAC128 tag.
                 chunk.resize(chunk.len() + AUTH_OVERHEAD, 0);
-                ks.encrypt(&mut chunk)?;
+                if last {
+                    ks.encrypt_final(&mut chunk)?;
+                } else {
+                    ks.encrypt(&mut chunk)?;
+                }
                 output_file.write_all(&chunk)?;
             } else {
-                ks.decrypt(&mut chunk)?;
+                if last {
+                    ks.decrypt_final(&mut chunk)?;
+                } else {
+                    ks.decrypt(&mut chunk)?;
+                }
                 // Strip the version byte + tag: output is plaintext only.
                 output_file.write_all(&chunk[..chunk.len() - AUTH_OVERHEAD])?;
             }
             total_processed += bytes_read as u64;
+            if last {
+                break;
+            }
             if total_processed.is_multiple_of(1024 * 1024) {
                 print!(".");
                 let _ = std::io::stdout().flush();
@@ -333,8 +407,11 @@ fn process_file_photon(
         let mut total_processed = 0u64;
         loop {
             let bytes_read = read_full(&mut input_file, &mut buffer)?;
-            if bytes_read == 0 {
-                break;
+            // The final chunk is the one shorter than a full read (it may be
+            // empty). It carries the final flag, so a cut-off file is rejected.
+            let last = bytes_read < read_size;
+            if !encrypt && bytes_read < AUTH_OVERHEAD {
+                anyhow::bail!("Invalid ciphertext: truncated data at offset {}", total_processed);
             }
 
             chunk.clear();
@@ -342,14 +419,25 @@ fn process_file_photon(
             if encrypt {
                 // Reserve room for the version byte + KMAC128 tag.
                 chunk.resize(chunk.len() + AUTH_OVERHEAD, 0);
-                photon.encrypt(&mut chunk)?;
+                if last {
+                    photon.encrypt_final(&mut chunk)?;
+                } else {
+                    photon.encrypt(&mut chunk)?;
+                }
                 output_file.write_all(&chunk)?;
             } else {
-                photon.decrypt(&mut chunk)?;
+                if last {
+                    photon.decrypt_final(&mut chunk)?;
+                } else {
+                    photon.decrypt(&mut chunk)?;
+                }
                 // Strip the version byte + tag: output is plaintext only.
                 output_file.write_all(&chunk[..chunk.len() - AUTH_OVERHEAD])?;
             }
             total_processed += bytes_read as u64;
+            if last {
+                break;
+            }
             if total_processed.is_multiple_of(1024 * 1024) {
                 print!(".");
                 let _ = std::io::stdout().flush();
@@ -436,8 +524,11 @@ fn process_file_quantum(
         let mut total_processed = 0u64;
         loop {
             let bytes_read = read_full(&mut input_file, &mut buffer)?;
-            if bytes_read == 0 {
-                break;
+            // The final chunk is the one shorter than a full read (it may be
+            // empty). It carries the final flag, so a cut-off file is rejected.
+            let last = bytes_read < read_size;
+            if !encrypt && bytes_read < AUTH_OVERHEAD {
+                anyhow::bail!("Invalid ciphertext: truncated data at offset {}", total_processed);
             }
 
             chunk.clear();
@@ -445,14 +536,25 @@ fn process_file_quantum(
             if encrypt {
                 // Reserve room for the version byte + KMAC128 tag.
                 chunk.resize(chunk.len() + AUTH_OVERHEAD, 0);
-                quantum.encrypt(&mut chunk)?;
+                if last {
+                    quantum.encrypt_final(&mut chunk)?;
+                } else {
+                    quantum.encrypt(&mut chunk)?;
+                }
                 output_file.write_all(&chunk)?;
             } else {
-                quantum.decrypt(&mut chunk)?;
+                if last {
+                    quantum.decrypt_final(&mut chunk)?;
+                } else {
+                    quantum.decrypt(&mut chunk)?;
+                }
                 // Strip the version byte + tag: output is plaintext only.
                 output_file.write_all(&chunk[..chunk.len() - AUTH_OVERHEAD])?;
             }
             total_processed += bytes_read as u64;
+            if last {
+                break;
+            }
             if total_processed.is_multiple_of(1024 * 1024) {
                 print!(".");
                 let _ = std::io::stdout().flush();

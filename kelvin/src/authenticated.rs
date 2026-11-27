@@ -13,8 +13,20 @@
 //!   ↓
 //! 32-byte KMAC128 key
 //!   ↓
-//! KMAC128(key, ciphertext, customization_string) → 32-byte tag
+//! KMAC128(key, version || chunk index || final flag || ciphertext,
+//!         customization_string) → 32-byte tag
 //! ```
+//!
+//! ## Chunked Streams
+//!
+//! Every tag is bound to the position of its chunk in the stream, so chunks
+//! cannot be reordered, repeated or skipped. The sender seals the last chunk
+//! (which may be empty) with `encrypt_final`, and the receiver opens it with
+//! `decrypt_final`. A receiver that reaches the end of its input without a
+//! successful `decrypt_final` must treat the stream as truncated.
+//!
+//! One instance handles one stream in one direction: use separate instances to
+//! encrypt and to decrypt.
 //!
 //! ## Security
 //!
@@ -63,20 +75,116 @@ fn derive_mac_key(seed: &[u8; PHOTON_BASE_SEED_SIZE]) -> [u8; MAC_KEY_SIZE] {
     mac_key
 }
 
-/// Compute a KMAC128 tag over the ciphertext.
+/// Position of an authenticated stream: next chunk index and whether the
+/// final chunk has been processed.
+#[derive(Debug, Default)]
+struct ChunkState {
+    next: u64,
+    finished: bool,
+}
+
+/// Compute a KMAC128 tag over one chunk.
 ///
 /// Uses the `sha3-kmac` crate (NIST SP 800-185 compliant KMAC128).
 /// The tag is 32 bytes (256 bits), providing 128-bit security against forgery.
-fn compute_tag(key: &[u8; MAC_KEY_SIZE], ciphertext: &[u8], custom: &[u8]) -> [u8; TAG_LEN] {
+///
+/// The MAC input is `version (1) || chunk index (8, LE) || final flag (1) ||
+/// ciphertext`. The prefix has a fixed length, so the encoding is unambiguous.
+fn compute_tag(
+    key: &[u8; MAC_KEY_SIZE],
+    index: u64,
+    last: bool,
+    ciphertext: &[u8],
+    custom: &[u8],
+) -> [u8; TAG_LEN] {
     use sha3_kmac::generic_array::typenum::U32;
     use sha3_kmac::Mac;
 
     let mut mac = Kmac128::new(key, custom).expect("KMAC128 key size is valid");
+    mac.update(&[AUTH_FORMAT_VERSION]);
+    mac.update(&index.to_le_bytes());
+    mac.update(&[u8::from(last)]);
     mac.update(ciphertext);
     let tag: Mac<U32> = mac.finalize();
     let mut out = [0u8; TAG_LEN];
     out.copy_from_slice(&tag);
     out
+}
+
+/// Check that the stream is still open and the buffer can hold the version
+/// byte and tag. Returns the length of the chunk without that overhead.
+fn check_chunk(state: &ChunkState, len: usize) -> Result<usize, KelvinError> {
+    if state.finished {
+        return Err(KelvinError::AuthenticationFailed(
+            "stream already ended with a final chunk".into(),
+        ));
+    }
+    len.checked_sub(AUTH_OVERHEAD).ok_or_else(|| {
+        KelvinError::InvalidConfig(format!(
+            "buffer too short: need at least {} bytes for auth overhead, got {}",
+            AUTH_OVERHEAD, len
+        ))
+    })
+}
+
+/// Encrypt one chunk in place and append the version byte and tag.
+fn seal_chunk(
+    state: &mut ChunkState,
+    key: &[u8; MAC_KEY_SIZE],
+    custom: &[u8],
+    data: &mut [u8],
+    last: bool,
+    encrypt: impl FnOnce(&mut [u8]) -> Result<(), KelvinError>,
+) -> Result<(), KelvinError> {
+    let plaintext_len = check_chunk(state, data.len())?;
+    let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
+
+    // Encrypt the plaintext in-place
+    encrypt(plaintext)?;
+
+    // Write the version byte, then the tag over the ciphertext
+    auth_out[0] = AUTH_FORMAT_VERSION;
+    let tag = compute_tag(key, state.next, last, plaintext, custom);
+    auth_out[1..].copy_from_slice(&tag);
+
+    state.next += 1;
+    state.finished = last;
+    Ok(())
+}
+
+/// Verify one chunk and decrypt it in place. Nothing is decrypted and the
+/// stream does not advance unless the tag matches.
+fn open_chunk(
+    state: &mut ChunkState,
+    key: &[u8; MAC_KEY_SIZE],
+    custom: &[u8],
+    data: &mut [u8],
+    last: bool,
+    decrypt: impl FnOnce(&mut [u8]) -> Result<(), KelvinError>,
+) -> Result<(), KelvinError> {
+    let ciphertext_len = check_chunk(state, data.len())?;
+    let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+
+    // Check version byte
+    if auth_in[0] != AUTH_FORMAT_VERSION {
+        return Err(KelvinError::AuthenticationFailed(format!(
+            "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
+            AUTH_FORMAT_VERSION, auth_in[0]
+        )));
+    }
+
+    // Verify the tag before decrypting (constant-time comparison)
+    let expected_tag = compute_tag(key, state.next, last, ciphertext, custom);
+    if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
+        return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
+    }
+
+    // Decrypt the ciphertext in-place
+    decrypt(ciphertext)?;
+
+    state.next += 1;
+    state.finished = last;
+    Ok(())
 }
 
 // ============================================================================
@@ -94,11 +202,13 @@ fn compute_tag(key: &[u8; MAC_KEY_SIZE], ciphertext: &[u8], custom: &[u8]) -> [u
 /// use kelvin::KelvinPhotonAuthenticated;
 ///
 /// let seed = [0u8; PHOTON_BASE_SEED_SIZE];
-/// let mut auth = KelvinPhotonAuthenticated::new(seed, 1000)?;
+/// let mut sender = KelvinPhotonAuthenticated::new(seed, 1000);
+/// let mut receiver = KelvinPhotonAuthenticated::new(seed, 1000);
 /// let mut data = b"Secret message".to_vec();
-/// auth.encrypt(&mut data)?;
-/// auth.decrypt(&mut data)?;
-/// assert_eq!(&data, b"Secret message");
+/// data.resize(data.len() + AUTH_OVERHEAD, 0);
+/// sender.encrypt_final(&mut data)?;
+/// receiver.decrypt_final(&mut data)?; // a second instance
+/// assert_eq!(&data[..data.len() - AUTH_OVERHEAD], b"Secret message");
 /// ```
 #[derive(Debug)]
 pub struct KelvinPhotonAuthenticated {
@@ -108,6 +218,8 @@ pub struct KelvinPhotonAuthenticated {
     mac_key: [u8; MAC_KEY_SIZE],
     /// Buffer for computing authentication tags.
     tag_buf: [u8; TAG_LEN],
+    /// Chunk counter and final-chunk state bound into each tag.
+    chunks: ChunkState,
 }
 
 impl KelvinPhotonAuthenticated {
@@ -121,75 +233,65 @@ impl KelvinPhotonAuthenticated {
             inner: KelvinPhoton::new(seed, max_reseeds),
             mac_key,
             tag_buf: [0u8; TAG_LEN],
+            chunks: ChunkState::default(),
         }
     }
 
-    /// Encrypt data in-place with authentication.
+    /// Encrypt a chunk in-place with authentication. Use
+    /// [`encrypt_final`](Self::encrypt_final) for the last chunk of a stream.
     ///
     /// The buffer must have `AUTH_OVERHEAD` (33) extra bytes after the
     /// plaintext for the version byte + KMAC128 authentication tag.
     ///
     /// Wire format: `ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)`
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < AUTH_OVERHEAD {
-            return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for auth overhead, got {}",
-                AUTH_OVERHEAD,
-                data.len()
-            )));
-        }
-
-        let plaintext_len = data.len() - AUTH_OVERHEAD;
-        let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
-
-        // Encrypt the plaintext in-place
-        self.inner.encrypt(plaintext)?;
-
-        // Write version byte
-        auth_out[0] = AUTH_FORMAT_VERSION;
-
-        // Compute KMAC128 tag over the ciphertext
-        let tag = compute_tag(&self.mac_key, plaintext, b"KelvinPhotonAuthenticated-v1");
-        auth_out[1..].copy_from_slice(&tag);
-
-        Ok(())
+        self.seal(data, false)
     }
 
-    /// Decrypt data in-place with authentication verification.
+    /// Encrypt the last chunk of a stream (the plaintext may be empty).
+    /// This instance cannot process further chunks afterwards.
+    pub fn encrypt_final(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.seal(data, true)
+    }
+
+    /// Verify and decrypt a chunk in-place. Use
+    /// [`decrypt_final`](Self::decrypt_final) for the last chunk of a stream.
     ///
     /// The buffer must contain ciphertext + version byte + 32-byte
-    /// authentication tag. Returns an error if the tag doesn't match
-    /// (tampered data) or the version is unknown.
+    /// authentication tag. Returns an error if the tag does not match
+    /// (tampered, reordered or repeated chunk) or the version is unknown.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < AUTH_OVERHEAD {
-            return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for auth overhead, got {}",
-                AUTH_OVERHEAD,
-                data.len()
-            )));
-        }
+        self.open(data, false)
+    }
 
-        let ciphertext_len = data.len() - AUTH_OVERHEAD;
-        let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+    /// Verify and decrypt the last chunk of a stream. It succeeds only for a
+    /// chunk sealed with `encrypt_final`, which is how truncation is detected.
+    pub fn decrypt_final(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.open(data, true)
+    }
 
-        // Check version byte
-        if auth_in[0] != AUTH_FORMAT_VERSION {
-            return Err(KelvinError::AuthenticationFailed(format!(
-                "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
-                AUTH_FORMAT_VERSION, auth_in[0]
-            )));
-        }
+    fn seal(&mut self, data: &mut [u8], last: bool) -> Result<(), KelvinError> {
+        let inner = &mut self.inner;
+        seal_chunk(
+            &mut self.chunks,
+            &self.mac_key,
+            b"KelvinPhotonAuthenticated-v2",
+            data,
+            last,
+            |buf| inner.encrypt(buf),
+        )
+    }
 
-        // Verify the tag before decrypting (constant-time comparison)
-        let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinPhotonAuthenticated-v1");
-        if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
-            return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
-        }
-
-        // Decrypt the ciphertext in-place
-        self.inner.decrypt(ciphertext)?;
-
-        Ok(())
+    fn open(&mut self, data: &mut [u8], last: bool) -> Result<(), KelvinError> {
+        let inner = &mut self.inner;
+        open_chunk(
+            &mut self.chunks,
+            &self.mac_key,
+            b"KelvinPhotonAuthenticated-v2",
+            data,
+            last,
+            |buf| inner.decrypt(buf),
+        )
     }
 
     /// Get the total bytes processed (plaintext only, excluding tags).
@@ -230,11 +332,13 @@ impl Drop for KelvinPhotonAuthenticated {
 /// use kelvin::KelvinQuantumAuthenticated;
 ///
 /// let seed = [0u8; QUANTUM_BASE_SEED_SIZE];
-/// let mut auth = KelvinQuantumAuthenticated::new(seed, 1000)?;
+/// let mut sender = KelvinQuantumAuthenticated::new(seed, 1000);
+/// let mut receiver = KelvinQuantumAuthenticated::new(seed, 1000);
 /// let mut data = b"Secret message".to_vec();
-/// auth.encrypt(&mut data)?;
-/// auth.decrypt(&mut data)?;
-/// assert_eq!(&data, b"Secret message");
+/// data.resize(data.len() + AUTH_OVERHEAD, 0);
+/// sender.encrypt_final(&mut data)?;
+/// receiver.decrypt_final(&mut data)?; // a second instance
+/// assert_eq!(&data[..data.len() - AUTH_OVERHEAD], b"Secret message");
 /// ```
 #[derive(Debug)]
 pub struct KelvinQuantumAuthenticated {
@@ -244,6 +348,8 @@ pub struct KelvinQuantumAuthenticated {
     mac_key: [u8; MAC_KEY_SIZE],
     /// Buffer for computing authentication tags.
     tag_buf: [u8; TAG_LEN],
+    /// Chunk counter and final-chunk state bound into each tag.
+    chunks: ChunkState,
 }
 
 impl KelvinQuantumAuthenticated {
@@ -257,74 +363,65 @@ impl KelvinQuantumAuthenticated {
             inner: KelvinQuantum::new(seed, max_reseeds),
             mac_key,
             tag_buf: [0u8; TAG_LEN],
+            chunks: ChunkState::default(),
         }
     }
 
-    /// Encrypt data in-place with authentication.
+    /// Encrypt a chunk in-place with authentication. Use
+    /// [`encrypt_final`](Self::encrypt_final) for the last chunk of a stream.
     ///
     /// The buffer must have `AUTH_OVERHEAD` (33) extra bytes after the
     /// plaintext for the version byte + KMAC128 authentication tag.
     ///
     /// Wire format: `ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)`
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < AUTH_OVERHEAD {
-            return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for auth overhead, got {}",
-                AUTH_OVERHEAD,
-                data.len()
-            )));
-        }
-
-        let plaintext_len = data.len() - AUTH_OVERHEAD;
-        let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
-
-        // Encrypt the plaintext in-place
-        self.inner.encrypt(plaintext)?;
-
-        // Write version byte
-        auth_out[0] = AUTH_FORMAT_VERSION;
-
-        // Compute KMAC128 tag over the ciphertext
-        let tag = compute_tag(&self.mac_key, plaintext, b"KelvinQuantumAuthenticated-v1");
-        auth_out[1..].copy_from_slice(&tag);
-
-        Ok(())
+        self.seal(data, false)
     }
 
-    /// Decrypt data in-place with authentication verification.
+    /// Encrypt the last chunk of a stream (the plaintext may be empty).
+    /// This instance cannot process further chunks afterwards.
+    pub fn encrypt_final(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.seal(data, true)
+    }
+
+    /// Verify and decrypt a chunk in-place. Use
+    /// [`decrypt_final`](Self::decrypt_final) for the last chunk of a stream.
     ///
-    /// Returns an error if the tag doesn't match (tampered data) or the
-    /// version is unknown.
+    /// The buffer must contain ciphertext + version byte + 32-byte
+    /// authentication tag. Returns an error if the tag does not match
+    /// (tampered, reordered or repeated chunk) or the version is unknown.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < AUTH_OVERHEAD {
-            return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for auth overhead, got {}",
-                AUTH_OVERHEAD,
-                data.len()
-            )));
-        }
+        self.open(data, false)
+    }
 
-        let ciphertext_len = data.len() - AUTH_OVERHEAD;
-        let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+    /// Verify and decrypt the last chunk of a stream. It succeeds only for a
+    /// chunk sealed with `encrypt_final`, which is how truncation is detected.
+    pub fn decrypt_final(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.open(data, true)
+    }
 
-        // Check version byte
-        if auth_in[0] != AUTH_FORMAT_VERSION {
-            return Err(KelvinError::AuthenticationFailed(format!(
-                "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
-                AUTH_FORMAT_VERSION, auth_in[0]
-            )));
-        }
+    fn seal(&mut self, data: &mut [u8], last: bool) -> Result<(), KelvinError> {
+        let inner = &mut self.inner;
+        seal_chunk(
+            &mut self.chunks,
+            &self.mac_key,
+            b"KelvinQuantumAuthenticated-v2",
+            data,
+            last,
+            |buf| inner.encrypt(buf),
+        )
+    }
 
-        // Verify the tag before decrypting (constant-time comparison)
-        let expected_tag = compute_tag(&self.mac_key, ciphertext, b"KelvinQuantumAuthenticated-v1");
-        if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
-            return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
-        }
-
-        // Decrypt the ciphertext in-place
-        self.inner.decrypt(ciphertext)?;
-
-        Ok(())
+    fn open(&mut self, data: &mut [u8], last: bool) -> Result<(), KelvinError> {
+        let inner = &mut self.inner;
+        open_chunk(
+            &mut self.chunks,
+            &self.mac_key,
+            b"KelvinQuantumAuthenticated-v2",
+            data,
+            last,
+            |buf| inner.decrypt(buf),
+        )
     }
 
     /// Get the total bytes processed (plaintext only, excluding tags).
@@ -366,11 +463,13 @@ impl Drop for KelvinQuantumAuthenticated {
 /// use kelvin::{KelvinStreamingAuthenticated, OrbitalConfig};
 ///
 /// let config = OrbitalConfig::from_json(json_str)?;
-/// let mut auth = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
+/// let mut sender = KelvinStreamingAuthenticated::new(config.clone(), 1024 * 1024)?;
+/// let mut receiver = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
 /// let mut data = b"Secret message".to_vec();
-/// auth.encrypt(&mut data)?;
-/// auth.decrypt(&mut data)?;
-/// assert_eq!(&data, b"Secret message");
+/// data.resize(data.len() + AUTH_OVERHEAD, 0);
+/// sender.encrypt_final(&mut data)?;
+/// receiver.decrypt_final(&mut data)?; // a second instance
+/// assert_eq!(&data[..data.len() - AUTH_OVERHEAD], b"Secret message");
 /// ```
 #[derive(Debug)]
 pub struct KelvinStreamingAuthenticated {
@@ -380,6 +479,8 @@ pub struct KelvinStreamingAuthenticated {
     mac_key: [u8; MAC_KEY_SIZE],
     /// Buffer for computing authentication tags.
     tag_buf: [u8; TAG_LEN],
+    /// Chunk counter and final-chunk state bound into each tag.
+    chunks: ChunkState,
 }
 
 /// Derive a MAC key from the initial orbital bodies for V2 streaming mode.
@@ -445,75 +546,69 @@ impl KelvinStreamingAuthenticated {
             nonce,
         );
 
-        Ok(KelvinStreamingAuthenticated { inner, mac_key, tag_buf: [0u8; TAG_LEN] })
+        Ok(KelvinStreamingAuthenticated {
+            inner,
+            mac_key,
+            tag_buf: [0u8; TAG_LEN],
+            chunks: ChunkState::default(),
+        })
     }
 
-    /// Encrypt data in-place with authentication.
+    /// Encrypt a chunk in-place with authentication. Use
+    /// [`encrypt_final`](Self::encrypt_final) for the last chunk of a stream.
     ///
     /// The buffer must have `AUTH_OVERHEAD` (33) extra bytes after the
     /// plaintext for the version byte + KMAC128 authentication tag.
     ///
     /// Wire format: `ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)`
     pub fn encrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < AUTH_OVERHEAD {
-            return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for auth overhead, got {}",
-                AUTH_OVERHEAD,
-                data.len()
-            )));
-        }
-
-        let plaintext_len = data.len() - AUTH_OVERHEAD;
-        let (plaintext, auth_out) = data.split_at_mut(plaintext_len);
-
-        // Encrypt the plaintext in-place
-        self.inner.encrypt(plaintext)?;
-
-        // Write version byte
-        auth_out[0] = AUTH_FORMAT_VERSION;
-
-        // Compute KMAC128 tag over the ciphertext
-        let tag = compute_tag(&self.mac_key, plaintext, b"KelvinStreamingAuthenticated-v1");
-        auth_out[1..].copy_from_slice(&tag);
-
-        Ok(())
+        self.seal(data, false)
     }
 
-    /// Decrypt data in-place with authentication verification.
+    /// Encrypt the last chunk of a stream (the plaintext may be empty).
+    /// This instance cannot process further chunks afterwards.
+    pub fn encrypt_final(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.seal(data, true)
+    }
+
+    /// Verify and decrypt a chunk in-place. Use
+    /// [`decrypt_final`](Self::decrypt_final) for the last chunk of a stream.
     ///
-    /// Returns an error if the tag doesn't match (tampered data) or the
-    /// version is unknown.
+    /// The buffer must contain ciphertext + version byte + 32-byte
+    /// authentication tag. Returns an error if the tag does not match
+    /// (tampered, reordered or repeated chunk) or the version is unknown.
     pub fn decrypt(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
-        if data.len() < AUTH_OVERHEAD {
-            return Err(KelvinError::InvalidConfig(format!(
-                "buffer too short: need at least {} bytes for auth overhead, got {}",
-                AUTH_OVERHEAD,
-                data.len()
-            )));
-        }
+        self.open(data, false)
+    }
 
-        let ciphertext_len = data.len() - AUTH_OVERHEAD;
-        let (ciphertext, auth_in) = data.split_at_mut(ciphertext_len);
+    /// Verify and decrypt the last chunk of a stream. It succeeds only for a
+    /// chunk sealed with `encrypt_final`, which is how truncation is detected.
+    pub fn decrypt_final(&mut self, data: &mut [u8]) -> Result<(), KelvinError> {
+        self.open(data, true)
+    }
 
-        // Check version byte
-        if auth_in[0] != AUTH_FORMAT_VERSION {
-            return Err(KelvinError::AuthenticationFailed(format!(
-                "unsupported auth format version: expected 0x{:02x}, got 0x{:02x}",
-                AUTH_FORMAT_VERSION, auth_in[0]
-            )));
-        }
+    fn seal(&mut self, data: &mut [u8], last: bool) -> Result<(), KelvinError> {
+        let inner = &mut self.inner;
+        seal_chunk(
+            &mut self.chunks,
+            &self.mac_key,
+            b"KelvinStreamingAuthenticated-v2",
+            data,
+            last,
+            |buf| inner.encrypt(buf),
+        )
+    }
 
-        // Verify the tag before decrypting (constant-time comparison)
-        let expected_tag =
-            compute_tag(&self.mac_key, ciphertext, b"KelvinStreamingAuthenticated-v1");
-        if !bool::from(expected_tag.ct_eq(&auth_in[1..])) {
-            return Err(KelvinError::AuthenticationFailed("KMAC128 tag mismatch".into()));
-        }
-
-        // Decrypt the ciphertext in-place
-        self.inner.decrypt(ciphertext)?;
-
-        Ok(())
+    fn open(&mut self, data: &mut [u8], last: bool) -> Result<(), KelvinError> {
+        let inner = &mut self.inner;
+        open_chunk(
+            &mut self.chunks,
+            &self.mac_key,
+            b"KelvinStreamingAuthenticated-v2",
+            data,
+            last,
+            |buf| inner.decrypt(buf),
+        )
     }
 
     /// Get the total bytes processed (plaintext only, excluding tags).

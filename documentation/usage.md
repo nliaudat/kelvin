@@ -71,6 +71,18 @@ kelvin identify --config my_secret.json --ecc --kem
 ### Authenticated Encryption (`--auth`, on by default)
 V2 (Chaos), V3 (Photon), and H (Quantum) modes are pure XOR stream ciphers with no built-in authentication. The CLI therefore appends a version byte plus a 32-byte KMAC128 tag (NIST SP 800-185; 33 bytes in total) to the ciphertext by default, defeating malleability. Pass `--no-auth` to opt out.
 
+Each tag also covers the chunk's position and marks the final chunk, so a
+ciphertext with reordered, repeated or missing chunks is rejected. This is
+format version 2: files written with version 1 must be decrypted with an older
+build and encrypted again.
+
+In every mode, `secure` included, the CLI writes to a temporary file and renames
+it into place only on success. A failed decryption leaves no output, and
+`--output` may not be the `--input` file. A `secure` file always ends with a
+short (possibly empty) chunk; a `secure` file written by an older build whose
+plaintext length was an exact multiple of the chunk size lacks it and is
+reported as truncated. With `--no-auth` there is no integrity check at all.
+
 ```bash
 # Chaos mode (authenticated by default)
 kelvin encrypt --mode chaos --config my_secret.json --input file.txt --output file.enc --nonce 01
@@ -203,14 +215,15 @@ For modes that lack built-in authentication (Chaos, Photon, Quantum), wrap the e
 ```rust
 use kelvin::{
     KelvinPhotonAuthenticated, KelvinStreamingAuthenticated,
-    KelvinQuantumAuthenticated, OrbitalConfig,
+    KelvinQuantumAuthenticated, OrbitalConfig, AUTH_OVERHEAD,
 };
 
 // V2 Chaos + KMAC128
 let config = OrbitalConfig::from_json(&config_json)?;
 let mut ks = KelvinStreamingAuthenticated::new(config, 1024 * 1024)?;
 let mut data = b"Hello authenticated streaming!".to_vec();
-ks.encrypt(&mut data)?; // ciphertext + version byte + 32-byte tag appended
+data.resize(data.len() + AUTH_OVERHEAD, 0); // room for version byte + tag
+ks.encrypt_final(&mut data)?; // the only (and therefore last) chunk
 
 // V3 Photon + KMAC128
 let (seed, _bodies) = kelvin::simulate_and_extract_seed_with_method(
@@ -218,7 +231,8 @@ let (seed, _bodies) = kelvin::simulate_and_extract_seed_with_method(
 )?;
 let mut photon = KelvinPhotonAuthenticated::new(seed, 100_000);
 let mut data = b"Hello authenticated photon!".to_vec();
-photon.encrypt(&mut data)?;
+data.resize(data.len() + AUTH_OVERHEAD, 0);
+photon.encrypt_final(&mut data)?;
 
 // H Quantum + KMAC128 (authenticated Quantum exposes only
 // new(seed, max_reseeds); bare KelvinQuantum has with_config with
@@ -226,10 +240,16 @@ photon.encrypt(&mut data)?;
 // QUANTUM_DEFAULT_RESEED_INTERVAL = 64 MiB defaults)
 let mut quantum = KelvinQuantumAuthenticated::new(seed, 100_000);
 let mut data = b"Hello authenticated quantum!".to_vec();
-quantum.encrypt(&mut data)?;
+data.resize(data.len() + AUTH_OVERHEAD, 0);
+quantum.encrypt_final(&mut data)?;
 ```
 
 > **Important:** The authenticated wrappers append a version byte and a 32-byte KMAC128 tag (`AUTH_OVERHEAD` = 33 bytes) to the ciphertext. During decryption, the tag is verified in constant time using `subtle::ConstantTimeEq`. If the tag is missing or tampered, decryption returns an error.
+>
+> For a stream of several chunks, call `encrypt` / `decrypt` for every chunk but
+> the last, and `encrypt_final` / `decrypt_final` for the last one. The receiver
+> must treat input that ends before a successful `decrypt_final` as truncated.
+> Use separate instances to encrypt and to decrypt.
 
 ### Accessing Asymmetric Keys
 ```rust

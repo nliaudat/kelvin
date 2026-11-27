@@ -752,7 +752,7 @@ flowchart LR
     subgraph Authenticated Encryption
         A["plaintext"] --> B["XOR with keystream"]
         B --> C["ciphertext"]
-        C --> D["KMAC128(key, ciphertext, custom)"]
+        C --> D["KMAC128(key, version, index, final, ciphertext, custom)"]
         D --> E["32-byte tag"]
         C --> F["wire: ciphertext || version(1B) || tag(32B)"]
         E --> F
@@ -760,7 +760,7 @@ flowchart LR
 
     subgraph Authenticated Decryption
         G["wire: ciphertext || version || tag"] --> H["Verify version byte"]
-        H --> I["KMAC128(key, ciphertext, custom) == tag?"]
+        H --> I["KMAC128(key, version, index, final, ciphertext, custom) == tag?"]
         I -->|Yes| J["XOR with keystream → plaintext"]
         I -->|No| K["Return AuthenticationFailed"]
     end
@@ -769,3 +769,7 @@ flowchart LR
 The MAC key is derived from the same 2048-byte seed using HKDF-SHA512 with a
 distinct domain separator (`DOMSEP_MAC_KEY_V1`), preventing related-key attacks
 between keystream generation and authentication.
+
+Each tag binds the format version (2), the chunk index and a final-chunk flag,
+so reordered, repeated or missing chunks are rejected. The last chunk is
+processed with `encrypt_final` / `decrypt_final`.

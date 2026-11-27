@@ -617,12 +617,14 @@ pub const AUTH_TAG_LEN: usize = 32;
 /// ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)
 /// ```
 ///
-/// **Why 0x01?** This is the initial version. Future versions can be
-/// detected and handled gracefully during decryption.
+/// **Why 0x02?** In version 1 the tag covered only the ciphertext of one chunk,
+/// so chunks could be reordered, repeated or dropped without detection. Version
+/// 2 also binds the chunk index and a final-chunk flag. Version 1 ciphertexts
+/// are rejected.
 ///
 /// **Changing this** would break compatibility with existing authenticated
 /// ciphertexts.
-pub const AUTH_FORMAT_VERSION: u8 = 0x01;
+pub const AUTH_FORMAT_VERSION: u8 = 0x02;
 
 /// Total overhead for authenticated ciphertexts in bytes.
 ///

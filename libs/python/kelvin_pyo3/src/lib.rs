@@ -344,6 +344,22 @@ impl KelvinPhotonAuthenticated {
         Ok(())
     }
 
+    fn encrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let mut buf = data.to_vec();
+        self.inner.encrypt_final(&mut buf).map_err(map_error)?;
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
+        Ok(())
+    }
+
+    fn decrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let mut buf = data.to_vec();
+        self.inner.decrypt_final(&mut buf).map_err(map_error)?;
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
+        Ok(())
+    }
+
     fn bytes_processed(&self) -> u64 {
         self.inner.bytes_processed()
     }
@@ -405,6 +421,22 @@ impl KelvinQuantumAuthenticated {
     fn decrypt(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
         let mut buf = data.to_vec();
         self.inner.decrypt(&mut buf).map_err(map_error)?;
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
+        Ok(())
+    }
+
+    fn encrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let mut buf = data.to_vec();
+        self.inner.encrypt_final(&mut buf).map_err(map_error)?;
+        data.resize(buf.len())?;
+        get_mut_slice(data).copy_from_slice(&buf);
+        Ok(())
+    }
+
+    fn decrypt_final(&mut self, data: &Bound<'_, PyByteArray>) -> PyResult<()> {
+        let mut buf = data.to_vec();
+        self.inner.decrypt_final(&mut buf).map_err(map_error)?;
         data.resize(buf.len())?;
         get_mut_slice(data).copy_from_slice(&buf);
         Ok(())

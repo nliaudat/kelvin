@@ -96,7 +96,7 @@ enum Commands {
         #[arg(long)]
         output: Option<String>,
         /// Bytes of keystream per step/chunk (chaos/photon/quantum, mode-specific default)
-        #[arg(long)]
+        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         bytes_per_step: Option<u64>,
         /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
@@ -140,7 +140,7 @@ enum Commands {
         #[arg(long)]
         output: Option<String>,
         /// Bytes of keystream per step/chunk (chaos/photon/quantum, mode-specific default)
-        #[arg(long)]
+        #[arg(long, value_parser = clap::value_parser!(u64).range(1..))]
         bytes_per_step: Option<u64>,
         /// Use Euler integration instead of default Verlet (numerically unstable, faster chaos)
         #[arg(long)]
