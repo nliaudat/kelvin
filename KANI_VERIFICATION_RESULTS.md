@@ -127,3 +127,5 @@ Run individually with `--proof`:
 `kelvin-core::find_cycle` / `detect_orbital_period` (a real Floyd detector for the Verlet simulation) now exist; they are unit-tested but **not** covered by any Kani harness, which still targets the stub.
 
 Update, 2026-11-26: all 37 harnesses now on `dev` have a SUCCESSFUL verdict, collected over three separate runs rather than one `--all` pass. Details, source commits and the two replaced C3 harnesses are in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md).
+
+Update, 2026-11-27: a single `--all` run on `dev` at `7ae03a9` passed all 37 harnesses (about 1 h 23 min).
