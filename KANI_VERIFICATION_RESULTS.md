@@ -149,4 +149,6 @@ Update, 2026-11-27: a single `--all` run on `dev` at `7ae03a9` passed all 37 har
 
 Update, 2026-11-27 (later): the three stub harnesses (`verify_periodicity_*`) and the stub were removed and replaced by the three `verify_find_cycle_*` harnesses above. The five C6 harnesses were run individually and succeeded; planted off-by-one errors in `find_cycle` made them fail. The other 32 harnesses were not re-run for this change.
 
-Update, 2026-11-27: the six `kelvin-kdf` harnesses were added and run individually; all succeeded (the slowest, `verify_extraction_header_injective`, in about 2.5 minutes), and a planted bug made each fail. No full `--all` run of the 43 has been made.
+Update, 2026-11-27: the six `kelvin-kdf` harnesses were added and run individually; all succeeded (the slowest, `verify_extraction_header_injective`, in about 2.5 minutes), and a planted bug made each fail. A full `--all` run of the 43 followed (next entry).
+
+Update, 2026-11-27: a single `--all` run on `dev` at `326c911` passed all 43 harnesses (about 1 h 25 min); details in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md). One of them is weak: `verify_c1_preimage_bound` asserts that at most 9 of 9 compared values match, which cannot fail.
