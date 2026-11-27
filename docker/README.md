@@ -13,11 +13,12 @@ Three independent setups:
 ```bash
 docker compose -f docker/docker-compose.yml build kani
 docker compose -f docker/docker-compose.yml run --rm kani --list
-docker compose -f docker/docker-compose.yml run --rm kani            # all 37
+docker compose -f docker/docker-compose.yml run --rm kani            # all 43
 docker compose -f docker/docker-compose.yml run --rm kani --proof verify_add_no_overflow
 ```
 
-37 harnesses are compiled into `kelvin-core`:
+43 harnesses run: 6 in `kelvin-kdf` (`src/schedule.rs`, `src/extractor.rs`) and
+37 compiled into `kelvin-core`:
 
 - **8** in `kelvin-core/src/fixed_math.rs` under `#[cfg(kani)]`
   (`verify_add_no_overflow`, `verify_sub_no_overflow`, `verify_mul_range`,

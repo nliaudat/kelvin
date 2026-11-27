@@ -19,7 +19,8 @@
 
 ## What runs
 
-37 harnesses are compiled into `kelvin-core`:
+43 harnesses run: 6 in `kelvin-kdf` (see below) and 37 compiled into
+`kelvin-core`:
 
 - **8** in `kelvin-core/src/fixed_math.rs` under `#[cfg(kani)]`;
 - **29** in `proofs/kani/*.rs`, included by `kelvin-core/src/kani_harnesses.rs`
@@ -29,7 +30,7 @@
 docker compose -f docker/docker-compose.yml build kani
 docker compose -f docker/docker-compose.yml run --rm kani --list
 docker compose -f docker/docker-compose.yml run --rm kani --proof <name>
-docker compose -f docker/docker-compose.yml run --rm kani          # all 37
+docker compose -f docker/docker-compose.yml run --rm kani          # all 43
 ```
 
 Per-harness logs land in `proofs/kani/results/`.
@@ -92,6 +93,18 @@ for every step map on 6 states and every start state,
 budget of 6, never reports a wrong cycle with a smaller budget, and takes no
 step with a zero budget.
 
+### Key derivation (`kelvin-kdf`)
+
+`verify_schedule_info_injective`, `verify_schedule_key_and_nonce_info_separated`,
+`verify_schedule_first_indices`, `verify_schedule_limit_invariant` (16-bit
+parameters): HKDF info strings are distinct per index and purpose, and the key
+schedule stops at its limits without overflow.
+
+`verify_extraction_header_injective`, `verify_extraction_body_injective`:
+within small bounds, distinct arguments or bodies give distinct hash input.
+Domain separators are not length-prefixed, so this relies on no separator being a
+prefix of another. The hash functions themselves are not modelled.
+
 ## What is *not* verified by Kani
 
 - C1 per-operation or per-step entropy loss.
@@ -114,7 +127,7 @@ The remaining `proofs/kani/*.rs` files that are not in the list above
 
 An earlier revision of this file listed "20 Kani harnesses", "18 verified today",
 "24/25 gaps proved". None of those numbers came from a tool. The honest totals
-are: **37 runnable harnesses**, **0 proved security gaps**, 3 partial, 5
+are: **43 runnable harnesses**, **0 proved security gaps**, 3 partial, 5
 empirical, 15 open. See
 [`documentation/formal_verification/PROOF_INDEX.md`](documentation/formal_verification/PROOF_INDEX.md).
 
@@ -135,3 +148,5 @@ Update, 2026-11-26: all 37 harnesses now on `dev` have a SUCCESSFUL verdict, col
 Update, 2026-11-27: a single `--all` run on `dev` at `7ae03a9` passed all 37 harnesses (about 1 h 23 min).
 
 Update, 2026-11-27 (later): the three stub harnesses (`verify_periodicity_*`) and the stub were removed and replaced by the three `verify_find_cycle_*` harnesses above. The five C6 harnesses were run individually and succeeded; planted off-by-one errors in `find_cycle` made them fail. The other 32 harnesses were not re-run for this change.
+
+Update, 2026-11-27: the six `kelvin-kdf` harnesses were added and run individually; all succeeded (the slowest, `verify_extraction_header_injective`, in about 2.5 minutes), and a planted bug made each fail. No full `--all` run of the 43 has been made.

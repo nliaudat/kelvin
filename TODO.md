@@ -46,7 +46,7 @@ Self-contained, no Mathlib. 50 theorems (23 primary + 27 legacy adapters), no
 
 ### Kani (`docker/run-kani.sh`)
 
-37 harnesses, all compiled into `kelvin-core`:
+43 harnesses (37 in `kelvin-core`, 6 in `kelvin-kdf`):
 
 - 8 in `kelvin-core/src/fixed_math.rs` under `#[cfg(kani)]`;
 - 29 in `proofs/kani/*.rs`, included by `kelvin-core/src/kani_harnesses.rs`
@@ -80,13 +80,21 @@ verify_floyd_cycle_detection           verify_hare_leads
 verify_find_cycle_is_complete_and_correct
 verify_find_cycle_is_sound_for_any_budget
 verify_find_cycle_zero_budget
+
+# kelvin-kdf (schedule.rs, extractor.rs)
+verify_schedule_info_injective
+verify_schedule_key_and_nonce_info_separated
+verify_schedule_first_indices
+verify_schedule_limit_invariant
+verify_extraction_header_injective
+verify_extraction_body_injective
 ```
 
 ```bash
 docker compose -f docker/docker-compose.yml build kani
 docker compose -f docker/docker-compose.yml run --rm kani --list
 docker compose -f docker/docker-compose.yml run --rm kani --proof <name>
-docker compose -f docker/docker-compose.yml run --rm kani          # all 37
+docker compose -f docker/docker-compose.yml run --rm kani          # all 43
 ```
 
 These check arithmetic, scheduling, framing and loop invariants. They do

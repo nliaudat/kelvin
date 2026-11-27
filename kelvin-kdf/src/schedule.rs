@@ -40,6 +40,22 @@ use zeroize::Zeroize;
 /// allowing millions of key derivations without reseeding.
 const KEY_SCHEDULE_SEED_SIZE: usize = 2048;
 
+/// HKDF `info` string for the cipher key with the given index.
+fn key_info(index: u64) -> [u8; 26] {
+    let mut info = [0u8; 26];
+    info[..18].copy_from_slice(b"kelvin-hkdf-key-v1");
+    info[18..].copy_from_slice(&index.to_le_bytes());
+    info
+}
+
+/// HKDF `info` string for the nonce with the given index.
+fn nonce_info(index: u64) -> [u8; 28] {
+    let mut info = [0u8; 28];
+    info[..20].copy_from_slice(b"kelvin-hkdf-nonce-v1");
+    info[20..].copy_from_slice(&index.to_le_bytes());
+    info
+}
+
 /// State of the key schedule.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ScheduleState {
@@ -139,39 +155,18 @@ impl KeySchedule {
     ///
     /// Returns `None` if the schedule is exhausted.
     pub fn next_key(&mut self) -> Option<([u8; 32], [u8; 12])> {
-        if self.state == ScheduleState::Exhausted {
-            return None;
-        }
-
-        if self.keys_generated >= self.max_keys {
-            self.state = ScheduleState::Exhausted;
-            return None;
-        }
+        let index = self.claim_index()?;
 
         // Derive key and nonce using HKDF-SHA512 (RFC 5869)
         let hk = Hkdf::<Sha3_512>::new(None, &self.seed);
 
-        // Domain-separated key derivation using stack-allocated arrays
-        // to avoid heap allocations in this performance-critical path.
-        let mut info = [0u8; 28];
-
-        // Derive key: "kelvin-hkdf-key-v1" (18 bytes) + counter (8 bytes) = 26 bytes
-        info[..18].copy_from_slice(b"kelvin-hkdf-key-v1");
-        info[18..26].copy_from_slice(&self.keys_generated.to_le_bytes());
+        // Domain-separated derivation; the info strings are stack allocated
         let mut key = [0u8; 32];
-        hk.expand(&info[..26], &mut key)
+        hk.expand(&key_info(index), &mut key)
             .expect("HKDF expand should not fail for valid output length");
-
-        // Derive nonce: "kelvin-hkdf-nonce-v1" (20 bytes) + counter (8 bytes) = 28 bytes
-        info[..20].copy_from_slice(b"kelvin-hkdf-nonce-v1");
-        info[20..28].copy_from_slice(&self.keys_generated.to_le_bytes());
         let mut nonce = [0u8; 12];
-        hk.expand(&info[..28], &mut nonce)
+        hk.expand(&nonce_info(index), &mut nonce)
             .expect("HKDF expand should not fail for valid output length");
-
-        // Advance step and reseed if needed
-        self.step += self.reseed_interval;
-        self.keys_generated += 1;
 
         // Reseed: derive new seed from current seed using BLAKE3
         let mut reseed_hasher = Hasher::new();
@@ -182,12 +177,33 @@ impl KeySchedule {
         reseed_hasher.finalize_xof().fill(&mut reseed_buf);
         self.seed = reseed_buf;
 
+        Some((key, nonce))
+    }
+
+    /// Reserve the index of the next key and advance the counters.
+    ///
+    /// Returns `None`, and marks the schedule exhausted, once no further key may
+    /// be issued. All limit checks are made here; the caller only derives.
+    fn claim_index(&mut self) -> Option<u64> {
+        if self.state == ScheduleState::Exhausted {
+            return None;
+        }
+
+        if self.keys_generated >= self.max_keys {
+            self.state = ScheduleState::Exhausted;
+            return None;
+        }
+
+        let index = self.keys_generated;
+        self.step += self.reseed_interval;
+        self.keys_generated += 1;
+
         // Check exhaustion
         if self.step >= self.safe_steps || self.step >= self.total_steps {
             self.state = ScheduleState::Exhausted;
         }
 
-        Some((key, nonce))
+        Some(index)
     }
 
     /// Get the current state.
@@ -234,6 +250,112 @@ impl Drop for KeySchedule {
         self.keys_generated.zeroize();
         self.max_keys.zeroize();
         self.max_bytes_per_key.zeroize();
+    }
+}
+
+// ============================================================================
+// Kani harnesses: key schedule
+// ============================================================================
+//
+// They check how derivation inputs are built and when keys stop being issued.
+// HKDF-SHA512 and BLAKE3 are not modelled: nothing here says that distinct
+// inputs give distinct keys.
+//
+// `KeySchedule` zeroizes its 2048-byte seed on drop, which is irrelevant to
+// these properties and costly to unwind, so the harnesses forget it.
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    fn any_schedule(total: u64, interval: u64, safe: u64) -> KeySchedule {
+        KeySchedule::new([0u8; KEY_SCHEDULE_SEED_SIZE], total, interval, safe)
+    }
+
+    /// Distinct indices give distinct key info strings and nonce info strings.
+    #[kani::proof]
+    #[kani::unwind(30)]
+    fn verify_schedule_info_injective() {
+        let a: u64 = kani::any();
+        let b: u64 = kani::any();
+        kani::assume(a != b);
+
+        kani::assert(key_info(a) != key_info(b), "key info strings differ");
+        kani::assert(nonce_info(a) != nonce_info(b), "nonce info strings differ");
+    }
+
+    /// No key info string equals, or is a prefix of, a nonce info string.
+    #[kani::proof]
+    #[kani::unwind(30)]
+    fn verify_schedule_key_and_nonce_info_separated() {
+        let key = key_info(kani::any());
+        let nonce = nonce_info(kani::any());
+
+        kani::assert(key[..] != nonce[..key.len()], "key and nonce inputs never overlap");
+    }
+
+    /// For every parameter choice, the first calls issue consecutive indices
+    /// without overflow, within the key limit, and exhaustion is permanent.
+    #[kani::proof]
+    #[kani::unwind(6)]
+    fn verify_schedule_first_indices() {
+        let mut schedule = any_schedule(kani::any(), kani::any(), kani::any());
+        let mut expected = 0u64;
+        let mut stopped = false;
+
+        for _ in 0..4 {
+            match schedule.claim_index() {
+                Some(index) => {
+                    kani::assert(!stopped, "nothing is issued after a refusal");
+                    kani::assert(index == expected, "indices are consecutive from zero");
+                    kani::assert(index < schedule.max_keys, "within the key limit");
+                    expected += 1;
+                },
+                None => {
+                    stopped = true;
+                    kani::assert(
+                        schedule.state == ScheduleState::Exhausted,
+                        "a refusal marks the schedule exhausted",
+                    );
+                },
+            }
+        }
+        kani::cover!(expected == 4, "four keys can be issued");
+        kani::cover!(stopped && expected > 0, "exhaustion is reachable");
+        core::mem::forget(schedule);
+    }
+
+    /// Inductive step, for 16-bit parameters: from any reachable state, one more
+    /// call keeps `step == keys_generated * reseed_interval` and the key limit,
+    /// so no number of calls can overflow or exceed the limit.
+    #[kani::proof]
+    fn verify_schedule_limit_invariant() {
+        let total: u16 = kani::any();
+        let interval: u16 = kani::any();
+        let safe: u16 = kani::any();
+        let mut schedule = any_schedule(total.into(), interval.into(), safe.into());
+
+        let issued: u16 = kani::any();
+        schedule.keys_generated = issued.into();
+        schedule.step = u64::from(issued) * u64::from(interval);
+        kani::assume(schedule.keys_generated <= schedule.max_keys);
+        // An active schedule that has issued a key is below its step limits.
+        kani::assume(issued == 0 || (schedule.step < safe.into() && schedule.step < total.into()));
+
+        if let Some(index) = schedule.claim_index() {
+            kani::assert(index == u64::from(issued), "the next index is issued");
+            kani::assert(schedule.keys_generated <= schedule.max_keys, "within the key limit");
+            kani::assert(
+                schedule.step == schedule.keys_generated * u64::from(interval),
+                "the step counter tracks the keys issued",
+            );
+            kani::assert(
+                schedule.state == ScheduleState::Exhausted
+                    || (schedule.step < safe.into() && schedule.step < total.into()),
+                "the schedule stays active only below its step limits",
+            );
+        }
+        kani::cover!(schedule.keys_generated > 1, "a later key is reachable");
+        core::mem::forget(schedule);
     }
 }
 

@@ -5,8 +5,8 @@
 >   Mathlib; 23 primary + 27 legacy adapters). They cover integer arithmetic,
 >   Verlet scheduling, pairwise momentum, domain framing, Kaplan–Yorke
 >   arithmetic, and Floyd loop invariants.
-> - **Kani:** 37 harnesses compiled into `kelvin-core` (8 in `fixed_math.rs`,
->   29 included from `proofs/kani/`). The remaining `proofs/kani/*.rs` files are
+> - **Kani:** 43 harnesses: 37 compiled into `kelvin-core` (8 in
+>   `fixed_math.rs`, 29 included from `proofs/kani/`) and 6 in `kelvin-kdf`. The remaining `proofs/kani/*.rs` files are
 >   templates and are not compiled.
 > - **C1–C5:** **none of the 23 security gaps is machine-checked.** Three have a
 >   partial arithmetic artifact, five are empirical, fifteen are open. See
@@ -45,8 +45,8 @@ correspondence is by inspection, and the models are deliberately coarse.
 
 The Kani strategy is described in
 [`formal_verification/code_verification.md`](formal_verification/code_verification.md).
-37 harnesses are compiled into `kelvin-core`: 8 in `fixed_math.rs` and 29
-included from `proofs/kani/` by `src/kani_harnesses.rs`. Run them with:
+43 harnesses run: 8 in `kelvin-core/src/fixed_math.rs`, 29 included from
+`proofs/kani/` by `kelvin-core/src/kani_harnesses.rs`, and 6 in `kelvin-kdf`. Run them with:
 
 ```bash
 docker compose -f docker/docker-compose.yml run --rm kani --list

@@ -354,8 +354,9 @@ impl fmt::Display for LyapunovError {
 // Run with: cargo kani -p kelvin-kdf
 #[cfg(kani)]
 mod kani_proofs {
-    use kelvin_core::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
-    use kelvin_core::{verlet_step, Fixed, OrbitalBody, Vec3};
+    use kelvin_core::{
+        verlet_step, Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR,
+    };
 
     // ── Harness 1: Padé ln numerical behavior ─────────────────────────
     //

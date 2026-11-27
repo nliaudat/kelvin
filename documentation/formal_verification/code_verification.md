@@ -6,8 +6,9 @@
 > **Scope warning (2026-11-23).** The `proofs/kani/*.rs` files that are not
 > included by `kelvin-core/src/kani_harnesses.rs` (for example
 > `acceleration_proofs.rs`) are **templates**: they are not part of any Cargo
-> target and have never been compiled. The 37 runnable harnesses are the 8 in
-> `kelvin-core/src/fixed_math.rs` plus the 29 included from `proofs/kani/`. See
+> target and have never been compiled. The 43 runnable harnesses are the 8 in
+> `kelvin-core/src/fixed_math.rs`, the 29 included from `proofs/kani/` and 6 in
+> `kelvin-kdf`. See
 > [`../../docker/run-kani.sh`](../../docker/run-kani.sh) for the list.
 
 ---

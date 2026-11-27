@@ -2,9 +2,13 @@
 # =============================================================================
 # run-kani.sh — Run Kani proofs inside Docker container
 #
-# Runs 37 harnesses:
+# Runs 43 harnesses:
 #   - 8 integrated in kelvin-core/src/fixed_math.rs under #[cfg(kani)]
 #   - 29 in proofs/kani/*.rs, included by kelvin-core/src/kani_harnesses.rs
+#   - 4 in kelvin-kdf/src/schedule.rs and 2 in kelvin-kdf/src/extractor.rs
+#
+# kelvin-kdf also contains older #[cfg(kani)] harnesses that are not in this
+# list; they have no recorded verdict.
 #
 # The included files were corrected on 2026-11-23: they previously sat outside
 # every Cargo target, used `rand`/`Instant::now()`, or asserted constants chosen
@@ -79,6 +83,15 @@ draw_progress_bar() {
     fi
 }
 
+# The crate that contains a harness.
+package_for() {
+    case "$1" in
+        verify_schedule_* | verify_extraction_header_injective | verify_extraction_body_injective)
+            echo kelvin-kdf ;;
+        *) echo kelvin-core ;;
+    esac
+}
+
 run_with_progress() {
     local harness_name="$1"
     local log_file="$2"
@@ -122,7 +135,7 @@ run_with_progress() {
         elif [[ "$line" == "VERIFICATION:- FAILED" ]]; then
             printf "\n  ${RED}✗ VERIFICATION: FAILED${NC}\n" >&3
         fi
-    done < <(cargo kani -p kelvin-core --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
+    done < <(cargo kani -p "$(package_for "$harness_name")" --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
 
     if [ "$total_checks" -eq 0 ]; then
         if grep -iq "error\|not found" "$log_file" 2>/dev/null; then
@@ -139,7 +152,7 @@ print_banner() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║       KELVIN FORMAL VERIFICATION — Kani Model Checker       ║"
-    echo "║      37 integrated harnesses (8 core + 29 included)         ║"
+    echo "║      43 integrated harnesses (37 core + 6 kdf)              ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
     echo "  Kani:   $(cargo kani --version 2>/dev/null || echo 'unknown')"
@@ -165,7 +178,7 @@ run_proofs() {
     } > "$RESULTS_DIR/SUMMARY.txt"
 
     local all_passed=true
-    # Only harnesses actually integrated under #[cfg(kani)] in kelvin-core/src/
+    # Only harnesses actually integrated under #[cfg(kani)]
     local harnesses=(
         # L0: Fixed arithmetic safety (kelvin-core/src/fixed_math.rs)
         "verify_add_no_overflow:add never wraps in [-100, 100] AU"
@@ -217,6 +230,14 @@ run_proofs() {
         "verify_find_cycle_is_complete_and_correct:finds the true mu and lambda"
         "verify_find_cycle_is_sound_for_any_budget:any reported cycle is correct"
         "verify_find_cycle_zero_budget:zero budget takes no step"
+
+        # Key derivation: input construction and key limits (kelvin-kdf)
+        "verify_schedule_info_injective:distinct indices give distinct HKDF info"
+        "verify_schedule_key_and_nonce_info_separated:key and nonce info never overlap"
+        "verify_schedule_first_indices:consecutive indices, permanent exhaustion"
+        "verify_schedule_limit_invariant:no overflow or excess keys (16-bit parameters)"
+        "verify_extraction_header_injective:distinct arguments give distinct hash input"
+        "verify_extraction_body_injective:distinct bodies give distinct hash input"
     )
     local total=${#harnesses[@]}
     local current=0
@@ -277,6 +298,12 @@ run_proofs() {
 
 list_harnesses() {
     printf '%s\n' \
+        verify_schedule_info_injective \
+        verify_schedule_key_and_nonce_info_separated \
+        verify_schedule_first_indices \
+        verify_schedule_limit_invariant \
+        verify_extraction_header_injective \
+        verify_extraction_body_injective \
         verify_add_no_overflow \
         verify_sub_no_overflow \
         verify_mul_range \
@@ -311,9 +338,9 @@ list_harnesses() {
         verify_ct_select_u64_is_exact \
         verify_floyd_cycle_detection \
         verify_hare_leads \
-        verify_periodicity_detection \
-        verify_periodicity_no_steps \
-        verify_periodicity_min_period_bound
+        verify_find_cycle_is_complete_and_correct \
+        verify_find_cycle_is_sound_for_any_budget \
+        verify_find_cycle_zero_budget
 }
 
 run_single() {

@@ -1,7 +1,7 @@
 # Harness Specification Review
 
-**Date:** 2026-11-23 (C6 updated 2026-11-27)
-**Scope:** the 37 Kani harnesses currently compiled into `kelvin-core`.
+**Date:** 2026-11-23 (C6 and `kelvin-kdf` updated 2026-11-27)
+**Scope:** the 43 Kani harnesses run by `docker/run-kani.sh`.
 
 A harness can be green and still prove nothing about the crate. This document
 records, for each harness, what it asserts, what it does **not** assert, and
@@ -24,11 +24,12 @@ This distinction is not visible from `VERIFICATION:- SUCCESSFUL`.
 
 | | Count |
 |---|---|
-| Harnesses total | 37 |
+| Harnesses total | 43 |
 | Exercise `kelvin-core` | **11** |
+| Exercise `kelvin-kdf` | **6** |
 | Model-only | **26** |
 | Directly address a C1–C5 security gap | 3 (all partial) |
-| Cover `kelvin-kdf` (extractor, key schedule, nonce) | **0** |
+| Cover `kelvin-kdf` (extractor, key schedule, nonce) | **6** (input construction and limits only) |
 | Cover `kelvin` (encrypt/decrypt, AEAD) | **0** |
 | Cover timing / constant-time | **0** (see C5 note) |
 
@@ -110,18 +111,41 @@ The last three run `kelvin_core::find_cycle`, bounded to 6 states (the zero
 budget one is independent of the state space). None runs the Verlet simulation,
 so they say nothing about the period of an orbital configuration.
 
+## Key derivation (`kelvin-kdf`, 6)
+
+| Harness | Asserts | Bound |
+|---|---|---|
+| `verify_schedule_info_injective` | distinct indices give distinct key and nonce HKDF info strings | all `u64` |
+| `verify_schedule_key_and_nonce_info_separated` | no key info string is a prefix of a nonce info string | all `u64` |
+| `verify_schedule_first_indices` | consecutive indices, no overflow, key limit, permanent exhaustion | all parameters, first 4 calls |
+| `verify_schedule_limit_invariant` | one call from any reachable state keeps `step = keys * interval`, the key limit and the step limits | 16-bit parameters |
+| `verify_extraction_header_injective` | equal hash inputs imply equal separator, nonce, step, G, softening | 3-byte separator, nonce up to 3 bytes, no bodies |
+| `verify_extraction_body_injective` | equal hash inputs imply equal mass, position, velocity | one body |
+
+They call the code used in production (`claim_index`, `key_info`, `nonce_info`,
+`feed_orbital_state`). HKDF-SHA512, BLAKE3 and SHAKE256 are not modelled, so
+nothing here shows that distinct inputs give distinct keys.
+
+**Framing limit.** The domain separator is not length-prefixed. Hash inputs are
+unambiguous only if no separator is a proper prefix of another; a unit test
+shows a collision otherwise, and another checks the library's constants.
+
+`kelvin-kdf` also contains older harnesses (extraction, configuration,
+Lyapunov) that the run script does not list. One of them kept the crate from
+compiling under Kani until 2026-11-27; they have no recorded verdict.
+
 ## Findings
 
-1. **26 of 37 harnesses never touch the crate.** They are executable
+1. **26 of 43 harnesses never touch the crate.** They are executable
    documentation for model arithmetic. That is not worthless, but it cannot
    catch a regression in `kelvin-core`.
 2. **Two "core" harnesses are model-only.** `verify_c1_epsilon_bound` and
    `verify_c1_division_remainder` recompute with `i128` shifts and `%`; they do
    not call `Fixed::div`. Documentation that describes them as checking the
    implemented division is too strong.
-3. **No harness covers the extraction or protocol layer.** `kelvin-kdf`
-   (`extract_seed_with_nonce`, `schedule.rs`, `lyapunov.rs`) and `kelvin`
-   (`encrypt`, `decrypt`, `authenticated`) are entirely uncovered by Kani.
+3. **The protocol layer is not covered.** `kelvin-kdf` is covered only for
+   input construction and key limits (not `lyapunov.rs`), and `kelvin`
+   (`encrypt`, `decrypt`, `authenticated`) is entirely uncovered by Kani.
    Those are exactly the layers where nonce reuse and domain-separation bugs
    live.
 4. **The C3 harnesses check division rounding on concrete denominators.** They
@@ -150,25 +174,19 @@ so they say nothing about the period of an orbital configuration.
 - **Timing was not measured.** The `kelvin-rust-tools` image provides `miri` and
   the Rust analyzers; `dudect`/`ctgrind` are not packaged. The existing DudeCT
   benches cover 12 arithmetic/simulation cases, not the full pipeline.
-- **`kelvin-kdf` and `kelvin` have no Kani harnesses at all.** Until they do,
-  the harness suite says nothing about extraction, key scheduling, nonce
-  construction or AEAD rejection.
+- **`kelvin` has no Kani harnesses at all.** Until it does, the harness suite
+  says nothing about AEAD rejection.
 
 ## Recommended next harnesses
 
-1. `kelvin-kdf::extractor::extract_seed_with_nonce` — determinism for fixed
-   inputs, and distinct `(domain_separator, nonce)` pairs giving distinct
-   framed hasher inputs.
-2. `kelvin-kdf::schedule` — distinct indices produce distinct info strings; reject
-   out-of-range index.
-3. `kelvin::authenticated` — tampered ciphertext/tag is rejected (no panic, no
+1. `kelvin::authenticated` — tampered ciphertext/tag is rejected (no panic, no
    plaintext); decrypt∘encrypt = identity for symbolic small buffers.
-4. `verlet_step` semantic pinning: compare against a reference implementation of
+2. `verlet_step` semantic pinning: compare against a reference implementation of
    kick-drift-kick in the harness, so the drift ordering is checked in Rust (the
    Lean model currently has no refinement link).
-5. `kelvin-kdf::lyapunov::estimate` — range/monotonicity of the estimator, which
+3. `kelvin-kdf::lyapunov::estimate` — range/monotonicity of the estimator, which
    is the code the C2 documentation describes.
-6. Timing: keep dudect for measurement; do not create a Kani harness that claims
+4. Timing: keep dudect for measurement; do not create a Kani harness that claims
    to prove constant time.
 
 ## Mutation check

@@ -27,6 +27,7 @@ Status legend:
 | L-PD | Lean: Floyd loop invariants | [`proofs/lean/src/KelvinProofs/PeriodDetection.lean`](../../proofs/lean/src/KelvinProofs/PeriodDetection.lean) |
 | K-CORE | Kani: harnesses in the crate | `kelvin-core/src/fixed_math.rs` (`#[cfg(kani)]`) |
 | K-INC | Kani: harnesses included from `proofs/kani/` | `kelvin-core/src/kani_harnesses.rs` |
+| K-KDF | Kani: key schedule and extraction framing | `kelvin-kdf/src/schedule.rs`, `kelvin-kdf/src/extractor.rs` |
 
 **K-CORE (8):** `verify_add_no_overflow`, `verify_sub_no_overflow`,
 `verify_mul_range`, `verify_c1_preimage_bound`, `verify_c1_epsilon_bound`,
@@ -49,7 +50,13 @@ Status legend:
 `verify_find_cycle_is_complete_and_correct`,
 `verify_find_cycle_is_sound_for_any_budget`, `verify_find_cycle_zero_budget`.
 
-All 37 are listed by `docker compose -f docker/docker-compose.yml run --rm kani --list`
+**K-KDF (6):** `verify_schedule_info_injective`,
+`verify_schedule_key_and_nonce_info_separated`, `verify_schedule_first_indices`,
+`verify_schedule_limit_invariant`, `verify_extraction_header_injective`,
+`verify_extraction_body_injective` (in `kelvin-kdf/src/schedule.rs` and
+`extractor.rs`).
+
+All 43 are listed by `docker compose -f docker/docker-compose.yml run --rm kani --list`
 and run by the same command without arguments. They check arithmetic, scheduling,
 framing and loop invariants; **none of them establishes a C1–C5 security gap.**
 See [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) for what each one actually
