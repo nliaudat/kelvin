@@ -25,8 +25,6 @@ fn config() -> [OrbitalBody; 3] {
 fn no_repeat_within_budget_is_reported_honestly() {
     let r = detect_orbital_period(&config(), DEFAULT_DT, SOFTENING_FACTOR, DEFAULT_G, 20_000);
     println!("observed (budget 20000): {r:?}");
-    // Any reported cycle must be genuine; absence is the expected outcome.
-    if let Some(c) = r {
-        assert!(c.lambda >= 1);
-    }
+    // Pins the observation recorded in TODO.md.
+    assert_eq!(r, None);
 }
