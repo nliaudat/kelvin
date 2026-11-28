@@ -19,8 +19,8 @@
 
 ## What runs
 
-43 harnesses run: 6 in `kelvin-kdf` (see below) and 37 compiled into
-`kelvin-core`:
+46 harnesses run: 6 in `kelvin-kdf` and 3 in `kelvin` (see below), and 37
+compiled into `kelvin-core`:
 
 - **8** in `kelvin-core/src/fixed_math.rs` under `#[cfg(kani)]`;
 - **29** in `proofs/kani/*.rs`, included by `kelvin-core/src/kani_harnesses.rs`
@@ -30,7 +30,7 @@
 docker compose -f docker/docker-compose.yml build kani
 docker compose -f docker/docker-compose.yml run --rm kani --list
 docker compose -f docker/docker-compose.yml run --rm kani --proof <name>
-docker compose -f docker/docker-compose.yml run --rm kani          # all 43
+docker compose -f docker/docker-compose.yml run --rm kani          # all 46
 ```
 
 Per-harness logs land in `proofs/kani/results/`.
@@ -105,6 +105,13 @@ within small bounds, distinct arguments or bodies give distinct hash input.
 Domain separators are not length-prefixed, so this relies on no separator being a
 prefix of another. The hash functions themselves are not modelled.
 
+### Chunk protocol (`kelvin`)
+
+`verify_chunk_prefix_injective`, `verify_chunk_open_all_or_nothing`,
+`verify_chunk_opens_only_in_place` (2-byte chunks): a rejected chunk changes
+neither data nor state, and a sealed chunk opens only at its own index with its
+own final flag. The last two assume an ideal tag; KMAC128 is not modelled.
+
 ## What is *not* verified by Kani
 
 - C1 per-operation or per-step entropy loss.
@@ -127,7 +134,7 @@ The remaining `proofs/kani/*.rs` files that are not in the list above
 
 An earlier revision of this file listed "20 Kani harnesses", "18 verified today",
 "24/25 gaps proved". None of those numbers came from a tool. The honest totals
-are: **43 runnable harnesses**, **0 proved security gaps**, 3 partial, 5
+are: **46 runnable harnesses**, **0 proved security gaps**, 3 partial, 5
 empirical, 15 open. See
 [`documentation/formal_verification/PROOF_INDEX.md`](documentation/formal_verification/PROOF_INDEX.md).
 
@@ -154,3 +161,5 @@ Update, 2026-11-27: the six `kelvin-kdf` harnesses were added and run individual
 Update, 2026-11-27: a single `--all` run on `dev` at `326c911` passed all 43 harnesses (about 1 h 25 min); details in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md). One of them is weak: `verify_c1_preimage_bound` asserts that at most 9 of 9 compared values match, which cannot fail.
 
 Update, 2026-11-27: `verify_c1_preimage_bound` was rewritten to assert that adjacent divisors in the window give distinct quotients. Run individually: successful (45 s); it fails when the division result is truncated.
+
+Update, 2026-11-27: the three `verify_chunk_*` harnesses were added and run individually with `-Z stubbing`; all succeeded (the slowest in 28 s), and planted bugs made each fail. No full `--all` run of the 46 has been made.

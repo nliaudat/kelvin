@@ -28,6 +28,7 @@ Status legend:
 | K-CORE | Kani: harnesses in the crate | `kelvin-core/src/fixed_math.rs` (`#[cfg(kani)]`) |
 | K-INC | Kani: harnesses included from `proofs/kani/` | `kelvin-core/src/kani_harnesses.rs` |
 | K-KDF | Kani: key schedule and extraction framing | `kelvin-kdf/src/schedule.rs`, `kelvin-kdf/src/extractor.rs` |
+| K-AUTH | Kani: authenticated chunk protocol (ideal tag) | `kelvin/src/authenticated.rs` |
 
 **K-CORE (8):** `verify_add_no_overflow`, `verify_sub_no_overflow`,
 `verify_mul_range`, `verify_c1_preimage_bound`, `verify_c1_epsilon_bound`,
@@ -56,7 +57,11 @@ Status legend:
 `verify_extraction_body_injective` (in `kelvin-kdf/src/schedule.rs` and
 `extractor.rs`).
 
-All 43 are listed by `docker compose -f docker/docker-compose.yml run --rm kani --list`
+**K-AUTH (3):** `verify_chunk_prefix_injective`,
+`verify_chunk_open_all_or_nothing`, `verify_chunk_opens_only_in_place` (in
+`kelvin/src/authenticated.rs`).
+
+All 46 are listed by `docker compose -f docker/docker-compose.yml run --rm kani --list`
 and run by the same command without arguments. They check arithmetic, scheduling,
 framing and loop invariants; **none of them establishes a C1–C5 security gap.**
 See [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) for what each one actually

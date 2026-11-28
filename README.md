@@ -127,7 +127,7 @@ See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.m
 - **Constant-time operations**: Integer-only arithmetic; dudect-bencher (|t| < 5) on 12 primitive-level benches (full pipeline not covered — see COMPLIANCE.md §5)
 - **Memory safety**: `#![forbid(unsafe_code)]` across all crates
 - **Zeroization**: All secret material cleared on drop (verified by runtime read-back test)
-- **Formal verification**: 43 Kani harnesses (arithmetic safety/equivalence, key derivation inputs, framing, loop invariants) plus Lean proofs of the integrator schedule, gravity momentum cancellation and key/domain framing. The C1–C5 security claims are **not** machine-checked — see [Formal Verification](#formal-verification) section
+- **Formal verification**: 46 Kani harnesses (arithmetic safety/equivalence, key derivation inputs, framing, loop invariants) plus Lean proofs of the integrator schedule, gravity momentum cancellation and key/domain framing. The C1–C5 security claims are **not** machine-checked — see [Formal Verification](#formal-verification) section
 - **NIST SP 800-90B compliance**: Built-in health tests (repetition, adaptive proportion, runs, longest run, Shannon entropy, chi-square, correlation)
 - **NIST SP 800-22 compliance**: 13–15 of 15 statistical tests pass on orbital keystream depending on mode (Random Excursions inapplicable on some 1-MB samples; see `nist_test_anomalies.md`)
 - **Post-quantum identity**: ML-DSA-65 (FIPS 204) signatures + ML-KEM-768 (FIPS 203) key encapsulation
@@ -262,7 +262,7 @@ kelvin analyze --config my-key.json
 
 ## Formal Verification
 
-Kelvin follows Apple's corecrypto blueprint as a *model*, using the Kani Rust Verifier and Lean 4. Only part of it is realised; 43 harnesses run (37 in `kelvin-core`, 6 in `kelvin-kdf`), and the other files in `proofs/kani/` are uncompiled templates:
+Kelvin follows Apple's corecrypto blueprint as a *model*, using the Kani Rust Verifier and Lean 4. Only part of it is realised; 46 harnesses run (37 in `kelvin-core`, 6 in `kelvin-kdf`, 3 in `kelvin`), and the other files in `proofs/kani/` are uncompiled templates:
 
 | Level | Target | Status |
 |-------|--------|--------|

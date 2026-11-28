@@ -83,6 +83,18 @@ struct ChunkState {
     finished: bool,
 }
 
+/// Length of the fixed MAC input prefix: version, chunk index, final flag.
+const CHUNK_PREFIX_LEN: usize = 10;
+
+/// The MAC input that precedes the ciphertext of a chunk.
+fn chunk_prefix(index: u64, last: bool) -> [u8; CHUNK_PREFIX_LEN] {
+    let mut prefix = [0u8; CHUNK_PREFIX_LEN];
+    prefix[0] = AUTH_FORMAT_VERSION;
+    prefix[1..9].copy_from_slice(&index.to_le_bytes());
+    prefix[9] = u8::from(last);
+    prefix
+}
+
 /// Compute a KMAC128 tag over one chunk.
 ///
 /// Uses the `sha3-kmac` crate (NIST SP 800-185 compliant KMAC128).
@@ -101,9 +113,7 @@ fn compute_tag(
     use sha3_kmac::Mac;
 
     let mut mac = Kmac128::new(key, custom).expect("KMAC128 key size is valid");
-    mac.update(&[AUTH_FORMAT_VERSION]);
-    mac.update(&index.to_le_bytes());
-    mac.update(&[u8::from(last)]);
+    mac.update(&chunk_prefix(index, last));
     mac.update(ciphertext);
     let tag: Mac<U32> = mac.finalize();
     let mut out = [0u8; TAG_LEN];
@@ -691,5 +701,143 @@ impl Drop for KelvinStreamingAuthenticated {
     fn drop(&mut self) {
         self.mac_key.zeroize();
         self.tag_buf.zeroize();
+    }
+}
+
+/// Kani proofs of the chunk protocol. KMAC128 is not modelled: the stream
+/// harnesses replace `compute_tag` with an ideal, collision-free tag.
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Chunk length used by the stream harnesses.
+    const LEN: usize = 2;
+    const BUF: usize = LEN + AUTH_OVERHEAD;
+    const MASK: u8 = 0x5a;
+
+    /// Ideal tag for chunks of at most 22 bytes: it spells out every input
+    /// except the key and customization string, so it has no collisions.
+    fn ideal_tag(
+        _key: &[u8; MAC_KEY_SIZE],
+        index: u64,
+        last: bool,
+        ciphertext: &[u8],
+        _custom: &[u8],
+    ) -> [u8; TAG_LEN] {
+        let mut tag = [0u8; TAG_LEN];
+        tag[..CHUNK_PREFIX_LEN].copy_from_slice(&chunk_prefix(index, last));
+        tag[CHUNK_PREFIX_LEN] = ciphertext.len() as u8;
+        let start = CHUNK_PREFIX_LEN + 1;
+        let mut i = 0;
+        while i < ciphertext.len() {
+            tag[start + i] = ciphertext[i];
+            i += 1;
+        }
+        tag
+    }
+
+    /// Error messages are irrelevant here, and formatting them is intractable
+    /// for the solver.
+    fn no_format(_: core::fmt::Arguments<'_>) -> String {
+        String::new()
+    }
+
+    /// Stand-in for the keystream.
+    fn xor(buf: &mut [u8]) -> Result<(), KelvinError> {
+        for byte in buf {
+            *byte ^= MASK;
+        }
+        Ok(())
+    }
+
+    fn any_open_state() -> ChunkState {
+        let next: u64 = kani::any();
+        // 2^64 chunks are out of reach; the counter increment would overflow.
+        kani::assume(next < u64::MAX);
+        ChunkState { next, finished: false }
+    }
+
+    /// Distinct (index, final flag) pairs give distinct prefixes. The prefix
+    /// has a fixed length, so the ciphertext that follows cannot be confused
+    /// with it.
+    #[kani::proof]
+    fn verify_chunk_prefix_injective() {
+        let (i, a): (u64, bool) = (kani::any(), kani::any());
+        let (j, b): (u64, bool) = (kani::any(), kani::any());
+        if chunk_prefix(i, a) == chunk_prefix(j, b) {
+            assert!(i == j && a == b);
+        }
+    }
+
+    /// For any received bytes, `open_chunk` either rejects them and changes
+    /// nothing, or the version and tag were correct and the stream advances.
+    #[kani::proof]
+    #[kani::stub(compute_tag, ideal_tag)]
+    #[kani::stub(std::fmt::format, no_format)]
+    #[kani::unwind(37)]
+    fn verify_chunk_open_all_or_nothing() {
+        let mut state = ChunkState { next: kani::any(), finished: kani::any() };
+        kani::assume(state.next < u64::MAX);
+        let (next, finished) = (state.next, state.finished);
+        let received: [u8; BUF] = kani::any();
+        let mut data = received;
+        let last: bool = kani::any();
+        let mut decrypted = false;
+
+        let result = open_chunk(&mut state, &[0; MAC_KEY_SIZE], b"", &mut data, last, |buf| {
+            decrypted = true;
+            xor(buf)
+        });
+
+        let expected = ideal_tag(&[0; MAC_KEY_SIZE], next, last, &received[..LEN], b"");
+        let authentic =
+            !finished && received[LEN] == AUTH_FORMAT_VERSION && received[LEN + 1..] == expected;
+        assert!(result.is_ok() == authentic);
+        kani::cover!(result.is_ok(), "a chunk is accepted");
+        kani::cover!(result.is_err(), "a chunk is rejected");
+
+        if result.is_ok() {
+            assert!(decrypted);
+            assert!(state.next == next + 1 && state.finished == last);
+            assert!(data[0] == received[0] ^ MASK && data[1] == received[1] ^ MASK);
+        } else {
+            assert!(!decrypted);
+            assert!(state.next == next && state.finished == finished);
+            assert!(data == received);
+        }
+        core::mem::forget(result);
+    }
+
+    /// A sealed chunk opens to its plaintext at the same position with the
+    /// same final flag, and is rejected at any other position or flag.
+    #[kani::proof]
+    #[kani::stub(compute_tag, ideal_tag)]
+    #[kani::stub(std::fmt::format, no_format)]
+    #[kani::unwind(37)]
+    fn verify_chunk_opens_only_in_place() {
+        let key = [0; MAC_KEY_SIZE];
+        let mut sender = any_open_state();
+        let mut receiver = any_open_state();
+        let (sent_index, expected_index) = (sender.next, receiver.next);
+        let plaintext: [u8; LEN] = kani::any();
+        let mut data = [0u8; BUF];
+        data[..LEN].copy_from_slice(&plaintext);
+        let sealed_last: bool = kani::any();
+        let opened_last: bool = kani::any();
+
+        let sealed = seal_chunk(&mut sender, &key, b"", &mut data, sealed_last, xor);
+        assert!(sealed.is_ok());
+        assert!(sender.next == sent_index + 1 && sender.finished == sealed_last);
+
+        let opened = open_chunk(&mut receiver, &key, b"", &mut data, opened_last, xor);
+        let in_place = sent_index == expected_index && sealed_last == opened_last;
+        assert!(opened.is_ok() == in_place);
+        kani::cover!(opened.is_ok(), "round trip");
+        kani::cover!(opened.is_err(), "misplaced chunk");
+        if in_place {
+            assert!(data[0] == plaintext[0] && data[1] == plaintext[1]);
+        }
+        core::mem::forget(sealed);
+        core::mem::forget(opened);
     }
 }

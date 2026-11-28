@@ -79,7 +79,7 @@ Status is tracked in [`documentation/formal_verification.md`](documentation/form
 | L3 | Pipeline executes the right steps with the right domain separators | Not proved (domain framing is proved in Lean/Kani; the pipeline is tested) |
 | L4 | Bit-identical output on the tested toolchain | Tested (18 golden-hash and repeatability tests), not proved |
 
-43 Kani harnesses run (37 in `kelvin-core`, 6 in `kelvin-kdf`); other files under `proofs/kani/` are uncompiled templates.
+46 Kani harnesses run (37 in `kelvin-core`, 6 in `kelvin-kdf`, 3 in `kelvin`); other files under `proofs/kani/` are uncompiled templates.
 
 **Limitation:** These are implementation-correctness checks on a narrow set of facts. They do not prove cryptographic security, and there is no verified refinement from the Lean models to the Rust code.
 

@@ -2,10 +2,11 @@
 # =============================================================================
 # run-kani.sh — Run Kani proofs inside Docker container
 #
-# Runs 43 harnesses:
+# Runs 46 harnesses:
 #   - 8 integrated in kelvin-core/src/fixed_math.rs under #[cfg(kani)]
 #   - 29 in proofs/kani/*.rs, included by kelvin-core/src/kani_harnesses.rs
 #   - 4 in kelvin-kdf/src/schedule.rs and 2 in kelvin-kdf/src/extractor.rs
+#   - 3 in kelvin/src/authenticated.rs (chunk protocol)
 #
 # kelvin-kdf also contains older #[cfg(kani)] harnesses that are not in this
 # list; they have no recorded verdict.
@@ -88,7 +89,15 @@ package_for() {
     case "$1" in
         verify_schedule_* | verify_extraction_header_injective | verify_extraction_body_injective)
             echo kelvin-kdf ;;
+        verify_chunk_*) echo kelvin ;;
         *) echo kelvin-core ;;
+    esac
+}
+
+# Extra cargo-kani flags a harness needs.
+flags_for() {
+    case "$1" in
+        verify_chunk_*) echo "-Z stubbing" ;;
     esac
 }
 
@@ -135,7 +144,7 @@ run_with_progress() {
         elif [[ "$line" == "VERIFICATION:- FAILED" ]]; then
             printf "\n  ${RED}✗ VERIFICATION: FAILED${NC}\n" >&3
         fi
-    done < <(cargo kani -p "$(package_for "$harness_name")" --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
+    done < <(cargo kani -p "$(package_for "$harness_name")" $(flags_for "$harness_name") --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
 
     if [ "$total_checks" -eq 0 ]; then
         if grep -iq "error\|not found" "$log_file" 2>/dev/null; then
@@ -152,7 +161,7 @@ print_banner() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║       KELVIN FORMAL VERIFICATION — Kani Model Checker       ║"
-    echo "║      43 integrated harnesses (37 core + 6 kdf)              ║"
+    echo "║      46 harnesses (37 core + 6 kdf + 3 kelvin)              ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
     echo "  Kani:   $(cargo kani --version 2>/dev/null || echo 'unknown')"
@@ -238,6 +247,11 @@ run_proofs() {
         "verify_schedule_limit_invariant:no overflow or excess keys (16-bit parameters)"
         "verify_extraction_header_injective:distinct arguments give distinct hash input"
         "verify_extraction_body_injective:distinct bodies give distinct hash input"
+
+        # Authenticated chunk protocol (kelvin), with an ideal tag instead of KMAC128
+        "verify_chunk_prefix_injective:index and final flag are bound unambiguously"
+        "verify_chunk_open_all_or_nothing:rejected chunks change nothing"
+        "verify_chunk_opens_only_in_place:no reordering or final-flag change"
     )
     local total=${#harnesses[@]}
     local current=0
@@ -304,6 +318,9 @@ list_harnesses() {
         verify_schedule_limit_invariant \
         verify_extraction_header_injective \
         verify_extraction_body_injective \
+        verify_chunk_prefix_injective \
+        verify_chunk_open_all_or_nothing \
+        verify_chunk_opens_only_in_place \
         verify_add_no_overflow \
         verify_sub_no_overflow \
         verify_mul_range \

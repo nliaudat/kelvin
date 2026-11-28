@@ -5,7 +5,7 @@ cryptosystem.
 
 > **Read this first.** No cryptographic security claim in this repository is
 > currently machine-checked. What *is* machine-checked is a set of arithmetic and
-> scheduling lemmas (Lean) plus 43 Kani harnesses over fixed-point arithmetic,
+> scheduling lemmas (Lean) plus 46 Kani harnesses over fixed-point arithmetic,
 > model arithmetic, key derivation inputs, framing and loop invariants. Everything else is empirical, an explicit assumption, or open.
 
 **Last updated:** 2026-11-23
@@ -32,8 +32,9 @@ cryptosystem.
 |----------|----------|-----------|
 | Lean 4 proofs | [`proofs/lean/`](../../proofs/lean/README.md) | `cd proofs/lean && lake build` |
 | Kani harnesses (in-crate) | `kelvin-core/src/fixed_math.rs` (`#[cfg(kani)]`) | `docker compose -f docker/docker-compose.yml run --rm kani` |
-| Kani harnesses (included from `proofs/kani/`) | `kelvin-core/src/kani_harnesses.rs` | same; `--list` names all 43 |
+| Kani harnesses (included from `proofs/kani/`) | `kelvin-core/src/kani_harnesses.rs` | same; `--list` names all 46 |
 | Kani harnesses (`kelvin-kdf`) | `kelvin-kdf/src/schedule.rs`, `extractor.rs` | same |
+| Kani harnesses (`kelvin`) | `kelvin/src/authenticated.rs` | same |
 | Kani harness templates (not compiled) | other `proofs/kani/*.rs` files | n/a — templates only |
 | Protocol proof tooling (no Kelvin models yet) | [`docker/formal/`](../../docker/formal/README.md), [`formal/`](../../formal/README.md) | `docker compose -f docker/docker-compose.formal.yml run --rm proverif ...` |
 
@@ -42,7 +43,7 @@ cryptosystem.
 | Document | Description |
 |----------|-------------|
 | [`PROOF_INDEX.md`](PROOF_INDEX.md) | Gap-by-gap mapping to artifacts |
-| [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) | What each of the 43 harnesses actually constrains |
+| [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) | What each of the 46 harnesses actually constrains |
 | [`../formal_verification.md`](../formal_verification.md) | Architecture and threat model |
 | [`code_verification.md`](code_verification.md) | Dynamic error-bound strategy |
 

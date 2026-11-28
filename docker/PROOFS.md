@@ -13,9 +13,10 @@ L3: Pipeline        ──  Full simulate_and_extract_seed produces correct outp
 L4: Determinism     ──  Bit-identical results across platforms
 ```
 
-> **Status note.** 43 harnesses run (`docker/run-kani.sh --list`): 8 in
-> `fixed_math.rs`, 29 included from `proofs/kani/` by `kani_harnesses.rs`, and 6
-> in `kelvin-kdf` (key schedule and extraction framing). The L1–L3 sections below describe
+> **Status note.** 46 harnesses run (`docker/run-kani.sh --list`): 8 in
+> `fixed_math.rs`, 29 included from `proofs/kani/` by `kani_harnesses.rs`, 6 in
+> `kelvin-kdf` (key schedule and extraction framing) and 3 in `kelvin` (chunk
+> protocol). The L1–L3 sections below describe
 > **template** files (`fixed_equivalence.rs`, `acceleration_proofs.rs`,
 > `pipeline_proofs.rs`) that are not compiled, so their properties are targets,
 > not established results. See `documentation/formal_verification.md`.

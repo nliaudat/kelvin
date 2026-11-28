@@ -82,6 +82,9 @@ path = "../tests/kelvin_tests/redaction.rs"
 name = "golden_hash"
 path = "../tests/kelvin_tests/golden_hash.rs"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
 [features]
 default = []
 serde = ["dep:serde", "dep:serde_json", "kelvin-kdf/serde"]
