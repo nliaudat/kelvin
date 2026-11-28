@@ -119,7 +119,7 @@ This is the deepest flaw in the chain. The reduction in C4 requires that knowing
 
 ### 🟡 11. [ACKNOWLEDGED] Kani Harness Names Overstate
 
-**Status:** ACKNOWLEDGED — Harness names like `verify_c3_step_non_injective` imply non-injectivity is proven, but the harness verifies a 1-ULP difference property, not non-injectivity. This is a known limitation.
+**Status:** ACKNOWLEDGED — Harness names like `verify_c3_step_damping` imply non-injectivity is proven, but the harness verifies a 1-ULP difference property, not non-injectivity. This is a known limitation.
 
 **Sources:** C3, C4, C5 Kani harness tables
 

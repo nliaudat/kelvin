@@ -13,4 +13,4 @@ crate-type = ["staticlib", "cdylib"]
 [dependencies]
 kelvin = { path = "../kelvin", features = ["serde"] }
 kelvin-core = { path = "../kelvin-core" }
-paste = "1"
+pastey = "0.2"

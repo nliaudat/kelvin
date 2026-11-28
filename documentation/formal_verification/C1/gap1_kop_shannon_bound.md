@@ -1,83 +1,60 @@
-/-!
-# C1 Gap 1: Per-Operation Information Loss k_op ≥ 1 Bit — PROVED
+# C1 Gap 1: Per-Operation Information Loss `k_op ≥ 1` Bit
 
-Formal Lean proof that each fixed-point division operation discards at least 1 bit of Shannon entropy.
+**Status:** Partial. Division arithmetic is proved; the entropy claim is open.
 
-Status: ✅ PROVED (Lean) + ✅ VERIFIED (Kani)
-Date: 2026-11-21
-Conjecture: C1 — Fixed-Point Information Loss (Irreversibility)
-Kani Cross-Reference: verify_c1_division_remainder in kelvin-core/src/fixed_math.rs
+**Claim:** each Q32.64 division `q = g / dist_cubed` discards at least 1 bit of
+Shannon entropy.
 
----
+## The argument, stated precisely
 
-## Theorem Statement
+For the division
 
-**Theorem (Per-Operation Shannon Entropy Loss):**
-For a Q32.64 fixed-point division `q = g / dist_cubed` where:
+$$q_{\text{raw}} = \left\lfloor \frac{g_{\text{raw}} \cdot 2^{64}}
+  {d^3_{\text{raw}}} \right\rfloor,$$
 
-- `g` is the gravitational constant (`g_raw = 0x277A79937C8BBC0000`, constant)
-- `dist_cubed` is uniformly distributed over `[2^36, 8·10^6 · 2^64]` raw units
-- The division uses 192-iteration restoring division
+the remainder $r = (g_{\text{raw}} \cdot 2^{64}) \bmod d^3_{\text{raw}}$ is
+discarded. The claim is that
 
-Then the per-operation information loss satisfies:
-$$k_{\text{op}} \geq 1 \text{ bit}$$
+$$k_{op} = I(d^3;\, r \mid q) = H(r \mid q) \ge 1 \text{ bit}.$$
 
----
+## What is actually proved
 
-## Proof (Lean Formalization)
-
-The proof is formalized in `proofs/lean/src/fixed_point/FixedPoint.lean`:
+`FixedPoint.lean` proves two arithmetic facts:
 
 ```lean
-theorem div_correctness (a b : Fixed) (hb : b.raw ≠ 0) :
-  ∀ q ∈ Fixed.div a b, 
-    |((q.raw : ℝ) / SCALE_VAL - ((a.raw : ℝ) / SCALE_VAL) / ((b.raw : ℝ) / SCALE_VAL)| < 2 := by
-  -- Restoring division provides bounded error (within 2 ULPs)
-  -- The remainder r = (g_raw * 2^64) mod d_cubed_raw is discarded
-  -- This remainder depends on the LSB of dist_cubed, carrying ≥1 bit of entropy
-  simp [restore_division]
-  rw [div_eq_mul_inv]
-  field_simp at *
-  <;> norm_num at *
-  <;> linarith
+theorem div_rem_identity (a b : Int) : a / b * b + a % b = a
+theorem rem_bounds (a b : Int) (hb : 0 < b) : 0 ≤ a % b ∧ a % b < b
 ```
 
-### Key Points:
+These are identities about `Int` division. They do **not** mention entropy, a
+distribution, or independence, so they cannot imply $k_{op} \ge 1$.
 
-1. **Division Remainder**: The integer division `q_raw = floor((g_raw * 2^64) / d_cubed_raw)` produces a remainder `r = (g_raw * 2^64) mod d_cubed_raw` that is discarded.
+## What is missing for the entropy claim
 
-2. **LSB Entropy Principle**: For uniformly distributed `dist_cubed`, the LSB carries exactly 1 bit of Shannon entropy, and this information is lost in the quotient.
+1. **A distribution.** $H(r \mid q)$ is defined relative to a distribution on
+   $d^3$. C1 gap 2 proposes uniformity but does not prove it.
+2. **Conditioning.** $H(r \mid q)$ requires the joint law of $(q, r)$, i.e. the
+   map $d^3 \mapsto (q, r)$ and its fibres.
+3. **A lower bound on the fibre entropy.** The heuristic "the LSB carries one
+   bit" is not a theorem: the fibre of $q$ is an interval of length $d^3$, whose
+   size in raw units is what determines the conditional entropy.
 
-3. **Mutual Information**: The information loss is defined as:
-   $$k_{op} = I(d^3;\; r \mid q) = H(r \mid q) \geq 1 \text{ bit}$$
+The Kani harness `verify_c1_division_remainder` checks the *range* of the
+remainder ($0 \le r < \text{den}$). It does not check entropy.
 
-4. **Kani Verification**: The harness `verify_c1_division_remainder` confirms that the remainder satisfies `0 ≤ r < d_cubed_raw`.
+## Per-step extrapolation (unproved)
 
----
+The sketch multiplies by the operation count:
 
-## Per-Step Cumulative Loss
+$$k_{\text{step}} = 2N(N-1)\,k_{op} \ge 40 \text{ bits/step for } N=5.$$
 
-The Verlet integrator computes accelerations twice per step (kick-drift-kick):
-
-$$k_{\text{step}} = 2N(N-1) \times k_{\text{op}} \geq 40 \text{ bits/step for N=5}$$
-
-This feeds into the C1 saturation model:
-$$L_{\text{total}}(S) = \min(S \cdot k_{\text{step}},\; H_{\max} - \log_2(A))$$
-
----
+This assumes the per-operation losses are independent and additive. Neither is
+proved.
 
 ## References
 
-- [`../../proofs/lean/src/fixed_point/FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean) (Lean proof)
-- `kelvin-core/src/fixed_math.rs` lines 637–891 (Kani harnesses)
-- [`../readme.md`](../readme.md) (C1 overview)
-- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
-
----
-
-## See Also
-
-- [C1 Proof Sketch](../readme.md)
-- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
-
-/-
+- [C1 overview](readme.md)
+- [C1 gap 2](gap2_uniform_distribution.md) — uniformity (empirical)
+- [C1 gap 4](gap4_epsilon_bound.md) — ε-version (partial)
+- [`../../../proofs/lean/src/KelvinProofs/FixedPoint.lean`](../../../proofs/lean/src/KelvinProofs/FixedPoint.lean)
+- [PROOF_INDEX.md](../PROOF_INDEX.md)

@@ -1,0 +1,22 @@
+/*
+  Kelvin - Tamarin smoke test.
+
+  TOOLCHAIN smoke test, not a proof about Kelvin. A freshly generated key is
+  used to publish a hash; the lemma says the adversary never learns the key.
+*/
+
+theory KelvinSmoke
+begin
+
+builtins: hashing
+
+rule Generate:
+  [ Fr(~k) ] --[ Generated(~k) ]-> [ !Key(~k) ]
+
+rule Publish:
+  [ !Key(k) ] --> [ Out(h(k)) ]
+
+lemma key_secret:
+  "All k #i. Generated(k) @ i ==> not (Ex #j. K(k) @ j)"
+
+end

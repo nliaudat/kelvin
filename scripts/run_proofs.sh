@@ -2,7 +2,9 @@
 # =============================================================================
 # run_proofs.sh — Run all Kani formal verification proofs for Kelvin
 #
-# Runs all 62 proof harnesses across 9 proof files in kelvin-core.
+# NOTE: the list below is a legacy catalogue of template files in proofs/kani/ that
+# are NOT compiled into kelvin-core. The authoritative suite is the 46 harnesses
+# run by docker/run-kani.sh (see documentation/formal_verification.md).
 # Requires Kani Rust Verifier: https://model-checking.github.io/kani/
 #
 # Usage:
@@ -105,7 +107,7 @@ list_harnesses() {
     echo "   verify_c1_epsilon_bound"
     echo "   verify_c1_division_remainder"
     echo ""
-    echo " Total: 62 harnesses (59 previous + 3 C1 information loss proofs)"
+    echo " Legacy catalogue total: 62 (templates, not all compiled). Active suite: 46 (docker/run-kani.sh --list)"
 }
 
 run_fast() {

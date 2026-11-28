@@ -70,3 +70,7 @@ golden_hash_output.txt
 golden_hash_stderr.txt
 streaming_test_result.txt
 
+/proofs/lean/.lake
+
+# EasyCrypt proof caches generated when running the image against the repo
+*.eco

@@ -4,7 +4,7 @@ This crate uses the [dudect-bencher](https://crates.io/crates/dudect-bencher) fr
 (Welch's t-test) to empirically verify that the Q32.64 fixed-point arithmetic operations
 in `kelvin-core` execute in constant time regardless of secret input values.
 
-**Full results report:** See [Section 8 of the Proof of Concept](../documentation/proof_of_concept.md#8-constant-time-side-channel-benchmarking).
+**Full results report:** See [Section 8 of the Proof of Concept](../../documentation/proof_of_concept.md#8-constant-time-side-channel-benchmarking).
 
 ## Quick Start
 
@@ -42,4 +42,4 @@ cargo run -p constant_time_bench -- --continuous mul
 ## References
 
 - Reparaz, O., Balasch, J., & Verbauwhede, I. (2017). "Dude, is my code constant time?"
-  *Design, Automation & Test in Europe Conference (DATE)*. doi:10.23919/DATE.2017.7927267
+  *Design, Automation & Test in Europe Conference (DATE)*. [doi:10.23919/DATE.2017.7927267](https://doi.org/10.23919/DATE.2017.7927267)

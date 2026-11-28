@@ -1,179 +1,162 @@
 # Formal Verification Documentation Index
 
-This directory contains the complete formal verification documentation for the Kelvin cryptosystem.
+This directory documents what is and is not formally verified about the Kelvin
+cryptosystem.
 
-## Overview
+> **Read this first.** No cryptographic security claim in this repository is
+> currently machine-checked. What *is* machine-checked is a set of arithmetic and
+> scheduling lemmas (Lean) plus 46 Kani harnesses over fixed-point arithmetic,
+> model arithmetic, key derivation inputs, framing and loop invariants. Everything else is empirical, an explicit assumption, or open.
 
-**Status:** ✅ **All 23 gaps closed (19 proved, 4 justified, 0 open)**
+**Last updated:** 2026-11-23
 
-- **Lean Proofs**: Mathematical specifications in `proofs/lean/src/` (7 files, 32 theorems)
-- **Kani Proofs**: Code verification in `proofs/kani/*.rs`
-- **Gap Documentation**: Detailed analysis in `documentation/formal_verification/C*/gap*.md`
+## Status summary
 
-**Last Updated:** 2026-11-21
+| Category | Gaps | Proved | Partial | Empirical | Open |
+|----------|------|--------|---------|-----------|------|
+| C1 Information loss | 7 | 0 | 2 | 2 | 3 |
+| C2 Lyapunov chaos | 6 | 0 | 0 | 2 | 4 |
+| C3 Quantum hardness | 3 | 0 | 0 | 0 | 3 |
+| C4 Keystream indistinguishability | 3 | 0 | 1 | 0 | 2 |
+| C5 Configuration space | 4 | 0 | 0 | 1 | 3 |
+| **Total** | **23** | **0** | **3** | **5** | **15** |
 
-## Quick Links
+- **Proved** — machine-checked artifact establishes the stated claim.
+- **Partial** — a strictly weaker related fact is machine-checked.
+- **Empirical** — measured or taken from literature, not proved.
+- **Open** — no artifact.
+
+## Where the artifacts are
+
+| Artifact | Location | How to run |
+|----------|----------|-----------|
+| Lean 4 proofs | [`proofs/lean/`](../../proofs/lean/README.md) | `cd proofs/lean && lake build` |
+| Kani harnesses (in-crate) | `kelvin-core/src/fixed_math.rs` (`#[cfg(kani)]`) | `docker compose -f docker/docker-compose.yml run --rm kani` |
+| Kani harnesses (included from `proofs/kani/`) | `kelvin-core/src/kani_harnesses.rs` | same; `--list` names all 46 |
+| Kani harnesses (`kelvin-kdf`) | `kelvin-kdf/src/schedule.rs`, `extractor.rs` | same |
+| Kani harnesses (`kelvin`) | `kelvin/src/authenticated.rs` | same |
+| Kani harness templates (not compiled) | other `proofs/kani/*.rs` files | n/a — templates only |
+| Protocol proof tooling (no Kelvin models yet) | [`docker/formal/`](../../docker/formal/README.md), [`formal/`](../../formal/README.md) | `docker compose -f docker/docker-compose.formal.yml run --rm proverif ...` |
+
+## Quick links
 
 | Document | Description |
 |----------|-------------|
-| [`PROOF_INDEX.md`](PROOF_INDEX.md) | Complete mapping of all 23 gaps to Lean/Kani proofs |
-| [`formal_verification.md`](../formal_verification.md) | Main documentation with architecture and status |
-| [`code_verification.md`](code_verification.md) | Apple-inspired dynamic error bound strategy |
+| [`PROOF_INDEX.md`](PROOF_INDEX.md) | Gap-by-gap mapping to artifacts |
+| [`HARNESS_REVIEW.md`](HARNESS_REVIEW.md) | What each of the 46 harnesses actually constrains |
+| [`../formal_verification.md`](../formal_verification.md) | Architecture and threat model |
+| [`code_verification.md`](code_verification.md) | Dynamic error-bound strategy |
+
+---
 
 ## C1: Information Loss (7 gaps)
 
-**Location:** `C1/`
+**Location:** [`C1/`](C1/readme.md)
 
-Quantifies irreversibility of fixed-point rounding operations. All gaps now have Lean proofs.
+Irreversibility of fixed-point rounding.
 
-| Gap | Description | Status |
-|-----|-------------|--------|
-| [gap1_kop_shannon_bound.md](gap1_kop_shannon_bound.md) | $k_{op} \geq 1$ bit per division | ✅ Proved (Lean + Kani) |
-| [gap2_uniform_distribution.md](gap2_uniform_distribution.md) | Uniformity of $d^3$ | ✅ Justified (empirical) |
-| [gap3_saturation_bound.md](gap3_saturation_bound.md) | **NEW:** Cumulative loss saturation | ✅ Proved (Lean + Kani) |
-| [gap4_epsilon_bound.md](gap4_epsilon_bound.md) | **UPDATED:** $\varepsilon$-bound $k_{op} \geq 1-\varepsilon$ | ✅ Proved (Lean + Kani) |
-| [gap5_error_independence.md](gap5_error_independence.md) | Error independence (Lemma A3) | ✅ Justified |
-| [gap6_hartley_min_entropy.md](gap6_hartley_min_entropy.md) | Hartley vs min-entropy | ✅ Proved (Lean + Kani) |
-| [gap7_verlet_double_effect.md](gap7_verlet_double_effect.md) | Verlet double computation | ✅ Verified (Kani) |
+| Gap | Claim | Status |
+|-----|-------|--------|
+| [`C1/gap1_kop_shannon_bound.md`](C1/gap1_kop_shannon_bound.md) | $k_{op} \ge 1$ bit per division | **Partial** — `div_rem_identity` proved; entropy claim open |
+| [`C1/gap2_uniform_distribution.md`](C1/gap2_uniform_distribution.md) | Uniformity of $d^3$ | **Empirical** |
+| [`C1/gap3_saturation_bound.md`](C1/gap3_saturation_bound.md) | Cumulative loss saturates | **Open** |
+| [`C1/gap4_epsilon_bound.md`](C1/gap4_epsilon_bound.md) | $k_{op} \ge 1-\varepsilon$ | **Partial** — Kani `verify_c1_epsilon_bound` checks the implemented arithmetic |
+| [`C1/gap5_error_independence.md`](C1/gap5_error_independence.md) | Error independence (Lemma A3) | **Empirical / assumption** |
+| [`C1/gap6_hartley_min_entropy.md`](C1/gap6_hartley_min_entropy.md) | Hartley vs min-entropy | **Open** |
+| [`C1/gap7_verlet_double_effect.md`](C1/gap7_verlet_double_effect.md) | Verlet double computation | **Partial** — `Integrator.lean` proves the two-kick schedule |
 
-**Lean Proofs:** [`FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean), [`VerletIntegrator.lean`](../../proofs/lean/src/dynamics/VerletIntegrator.lean)
+**Lean modules:** [`FixedPoint.lean`](../../proofs/lean/src/KelvinProofs/FixedPoint.lean),
+[`Integrator.lean`](../../proofs/lean/src/KelvinProofs/Integrator.lean)
 
 ---
 
 ## C2: Lyapunov Chaos Certification (6 gaps)
 
-**Location:** `C2/`
+**Location:** [`C2/`](C2/readme.md)
 
-Chaos certification via shadow orbit method and Kaplan-Yorke dimension. All gaps now have Lean proofs.
+| Gap | Claim | Status |
+|-----|-------|--------|
+| [`C2/gap1_discrete_lyapunov_bound.md`](C2/gap1_discrete_lyapunov_bound.md) | Discrete Lyapunov error bound | **Open** |
+| [`C2/gap2_positive_lambda_certification.md`](C2/gap2_positive_lambda_certification.md) | Positive $\lambda$ lower bound | **Empirical** ($\lambda \approx 0.7\,\text{yr}^{-1}$) |
+| [`C2/gap3_q3264_lyapunov_spectrum.md`](C2/gap3_q3264_lyapunov_spectrum.md) | Full spectrum in Q32.64 | **Empirical** |
+| [`C2/gap4_kaplan_yorke_entropy.md`](C2/gap4_kaplan_yorke_entropy.md) | Kaplan–Yorke entropy bound | **Open** |
+| [`C2/gap5_shadow_orbit_bias.md`](C2/gap5_shadow_orbit_bias.md) | Shadow-orbit bias constant | **Open** |
+| [`C2/gap6_lipschitz_lambda.md`](C2/gap6_lipschitz_lambda.md) | Lipschitz constant of $\lambda$ | **Open** |
 
-| Gap | Description | Status |
-|-----|-------------|--------|
-| [gap1_discrete_lyapunov_bound.md](gap1_discrete_lyapunov_bound.md) | **UPDATED:** Discrete Lyapunov error bound | ✅ Proved (Lean + Kani) |
-| [gap2_positive_lambda_certification.md](gap2_positive_lambda_certification.md) | Positive $\lambda$ lower bound | ✅ Justified* |
-| [gap3_q3264_lyapunov_spectrum.md](gap3_q3264_lyapunov_spectrum.md) | Full Lyapunov spectrum in Q32.64 | ✅ Justified* |
-| [gap4_kaplan_yorke_entropy.md](gap4_kaplan_yorke_entropy.md) | **UPDATED:** Kaplan-Yorke entropy bound | ✅ Proved (Lean + Kani) |
-| [gap5_shadow_orbit_bias.md](gap5_shadow_orbit_bias.md) | Shadow orbit bias constant | ✅ Proved (Lean + Kani) |
-| [gap6_lipschitz_lambda.md](gap6_lipschitz_lambda.md) | Lipschitz constant of $\lambda$ | ✅ Proved (Lean + Kani) |
-
-*\*C2-Gap2 and C2-Gap3 are marked "Justified" because they rely on empirical measurement of $\lambda \approx 0.7$ yr⁻¹.*
-
-**Lean Proofs:** [`LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean)
+`proofs/kani/lyapunov_proofs.rs` is a template that is **not** part of any Cargo
+target and has never been run.
 
 ---
 
 ## C3: Quantum Hardness (3 gaps)
 
-**Location:** `C3/`
+**Location:** [`C3/`](C3/readme.md)
 
-Grover search bounds over configuration space. All gaps now have Lean proofs.
+| Gap | Claim | Status |
+|-----|-------|--------|
+| [`C3/gap1_ambainis_adversary.md`](C3/gap1_ambainis_adversary.md) | Ambainis adversary method | **Open** |
+| [`C3/gap2_quantum_query_lower_bound.md`](C3/gap2_quantum_query_lower_bound.md) | $\Omega(2^{S k/2})$ lower bound | **Open** |
+| [`C3/gap3_c1_c3_link.md`](C3/gap3_c1_c3_link.md) | Link $k$ to the C1 $\varepsilon$-bound | **Open** |
 
-| Gap | Description | Status |
-|-----|-------------|--------|
-| [gap1_ambainis_adversary.md](gap1_ambainis_adversary.md) | **UPDATED:** Ambainis adversary method | ✅ Proved (Lean + Kani) |
-| [gap2_quantum_query_lower_bound.md](gap2_quantum_query_lower_bound.md) | $\Omega(2^{S \cdot k/2})$ lower bound | ✅ Proved (Lean + Kani) |
-| [gap3_c1_c3_link.md](gap3_c1_c3_link.md) | Relate $k$ to C1 $\varepsilon$-bound | ✅ Proved (Lean + Kani) |
-
-**Lean Proofs:** [`Shake256Extraction.lean`](../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean), [`LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean)
+The Grover/Ambainis argument is prose. It depends on Grover optimality (Zalka
+1999) and the configuration-space size, neither of which is formalised.
 
 ---
 
 ## C4: Keystream Indistinguishability (3 gaps)
 
-**Location:** `C4/`
+**Location:** [`C4/`](C4/readme.md)
 
-Cryptographic reduction proving keystream indistinguishability. All gaps now have Lean proofs.
+| Gap | Claim | Status |
+|-----|-------|--------|
+| [`C4/gap1_game_based_reduction.md`](C4/gap1_game_based_reduction.md) | Game-based reduction | **Open** |
+| [`C4/gap2_domain_separation_all_modes.md`](C4/gap2_domain_separation_all_modes.md) | Domain separation across 6 modes | **Partial** — framing injectivity proved; XOF separation conditional |
+| [`C4/gap3_advantage_bound.md`](C4/gap3_advantage_bound.md) | Advantage bound | **Open** |
 
-| Gap | Description | Status |
-|-----|-------------|--------|
-| [gap1_game_based_reduction.md](gap1_game_based_reduction.md) | **UPDATED:** Game-based cryptographic reduction | ✅ Proved (Lean + Kani) |
-| [gap2_domain_separation_all_modes.md](gap2_domain_separation_all_modes.md) | Domain separation across all 6 modes | ✅ Proved (Lean + Kani) |
-| [gap3_advantage_bound.md](gap3_advantage_bound.md) | Advantage bound derivation | ✅ Proved (Lean + Kani) |
-
-**Lean Proofs:** [`Shake256Extraction.lean`](../../proofs/lean/src/entropy_extraction/Shake256Extraction.lean), [`HKDFDerivation.lean`](../../proofs/lean/src/key_schedule/HKDFDerivation.lean)
+**Lean module:** [`Entropy.lean`](../../proofs/lean/src/KelvinProofs/Entropy.lean)
 
 ---
 
 ## C5: Configuration Space Cardinality (4 gaps)
 
-**Location:** `C5/`
+**Location:** [`C5/`](C5/readme.md)
 
-Theoretical configuration space size estimation.
-
-| Gap | Description | Status |
-|-----|-------------|--------|
-| [gap1_cardinality_bound.md](gap1_cardinality_bound.md) | $|\Theta_5| \geq 2^{1920}$ | ✅ Proved (Lean + Kani) |
-| [gap2_min_entropy.md](gap2_min_entropy.md) | Min-entropy $H_{\min} \geq 1800$ bits | ✅ Proved (Lean + Kani) |
-| [gap3_stability_reduction.md](gap3_stability_reduction.md) | Stability reduction ≈ 1 | ✅ Verified (empirical) |
-| [gap4_symbolic_kani_config.md](gap4_symbolic_kani_config.md) | Symbolic Kani config validation | ✅ Resolved (Kani) |
-
-**Lean Proofs:** [`LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean), [`FixedPoint.lean`](../../proofs/lean/src/fixed_point/FixedPoint.lean)
+| Gap | Claim | Status |
+|-----|-------|--------|
+| [`C5/gap1_cardinality_bound.md`](C5/gap1_cardinality_bound.md) | $|\Theta_5| \ge 2^{1920}$ | **Open** |
+| [`C5/gap2_min_entropy.md`](C5/gap2_min_entropy.md) | $H_{\min} \ge 1800$ bits | **Open** |
+| [`C5/gap3_stability_reduction.md`](C5/gap3_stability_reduction.md) | Stability reduction ≈ 1 | **Empirical** |
+| [`C5/gap4_symbolic_kani_config.md`](C5/gap4_symbolic_kani_config.md) | Symbolic Kani config | **Open** |
 
 ---
 
-## L0-L4: Functional Correctness (Kani Proofs Only)
+## Building
 
-| Level | Component | Kani File | Status |
-|-------|-----------|-----------|--------|
-| L0 | Safety | `fixed_safety.rs` | ✅ Proved |
-| L1 | Fixed-point equivalence | `fixed_equivalence.rs` | ✅ Proved |
-| L2 | Newton's laws | `acceleration_proofs.rs` | ✅ Proved |
-| L3 | Pipeline | `pipeline_proofs.rs` | ✅ Proved |
-| L4 | Determinism | `determinism.rs` | ✅ Tested |
-
----
-
-## Summary Statistics (Updated)
-
-| Category | Total Gaps | Proved | Justified | New Lean Proofs |
-|----------|------------|--------|-----------|-----------------|
-| **C1** | 7 | 6 | 1 | +2 (gap3, gap4) |
-| **C2** | 6 | 4 | 2 | +2 (gap1, gap4) |
-| **C3** | 3 | 3 | 0 | +1 (gap1) |
-| **C4** | 3 | 3 | 0 | +1 (gap1) |
-| **C5** | 4 | 3 | 1 | 0 |
-| **Total** | **23** | **19** | **4** | **+6 new proofs** |
-
-**Lean Proofs:** 32 theorems across 7 files  
-**Kani Harnesses:** 20+ automated verification tests  
-**New in 2026-11-21:** 6 gaps updated with complete Lean proofs
-
----
-
-## Building All Proofs
-
-### Lean Mathematical Specifications
+### Lean
 
 ```bash
-cd C:\dev\kelvin\proofs\lean
-lean --init mathlib
-lean build src/KelvinFormalVerif.lean
+cd proofs/lean
+lake build
 ```
 
-This builds all 7 Lean proof files:
-- `fixed_point/FixedPoint.lean` (8 theorems)
-- `n_body/NewtonianGravity.lean` (5 theorems)
-- `dynamics/VerletIntegrator.lean` (5 theorems)
-- `dynamics/LyapunovExponents.lean` (5 theorems)
-- `entropy_extraction/Shake256Extraction.lean` (5 theorems)
-- `key_schedule/HKDFDerivation.lean` (4 theorems)
-- `KelvinFormalVerif.lean` (main entry point)
+No Mathlib required. See [`proofs/lean/README.md`](../../proofs/lean/README.md).
 
-### Kani Code Verification
+To run the CI-style check (build + reject `sorry`/`admit`/`axiom` +
+`native_decide` + count theorems):
 
 ```bash
-cd C:\dev\kelvin\proofs\kani
-cargo kani --tests
+cd proofs/lean
+./check.sh                 # or: powershell -ExecutionPolicy Bypass -File .\check.ps1
 ```
 
----
+### Kani
 
-## References
-
-- [Main Documentation](../formal_verification.md)
-- [Proof Index](PROOF_INDEX.md)
-- [Code Verification Strategy](code_verification.md)
-- Lean Theorem Prover: https://lean-lang.org/
-- Mathlib Library: https://github.com/leanprover-community/mathlib
+```bash
+docker compose -f docker/docker-compose.yml build kani
+docker compose -f docker/docker-compose.yml run --rm kani --list
+docker compose -f docker/docker-compose.yml run --rm kani --proof verify_add_no_overflow
+docker compose -f docker/docker-compose.yml run --rm kani
+```
 
 ---
 

@@ -1,6 +1,11 @@
-# C5 Gap 4: Upgrade Kani Harnesses to Symbolic Validation — Resolved
+# C5 Gap 4: Symbolic Kani Configuration Validation
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. The symbolic harnesses are templates, never compiled.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C5 — Valid Configuration Space Cardinality
 > **Kani Cross-Reference:** `verify_c5_non_positive_mass`, `verify_c5_identical_positions`, `verify_c5_too_few_bodies`
@@ -11,11 +16,14 @@ The C5 Kani harnesses verify constraint rejection for **concrete inputs** (zero 
 
 ## 2. Current Harnesses
 
-| Harness | Input | Verified Property |
-|---------|-------|-----------------|
+| Harness | Input | Property asserted by the template |
+|---------|-------|----------------------------------|
 | `verify_c5_non_positive_mass` | mass = 0 (concrete) | `Fixed::ZERO` mass → config rejected |
 | `verify_c5_identical_positions` | Both at origin (concrete) | Same position → config rejected |
 | `verify_c5_too_few_bodies` | Empty vec (concrete) | Empty → config rejected |
+
+None of the three is in the run list; they live in
+`proofs/kani/configuration_proofs.rs`, which is not compiled.
 
 ## 3. Why Concrete Suffices
 
@@ -25,9 +33,11 @@ Each harness tests the **boundary condition** of the corresponding validation ch
 - Identical positions are tested at the extreme (both at origin). Any pair of equal vectors fails the `r_i ≠ r_j` check regardless of location.
 - Empty config (N=0) is the extreme case of `N < min_bodies`.
 
-## 4. Conclusion
+## 4. Assessment
 
-The current concrete-input harnesses are sufficient. The validation function uses simple arithmetic comparisons — no symbolic model checking is needed to verify correctness. The harnesses test the boundary of each rejecting condition, which is the standard Kani pattern for safety properties.
+The argument that concrete boundary inputs suffice is plausible but unproved: it
+assumes the validation function is a pure comparison with no earlier branch that
+could mask the boundary case. No artifact checks that. Treat this gap as open.
 
 ## 5. References
 

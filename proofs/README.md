@@ -3,8 +3,10 @@
 This directory contains formal verification artifacts for the Kelvin cryptosystem,
 following Apple's corecrypto formal verification blueprint.
 
-> **Staleness warning (2026-10-10):** `proofs/kani/` is maintained and matches
-> the code. `proofs/specs/` is a stale early-design snapshot — struct shapes
+> **Status (2026-11-25):** only 29 harnesses in `proofs/kani/` (the `C*_*.rs` and
+> `verify_*.rs` files) are compiled, via `kelvin-core/src/kani_harnesses.rs`; the
+> other `proofs/kani/*.rs` files are uncompiled templates. Lean proofs live in
+> `proofs/lean/`. `proofs/specs/` is a stale early-design snapshot — struct shapes
 > (`OrbitalState` with f64 fields, `OrbitalConfig` with `method`/`domain`),
 > constants (ranges, defaults, separators), and API names throughout `specs/`
 > do not match the implementation. Do not quote `specs/` without checking the
@@ -40,7 +42,8 @@ proofs/
     ├── integrator_proofs.rs      ← Verlet + Euler integrator proofs
     ├── stability_proofs.rs       ← Ejection + collapse detection proofs
     ├── extraction_proofs.rs      ← Entropy extraction safety proofs
-    └── orbital_state_proofs.rs   ← OrbitalState safety proofs
+    ├── orbital_state_proofs.rs   ← OrbitalState safety proofs (template)
+    └── C1…C6_*.rs, verify_*.rs   ← compiled harnesses (see status note above)
 ```
 
 ## Quick Start

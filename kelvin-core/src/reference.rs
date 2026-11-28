@@ -23,8 +23,9 @@ pub fn compute_lyapunov_high_prec(config: &[i128]) -> f64 {
         let frac_raw = (val & ((1i128 << 64) - 1)) as u64;
         let frac_part = (frac_raw as f64) / ((1u128 << 64) as f64);
         let fp = int_part + frac_part;
-        // Placeholder contribution.
-        sum += fp.powi(2);
+        // Placeholder contribution. `powi` is std-only and this crate is no_std,
+        // so square by multiplication.
+        sum += fp * fp;
     }
     sum
 }

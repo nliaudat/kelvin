@@ -84,6 +84,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs, missing_debug_implementations)]
 
+mod atomic_output;
 mod authenticated;
 mod decrypt;
 mod encrypt;
@@ -97,6 +98,7 @@ mod quantum;
 mod split;
 pub mod streaming;
 
+pub use atomic_output::write_atomically;
 pub use error::KelvinError;
 pub use kelvin_core::{Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
 pub use kelvin_kdf::{
@@ -200,6 +202,9 @@ fn run_simulation_pipeline(
         });
     }
 
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("verlet-step", |_| Err(KelvinError::OrbitalTimeExhausted { step: 0 }));
+
     // Run initial simulation with stability monitoring (Verlet or Euler)
     match method {
         IntegrationMethod::Verlet => {
@@ -230,6 +235,8 @@ fn run_simulation_pipeline(
 
     // Extract initial orbital seed (using SHAKE256 XOF) directly into
     // a fixed-size array — avoids an unnecessary Vec allocation.
+    #[cfg(feature = "failpoints")]
+    fail::fail_point!("shake256-extract", |_| Err(KelvinError::SeedExhausted));
     let mut seed = [0u8; ORBITAL_SEED_SIZE];
     extract_shake256_into_with_nonce(
         &bodies,
@@ -246,6 +253,20 @@ fn run_simulation_pipeline(
         bodies,
         lyapunov: LyapunovResult { min_chaos_steps: result.min_chaos_steps },
     })
+}
+
+/// Fallible wrapper around [`KeySchedule::next_key`] (also hosts the
+/// `key-schedule-exhaust` fail point used by the fault-resilience tests).
+trait NextKeyChecked {
+    fn next_key_checked(&mut self) -> Result<([u8; 32], [u8; 12]), KelvinError>;
+}
+
+impl NextKeyChecked for KeySchedule {
+    fn next_key_checked(&mut self) -> Result<([u8; 32], [u8; 12]), KelvinError> {
+        #[cfg(feature = "failpoints")]
+        fail::fail_point!("key-schedule-exhaust", |_| Err(KelvinError::SeedExhausted));
+        self.next_key().ok_or(KelvinError::SeedExhausted)
+    }
 }
 
 /// Run the full orbital simulation pipeline and extract an orbital seed.
@@ -311,7 +332,6 @@ pub fn simulate_and_extract_seed_with_method_and_nonce(
 /// 3. Run orbital simulation
 /// 4. Extract seeds via SHA3-512
 /// 5. Generate keystream via ChaCha20Poly1305 AEAD
-#[derive(Debug)]
 pub struct Kelvin {
     #[allow(dead_code)]
     config: OrbitalConfig,
@@ -320,6 +340,15 @@ pub struct Kelvin {
     schedule: KeySchedule,
     stream: Box<dyn StreamCipher>,
     bytes_processed: u64,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for Kelvin {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Kelvin")
+            .field("bytes_processed", &self.bytes_processed)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Shared state produced by the initialization pipeline.
@@ -413,7 +442,7 @@ impl Kelvin {
         let mut state = Self::init_with_method(config, method, nonce)?;
 
         // Get first key
-        let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = state.schedule.next_key_checked()?;
 
         // Create stream cipher with configurable byte limit
         let stream =
@@ -447,7 +476,7 @@ impl Kelvin {
         let mut state = Self::init_with_method(config, method, &[])?;
 
         // Get first key
-        let (key, nonce) = state.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = state.schedule.next_key_checked()?;
 
         // Create AES-256-GCM stream cipher with configurable byte limit
         let stream =
@@ -509,7 +538,7 @@ impl Kelvin {
     /// Called automatically when the current key approaches its maximum safe
     /// byte limit. This prevents nonce reuse and provides forward secrecy.
     fn rotate_key(&mut self) -> Result<(), KelvinError> {
-        let (key, nonce) = self.schedule.next_key().ok_or(KelvinError::SeedExhausted)?;
+        let (key, nonce) = self.schedule.next_key_checked()?;
         // Rekey the existing stream in-place to preserve the cipher variant
         // (ChaCha20Poly1305 vs AES-256-GCM) chosen at construction time.
         self.stream.rekey(key, nonce);
@@ -562,7 +591,6 @@ impl Drop for Kelvin {
 /// ks.decrypt(&mut data)?;
 /// assert_eq!(&data, b"Hello, world!");
 /// ```
-#[derive(Debug)]
 pub struct KelvinStreaming {
     /// Current orbital bodies (simulation state).
     bodies: Vec<OrbitalBody>,
@@ -587,6 +615,18 @@ pub struct KelvinStreaming {
     keystream_buf: Vec<u8>,
     /// Integration method (Verlet or Euler).
     integration_method: IntegrationMethod,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KelvinStreaming {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KelvinStreaming")
+            .field("step", &self.step)
+            .field("bytes_per_step", &self.bytes_per_step)
+            .field("bytes_processed", &self.bytes_processed)
+            .field("integration_method", &self.integration_method)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KelvinStreaming {
@@ -672,6 +712,10 @@ impl KelvinStreaming {
     ///
     /// If either condition is detected, returns `KelvinError::StabilityError`.
     fn advance_step(&mut self) -> Result<(), KelvinError> {
+        #[cfg(feature = "failpoints")]
+        fail::fail_point!("verlet-step", |_| Err(KelvinError::OrbitalTimeExhausted {
+            step: self.step
+        }));
         match self.integration_method {
             IntegrationMethod::Verlet => {
                 kelvin_core::verlet_step(&mut self.bodies, self.dt, self.softening, self.g);

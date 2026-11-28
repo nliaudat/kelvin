@@ -32,7 +32,7 @@
 //! ## Running
 //!
 //! ```bash
-//! cargo kani -p kelvin-core --harness verify_c3_step_non_injective
+//! cargo kani -p kelvin-core --harness verify_c3_step_damping
 //! ```
 //!
 //! ## References
@@ -44,5 +44,5 @@
 
 // NOTE: These harnesses are designed to be integrated into
 // kelvin-core/src/ under #[cfg(kani)]. The actual implementations
-// live in kelvin-core/src/fixed_math.rs as verify_c3_step_non_injective
-// and verify_c3_two_step_preimage_growth.
+// live in kelvin-core/src/fixed_math.rs as verify_c3_step_damping
+// and verify_c3_two_step_dispersion.

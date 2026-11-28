@@ -617,12 +617,14 @@ pub const AUTH_TAG_LEN: usize = 32;
 /// ciphertext (N bytes) || version (1 byte) || KMAC128 tag (32 bytes)
 /// ```
 ///
-/// **Why 0x01?** This is the initial version. Future versions can be
-/// detected and handled gracefully during decryption.
+/// **Why 0x02?** In version 1 the tag covered only the ciphertext of one chunk,
+/// so chunks could be reordered, repeated or dropped without detection. Version
+/// 2 also binds the chunk index and a final-chunk flag. Version 1 ciphertexts
+/// are rejected.
 ///
 /// **Changing this** would break compatibility with existing authenticated
 /// ciphertexts.
-pub const AUTH_FORMAT_VERSION: u8 = 0x01;
+pub const AUTH_FORMAT_VERSION: u8 = 0x02;
 
 /// Total overhead for authenticated ciphertexts in bytes.
 ///
@@ -636,3 +638,42 @@ pub const AUTH_OVERHEAD: usize = 1 + AUTH_TAG_LEN;
 // (Commented out: not currently used within the `kelvin` crate.
 //  The AEAD tag size is handled internally by ChaChaStream.)
 // pub const AEAD_TAG_SIZE: usize = 16;
+
+#[cfg(test)]
+mod domain_separator_tests {
+    use super::*;
+
+    /// Seed extraction does not length-prefix the domain separator, so no
+    /// separator may be a prefix of another (see `kelvin_kdf` extraction).
+    #[test]
+    fn no_domain_separator_is_a_prefix_of_another() {
+        let separators: &[&[u8]] = &[
+            DOMSEP_ORBITAL_STATE_V1,
+            DOMSEP_PHOTON_KEYSTREAM_V1,
+            DOMSEP_PHOTON_RESEED_V1,
+            DOMSEP_QUANTUM_PERTURB_V1,
+            DOMSEP_QUANTUM_RESEED_V1,
+            DOMSEP_QUANTUM_CACHE_V1,
+            DOMSEP_QUANTUM_KEYSTREAM,
+            DOMSEP_MAC_KEY_V1,
+            DOMSEP_STREAMING_MAC_KEY_V1,
+            DOMSEP_PRISM_KEYSTREAM_V1,
+            DOMSEP_PRISM_RESEED_V1,
+            DOMSEP_SPLIT_KEYSTREAM_V1,
+            DOMSEP_SPLIT_RESEED_V1,
+            DOMSEP_FLARE_KEYSTREAM_V1,
+            DOMSEP_FLARE_RESEED_V1,
+            // Used inside kelvin-kdf and kelvin.
+            b"kelvin-curve25519-v1",
+            b"kelvin-ml-kem-v1",
+            b"kelvin-ml-dsa-v1",
+            b"kelvin-ed25519-v1",
+            b"kelvin-streaming-v2-v1-000000000",
+        ];
+        for (i, a) in separators.iter().enumerate() {
+            for (j, b) in separators.iter().enumerate() {
+                assert!(i == j || !b.starts_with(a), "separator {i} is a prefix of {j}");
+            }
+        }
+    }
+}

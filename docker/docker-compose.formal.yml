@@ -1,0 +1,84 @@
+# Kelvin — formal / analysis tooling (Docker Compose)
+#
+# One service per tool. All mount the repository at /work so models and code are
+# shared. Usage:
+#
+#   docker compose -f docker/docker-compose.formal.yml build
+#   docker compose -f docker/docker-compose.formal.yml run --rm proverif formal/proverif/kelvin_smoke.pv
+#   docker compose -f docker/docker-compose.formal.yml run --rm tamarin formal/tamarin/kelvin_smoke.spthy
+#   docker compose -f docker/docker-compose.formal.yml run --rm smt z3 --version
+#
+# These are analysis tools, not part of the build. The Kani/cross images remain
+# in docker/docker-compose.yml.
+
+name: kelvin-formal
+
+services:
+  proverif:
+    build:
+      context: ..
+      dockerfile: docker/formal/Dockerfile.ocaml
+      target: proverif
+    image: kelvin-proverif:latest
+    working_dir: /work
+    volumes:
+      - ..:/work
+    entrypoint: ["proverif"]
+    command: ["--help"]
+
+  tamarin:
+    build:
+      context: ..
+      dockerfile: docker/formal/Dockerfile.tamarin
+    image: kelvin-tamarin:latest
+    working_dir: /work
+    volumes:
+      - ..:/work
+    entrypoint: ["tamarin-prover"]
+    command: ["--help"]
+
+  cryptoverif:
+    build:
+      context: ..
+      dockerfile: docker/formal/Dockerfile.ocaml
+      target: cryptoverif
+    image: kelvin-cryptoverif:latest
+    working_dir: /work
+    volumes:
+      - ..:/work
+    entrypoint: ["cryptoverif"]
+    command: ["-help"]
+
+  easycrypt:
+    build:
+      context: ..
+      dockerfile: docker/formal/Dockerfile.ocaml
+      target: easycrypt
+    image: kelvin-easycrypt:latest
+    working_dir: /work
+    volumes:
+      - ..:/work
+    entrypoint: ["easycrypt"]
+    command: ["-h"]
+
+  smt:
+    build:
+      context: ..
+      dockerfile: docker/formal/Dockerfile.smt
+    image: kelvin-smt:latest
+    working_dir: /work
+    volumes:
+      - ..:/work
+    entrypoint: ["z3"]
+    command: ["--version"]
+
+  rust-tools:
+    build:
+      context: ..
+      dockerfile: docker/formal/Dockerfile.rust-tools
+    image: kelvin-rust-tools:latest
+    working_dir: /work
+    volumes:
+      - ..:/work
+    entrypoint: ["cargo"]
+    command: ["--version"]

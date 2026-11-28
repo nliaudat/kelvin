@@ -69,7 +69,6 @@ use kelvin_kdf::OrbitalState;
 /// quantum.decrypt(&mut data)?;
 /// assert_eq!(&data, b"Secret message");
 /// ```
-#[derive(Debug)]
 pub struct KelvinQuantum {
     /// Base seed material (QUANTUM_BASE_SEED_SIZE bytes), refreshed with orbital entropy.
     base_seed: [u8; QUANTUM_BASE_SEED_SIZE],
@@ -93,6 +92,18 @@ pub struct KelvinQuantum {
     reseed_count: u64,
     /// Maximum reseeds before exhaustion.
     max_reseeds: u64,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for KelvinQuantum {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("KelvinQuantum")
+            .field("total_bytes_generated", &self.total_bytes_generated)
+            .field("reseed_count", &self.reseed_count)
+            .field("max_reseeds", &self.max_reseeds)
+            .field("integration_method", &self.integration_method)
+            .finish_non_exhaustive()
+    }
 }
 
 impl KelvinQuantum {

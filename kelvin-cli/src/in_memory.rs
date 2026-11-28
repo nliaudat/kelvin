@@ -99,9 +99,13 @@ pub fn process_in_memory(
 
         CryptoMode::Chaos => {
             if auth {
-                let mut ks =
-                    KelvinStreamingAuthenticated::new_with_nonce(config, bytes_per_step, nonce)
-                        .context("Failed to initialize KelvinStreamingAuthenticated")?;
+                let mut ks = KelvinStreamingAuthenticated::new_with_method_and_nonce(
+                    config,
+                    bytes_per_step,
+                    method,
+                    nonce,
+                )
+                .context("Failed to initialize KelvinStreamingAuthenticated")?;
                 println!("  Setup complete. Processing {} bytes...", size);
                 let start = std::time::Instant::now();
                 let chunk_size = STREAMING_CHUNK_SIZE;

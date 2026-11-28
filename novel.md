@@ -8,19 +8,19 @@
 
 ## Abstract
 
-This document evaluates the Kelvin project's contribution to chaos-based cryptography. The project addresses a specific open problem — cross-platform deterministic chaotic simulation for key derivation — which has limited the reproducibility and practical applicability of chaos-based cryptosystems since their inception in the 1990s. Kelvin's primary contributions are: (1) a Q32.64 fixed-point arithmetic engine that produces bit-identical chaotic trajectories on the tested toolchain (cross-architecture bit-identity follows from integer-only arithmetic by design; no multi-platform matrix currently covers x86_64/aarch64/riscv64/WASM); (2) formal verification of numerical safety and physical invariants using bounded model checking; and (3) a domain-separated multi-mode architecture that isolates the chaotic KDF from downstream cipher operations. The cryptographic security of the system is bounded by SHAKE256 (128-bit post-quantum), which is equivalent to existing standards. The contribution is to the engineering practice of chaos-based cryptography, not to cryptographic theory. Measured basis: 215 library unit tests, 8/8 golden vectors, 12 DudeCT benches with |t| < 5, and a full release gate green 2026-10-10.
+This document evaluates the Kelvin project's contribution to chaos-based cryptography. The project addresses a specific open problem — cross-platform deterministic chaotic simulation for key derivation — which has limited the reproducibility and practical applicability of chaos-based cryptosystems since their inception in the 1990s. Kelvin's primary contributions are: (1) a Q32.64 fixed-point arithmetic engine that produces bit-identical chaotic trajectories on the tested toolchain (cross-architecture bit-identity follows from integer-only arithmetic by design; no multi-platform matrix currently covers x86_64/aarch64/riscv64/WASM); (2) machine-checked proofs of a limited set of implementation facts (bounded add/sub/mul ranges, division identities, Verlet kick schedule, pairwise momentum cancellation, domain-separation framing) using Kani and Lean 4 — the C1–C5 security claims themselves are not machine-checked; and (3) a domain-separated multi-mode architecture that isolates the chaotic KDF from downstream cipher operations. The cryptographic security of the system is bounded by SHAKE256 (128-bit post-quantum), which is equivalent to existing standards. The contribution is to the engineering practice of chaos-based cryptography, not to cryptographic theory. Measured basis: 215 library unit tests, 8/8 golden vectors, 12 DudeCT benches with |t| < 5, and a full release gate green 2026-10-10.
 
 ---
 
 ## 1. Introduction: The Reproducibility Problem in Chaos-Based Cryptography
 
-Chaos-based cryptography has been studied since the 1990s (Kocarev, 2001; Jakimoski & Kocarev, 2001; Alvarez & Li, 2006). A recurring criticism — articulated most comprehensively by Li et al. (2018) and Arroyo et al. (2017) — is that the field suffers from a systematic reproducibility deficit. Most published chaos-based cryptosystems are implemented in IEEE 754 floating-point arithmetic, which means that simulation results depend on:
+Chaos-based cryptography has been studied since the 1990s (Kocarev, 2001; Jakimoski & Kocarev, 2001; Alvarez & Li, 2006). A recurring criticism — articulated, for example, by Li et al. (2005) and Arroyo et al. (2009) — is that the field suffers from a systematic reproducibility deficit. Most published chaos-based cryptosystems are implemented in IEEE 754 floating-point arithmetic, which means that simulation results depend on:
 
 1. **Compiler optimization level:** Different levels (-O2 vs -O3 vs -Os) can reorder floating-point operations, producing different results.
 2. **Target architecture:** x86, ARM, and WASM implementations of transcendental functions differ, and fused multiply-add (FMA) behaviour varies.
 3. **Runtime library:** glibc, musl, and MSVC implement different numeric approximation strategies for sin/cos/sqrt.
 
-Arroyo et al. (2017) demonstrated that 22 of 37 published chaos-based encryption schemes had fundamental security flaws, and many more were not independently verifiable due to platform-dependent behaviour.
+Arroyo et al. (2009) propose a framework for cryptanalysing digital chaos-based ciphers, motivated by the many published schemes later shown to be weak; reproducibility problems from platform-dependent floating-point behaviour compound this. (An earlier draft quoted a "22 of 37 flawed schemes" figure that could not be traced to a source; it has been removed.)
 
 Kelvin addresses one specific sub-problem of this larger failure mode: **cross-platform determinism of chaotic simulations.**
 
@@ -30,7 +30,7 @@ Kelvin addresses one specific sub-problem of this larger failure mode: **cross-p
 
 ### 2.1 Chaos-Based Stream Ciphers
 
-The chaotic cryptographic literature contains proposals based on logistic maps, Lorenz attractors, Hénon maps, and Chua's circuits (Kocarev, 2001; Yang et al., 2010). These systems typically operate on 1–3 degrees of freedom, making them potentially vulnerable to phase-space reconstruction attacks (Álvarez et al., 2003; Short, 1994). Kelvin uses a gravitational n-body model with up to 30 degrees of freedom, which increases the dimensionality of the phase space but does not provide a formal security reduction.
+The chaotic cryptographic literature contains proposals based on logistic maps, Lorenz attractors, Hénon maps, and Chua's circuits (Kocarev, 2001; Yang et al., 2010). These systems typically operate on 1–3 degrees of freedom, making them potentially vulnerable to phase-space reconstruction attacks (Álvarez et al., 2003; Short, 1994). Kelvin uses a gravitational n-body model with 48 degrees of freedom at the standard level (8 bodies × 6; 30 in the 5-body analysis configuration), which increases the dimensionality of the phase space but does not provide a formal security reduction.
 
 ### 2.2 Deterministic Fixed-Point Chaos
 
@@ -38,9 +38,9 @@ Cang et al. (2021) proposed the Finite Precision Period Calculation (FPPC) algor
 
 ### 2.3 N-Body Chaotic Cryptography
 
-Kwong et al. (2025) published the first known n-body chaotic image encryption scheme using a seven-dimensional memristor-restricted four-body system for image encryption. Song et al. (2025) published CryptoChaos, a hybrid chaos-cryptography framework combining multiple chaotic maps with X25519 and SHA3-256. Both use floating-point arithmetic and do not verify cross-platform determinism.
+Kwong et al. (2025) published the first known n-body chaotic image encryption scheme using a seven-dimensional memristor-restricted four-body system for image encryption. Song et al. (2025) published CryptoChaos, a hybrid chaos-cryptography framework combining four chaotic maps (Logistic, Chebyshev, Tent, Hénon) with SHA3-256, X25519, HKDF and AES-GCM. Neither is described as verifying cross-platform determinism.
 
-Jawad (2025) proposed DUff-skg, a chaotic FHE key generator using a 2-DOF Duffing oscillator with RK4 floating-point integration. Kelvin's Flare mode uses a 30-DOF n-body model and fixed-point arithmetic as an alternative approach to the same problem.
+Jawad (2025) proposed DUff-skg, a chaotic FHE key generator using a 2-DOF Duffing oscillator with RK4 floating-point integration. Kelvin's Flare mode uses a 48-DOF (standard level) n-body model and fixed-point arithmetic as an alternative approach to the same problem.
 
 ---
 
@@ -61,7 +61,7 @@ This approach has the following properties:
 
 - **No floating-point in the simulation engine itself** (keygen sampling and display helpers use f64 outside the deterministic path). No transcendental functions, no rounding modes, no FMA contraction in the core loop.
 - **Bit-identical on the tested toolchain.** 18 determinism tests (golden hashes + intra-process repeatability) pass; SSE2/AVX/AVX2/NEON matrix coverage is asserted by design, not automated.
-- **Verified constant-time.** dudect-bencher (Welch's t-test) confirms |t| < 5 for all operations in tests/constant_time_bench/.
+- **Measured constant-time behaviour (statistical, not proved).** dudect-bencher (Welch's t-test) shows |t| < 5 for the 12 benches in `tests/constant_time_bench/`; `verlet_step` showed |t| ≈ 75 in one configuration and is under investigation (see `COMPLIANCE.md`).
 
 **Limitation:** Constant-time verification covers arithmetic primitives but not the full encrypt/decrypt pipeline. Higher-level operations (mode selection branching, authentication tag comparison) are not yet verified.
 
@@ -69,23 +69,25 @@ This approach has the following properties:
 
 ### 3.2 Formal Verification of Simulation Properties
 
-Kelvin uses the Kani Rust Verifier (bounded model checking) to prove:
+Status is tracked in [`documentation/formal_verification.md`](documentation/formal_verification.md) and [`documentation/formal_verification/PROOF_INDEX.md`](documentation/formal_verification/PROOF_INDEX.md). In summary (2026-11-25):
 
-| Level | Property | Method |
-|-------|----------|--------|
-| L0 | No arithmetic overflow under input bounds | Kani safety harness on `Fixed::from_raw`, `add`, `sub`, `mul`, `div`, `sqrt` |
-| L1 | Fixed-point ops match mathematical spec within error bounds | Kani equivalence harness; error ≤ 3 ULPs for sqrt, ≤ 2 ULPs for div |
-| L2 | `compute_accelerations` satisfies Newton's laws (action-reaction, direction, magnitude) | Kani composite harness on force pairs |
-| L3 | Pipeline executes correct number of steps with correct domain separators | Kani pipeline harness on `simulate_and_extract_seed` |
-| L4 | Bit-identical output on tested toolchain | 18 golden-hash + repeatability tests (cross-arch matrix not automated) |
+| Level | Target | Status |
+|-------|--------|--------|
+| L0 | No overflow for bounded add/sub/mul | Proved (Kani `fixed_math.rs`; Lean `FixedPoint`) |
+| L1 | Fixed-point ops match the mathematical spec | Partial — division/remainder identities only |
+| L2 | `compute_accelerations` satisfies Newton's laws | Partial — Lean pairwise momentum cancellation only |
+| L3 | Pipeline executes the right steps with the right domain separators | Not proved (domain framing is proved in Lean/Kani; the pipeline is tested) |
+| L4 | Bit-identical output on the tested toolchain | Tested (18 golden-hash and repeatability tests), not proved |
 
-**Limitation:** These are implementation correctness proofs. They do not prove cryptographic security — they prove that the code matches its specification. The distinction is clearly stated in `documentation/formal_verification.md`.
+46 Kani harnesses run (37 in `kelvin-core`, 6 in `kelvin-kdf`, 3 in `kelvin`); other files under `proofs/kani/` are uncompiled templates.
 
-**Context:** Formal verification of a chaotic simulation is uncommon in the chaos-cryptography literature (Cang et al., 2021 did not perform verification; Kwong et al., 2025 did not). Kelvin's L0–L4 proofs are novel within this subfield specifically because of the application of bounded model checking to a physical simulation with dynamical invariants (Newton's laws). The proofs do not extend to security properties.
+**Limitation:** These are implementation-correctness checks on a narrow set of facts. They do not prove cryptographic security, and there is no verified refinement from the Lean models to the Rust code.
 
-### 3.3 30-DOF Gravitational Model
+**Context:** Applying bounded model checking and theorem proving to a chaotic simulation is uncommon in the chaos-cryptography literature (Cang et al., 2021 and Kwong et al., 2025 did not), but the coverage here is partial and should not be read as a verified simulator.
 
-Kelvin uses a full gravitational n-body simulation with N ≥ 3 bodies (standard: 8, i.e. 48 DOF; the 30-DOF figure refers to the 5-body analysis configuration). This provides an order of magnitude more degrees of freedom (N × 3 × 2 for positions and velocities) compared with the 1–3 DOF typical of logistic-map or Lorenz-based systems.
+### 3.3 Higher-DOF Gravitational Model
+
+Kelvin uses a full gravitational n-body simulation with N ≥ 3 bodies (standard: 8 bodies, i.e. 48 DOF; maximum: 10 bodies, 60 DOF; the 30-DOF figure refers to the 5-body analysis configuration). This provides an order of magnitude more degrees of freedom (N × 3 × 2 for positions and velocities) compared with the 1–3 DOF typical of logistic-map or Lorenz-based systems.
 
 | System | DOF | Prior use in cryptography |
 |--------|-----|--------------------------|
@@ -94,9 +96,9 @@ Kelvin uses a full gravitational n-body simulation with N ≥ 3 bodies (standard
 | Lorenz attractor | 3 | Yang et al. (2010) |
 | Chua's circuit | 3 | Dachselt & Schwarz (2001) |
 | CryptoChaos (Song 2025) | 4 (4 maps × 1 DOF) | Hybrid framework |
-| **Kelvin n-body** | **30** | **First gravitational model in cryptography** |
+| **Kelvin n-body** | **48** (standard; 30 at N=5) | **Gravitational n-body model; first known use as a KDF** |
 
-The 30-DOF model does not provide a formal security guarantee — the relationship between DOF count and cryptographic security is not established. However, higher-dimensional phase spaces increase the data requirements for phase-space reconstruction attacks (Takens' theorem requires 2D+1 dimensions, so a 30-DOF attractor needs at least 61 dimensions of embedded data for reconstruction — a practical barrier for finite keystream observations).
+The 30-DOF model does not provide a formal security guarantee — the relationship between DOF count and cryptographic security is not established. However, higher-dimensional phase spaces increase the data requirements for phase-space reconstruction attacks (Takens' theorem requires 2D+1 dimensions, so a 30-DOF analysis configuration needs at least 61 dimensions (97 at the 48-DOF standard level) of embedded data for reconstruction — a practical barrier for finite keystream observations).
 
 **Limitation:** No formal proof links DOF count to attack resistance. This is a plausibility argument, not a security reduction.
 
@@ -130,7 +132,7 @@ Kelvin is positioned within the chaos-based cryptography subfield, not within ma
 | Song et al. (2025) | ❌ Float | ❌ | 4× 1D maps | Hybrid stream |
 | Cang et al. (2021) | ❌ Float | ❌ | 3 | PRNG only |
 | Jawad (2025) | ❌ Float (RK4) | ❌ | 2 | FHE keys only |
-| **Kelvin** | **✅ Fixed-point** | **✅ Kani L0–L4** | **30** | **General-purpose** |
+| **Kelvin** | **✅ Fixed-point** | **⚠️ Partial (see §3.2)** | **48 (standard)** | **General-purpose** |
 
 ---
 
@@ -158,16 +160,16 @@ The project is correctly described as: *"A research implementation of a chaotic 
 
 ## References
 
-- Arroyo, D., Alvarez, G., & Fernandez, V. (2017). "A basic framework for the cryptanalysis of digital chaos-based cryptography." *Chaos: An Interdisciplinary Journal of Nonlinear Science*, 27(6).
+- Arroyo, D., Alvarez, G., Li, S., Li, C., & Fernandez, V. (2009). "A basic framework for the cryptanalysis of digital chaos-based cryptography." *2009 3rd International Conference on Signals, Circuits and Systems (SCS)*. [doi:10.1109/SSD.2009.4956652](https://doi.org/10.1109/SSD.2009.4956652)
 - Alvarez, G. & Li, S. (2006). "Some basic cryptographic requirements for chaos-based cryptosystems." *International Journal of Bifurcation and Chaos*, 16(8), 2129–2151.
-- Cang, S., Kang, Z., & Wang, Z. (2021). "A conservative Sprott-A system and its FPGA-based PRNG." *Nonlinear Dynamics*, 104, 2899–2915.
-- Chai, X., et al. (2025). "Four-body memristor chaotic system for image encryption." *Nonlinear Dynamics*.
+- Cang, S., Kang, Z., & Wang, Z. (2021). "Pseudo-random number generator based on a generalized conservative Sprott-A system." *Nonlinear Dynamics*, 104, 827–844. [doi:10.1007/s11071-021-06310-9](https://doi.org/10.1007/s11071-021-06310-9)
+- Kwong, H., Chai, Z., & Wu, T. (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*. [doi:10.1109/JCICE66205.2025.11182029](https://doi.org/10.1109/JCICE66205.2025.11182029)
 - Jakimoski, G. & Kocarev, L. (2001). "Chaos and cryptography: Block encryption ciphers based on chaotic maps." *IEEE Transactions on Circuits and Systems I*, 48(2), 163–169.
-- Jawad (2025). "DUff-skg: FHE cryptographic systems with chaotic secret key generation." *Acta Scientiarum. Technology*, 47(1).
+- Jawad, N. H. (2025). "FHE cryptographic systems with using chaotic secret key generation (DUff-skg)." *Boletim da Sociedade Paranaense de Matemática*. [doi:10.5269/bspm.77855](https://doi.org/10.5269/bspm.77855)
 - Kocarev, L. (2001). "Chaos-based cryptography: A brief overview." *IEEE Circuits and Systems Magazine*, 1(3), 6–21.
-- Li, S., Chen, G., & Mou, X. (2018). "On the dynamical degradation of digital piecewise linear chaotic maps." *International Journal of Bifurcation and Chaos*, 15(10), 3119–3151.
+- Li, S., Chen, G., & Mou, X. (2005). "On the dynamical degradation of digital piecewise linear chaotic maps." *International Journal of Bifurcation and Chaos*, 15(10), 3119–3151.
 - NIST SP 800-185 (2016). "SHA-3 Derived Functions: cSHAKE, KMAC (Keccak Message Authentication Code), TupleHash, and ParallelHash."
 - Short, K. M. (1994). "Steps toward unmasking secure communications." *International Journal of Bifurcation and Chaos*, 4(4), 959–977.
-- Song, Y., et al. (2025). "CryptoChaos: A hybrid chaos-based cryptographic framework." arXiv:2504.08618.
+- Song, K., Imran, N., Chen, J. Y., & Dobbins, A. C. (2025). "A Hybrid Chaos-Based Cryptographic Framework for Post-Quantum Secure Communications" (CryptoChaos). [arXiv:2504.08618](https://arxiv.org/abs/2504.08618).
 - Takens, F. (1981). "Detecting strange attractors in turbulence." *Dynamical Systems and Turbulence*, 366–381.
 - Yang, J., et al. (2010). "A new chaotic image encryption scheme using Lorenz system." *International Journal of Bifurcation and Chaos*, 20(11), 3715–3730.

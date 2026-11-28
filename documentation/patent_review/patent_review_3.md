@@ -351,7 +351,7 @@ See Section 3 for full deep-dive.
 
 | Patent | Previous Status | Current Status | Change? |
 |--------|----------------|----------------|---------|
-| Apple US 6,587,559 | Expired 2019-02-20 | Expired | ✅ Confirmed |
+| Apple US 6,587,563 | Expired 2017-02-15 | Expired | ✅ Confirmed |
 | Toshiba US 6,014,445 | Expired 2016-10-22 | Expired | ✅ Confirmed |
 | CN102360488B | Expired (fee related) | Expired | ✅ Confirmed |
 | Nantes US 8,781,124 | Lapsed 2022 | Lapsed | ✅ Confirmed |
@@ -521,25 +521,25 @@ The following prior art means these concepts **cannot be patented by anyone**:
 
 ## 9. References
 
-1. Kwong, H., Chai, Z., & Wu, T. (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*, pp. 1–5. DOI: 10.1109/JCICE66205.2025.11182029.
+1. Kwong, H., Chai, Z., & Wu, T. (2025). "Chaotic Image Encryption Based on an Improved Seven-Dimensional Memristor-based Restricted Four-Body System." *2025 4th International Joint Conference on Information and Communication Engineering (JCICE)*, pp. 1–5. [doi:10.1109/JCICE66205.2025.11182029](https://doi.org/10.1109/JCICE66205.2025.11182029).
 
-2. Weng, Y., Zheng, R., & Chen, Y. (2009). "A Novel Orbit Perturbation Method for Continuous-Time Chaos to Obtain Dynamic Seeds-Key Stream Cipher." *2009 International Conference on Computational Intelligence and Software Engineering (CISE)*. DOI: 10.1109/CISE.2009.5366879.
+2. Weng, Y., Zheng, R., & Chen, Y. (2009). "A Novel Orbit Perturbation Method for Continuous-Time Chaos to Obtain Dynamic Seeds-Key Stream Cipher." *2009 International Conference on Computational Intelligence and Software Engineering (CISE)*. [doi:10.1109/CISE.2009.5366879](https://doi.org/10.1109/CISE.2009.5366879).
 
-3. Song, T. (2012). "A Novel Digital Image Cryptosystem with Chaotic Permutation and Perturbation Mechanism." *2012 Fifth International Workshop on Chaos-fractals Theories and Applications (IWCFTA)*. DOI: 10.1109/IWCFTA.2012.51.
+3. Song, T. (2012). "A Novel Digital Image Cryptosystem with Chaotic Permutation and Perturbation Mechanism." *2012 Fifth International Workshop on Chaos-fractals Theories and Applications (IWCFTA)*. [doi:10.1109/IWCFTA.2012.51](https://doi.org/10.1109/IWCFTA.2012.51).
 
-4. Jawad, N. H. (2025). "FHE cryptographic systems with using chaotic secret key generation (DUff-skg)." *Boletim da Sociedade Paranaense de Matemática*. DOI: 10.5269/bspm.77855.
+4. Jawad, N. H. (2025). "FHE cryptographic systems with using chaotic secret key generation (DUff-skg)." *Boletim da Sociedade Paranaense de Matemática*. [doi:10.5269/bspm.77855](https://doi.org/10.5269/bspm.77855).
 
-5. Mohammed, S. J., & Taha, D. B. (2021). "Privacy preserving algorithm using Chaos-scattering of partial homomorphic encryption." *Journal of Physics: Conference Series*, 1963(1), 012154. DOI: 10.1088/1742-6596/1963/1/012154.
+5. Mohammed, S. J., & Taha, D. B. (2021). "Privacy preserving algorithm using Chaos-scattering of partial homomorphic encryption." *Journal of Physics: Conference Series*, 1963(1), 012154. [doi:10.1088/1742-6596/1963/1/012154](https://doi.org/10.1088/1742-6596/1963/1/012154).
 
 6. Ahamed, I. S., & Ravi, V. (2022). "Privacy-Preserving Chaotic Extreme Learning Machine with Fully Homomorphic Encryption." *arXiv e-prints*, arXiv:2208.
 
-7. (2023). "Fractal-Based Hybrid Cryptosystem: Enhancing Image Encryption with RSA, Homomorphic Encryption, and Chaotic Maps." *Entropy*, 25(11), 1478. DOI: 10.3390/e25111478.
+7. (2023). "Fractal-Based Hybrid Cryptosystem: Enhancing Image Encryption with RSA, Homomorphic Encryption, and Chaotic Maps." *Entropy*, 25(11), 1478. [doi:10.3390/e25111478](https://doi.org/10.3390/e25111478).
 
 8. Song, Y. et al. (2025). "CryptoChaos: A Novel Hybrid Framework for Chaos-Based Cryptography." *IEEE Access*.
 
 9. OrBIT-KDF (2026). "Orbital Resonance-Based Key Derivation Using Chirikov Map and Julia Set Dynamics." *IACR ePrint*.
 
-10. Apple Inc. (2000). "Method and apparatus for generating chaotic signals." US Patent 6,587,559. Expired 2019-02-20.
+10. Apple Inc. (Crandall, R. E.; filed 1997, granted 2003). "Cryptographic system using chaotic dynamics." US Patent 6,587,563. Expired 2017-02-15.
 
 11. Toshiba Corp. (1997). "Chaotic stream cipher." US Patent 6,014,445. Expired 2016-10-22.
 

@@ -13,9 +13,17 @@ L3: Pipeline        ──  Full simulate_and_extract_seed produces correct outp
 L4: Determinism     ──  Bit-identical results across platforms
 ```
 
+> **Status note.** 46 harnesses run (`docker/run-kani.sh --list`): 8 in
+> `fixed_math.rs`, 29 included from `proofs/kani/` by `kani_harnesses.rs`, 6 in
+> `kelvin-kdf` (key schedule and extraction framing) and 3 in `kelvin` (chunk
+> protocol). The L1–L3 sections below describe
+> **template** files (`fixed_equivalence.rs`, `acceleration_proofs.rs`,
+> `pipeline_proofs.rs`) that are not compiled, so their properties are targets,
+> not established results. See `documentation/formal_verification.md`.
+
 ## Proof Harness Details
 
-### L0: Safety (`kelvin-core/src/fixed_math.rs` — 3 harnesses)
+### L0: Safety (`kelvin-core/src/fixed_math.rs` — 8 harnesses, incl. C1/C3 arithmetic facts; 3 shown)
 
 These harnesses confirm that Q32.64 fixed-point arithmetic never panics
 or overflows under physically-realistic orbital bounds.
@@ -26,7 +34,7 @@ or overflows under physically-realistic orbital bounds.
 | `verify_sub_no_overflow` | sub in [-100, 100] AU | [-200, 200] AU |
 | `verify_mul_range` | mul in [-4, 4] AU | [-16, 16] AU² |
 
-### L1: Fixed-Point Equivalence (`proofs/kani/fixed_equivalence.rs` — 9 harnesses)
+### L1: Fixed-Point Equivalence (`proofs/kani/fixed_equivalence.rs` — 9 harnesses, template, not compiled)
 
 | Harness | Property | Error Bound |
 |:---|:---|---:|
@@ -40,7 +48,7 @@ or overflows under physically-realistic orbital bounds.
 | `verify_vec3_dot_equivalence` | dot matches spec | Exact |
 | `verify_vec3_length_squared_equivalence` | |v|² matches spec | Exact |
 
-### L2: Composite Correctness (`proofs/kani/acceleration_proofs.rs` — 5 harnesses)
+### L2: Composite Correctness (`proofs/kani/acceleration_proofs.rs` — 5 harnesses, template, not compiled)
 
 | Harness | Physical Law |
 |:---|:---|
@@ -50,7 +58,7 @@ or overflows under physically-realistic orbital bounds.
 | `verify_three_body_symmetry` | Net force on symmetric configuration is zero |
 | `verify_acceleration_proportional_to_mass` | |a| ∝ source mass |
 
-### L3: Pipeline Integrity (`proofs/kani/pipeline_proofs.rs` — 3 harnesses)
+### L3: Pipeline Integrity (`proofs/kani/pipeline_proofs.rs` — 3 harnesses, template, not compiled)
 
 | Harness | What it proves |
 |:---|:---|

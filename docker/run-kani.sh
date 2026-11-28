@@ -2,18 +2,26 @@
 # =============================================================================
 # run-kani.sh — Run Kani proofs inside Docker container
 #
-# Runs the 6 actively-integrated proof harnesses from kelvin-core/src/fixed_math.rs
-# under #[cfg(kani)]:
-#   - 3 L0 safety: verify_add_no_overflow, verify_sub_no_overflow, verify_mul_range
-#   - 3 C1 information loss: verify_c1_preimage_bound, verify_c1_epsilon_bound,
-#     verify_c1_division_remainder
+# Runs 46 harnesses:
+#   - 8 integrated in kelvin-core/src/fixed_math.rs under #[cfg(kani)]
+#   - 29 in proofs/kani/*.rs, included by kelvin-core/src/kani_harnesses.rs
+#   - 4 in kelvin-kdf/src/schedule.rs and 2 in kelvin-kdf/src/extractor.rs
+#   - 3 in kelvin/src/authenticated.rs (chunk protocol)
 #
-# Remaining 56 harness template files in proofs/kani/ require integration into
-# workspace crates before they can be compiled. See scripts/run_proofs.sh --list.
+# kelvin-kdf also contains older #[cfg(kani)] harnesses that are not in this
+# list; they have no recorded verdict.
+#
+# The included files were corrected on 2026-11-23: they previously sat outside
+# every Cargo target, used `rand`/`Instant::now()`, or asserted constants chosen
+# inside the harness. Each now states a property Kani can check.
 #
 # Usage:
-#   run-kani           — Run all 6 active proofs with progress bar
-#   run-kani --version — Print Kani version info
+#   run-kani                 Run every integrated harness (default)
+#   run-kani --all           Same as the default
+#   run-kani --proof NAME    Run a single integrated harness by name
+#   run-kani --harness NAME  Alias of --proof
+#   run-kani --list          List the integrated harness names
+#   run-kani --version       Print Kani version info
 # =============================================================================
 set -euo pipefail
 
@@ -76,6 +84,23 @@ draw_progress_bar() {
     fi
 }
 
+# The crate that contains a harness.
+package_for() {
+    case "$1" in
+        verify_schedule_* | verify_extraction_header_injective | verify_extraction_body_injective)
+            echo kelvin-kdf ;;
+        verify_chunk_*) echo kelvin ;;
+        *) echo kelvin-core ;;
+    esac
+}
+
+# Extra cargo-kani flags a harness needs.
+flags_for() {
+    case "$1" in
+        verify_chunk_*) echo "-Z stubbing" ;;
+    esac
+}
+
 run_with_progress() {
     local harness_name="$1"
     local log_file="$2"
@@ -119,7 +144,7 @@ run_with_progress() {
         elif [[ "$line" == "VERIFICATION:- FAILED" ]]; then
             printf "\n  ${RED}✗ VERIFICATION: FAILED${NC}\n" >&3
         fi
-    done < <(cargo kani -p kelvin-core --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
+    done < <(cargo kani -p "$(package_for "$harness_name")" $(flags_for "$harness_name") --harness "$harness_name" $KANI_ARGS 2>&1 | tee "$log_file"; echo "EXIT_STATUS:${PIPESTATUS[0]}")
 
     if [ "$total_checks" -eq 0 ]; then
         if grep -iq "error\|not found" "$log_file" 2>/dev/null; then
@@ -136,7 +161,7 @@ print_banner() {
     echo ""
     echo "╔═══════════════════════════════════════════════════════════════╗"
     echo "║       KELVIN FORMAL VERIFICATION — Kani Model Checker       ║"
-    echo "║       6 active harnesses (L0 L1 L2 L3 templates available)  ║"
+    echo "║      46 harnesses (37 core + 6 kdf + 3 kelvin)              ║"
     echo "╚═══════════════════════════════════════════════════════════════╝"
     echo ""
     echo "  Kani:   $(cargo kani --version 2>/dev/null || echo 'unknown')"
@@ -162,17 +187,71 @@ run_proofs() {
     } > "$RESULTS_DIR/SUMMARY.txt"
 
     local all_passed=true
-    # Only harnesses actually integrated under #[cfg(kani)] in kelvin-core/src/
+    # Only harnesses actually integrated under #[cfg(kani)]
     local harnesses=(
-        # L0: Fixed arithmetic safety
+        # L0: Fixed arithmetic safety (kelvin-core/src/fixed_math.rs)
         "verify_add_no_overflow:add never wraps in [-100, 100] AU"
         "verify_sub_no_overflow:sub never wraps in [-100, 100] AU"
         "verify_mul_range:mul range safety for [-4, 4] AU"
 
-        # C1: Information loss (new)
-        "verify_c1_preimage_bound:preimage bound at softening limit"
-        "verify_c1_epsilon_bound:ε-bound on per-op information loss"
-        "verify_c1_division_remainder:division remainder 0 ≤ r < den"
+        # C1: Information loss arithmetic (fixed_math.rs + proofs/kani)
+        "verify_c1_preimage_bound:distinct quotients near the softening limit"
+        "verify_c1_epsilon_bound:epsilon-bound on the implemented division"
+        "verify_c1_division_remainder:division remainder 0 <= r < den"
+        "verify_information_loss_total:saturation model never exceeds H_max"
+        "verify_information_loss_monotone:saturation model is monotone in S"
+        "verify_saturation_point:96 steps saturate the N=5 model"
+        "verify_information_loss_saturating:capped loss <= H_max and <= uncapped"
+        "verify_information_loss_cap_boundary:larger k saturates no later"
+
+        # C2: Lyapunov arithmetic (proofs/kani)
+        "verify_lyapunov_spectrum_comprehensive:Pade ratio lies in [0, 1]"
+        "verify_lyapunov_division:lambda >= 0 and lambda <= ln(ratio)"
+        "verify_lyapunov_error_bounds:quantization error is below one raw unit"
+        "verify_lyapunov_quantization:eps_q / time is zero for time >= 2^54"
+        "verify_shadow_orbit_bias:bias budget below accumulated time"
+        "verify_perturbation_in_range:shadow perturbation fits in Q32.64"
+
+        # C3: division-rounding damping and exponent arithmetic
+        "verify_c3_step_damping:1-ULP divisor change moves the quotient by <= 1 ULP"
+        "verify_c3_two_step_dispersion:1-ULP quotient difference does not grow through a second division"
+        "verify_c3_quantum_reduction:halved exponent does not exceed original"
+        "verify_c3_exponent_arithmetic:sqrt(2^1920) has exponent 960"
+        "verify_c3_exponent_law:2^a * 2^b = 2^(a+b)"
+        "verify_c3_contraction_arithmetic:non-expanding steps cannot widen a window"
+
+        # C4: framing and bound-selection arithmetic
+        "verify_domain_separation:distinct tags give distinct framed inputs"
+        "verify_framing_deterministic:framing is deterministic"
+        "verify_shake256_grover_arithmetic:Grover on 256 bits leaves 128"
+        "verify_bound_is_min_of_two:operational bound is the smaller exponent"
+
+        # C5: branch-free primitives (functional only; timing is NOT verified)
+        "verify_ct_select_i128:ct_select returns the requested operand"
+        "verify_ct_select_sign_bits:ct_select yields an input verbatim"
+        "verify_ct_is_zero_u64:ct inequality test is exact"
+        "verify_ct_select_u64:64-bit ct_select returns the requested operand"
+        "verify_ct_select_u64_is_exact:64-bit ct_select stays in the operand interval"
+
+        # C6: Floyd invariants and the real find_cycle (bounded state space)
+        "verify_floyd_cycle_detection:tortoise advances k, hare 2k"
+        "verify_hare_leads:hare never falls behind the tortoise"
+        "verify_find_cycle_is_complete_and_correct:finds the true mu and lambda"
+        "verify_find_cycle_is_sound_for_any_budget:any reported cycle is correct"
+        "verify_find_cycle_zero_budget:zero budget takes no step"
+
+        # Key derivation: input construction and key limits (kelvin-kdf)
+        "verify_schedule_info_injective:distinct indices give distinct HKDF info"
+        "verify_schedule_key_and_nonce_info_separated:key and nonce info never overlap"
+        "verify_schedule_first_indices:consecutive indices, permanent exhaustion"
+        "verify_schedule_limit_invariant:no overflow or excess keys (16-bit parameters)"
+        "verify_extraction_header_injective:distinct arguments give distinct hash input"
+        "verify_extraction_body_injective:distinct bodies give distinct hash input"
+
+        # Authenticated chunk protocol (kelvin), with an ideal tag instead of KMAC128
+        "verify_chunk_prefix_injective:index and final flag are bound unambiguously"
+        "verify_chunk_open_all_or_nothing:rejected chunks change nothing"
+        "verify_chunk_opens_only_in_place:no reordering or final-flag change"
     )
     local total=${#harnesses[@]}
     local current=0
@@ -222,9 +301,8 @@ run_proofs() {
     echo ""
     echo "  Results saved to: $RESULTS_DIR/"
     echo ""
-    echo "  Note: 56 additional template harnesses in proofs/kani/ need"
-    echo "  integration into workspace crates under #[cfg(kani)] before"
-    echo "  they can be compiled. See scripts/run_proofs.sh --list."
+    echo "  Note: 14 further files in proofs/kani/ (acceleration_proofs.rs,"
+    echo "  lyapunov_proofs.rs, ...) remain templates outside this run list."
     echo ""
 
     if [ "${1:-}" = "--exit" ]; then
@@ -232,11 +310,93 @@ run_proofs() {
     fi
 }
 
+list_harnesses() {
+    printf '%s\n' \
+        verify_schedule_info_injective \
+        verify_schedule_key_and_nonce_info_separated \
+        verify_schedule_first_indices \
+        verify_schedule_limit_invariant \
+        verify_extraction_header_injective \
+        verify_extraction_body_injective \
+        verify_chunk_prefix_injective \
+        verify_chunk_open_all_or_nothing \
+        verify_chunk_opens_only_in_place \
+        verify_add_no_overflow \
+        verify_sub_no_overflow \
+        verify_mul_range \
+        verify_c1_preimage_bound \
+        verify_c1_epsilon_bound \
+        verify_c1_division_remainder \
+        verify_information_loss_total \
+        verify_information_loss_monotone \
+        verify_saturation_point \
+        verify_information_loss_saturating \
+        verify_information_loss_cap_boundary \
+        verify_lyapunov_spectrum_comprehensive \
+        verify_lyapunov_division \
+        verify_lyapunov_error_bounds \
+        verify_lyapunov_quantization \
+        verify_shadow_orbit_bias \
+        verify_perturbation_in_range \
+        verify_c3_step_damping \
+        verify_c3_two_step_dispersion \
+        verify_c3_quantum_reduction \
+        verify_c3_exponent_arithmetic \
+        verify_c3_exponent_law \
+        verify_c3_contraction_arithmetic \
+        verify_domain_separation \
+        verify_framing_deterministic \
+        verify_shake256_grover_arithmetic \
+        verify_bound_is_min_of_two \
+        verify_ct_select_i128 \
+        verify_ct_select_sign_bits \
+        verify_ct_is_zero_u64 \
+        verify_ct_select_u64 \
+        verify_ct_select_u64_is_exact \
+        verify_floyd_cycle_detection \
+        verify_hare_leads \
+        verify_find_cycle_is_complete_and_correct \
+        verify_find_cycle_is_sound_for_any_budget \
+        verify_find_cycle_zero_budget
+}
+
+run_single() {
+    local name="$1"
+    mkdir -p "$RESULTS_DIR"
+    print_banner
+    echo ""
+    echo "  ${BOLD}[1/1]${NC} ${CYAN}${name}${NC}"
+    echo ""
+    set +e
+    run_with_progress "$name" "$RESULTS_DIR/${name}.log"
+    local exit_code=$?
+    set -e
+    echo ""
+    echo "  Results saved to: $RESULTS_DIR/"
+    return "$exit_code"
+}
+
 case "${1:-}" in
     --version)
         cargo kani --version
         ;;
-    *)
+    --list)
+        list_harnesses
+        ;;
+    --all | "")
         run_proofs
+        ;;
+    --proof | --harness)
+        shift
+        if [ $# -lt 1 ]; then
+            echo "error: $0 --proof requires a harness name" >&2
+            exit 2
+        fi
+        run_single "$1"
+        ;;
+    *)
+        echo "error: unknown option '$1'" >&2
+        echo "usage: run-kani [--all | --proof NAME | --list | --version]" >&2
+        exit 2
         ;;
 esac

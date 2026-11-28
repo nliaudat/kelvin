@@ -32,7 +32,7 @@ const BINARY_EXTRA_SIZE: usize = 16 + 16 + 8 + 4 + 4 + 16 + 16 + 16 + 16 + 8 + 8
 ///
 /// Every non-trivial parameter is part of the config so that two parties
 /// with different compiled versions still derive identical keystreams.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct OrbitalConfig {
     /// Initial orbital bodies.
     pub bodies: Vec<OrbitalBody>,
@@ -97,6 +97,18 @@ pub struct OrbitalConfig {
     /// Larger values reduce key rotation frequency at the cost of
     /// increased exposure if a key is compromised.
     pub max_bytes_per_key: u64,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for OrbitalConfig {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("OrbitalConfig")
+            .field("body_count", &self.bodies.len())
+            .field("total_steps", &self.total_steps)
+            .field("reseed_interval", &self.reseed_interval)
+            .field("monitor_interval", &self.monitor_interval)
+            .finish_non_exhaustive()
+    }
 }
 
 impl OrbitalConfig {

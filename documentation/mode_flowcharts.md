@@ -76,6 +76,10 @@ hash for authentication. The authentication key is derived from the ChaCha20
 key+nonce using BLAKE3 key derivation, ensuring the tag is cryptographically
 bound to the encryption key.
 
+`update` returns plaintext before it is verified: callers must discard it unless
+`finalize` succeeds. `decrypt_file_streaming` creates the output file only after
+verification. The tag is computed incrementally, so memory use stays bounded.
+
 ### Wire Format
 
 ```
@@ -90,13 +94,13 @@ flowchart TD
     subgraph Initialization
         A1["SecureEncryptor::new(key, nonce)"] --> A2["Create ChaCha20 cipher from key+nonce"]
         A2 --> A3["Derive auth_key = BLAKE3(keyed_hash, key || 'Kelvin Secure Streaming Auth Key' || nonce)"]
-        A3 --> A4["Initialize empty plaintext_buf"]
+        A3 --> A4["Initialize keyed BLAKE3 hasher"]
     end
 
     subgraph Encryption
         B1["update(plaintext, &mut output)"] --> B2{"Already finalized?"}
         B2 -->|Yes| B3["Return error"]
-        B2 -->|No| B4["plaintext_buf.extend(plaintext)"]
+        B2 -->|No| B4["hasher.update(plaintext)"]
         B4 --> B5["output.extend(plaintext)"]
         B5 --> B6["ChaCha20.apply_keystream(&mut output[start..])"]
         B6 --> B7["Return Ok"]
@@ -105,29 +109,28 @@ flowchart TD
     subgraph Finalization
         C1["finalize()"] --> C2{"Already finalized?"}
         C2 -->|Yes| C3["Return error"]
-        C2 -->|No| C4["tag = BLAKE3(keyed_hash, auth_key, plaintext_buf)"]
+        C2 -->|No| C4["tag = hasher.finalize()"]
         C4 --> C5["Return 32-byte tag"]
     end
 
     subgraph Decryption
         D1["SecureDecryptor::new(key, nonce)"] --> D2["Create ChaCha20 cipher (same key)"]
         D2 --> D3["Derive auth_key (same derivation)"]
-        D3 --> D4["Initialize empty plaintext_buf"]
+        D3 --> D4["Initialize keyed BLAKE3 hasher"]
 
         D5["update(ciphertext, &mut output)"] --> D6{"Already finalized?"}
         D6 -->|Yes| D7["Return error"]
         D6 -->|No| D8["output.extend(ciphertext)"]
         D8 --> D9["ChaCha20.apply_keystream(&mut output[start..])"]
-        D9 --> D10["plaintext_buf.extend(decrypted bytes)"]
+        D9 --> D10["hasher.update(decrypted bytes)"]
         D10 --> D11["Return Ok (unverified plaintext)"]
 
         D12["finalize(tag)"] --> D13{"Already finalized?"}
         D13 -->|Yes| D14["Return error"]
-        D13 -->|No| D15["expected = BLAKE3(keyed_hash, auth_key, plaintext_buf)"]
+        D13 -->|No| D15["expected = hasher.finalize()"]
         D15 --> D16{"tag == expected?"}
         D16 -->|Yes| D17["Return Ok"]
-        D16 -->|No| D18["Zeroize plaintext_buf"]
-        D18 --> D19["Return AuthenticationFailed error"]
+        D16 -->|No| D19["Return AeadError (caller discards the output)"]
     end
 
     A4 --> B1
@@ -152,12 +155,12 @@ sequenceDiagram
     SecureEncryptor-->>Caller: SecureEncryptor instance
 
     Caller->>SecureEncryptor: update(plaintext, &mut output)
-    SecureEncryptor->>SecureEncryptor: plaintext_buf.extend(plaintext)
+    SecureEncryptor->>SecureEncryptor: hasher.update(plaintext)
     SecureEncryptor->>SecureEncryptor: ChaCha20.apply_keystream → ciphertext
     SecureEncryptor-->>Caller: ciphertext appended to output
 
     Caller->>SecureEncryptor: finalize()
-    SecureEncryptor->>SecureEncryptor: BLAKE3(keyed_hash, auth_key, plaintext_buf)
+    SecureEncryptor->>SecureEncryptor: hasher.finalize()
     SecureEncryptor-->>Caller: 32-byte tag
 
     Note over Caller,SecureDecryptor: Decryption
@@ -168,16 +171,15 @@ sequenceDiagram
 
     Caller->>SecureDecryptor: update(ciphertext, &mut output)
     SecureDecryptor->>SecureDecryptor: ChaCha20.apply_keystream → plaintext
-    SecureDecryptor->>SecureDecryptor: plaintext_buf.extend(plaintext)
+    SecureDecryptor->>SecureDecryptor: hasher.update(plaintext)
     SecureDecryptor-->>Caller: plaintext appended to output (unverified)
 
     Caller->>SecureDecryptor: finalize(tag)
-    SecureDecryptor->>SecureDecryptor: BLAKE3(keyed_hash, auth_key, plaintext_buf) == tag?
+    SecureDecryptor->>SecureDecryptor: hasher.finalize() == tag?
     alt Tag matches
         SecureDecryptor-->>Caller: Ok
     else Tag mismatch
-        SecureDecryptor->>SecureDecryptor: Zeroize plaintext_buf
-        SecureDecryptor-->>Caller: Err(AuthenticationFailed)
+        SecureDecryptor-->>Caller: Err(AeadError), discard the output
     end
 ```
 
@@ -752,7 +754,7 @@ flowchart LR
     subgraph Authenticated Encryption
         A["plaintext"] --> B["XOR with keystream"]
         B --> C["ciphertext"]
-        C --> D["KMAC128(key, ciphertext, custom)"]
+        C --> D["KMAC128(key, version, index, final, ciphertext, custom)"]
         D --> E["32-byte tag"]
         C --> F["wire: ciphertext || version(1B) || tag(32B)"]
         E --> F
@@ -760,7 +762,7 @@ flowchart LR
 
     subgraph Authenticated Decryption
         G["wire: ciphertext || version || tag"] --> H["Verify version byte"]
-        H --> I["KMAC128(key, ciphertext, custom) == tag?"]
+        H --> I["KMAC128(key, version, index, final, ciphertext, custom) == tag?"]
         I -->|Yes| J["XOR with keystream → plaintext"]
         I -->|No| K["Return AuthenticationFailed"]
     end
@@ -769,3 +771,7 @@ flowchart LR
 The MAC key is derived from the same 2048-byte seed using HKDF-SHA512 with a
 distinct domain separator (`DOMSEP_MAC_KEY_V1`), preventing related-key attacks
 between keystream generation and authentication.
+
+Each tag binds the format version (2), the chunk index and a final-chunk flag,
+so reordered, repeated or missing chunks are rejected. The last chunk is
+processed with `encrypt_final` / `decrypt_final`.

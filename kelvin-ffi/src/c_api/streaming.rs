@@ -202,7 +202,7 @@ pub(crate) unsafe fn streaming_decrypt_finalize_impl(
 #[macro_export]
 macro_rules! gen_stream_encrypt_ffi {
     ($prefix:ident, $ctx_type:ty, $inner_type:ty, $seed_type:ty) => {
-        paste::paste! {
+        pastey::paste! {
             #[no_mangle]
             pub unsafe extern "C" fn [<kelvin_ $prefix _encryptor_new>](
                 seed: *const u8,
@@ -277,7 +277,7 @@ macro_rules! gen_stream_encrypt_ffi {
 #[macro_export]
 macro_rules! gen_stream_decrypt_ffi {
     ($prefix:ident, $ctx_type:ty, $inner_type:ty, $seed_type:ty) => {
-        paste::paste! {
+        pastey::paste! {
             #[no_mangle]
             pub unsafe extern "C" fn [<kelvin_ $prefix _decryptor_new>](
                 seed: *const u8,

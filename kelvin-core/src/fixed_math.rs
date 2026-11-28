@@ -1,4 +1,4 @@
-//! Q32.64 fixed-point arithmetic.
+﻿//! Q32.64 fixed-point arithmetic.
 //!
 //! Format: Q32.64 stored as `i128` where `1.0 = 2^64`.
 //!
@@ -773,7 +773,7 @@ mod kani_proofs {
     // bounds from the C1 proof sketch (see formal_verification.md §L1').
     //
     // They verify:
-    //   1. Preimage size bound at the softening limit
+    //   1. Distinct quotients for adjacent divisors at the softening limit
     //   2. ε-bound on per-operation Shannon entropy loss
     //   3. Division remainder range
     //   4. Rounding operation count for Verlet (N=2)
@@ -788,45 +788,31 @@ mod kani_proofs {
 
     // ── Harness: Preimage Size at Softening Limit ──────────────────────
     //
-    // Prove: At the minimum physically-possible denominator (softening limit),
-    // the division g / dist_cubed maps at most 9 consecutive input values
-    // to the same output (local bound). The global bound is ≤ 2^32.
+    // Prove: for every dist_cubed in [C1_MIN_DC, C1_MIN_DC + 1024], the
+    // quotient g / dist_cubed is strictly greater than the quotient for the
+    // next divisor. By transitivity the quotients of the 1026 divisors in
+    // [C1_MIN_DC, C1_MIN_DC + 1025] are pairwise distinct: the division
+    // merges no two of them (preimage size 1).
+    //
+    // This says nothing about larger divisors, where quotients do collide.
     #[kani::proof]
     #[kani::unwind(4096)]
     fn verify_c1_preimage_bound() {
-        // Symbolic dist_cubed_raw near the softening limit
         let dist_cubed_raw: i128 = kani::any();
         kani::assume(dist_cubed_raw >= C1_MIN_DC);
         kani::assume(dist_cubed_raw <= C1_MIN_DC + 1024);
 
         let g = Fixed::from_raw(C1_G_RAW);
-        let dist_cubed = Fixed::from_raw(dist_cubed_raw);
-        let factor = g / dist_cubed;
-        let factor_raw = factor.to_raw();
+        let factor = g / Fixed::from_raw(dist_cubed_raw);
+        let next_factor = g / Fixed::from_raw(dist_cubed_raw + 1);
 
-        // Count preimages in a local window of 9 values
-        let mut preimage_count: u64 = 0;
-        for delta in 0..=8 {
-            let candidate_raw = dist_cubed_raw + delta;
-            if candidate_raw >= C1_MIN_DC && candidate_raw <= C1_MAX_DC {
-                let candidate = Fixed::from_raw(candidate_raw);
-                let candidate_factor = g / candidate;
-                if candidate_factor.to_raw() == factor_raw {
-                    preimage_count += 1;
-                }
-            }
-        }
-
-        kani::assert(preimage_count <= 9, "C1: local preimage count at softening limit ≤ 9");
-
-        kani::cover(
-            preimage_count == 0,
-            "C1-cover: zero preimages (neighbors produce different factor_raw)",
+        kani::assert(
+            factor.to_raw() > next_factor.to_raw(),
+            "C1: adjacent divisors near the softening limit give distinct quotients",
         );
-        kani::cover(
-            preimage_count > 0,
-            "C1-cover: at least one neighbor shares the same factor_raw",
-        );
+
+        kani::cover(dist_cubed_raw == C1_MIN_DC, "C1-cover: lower end of the window");
+        kani::cover(dist_cubed_raw == C1_MIN_DC + 1024, "C1-cover: upper end of the window");
     }
 
     // ── Harness: ε-Bound on Preimage Size (Full Range) ─────────────────
@@ -882,210 +868,67 @@ mod kani_proofs {
         );
     }
 
-    // ── C3 Harness 1: Verlet Step is Many-to-One (Non-Injective) ──────
+    // ── C3 Harness 1: Division Rounding Damps a 1-ULP Change ───────────
     //
-    // Prove: For N=2 bodies and 1 Verlet step, two distinct initial states
-    // differing by 1 ULP in one position coordinate produce the same
-    // output state within rounding tolerance (2 ULPs per component).
+    // A fixed-point step is many-to-one because `Div` rounds. This harness
+    // checks that reason at the operation level, on concrete denominators: for
+    // large denominators, changing the divisor by one raw unit moves the
+    // quotient by at most one raw unit (often by zero).
     //
-    // This validates the C3 claim that Φ is non-injective: information
-    // loss from fixed-point rounding means the map cannot be inverted
-    // uniquely even for a single step.
-    //
-    // Strategy: Use symbolic initial position for body 1, create a variant
-    // with body1.position.x += 1 ULP (smallest possible perturbation).
-    // After 1 Verlet step, the two outputs should differ by at most
-    // a small rounding tolerance, not by the full ULP difference.
+    // The previous version ran a full `verlet_step` on symbolic positions; it
+    // did not terminate in 30 minutes (a 3.5M-variable CBMC instance), so this
+    // replaces it with the division-level statement that is tractable.
     #[kani::proof]
-    fn verify_c3_step_non_injective() {
-        use crate::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
-        use crate::{verlet_step, OrbitalBody, Vec3};
-
-        // Base symbolic position for body 1
-        let bx_raw: i128 = kani::any();
-        // Constrain to allow ULP increment without exceeding bounds
-        kani::assume(bx_raw >= -50 * (1 << 64));
-        kani::assume(bx_raw <= 50 * (1 << 64));
-
-        let mass_sun = Fixed::ONE;
-        let mass_planet = Fixed::from_raw(1 << 50);
-        let dt = DEFAULT_DT;
-        let softening = SOFTENING_FACTOR;
-        let g = DEFAULT_G;
-
-        // State A: body 1 at x = bx_raw
-        let pos_a = Vec3::new(Fixed::from_raw(bx_raw), Fixed::ZERO, Fixed::ZERO);
-        let state_a = [
-            OrbitalBody::new(mass_sun, pos_a, Vec3::ZERO),
-            OrbitalBody::new(
-                mass_planet,
-                Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-            ),
+    #[kani::unwind(256)]
+    fn verify_c3_step_damping() {
+        // Denominators from 2^70 up to the physical maximum (~2^86.9).
+        const DENS: [i128; 6] = [
+            1i128 << 70,
+            1i128 << 72,
+            1i128 << 76,
+            1i128 << 80,
+            1i128 << 84,
+            8_000_000 * (1i128 << 64),
         ];
 
-        // State B: body 1 at x = bx_raw + 1 (1 ULP perturbation)
-        let pos_b = Vec3::new(Fixed::from_raw(bx_raw + 1), Fixed::ZERO, Fixed::ZERO);
-        let state_b = [
-            OrbitalBody::new(mass_sun, pos_b, Vec3::ZERO),
-            OrbitalBody::new(
-                mass_planet,
-                Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-            ),
-        ];
-
-        // Run 1 Verlet step for both
-        let mut out_a = state_a;
-        verlet_step(&mut out_a, dt, softening, g);
-        let mut out_b = state_b;
-        verlet_step(&mut out_b, dt, softening, g);
-
-        // After 1 step, the two outputs should differ by at most
-        // a small amount (not the original 1 ULP). The rounding in
-        // division and sqrt during the step discards the LSB.
-        // We assert the maximum component-wise difference is ≤ 2 ULPs.
-        let diff_x = (out_a[0].position.x - out_b[0].position.x).abs();
-        let diff_y = (out_a[0].position.y - out_b[0].position.y).abs();
-        let diff_z = (out_a[0].position.z - out_b[0].position.z).abs();
-
-        // The information loss from the 1 ULP perturbation means
-        // the outputs should be indistinguishable within 2 ULPs.
-        // This is NOT an assertion that the outputs are exactly equal
-        // (they may differ by rounding), but that the difference is
-        // bounded by the rounding tolerance of the operations involved.
-        kani::assert(
-            diff_x + diff_y + diff_z <= Fixed::from_raw(10),
-            "C3: 1-ULP perturbation causes ≤ 10 ULP total output difference (non-injective)",
-        );
-
-        // Cover: the two outputs are exactly equal (true collision)
-        if diff_x == Fixed::ZERO && diff_y == Fixed::ZERO && diff_z == Fixed::ZERO {
-            kani::cover(true, "C3-cover: exact collision (1-ULP difference vanishes after 1 step)");
+        let g = Fixed::from_raw(C1_G_RAW);
+        for &den in DENS.iter() {
+            let q0 = g / Fixed::from_raw(den);
+            let q1 = g / Fixed::from_raw(den + 1);
+            let diff = (q0 - q1).abs();
+            kani::assert(
+                diff <= Fixed::from_raw(1),
+                "C3: 1-ULP divisor change moves the quotient by at most 1 ULP",
+            );
+            kani::cover(
+                q0 == q1,
+                "C3-cover: adjacent divisors can produce the same quotient",
+            );
         }
     }
 
-    // ── C3 Harness 2: Two-Step Preimage Growth ────────────────────────
+    // ── C3 Harness 2: Damping Composes Across Two Divisions ────────────
     //
-    // Prove: For N=2 bodies and 2 Verlet steps, at least 2 out of 4
-    // distinct 1-ULP-perturbed initial states converge to the same
-    // output within rounding tolerance. This demonstrates compounding
-    // preimage growth: after 2 steps, the preimage set is at least
-    // as large as after 1 step.
-    //
-    // Strategy: Start from 4 initial states differing by 1 ULP in each
-    // of the 3 spatial axes. Run 2 Verlet steps. Check if any pair
-    // of the 4 outputs converge to within 2 ULPs.
+    // A quotient difference of at most one raw unit from the first stage cannot
+    // grow when the result is divided again by a denominator of at least 1.0.
     #[kani::proof]
-    fn verify_c3_two_step_preimage_growth() {
-        use crate::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
-        use crate::{verlet_step, OrbitalBody, Vec3};
+    #[kani::unwind(256)]
+    fn verify_c3_two_step_dispersion() {
+        const D1: [i128; 3] = [1i128 << 70, 1i128 << 76, 1i128 << 80];
+        const D2: i128 = 1i128 << 70;
 
-        let mass_sun = Fixed::ONE;
-        let mass_planet = Fixed::from_raw(1 << 50);
-        let dt = DEFAULT_DT;
-        let softening = SOFTENING_FACTOR;
-        let g = DEFAULT_G;
+        let g = Fixed::from_raw(C1_G_RAW);
+        let d2 = Fixed::from_raw(D2);
 
-        // Base position for body 1 (symbolic, constrained)
-        let bx_raw: i128 = kani::any();
-        kani::assume(bx_raw >= -50 * (1 << 64));
-        kani::assume(bx_raw <= 50 * (1 << 64));
-
-        let base_pos = Vec3::new(Fixed::from_raw(bx_raw), Fixed::ZERO, Fixed::ZERO);
-
-        // 4 perturbed initial states: original, +1 ULP in x, y, z
-        let states = [
-            // S0: base
-            [
-                OrbitalBody::new(mass_sun, base_pos, Vec3::ZERO),
-                OrbitalBody::new(
-                    mass_planet,
-                    Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                    Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-                ),
-            ],
-            // S1: +1 ULP in x
-            [
-                OrbitalBody::new(
-                    mass_sun,
-                    Vec3::new(Fixed::from_raw(bx_raw + 1), Fixed::ZERO, Fixed::ZERO),
-                    Vec3::ZERO,
-                ),
-                OrbitalBody::new(
-                    mass_planet,
-                    Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                    Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-                ),
-            ],
-            // S2: +1 ULP in y
-            [
-                OrbitalBody::new(
-                    mass_sun,
-                    Vec3::new(Fixed::from_raw(bx_raw), Fixed::from_raw(1), Fixed::ZERO),
-                    Vec3::ZERO,
-                ),
-                OrbitalBody::new(
-                    mass_planet,
-                    Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                    Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-                ),
-            ],
-            // S3: +1 ULP in z
-            [
-                OrbitalBody::new(
-                    mass_sun,
-                    Vec3::new(Fixed::from_raw(bx_raw), Fixed::ZERO, Fixed::from_raw(1)),
-                    Vec3::ZERO,
-                ),
-                OrbitalBody::new(
-                    mass_planet,
-                    Vec3::new(Fixed::from_int(5), Fixed::ZERO, Fixed::ZERO),
-                    Vec3::new(Fixed::ZERO, Fixed::from_int(6), Fixed::ZERO),
-                ),
-            ],
-        ];
-
-        // Run 2 Verlet steps for all 4 states
-        let mut outputs = states;
-        for _ in 0..2 {
-            for i in 0..4 {
-                verlet_step(&mut outputs[i], dt, softening, g);
-            }
-        }
-
-        // Check for preimage convergence: after 2 steps, at least 2 pairs
-        // should have outputs that differ by ≤ 10 ULPs total (demonstrating
-        // that 2 or more distinct initial states collapsed to nearby outputs).
-        let mut converged_pairs = 0;
-        for i in 0..4 {
-            for j in (i + 1)..4 {
-                let diff_x = (outputs[i][0].position.x - outputs[j][0].position.x).abs();
-                let diff_y = (outputs[i][0].position.y - outputs[j][0].position.y).abs();
-                let diff_z = (outputs[i][0].position.z - outputs[j][0].position.z).abs();
-                let total_diff = diff_x + diff_y + diff_z;
-                if total_diff <= Fixed::from_raw(10) {
-                    converged_pairs += 1;
-                }
-            }
-        }
-
-        // After 2 steps, we expect at least 1 pair to have converged
-        // (demonstrating that preimage growth compounds across steps).
-        kani::assert(
-            converged_pairs >= 0, // trivially true by counting
-            "C3: after 2 steps, preimage set has at least as many collisions as after 1 step",
-        );
-
-        // Check that the dispersion does NOT grow without bound
-        // (which would indicate the preimage is not contracting).
-        // If all 4 outputs are far apart, the step would be injective,
-        // contradicting C1's information loss claim. We check that at
-        // least one pair is close.
-        if converged_pairs > 0 {
-            kani::cover(
-                true,
-                "C3-cover: at least one pair converged after 2 steps (preimage growth)",
+        for &den in D1.iter() {
+            let a0 = g / Fixed::from_raw(den);
+            let a1 = g / Fixed::from_raw(den + 1);
+            let q0 = a0 / d2;
+            let q1 = a1 / d2;
+            let diff = (q0 - q1).abs();
+            kani::assert(
+                diff <= Fixed::from_raw(1),
+                "C3: a one-ULP stage-1 difference does not grow in stage 2",
             );
         }
     }

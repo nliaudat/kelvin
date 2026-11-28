@@ -1,6 +1,11 @@
-# C3 Gap 3: Relating k to C1's ε-Bound — Resolved
+# C3 Gap 3: Relating k to the C1 Epsilon Bound
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. The link between k and the C1 epsilon bound is not established.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C3 — Sequential Simulation Hardness Against Quantum Adversaries
 > **Dependencies:** C1 Gaps 1, 4, 5

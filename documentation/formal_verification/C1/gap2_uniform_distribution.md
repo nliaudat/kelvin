@@ -1,54 +1,41 @@
-/-!
-# C1 Gap 2: Uniformity of dist_cubed — JUSTIFIED
+# C1 Gap 2: Uniformity of `dist_cubed`
 
-Formal justification that the cubic distance distribution is uniform over the physical range.
+**Status:** Empirical. No proof.
 
-Status: ✅ JUSTIFIED (empirical) + ✅ DOCUMENTED
-Date: 2026-11-21
-Kani Cross-Reference: verify_c1_uniformity_test in kelvin-core/src/fixed_math.rs
+**Claim:** under the physical domain constraints, `dist_cubed` is uniformly
+distributed over `[MIN_DIST³, MAX_DIST³]`.
 
----
+## Why this matters
 
-## Theorem Statement
+C1 gap 1 wants to argue that a discarded remainder carries about one bit of
+entropy. That requires the input to the division to be distributed in a
+particular way. Uniformity of `dist_cubed` is the assumption that makes the
+per-operation entropy argument go through.
 
-**Theorem:** Under the physical domain constraints, `dist_cubed` is uniformly distributed over `[MIN_DIST^3, MAX_DIST^3]`.
+## Evidence
 
----
+The claim is supported empirically, not derived:
 
-## Proof Strategy (Justified)
+1. A Kolmogorov–Smirnov test in `tests/information_loss/` reports
+   p > 0.05 against a uniform null.
+2. Monte-Carlo sampling (10⁶ draws) is reported as consistent across quantiles.
+3. A physical plausibility argument: random orbital configurations should
+   produce a broad range of separations.
 
-This gap relies on empirical validation rather than pure mathematical derivation:
+## What would be needed for a proof
 
-1. **Kolmogorov-Smirnov Test**: The K-S test in `tests/information_loss/` confirms uniformity with p-value > 0.05
-2. **Monte Carlo Simulation**: 10^6 samples show consistent distribution across all quantiles
-3. **Physical Justification**: Random orbital configurations naturally produce uniform distance distributions
+- An explicit probability distribution over initial configurations.
+- A derivation of the induced distribution of pairwise separations.
+- A statement (and proof) that the rounding error is independent of the
+  quotient, which is **not** implied by uniformity of the input alone.
 
----
-
-## Lean Connection
-
-This property is implicitly used in the fixed-point proofs:
-
-```lean
--- In proofs/lean/src/fixed_point/FixedPoint.lean
-theorem div_correctness ... : 
-  -- Assumes uniform distribution for entropy calculation
-  -- See C1 gap2 for empirical justification
-```
-
----
-
-## Kani Verification
-
-The harness `verify_c1_uniformity_test` confirms:
-- Max preimage count ≤ 8,000,000
-- Distribution variance within acceptable bounds
-
----
+None of these exists. In particular, note that `dist_cubed = dist_sq * dist` is
+a deterministic function of `dist`, so "uniformity of `dist_cubed`" and
+"uniformity of `dist`" cannot both hold on the same interval; the claim needs a
+precise statement before it can be proved.
 
 ## References
 
-1. `tests/information_loss/src/main.rs` (K-S test)
-2. C1 readme.md §C1
-
-/-
+- `tests/information_loss/` (K–S test)
+- [C1 overview](readme.md)
+- [PROOF_INDEX.md](../PROOF_INDEX.md)

@@ -75,6 +75,10 @@ V1 (ChaCha20Poly1305) is AEAD. V2/V3/H append a KMAC128 tag by default
 (2^128) to forge tags. Running unauthenticated XOR modes accepts
 malleability; that is an explicit opt-out, not the default.
 
+The tags bind chunk order and mark the final chunk (format version 2). The V1
+library API (`Kelvin`) authenticates each chunk and its order but does not mark
+the last one; the CLI does this with a short final chunk.
+
 ### Session discipline (config, nonce)
 
 Security requires one (config, nonce) pair per instance: the CLI

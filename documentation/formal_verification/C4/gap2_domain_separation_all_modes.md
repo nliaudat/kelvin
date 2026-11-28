@@ -1,6 +1,11 @@
-# C4 Gap 2: Domain Separation Across All 6 Modes — Resolved (corrected 2026-10-10)
+# C4 Gap 2: Domain Separation Across All Six Modes
 
-> **Status:** ✅ RESOLVED (corrected)
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Partial. Framing injectivity is proved in `Entropy.lean`; XOF separation is conditional.
+
 > **Date:** 2026-05-30 (corrected 2026-10-10)
 > **Conjecture:** C4 — Computational Indistinguishability of the Keystream
 > **Kani Cross-Reference:** `verify_domain_separation_functional` in `kelvin-kdf/src/extractor.rs`

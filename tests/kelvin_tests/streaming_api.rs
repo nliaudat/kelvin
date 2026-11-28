@@ -764,3 +764,89 @@ fn test_streaming_trait_object_dispatch() {
     decryptor.finalize(&[]).unwrap();
     assert_eq!(&decrypted, plaintext);
 }
+
+// ============================================================================
+// File helpers: verification before output, and argument checks
+// ============================================================================
+
+/// A fresh, empty directory for one test.
+fn empty_dir(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("kelvin_test_{}_{}", std::process::id(), name));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn file_count(dir: &std::path::Path) -> usize {
+    std::fs::read_dir(dir).unwrap().count()
+}
+
+#[test]
+fn test_secure_file_decrypt_publishes_only_verified_plaintext() {
+    let (key, nonce) = ([0xABu8; 32], [0xCDu8; 12]);
+    let dir = empty_dir("verified");
+    let [plain, cipher, damaged, output] =
+        ["plain", "cipher", "damaged", "output"].map(|name| dir.join(name));
+    let plaintext = vec![0x5Au8; 1000];
+    std::fs::write(&plain, &plaintext).unwrap();
+    encrypt_file_streaming(SecureEncryptor::new(key, nonce), &plain, &cipher, 64).unwrap();
+    let ciphertext = std::fs::read(&cipher).unwrap();
+
+    let mut tampered = ciphertext.clone();
+    tampered[500] ^= 1;
+    let truncated = ciphertext[..600].to_vec();
+    let too_short = ciphertext[..10].to_vec();
+    for bytes in [tampered, truncated, too_short] {
+        std::fs::write(&damaged, bytes).unwrap();
+        let decryptor = SecureDecryptor::new(key, nonce);
+        assert!(decrypt_file_streaming(decryptor, &damaged, &output, 64, 32).is_err());
+        assert!(!output.exists(), "unverified plaintext was written");
+    }
+    assert_eq!(file_count(&dir), 3, "temporary file left behind");
+
+    let decryptor = SecureDecryptor::new(key, nonce);
+    decrypt_file_streaming(decryptor, &cipher, &output, 64, 32).unwrap();
+    assert_eq!(std::fs::read(&output).unwrap(), plaintext);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_file_streaming_rejects_destructive_arguments() {
+    let (key, nonce) = ([0xABu8; 32], [0xCDu8; 12]);
+    let dir = empty_dir("arguments");
+    let (plain, output) = (dir.join("plain"), dir.join("output"));
+    std::fs::write(&plain, b"keep me").unwrap();
+    let encryptor = || SecureEncryptor::new(key, nonce);
+    let decryptor = || SecureDecryptor::new(key, nonce);
+
+    assert!(encrypt_file_streaming(encryptor(), &plain, &plain, 64).is_err());
+    assert!(decrypt_file_streaming(decryptor(), &plain, &plain, 64, 0).is_err());
+    assert!(encrypt_file_streaming(encryptor(), &plain, &output, 0).is_err());
+    assert!(decrypt_file_streaming(decryptor(), &plain, &output, 0, 0).is_err());
+
+    assert_eq!(std::fs::read(&plain).unwrap(), b"keep me");
+    assert_eq!(file_count(&dir), 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The incrementally computed tag equals the one-shot keyed hash, so the wire
+/// format did not change.
+#[test]
+fn test_secure_streaming_tag_is_independent_of_chunking() {
+    let (key, nonce) = ([0xABu8; 32], [0xCDu8; 12]);
+    let plaintext = vec![0x11u8; 5000];
+    let tag_for = |chunk: usize| {
+        let mut encryptor = SecureEncryptor::new(key, nonce);
+        let mut output = Vec::new();
+        for part in plaintext.chunks(chunk) {
+            encryptor.update(part, &mut output).unwrap();
+        }
+        encryptor.finalize().unwrap()
+    };
+    let auth_key =
+        blake3::keyed_hash(&key, &[b"Kelvin Secure Streaming Auth Key", &nonce[..]].concat());
+    let expected = blake3::keyed_hash(auth_key.as_bytes(), &plaintext);
+
+    assert_eq!(tag_for(plaintext.len()), expected.as_bytes());
+    assert_eq!(tag_for(7), expected.as_bytes());
+}

@@ -87,7 +87,6 @@ pub struct LyapunovResult {
 /// full Lyapunov spectrum. For systems with more than 3 bodies, additional
 /// shadow orbits (e.g., perturbing different bodies or using random
 /// perturbations) could provide more robust estimates.
-#[derive(Debug)]
 pub struct LyapunovEstimator<'a> {
     /// Reference bodies (initial conditions).
     reference: &'a [OrbitalBody],
@@ -99,6 +98,13 @@ pub struct LyapunovEstimator<'a> {
     g: Fixed,
     /// Integration method (Verlet or Euler).
     method: IntegrationMethod,
+}
+
+/// Secret material is omitted from the output.
+impl core::fmt::Debug for LyapunovEstimator<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("LyapunovEstimator").field("method", &self.method).finish_non_exhaustive()
+    }
 }
 
 impl<'a> LyapunovEstimator<'a> {
@@ -348,8 +354,9 @@ impl fmt::Display for LyapunovError {
 // Run with: cargo kani -p kelvin-kdf
 #[cfg(kani)]
 mod kani_proofs {
-    use kelvin_core::constants::{DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR};
-    use kelvin_core::{verlet_step, Fixed, OrbitalBody, Vec3};
+    use kelvin_core::{
+        verlet_step, Fixed, OrbitalBody, Vec3, DEFAULT_DT, DEFAULT_G, SOFTENING_FACTOR,
+    };
 
     // ── Harness 1: Padé ln numerical behavior ─────────────────────────
     //

@@ -1,6 +1,11 @@
-# C2 Gap 5: Shadow Orbit Bias Constant `C_bias` — Resolved (corrected 2026-10-10)
+# C2 Gap 5: Shadow Orbit Bias Constant
 
-> **Status:** ✅ RESOLVED (corrected)
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. The bias constant is asserted, not derived.
+
 > **Date:** 2026-05-30 (corrected 2026-10-10)
 > **Conjecture:** C2 — Finite-Precision Lyapunov Exponent Certification
 

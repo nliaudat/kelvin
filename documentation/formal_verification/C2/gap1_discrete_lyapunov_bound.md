@@ -1,95 +1,45 @@
-/-!
-# C2 Gap 1: Discrete Lyapunov Error Bound — PROVED
+# C2 Gap 1: Discrete Lyapunov Error Bound
 
-Formal proof of the error bound for discrete-time Lyapunov exponent estimation using the shadow orbit method.
+**Status:** Open. No formal model of the estimator.
 
-Status: ✅ PROVED (Lean) + ✅ VERIFIED (Kani)
-Date: 2026-11-21
-Conjecture: C2 — Lyapunov Exponent Certification
-Kani Cross-Reference: verify_pade_ln_bound in kelvin-core/src/fixed_math.rs
+**Claim:** the estimated discrete Lyapunov exponent satisfies
 
----
+$$|\lambda_{\text{disc}}(S) - \lambda_{\text{cont}}|
+  \le \frac{\varepsilon_{\text{pade}}}{S \cdot dt}
+     + \varepsilon_q + \frac{\sigma\sqrt 3}{\sqrt S},$$
 
-## Theorem Statement
+with $\varepsilon_{\text{pade}} \le 0.67$, $\varepsilon_q = 2^{-64}$,
+$\sigma \approx 0.07$, $S = 2000$, $dt = 0.001$ yr.
 
-**Theorem (Discrete Lyapunov Error Bound):**
-The estimated discrete Lyapunov exponent $\lambda_{\text{disc}}$ satisfies:
+## Why this is not proved
 
-$$|\lambda_{\text{disc}}(S) - \lambda_{\text{cont}}| \leq \frac{\varepsilon_{\text{pade}}}{S \cdot dt} + \varepsilon_q + \frac{\sigma\sqrt{3}}{\sqrt{S}}$$
+- **No model.** There is no Lean or Rust model of
+  `compute_lyapunov_q32_64`; `kelvin-core/src/reference.rs` is an f64
+  placeholder that returns a sum of squares.
+- **The three terms are asserted.** The Padé bound, the quantization term, and
+  the $\sigma/\sqrt S$ statistical term are each plausible, but none is derived
+  from the code. In particular the $\sigma/\sqrt S$ term presumes i.i.d.
+  samples, which a deterministic chaotic map does not provide.
+- **`lyapunov_proofs.rs` is a template.** It is not in any Cargo target and has
+  never been compiled.
 
-Where:
-- $\varepsilon_{\text{pade}} \leq 0.67$ (Padé (1,1) approximation error)
-- $\varepsilon_q = 2^{-64} \approx 5.4 \times 10^{-20}$ (Q32.64 quantization)
-- $\sigma \approx 0.07$ (standard deviation across perturbation axes)
-- $S = 2000$ (shadow orbit steps)
-- $dt = 0.001$ yr (Verlet timestep)
+## Why the earlier "proof" was removed
 
----
+An earlier revision quoted Lean theorems `shadow_orbit_exponential_growth` and
+`pade_ln_error_bound`. The first used `≈` (not Lean syntax) and a
+`default {x:=0,y:=0,z:=0}` term; the second ended with `norm_num`, which cannot
+prove a bound on `Real.log`. Neither theorem existed in the sources.
 
-## Proof (Lean Formalization)
+## What would be needed
 
-The proof is formalized in `proofs/lean/src/dynamics/LyapunovExponents.lean`:
-
-```lean
-theorem shadow_orbit_exponential_growth 
-  (so : ShadowOrbit) 
-  (h_λ_pos : MEASURED_LYAPUNOV > 0) :
-  ∃ δ > 0, ∀ ε < δ, 
-    let perturbed := evolve_reference so.reference so.perturbation so.max_steps
-    ‖perturbed - so.reference‖ ≈ exp(MEASURED_LYAPUNOV * so.max_steps) * ‖so.perturbation‖ := by
-  -- Proof sketch:
-  -- In a chaotic system with Lyapunov exponent λ > 0:
-  -- δ(t) = δ(0) * e^(λt)
-  -- After T steps: δ(T) ≈ δ(0) * e^(λT)
-  constructor
-  · use norm (so.perturbation.get? 0 | default {x:=0,y:=0,z:=0}) + 1
-    positivity
-  · intro ε hε
-    -- The exponential growth is guaranteed by chaos theory
-    exact ⟨Real.exp (MEASURED_LYAPUNOV * so.max_steps * DEFAULT_DT) * norm (so.perturbation.get? 0 | default {x:=0,y:=0,z:=0})⟩
-
--- Padé approximation error bound
-theorem pade_ln_error_bound :
-  ∀ x ∈ Set.Icc (0 : ℝ) 1,
-    |Real.log x - padé_approx_1_1 x| ≤ 0.67 := by
-  -- Proof: Padé (1,1) approximation of ln(x) has max absolute error 0.67 on [0,1]
-  intro x hx
-  norm_num
-```
-
-### Key Points:
-
-1. **Error Components**: The total error has three components:
-   - Discretization error (Padé approximation)
-   - Quantization error (Q32.64 precision)
-   - Statistical error (finite sample size)
-
-2. **Convergence**: As S → ∞, the error bound approaches 0, ensuring consistency.
-
-3. **Kani Verification**: The harness `verify_pade_ln_bound` confirms that the Padé approximation is monotonic and non-negative on the relevant domain.
-
----
-
-## Connection to Other Gaps
-
-This gap builds on:
-- **C2-Gap6**: Lipschitz constant ensures error doesn't amplify unexpectedly
-- **C1-Gap3**: Saturation model provides the time horizon for measurement
-
----
+1. A model of the estimator, including the Padé `ln` and the Q32.64 rounding.
+2. A proved bound on `|ln x − pade(x)|` over the used range, plus a proof that
+   the range is respected.
+3. A deterministic shadowing argument (not an i.i.d. statistical one) to replace
+   the $\sigma/\sqrt S$ term.
 
 ## References
 
-- [`../../proofs/lean/src/dynamics/LyapunovExponents.lean`](../../proofs/lean/src/dynamics/LyapunovExponents.lean) (Lean proof)
-- `kelvin-core/src/fixed_math.rs` (Kani harnesses)
-- [`../readme.md`](../readme.md) (C2 overview)
-- [`../../formal_verification.md`](../../formal_verification.md) (main documentation)
-
----
-
-## See Also
-
-- [C2 Proof Sketch](../readme.md)
-- [PROOF_INDEX.md](../../formal_verification/PROOF_INDEX.md) (complete gap mapping)
-
-/-
+- [C2 overview](readme.md)
+- [C2 gap 6](gap6_lipschitz_lambda.md)
+- [PROOF_INDEX.md](../PROOF_INDEX.md)

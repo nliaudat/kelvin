@@ -127,7 +127,7 @@ See the [Stream Cipher Security Analysis](documentation/stream_cipher_security.m
 - **Constant-time operations**: Integer-only arithmetic; dudect-bencher (|t| < 5) on 12 primitive-level benches (full pipeline not covered — see COMPLIANCE.md §5)
 - **Memory safety**: `#![forbid(unsafe_code)]` across all crates
 - **Zeroization**: All secret material cleared on drop (verified by runtime read-back test)
-- **Formal verification**: Kani proofs L0–L4 (safety, functional equivalence, composite correctness, pipeline integrity, determinism) — see [Formal Verification](#formal-verification) section
+- **Formal verification**: 46 Kani harnesses (arithmetic safety/equivalence, key derivation inputs, framing, loop invariants) plus Lean proofs of the integrator schedule, gravity momentum cancellation and key/domain framing. The C1–C5 security claims are **not** machine-checked — see [Formal Verification](#formal-verification) section
 - **NIST SP 800-90B compliance**: Built-in health tests (repetition, adaptive proportion, runs, longest run, Shannon entropy, chi-square, correlation)
 - **NIST SP 800-22 compliance**: 13–15 of 15 statistical tests pass on orbital keystream depending on mode (Random Excursions inapplicable on some 1-MB samples; see `nist_test_anomalies.md`)
 - **Post-quantum identity**: ML-DSA-65 (FIPS 204) signatures + ML-KEM-768 (FIPS 203) key encapsulation
@@ -262,15 +262,15 @@ kelvin analyze --config my-key.json
 
 ## Formal Verification
 
-Kelvin follows Apple's corecrypto blueprint for formal verification using the Kani Rust Verifier:
+Kelvin follows Apple's corecrypto blueprint as a *model*, using the Kani Rust Verifier and Lean 4. Only part of it is realised; 46 harnesses run (37 in `kelvin-core`, 6 in `kelvin-kdf`, 3 in `kelvin`), and the other files in `proofs/kani/` are uncompiled templates:
 
-| Level | What is Proved | Status |
-|-------|---------------|--------|
-| L0: Safety | No panics, no overflows under bounded inputs | ✅ Done |
-| L1: Functional Equivalence | Arithmetic ops match mathematical spec within dynamically scaled error bounds | ✅ Done |
-| L2: Composite Correctness | `compute_accelerations` matches Newtonian gravity via force-based assertions | ✅ Done |
-| L3: Pipeline Integrity | Full `simulate_and_extract_seed` produces correct output | ✅ Done |
-| L4: Determinism | Bit-identical results on the tested toolchain (golden hashes; cross-arch matrix not automated) | ✅ Done |
+| Level | Target | Status |
+|-------|--------|--------|
+| L0: Safety | No overflow for bounded add/sub/mul | ✅ Kani (`fixed_math.rs`) + Lean `FixedPoint` |
+| L1: Functional Equivalence | Division/remainder identities | ⚠️ Partial — identities only, not full arithmetic equivalence |
+| L2: Composite Correctness | Newtonian gravity in `compute_accelerations` | ⚠️ Partial — Lean pairwise momentum cancellation only |
+| L3: Pipeline Integrity | Full `simulate_and_extract_seed` correctness | ❌ Not proved (tested only) |
+| L4: Determinism | Bit-identical results | 🧪 Tested (golden hashes on one toolchain), not proved |
 
 See [formal_verification.md](documentation/formal_verification.md) for details.
 
@@ -349,6 +349,6 @@ Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for gui
 The Kelvin cryptosystem is accompanied by a formal verification suite for core components:
 
 - 📚 **Documentation:** [documentation/formal_verification/README.md](documentation/formal_verification/README.md)
-- ✅ **CI status:** [![Verification status](https://github.com/nliaudat/kelvin/actions/workflows/verify.yml/badge.svg)](https://github.com/nliaudat/kelvin/actions/workflows/verify.yml)
+- ⚠️ **CI:** the verification workflows are currently disabled (`.github/workflows/*.yml_disabled`); run `docker/run-kani.sh` and `lake build` locally.
 
-The verification hierarchy (L0‑L4) and the empirical security conjectures (C1‑C5) are described in the linked docs.
+The verification hierarchy (L0‑L4) and the security conjectures (C1‑C5; none machine-checked) are described in the linked docs.

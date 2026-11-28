@@ -1,6 +1,11 @@
-# C1 Gap 6: Hartley vs Min-Entropy Relationship for Φ — Resolved
+﻿# C1 Gap 6: Hartley vs Min-Entropy
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. No machine-checked relation between Hartley and min-entropy for this system.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C1 — Fixed-Point Information Loss (Irreversibility)
 > **Prerequisites:** Gap 2 (uniformity), Gap 4 (ε-bound)
@@ -114,20 +119,19 @@ The factor `2^{δ/2} ≈ 2^{0.01} ≈ 1.007` represents a negligible (0.7%) tigh
 
 ---
 
-## 4. Summary of C1 Resolution
+## 4. Where C1 actually stands
 
-All 6 C1 gaps are now resolved:
+| # | Gap | Status |
+|---|-----|--------|
+| 1 | `k_op >= 1` bit Shannon derivation | Partial (division identity only) |
+| 2 | Uniformity of `dist_cubed` | Empirical |
+| 3 | Cumulative loss saturation | Open |
+| 4 | epsilon-bound `k_op >= 1 - epsilon` | Partial (arithmetic check) |
+| 5 | Error independence (Lemma A3) | Empirical / assumption |
+| 6 | Hartley vs min-entropy | Open |
 
-| # | Gap | Status | Key Insight |
-|---|-----|--------|-------------|
-| 1 | `k_op ≥ 1` bit Shannon derivation | ✅ | Remainder analysis |
-| 2 | Uniform distribution of `dist_cubed` | ✅ | Chaotic mixing + K-S test |
-| 3 | Cumulative loss saturation | ✅ | Finite-state pigeonhole |
-| 4 | ε-bound `k_op ≥ 1 − ε` | ✅ | ε = 1 / log₂(MAX/MIN) ≈ 0.0197 |
-| 5 | Error independence (Lemma A3) | ✅ | Two-regime model with conservative fallback |
-| 6 | Hartley vs min-entropy | ✅ | δ ≤ 0.0197, distribution is near-uniform |
-
-**C1 is now fully resolved.** The remaining 16 gaps are distributed across C2–C5.
+C1 is **not** resolved: no machine-checked artifact establishes an entropy
+statement. The other gaps are distributed across C2-C5.
 
 ---
 

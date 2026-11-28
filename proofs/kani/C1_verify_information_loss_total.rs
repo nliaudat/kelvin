@@ -1,48 +1,63 @@
 // C1_verify_information_loss_total.rs
-//! Kani harness to verify total information loss after S steps
-//! Proves that k_total = min(S * k_step, H_max)
+//
+// Corrected 2026-11-23. The previous version was never compiled and asserted
+// constants chosen inside the harness (`96 * 40 == 3840`). This version proves
+// arithmetic properties of the C1 *saturation model*
+//
+//     L(S) = min(S * k_step, H_max)
+//
+// for a symbolic step count.
+//
+// SCOPE: this is a statement about the model, not about the simulation. It does
+// NOT show that the simulation loses `k_step` bits per step; that claim has no
+// machine-checked artifact (see C1/gap3_saturation_bound.md).
 
-#![no_std]
-#![no_main]
+const C1_H_MAX: u64 = 3840; // 6 * 5 * 128 bits for N = 5
+const C1_K_STEP: u64 = 40;  // claimed bits lost per step for N = 5
 
-#[cfg(kani)]
-mod harness {
-    use kani::proof;
-    
-    #[proof]
-    fn verify_information_loss_total() {
-        // Parameters from C1 analysis
-        let N: usize = 5; // Number of bodies
-        let k_step_min: i128 = 40; // Minimum bits lost per step (from gap1)
-        let H_max: i128 = 3840; // Total state space entropy (6 * 5 * 128 bits)
-        
-        // Test various simulation lengths
-        for S in [100u32, 500u32, 1_000u32, 5_000u32, 10_000u32] {
-            let s_i128: i128 = S as i128;
-            
-            // Total loss should be bounded by saturation
-            let k_total_unbounded: i128 = s_i128 * k_step_min;
-            let k_total_satured: i128 = if k_total_unbounded > H_max {
-                H_max - 100 // Leave room for attractor bound
-            } else {
-                k_total_unbounded
-            };
-            
-            // Assertion: Total loss cannot exceed state space entropy
-            assert!(k_total_satured <= H_max, 
-                "Total loss {} exceeds H_max {}", k_total_satured, H_max);
-            
-            // Assertion: Loss is non-negative
-            assert!(k_total_satured >= 0, "Loss cannot be negative");
-        }
-        
-        // Test saturation point (~96 steps for N=5)
-        let S_saturation: u32 = 96;
-        let s_sat_i128: i128 = S_saturation as i128;
-        let k_at_saturation: i128 = s_sat_i128 * k_step_min; // 96 * 40 = 3840
-        
-        // At saturation, we've lost almost all usable information
-        assert!(k_at_saturation >= H_max - 100, 
-            "Saturation should occur around H_max");
-    }
+fn c1_saturating_loss(steps: u64, k_step: u64, h_max: u64) -> u64 {
+    steps.saturating_mul(k_step).min(h_max)
+}
+
+#[kani::proof]
+fn verify_information_loss_total() {
+    let steps: u64 = kani::any();
+    kani::assume(steps <= 1_000_000);
+
+    let loss = c1_saturating_loss(steps, C1_K_STEP, C1_H_MAX);
+
+    kani::assert(loss <= C1_H_MAX, "loss never exceeds H_max");
+    kani::assert(
+        loss <= steps.saturating_mul(C1_K_STEP),
+        "loss never exceeds S * k_step",
+    );
+}
+
+#[kani::proof]
+fn verify_information_loss_monotone() {
+    let a: u64 = kani::any();
+    let b: u64 = kani::any();
+    kani::assume(a <= b);
+    kani::assume(b <= 1_000_000);
+
+    let la = c1_saturating_loss(a, C1_K_STEP, C1_H_MAX);
+    let lb = c1_saturating_loss(b, C1_K_STEP, C1_H_MAX);
+
+    kani::assert(la <= lb, "loss is monotone in the step count");
+}
+
+#[kani::proof]
+fn verify_saturation_point() {
+    kani::assert(
+        c1_saturating_loss(96, C1_K_STEP, C1_H_MAX) == C1_H_MAX,
+        "96 steps saturate the model",
+    );
+    kani::assert(
+        c1_saturating_loss(95, C1_K_STEP, C1_H_MAX) < C1_H_MAX,
+        "95 steps do not saturate the model",
+    );
+    kani::assert(
+        c1_saturating_loss(1_000_000, C1_K_STEP, C1_H_MAX) == C1_H_MAX,
+        "the model stays saturated beyond the crossing point",
+    );
 }

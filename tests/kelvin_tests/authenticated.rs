@@ -212,3 +212,128 @@ fn test_streaming_auth_too_short() {
     assert!(auth.encrypt(&mut data).is_err());
     assert!(auth.decrypt(&mut data).is_err());
 }
+
+// ─── Chunk order and truncation ────────────────────────────────────────
+
+/// The same ordering and truncation checks for each authenticated wrapper.
+macro_rules! chunk_binding_tests {
+    ($module:ident, $wrapper:ty, $new:expr) => {
+        mod $module {
+            use super::*;
+
+            fn sealed(sender: &mut $wrapper, fill: u8, last: bool) -> Vec<u8> {
+                let mut chunk = vec![fill; 64 + AUTH_OVERHEAD];
+                if last {
+                    sender.encrypt_final(&mut chunk).unwrap();
+                } else {
+                    sender.encrypt(&mut chunk).unwrap();
+                }
+                chunk
+            }
+
+            #[test]
+            fn multi_chunk_round_trip_with_empty_final_chunk() {
+                let (mut sender, mut receiver): ($wrapper, $wrapper) = ($new, $new);
+                let mut first = sealed(&mut sender, 1, false);
+                let mut second = sealed(&mut sender, 2, false);
+                let mut end = vec![0u8; AUTH_OVERHEAD];
+                sender.encrypt_final(&mut end).unwrap();
+
+                receiver.decrypt(&mut first).unwrap();
+                receiver.decrypt(&mut second).unwrap();
+                receiver.decrypt_final(&mut end).unwrap();
+                assert_eq!(&first[..64], &[1u8; 64]);
+                assert_eq!(&second[..64], &[2u8; 64]);
+            }
+
+            #[test]
+            fn reordered_chunk_is_rejected_without_advancing() {
+                let (mut sender, mut receiver): ($wrapper, $wrapper) = ($new, $new);
+                let mut first = sealed(&mut sender, 1, false);
+                let mut second = sealed(&mut sender, 2, true);
+
+                let untouched = second.clone();
+                assert!(receiver.decrypt_final(&mut second).is_err());
+                assert_eq!(second, untouched);
+
+                receiver.decrypt(&mut first).unwrap();
+                receiver.decrypt_final(&mut second).unwrap();
+                assert_eq!(&second[..64], &[2u8; 64]);
+            }
+
+            #[test]
+            fn repeated_chunk_is_rejected() {
+                let (mut sender, mut receiver): ($wrapper, $wrapper) = ($new, $new);
+                let first = sealed(&mut sender, 1, false);
+
+                receiver.decrypt(&mut first.clone()).unwrap();
+                assert!(receiver.decrypt(&mut first.clone()).is_err());
+            }
+
+            #[test]
+            fn truncated_stream_is_rejected() {
+                let (mut sender, mut receiver): ($wrapper, $wrapper) = ($new, $new);
+                let first = sealed(&mut sender, 1, false);
+
+                // The last chunk received was not sealed as final.
+                assert!(receiver.decrypt_final(&mut first.clone()).is_err());
+            }
+
+            #[test]
+            fn final_chunk_is_not_accepted_as_a_middle_chunk() {
+                let (mut sender, mut receiver): ($wrapper, $wrapper) = ($new, $new);
+                let mut only = sealed(&mut sender, 1, true);
+
+                assert!(receiver.decrypt(&mut only).is_err());
+            }
+
+            #[test]
+            fn nothing_follows_the_final_chunk() {
+                let mut sender: $wrapper = $new;
+                sealed(&mut sender, 1, true);
+
+                let mut extra = vec![0u8; 64 + AUTH_OVERHEAD];
+                assert!(sender.encrypt(&mut extra).is_err());
+                assert!(sender.encrypt_final(&mut extra).is_err());
+            }
+        }
+    };
+}
+
+#[test]
+fn test_streaming_auth_rejects_mismatched_settings() {
+    use kelvin::IntegrationMethod::{Euler, Verlet};
+    let new = |bytes_per_step, method| {
+        KelvinStreamingAuthenticated::new_with_method_and_nonce(
+            streaming_config(),
+            bytes_per_step,
+            method,
+            b"nonce",
+        )
+        .unwrap()
+    };
+    let mut chunk = vec![7u8; 64 + AUTH_OVERHEAD];
+    new(1024, Euler).encrypt_final(&mut chunk).unwrap();
+
+    for mut receiver in [new(1024, Verlet), new(512, Euler)] {
+        assert!(receiver.decrypt_final(&mut chunk.clone()).is_err());
+    }
+    new(1024, Euler).decrypt_final(&mut chunk).unwrap();
+    assert_eq!(&chunk[..64], &[7u8; 64]);
+}
+
+chunk_binding_tests!(
+    photon_chunks,
+    KelvinPhotonAuthenticated,
+    KelvinPhotonAuthenticated::new(test_seed(), 1000)
+);
+chunk_binding_tests!(
+    quantum_chunks,
+    KelvinQuantumAuthenticated,
+    KelvinQuantumAuthenticated::new(test_quantum_seed(), 1000)
+);
+chunk_binding_tests!(
+    streaming_chunks,
+    KelvinStreamingAuthenticated,
+    KelvinStreamingAuthenticated::new(streaming_config(), 1024).unwrap()
+);

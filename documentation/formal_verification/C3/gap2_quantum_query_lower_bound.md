@@ -1,6 +1,11 @@
-# C3 Gap 2: `Ω(2^{960})` Quantum Query Lower Bound — Resolved
+# C3 Gap 2: Quantum Query Lower Bound
 
-> **Status:** ✅ RESOLVED
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Open. Conditional on C5 and on Grover optimality; not proved.
+
 > **Date:** 2026-05-31
 > **Conjecture:** C3 — Sequential Simulation Hardness Against Quantum Adversaries
 > **Proven prerequisites:** C3 Gap 1 (corrected attack model), C5 (|Θ| ≥ 2^{1920})

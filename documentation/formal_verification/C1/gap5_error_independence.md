@@ -1,6 +1,11 @@
-# C1 Gap 5: Rounding Error Independence Across Pairs (Lemma A3) — Justified
+# C1 Gap 5: Rounding Error Independence Across Pairs (Lemma A3)
 
-> **Status:** ✅ JUSTIFIED (with conservative fallback bound)
+> **Machine-checked status:** see [PROOF_INDEX.md](../PROOF_INDEX.md). The label
+> below states what is actually established. The surrounding text is the written
+> argument; it is not a proof unless the label says so.
+
+> **Status:** Empirical / assumption. The two-regime model is an argument, not a proof.
+
 > **Date:** 2026-05-30
 > **Conjecture:** C1 — Fixed-Point Information Loss (Irreversibility)
 > **Kani Cross-Reference:** `verify_c1_epsilon_bound` in `kelvin-core/src/fixed_math.rs`

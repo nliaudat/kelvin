@@ -37,8 +37,12 @@ fn feed_orbital_state(
     // Binds the extracted seed to a single cipher instance so that two
     // instances sharing one OrbitalConfig but using different nonces derive
     // independent keystreams. An empty nonce reproduces the legacy output
-    // (pre-nonce golden vectors remain valid). The length prefix keeps
-    // `(domain_separator, nonce)` pairs unambiguous.
+    // (pre-nonce golden vectors remain valid).
+    //
+    // The nonce is length-prefixed but the domain separator is not, so
+    // `(domain_separator, nonce)` pairs are unambiguous only if no domain
+    // separator is a proper prefix of another. The library's constants satisfy
+    // this; callers passing their own separators must keep to it.
     sha3::digest::Update::update(hasher, &(nonce.len() as u64).to_le_bytes());
     sha3::digest::Update::update(hasher, nonce);
 
@@ -191,8 +195,6 @@ pub fn extract_shake256_into_with_nonce(
     nonce: &[u8],
     output: &mut [u8],
 ) {
-    #[cfg(feature = "failpoints")]
-    fail::fail_point!("shake256-extract");
     let mut hasher = Shake256::default();
 
     // Feed all orbital state into the XOF hasher
@@ -311,6 +313,121 @@ mod kani_proofs {
         // Both outputs must be non-zero
         kani::cover(out_a != [0u8; 32], "C4-cover: domain A produces non-zero output");
         kani::cover(out_b != [0u8; 32], "C4-cover: domain B produces non-zero output");
+    }
+}
+
+// ============================================================================
+// Kani harnesses: input framing
+// ============================================================================
+//
+// These run the real `feed_orbital_state` with a sink that records the bytes
+// instead of hashing them, so they check what is hashed, not the hash. The
+// accelerations of zero or one body are trivially zero, which keeps the
+// gravity computation out of the proof.
+#[cfg(kani)]
+mod kani_framing {
+    use super::feed_orbital_state;
+    use kelvin_core::{Fixed, OrbitalBody, Vec3};
+
+    /// Enough for a header (at most 58 bytes) and for one body (212 bytes).
+    const HEADER: usize = 64;
+    const ONE_BODY: usize = 224;
+    const DOMAIN: usize = 3;
+    const NONCE: usize = 3;
+
+    struct Record<const CAPACITY: usize> {
+        bytes: [u8; CAPACITY],
+        len: usize,
+    }
+
+    impl<const CAPACITY: usize> sha3::digest::Update for Record<CAPACITY> {
+        fn update(&mut self, data: &[u8]) {
+            self.bytes[self.len..self.len + data.len()].copy_from_slice(data);
+            self.len += data.len();
+        }
+    }
+
+    #[derive(Clone, Copy, PartialEq)]
+    struct Input {
+        domain: [u8; DOMAIN],
+        nonce: [u8; NONCE],
+        nonce_len: usize,
+        step: u64,
+        g: i128,
+        softening: i128,
+    }
+
+    fn any_input() -> Input {
+        let mut input = Input {
+            domain: kani::any(),
+            nonce: kani::any(),
+            nonce_len: kani::any(),
+            step: kani::any(),
+            g: kani::any(),
+            softening: kani::any(),
+        };
+        kani::assume(input.nonce_len <= NONCE);
+        // Bytes beyond the nonce length are not part of the input.
+        let mut i = input.nonce_len;
+        while i < NONCE {
+            input.nonce[i] = 0;
+            i += 1;
+        }
+        input
+    }
+
+    fn record<const CAPACITY: usize>(input: &Input, bodies: &[OrbitalBody]) -> Record<CAPACITY> {
+        let mut sink = Record { bytes: [0u8; CAPACITY], len: 0 };
+        feed_orbital_state(
+            &mut sink,
+            bodies,
+            input.step,
+            Fixed::from_raw(input.g),
+            Fixed::from_raw(input.softening),
+            &input.domain,
+            &input.nonce[..input.nonce_len],
+        );
+        sink
+    }
+
+    /// With domain separators of one length, equal hash inputs imply equal
+    /// separator, nonce, step, G and softening.
+    #[kani::proof]
+    #[kani::unwind(66)]
+    fn verify_extraction_header_injective() {
+        let (a, b) = (any_input(), any_input());
+        let (left, right) = (record::<HEADER>(&a, &[]), record::<HEADER>(&b, &[]));
+
+        if left.len == right.len && left.bytes == right.bytes {
+            kani::assert(a == b, "equal hash inputs come from equal arguments");
+        }
+        kani::cover!(a.nonce_len != b.nonce_len, "nonces of different lengths are compared");
+    }
+
+    fn any_body() -> OrbitalBody {
+        let v = || Fixed::from_raw(kani::any());
+        OrbitalBody::new(v(), Vec3::new(v(), v(), v()), Vec3::new(v(), v(), v()))
+    }
+
+    /// For one body and fixed arguments, equal hash inputs imply equal mass,
+    /// position and velocity.
+    #[kani::proof]
+    #[kani::unwind(226)]
+    fn verify_extraction_body_injective() {
+        let input = Input {
+            domain: [1; DOMAIN],
+            nonce: [0; NONCE],
+            nonce_len: 0,
+            step: 0,
+            g: 1 << 64,
+            softening: 1 << 44,
+        };
+        let (a, b) = (any_body(), any_body());
+        let (left, right) = (record::<ONE_BODY>(&input, &[a]), record::<ONE_BODY>(&input, &[b]));
+
+        if left.bytes == right.bytes {
+            kani::assert(a == b, "equal hash inputs come from equal bodies");
+        }
     }
 }
 
@@ -483,5 +600,23 @@ mod tests {
 
         let diff_bits: u32 = a.iter().zip(b.iter()).map(|(x, y)| (x ^ y).count_ones()).sum();
         assert!(diff_bits > 200, "Nonce separation too weak: {} bits", diff_bits);
+    }
+
+    /// Documents the limit of the framing: a domain separator that extends
+    /// another one can produce the same hash input.
+    #[test]
+    fn prefix_related_domain_separators_can_collide() {
+        let bodies = test_bodies();
+        let (g, softening) = (Fixed::ONE, Fixed::from_raw(1 << 44));
+        // nonce = le64(2) || "hi" under "domain" ...
+        let mut long_nonce = 2u64.to_le_bytes().to_vec();
+        long_nonce.extend_from_slice(b"hi");
+        // ... reads the same as "domain" || le64(10) with nonce "hi".
+        let mut longer_domain = b"domain".to_vec();
+        longer_domain.extend_from_slice(&10u64.to_le_bytes());
+
+        let a = extract_seed_with_nonce(&bodies, 1, g, softening, b"domain", &long_nonce);
+        let b = extract_seed_with_nonce(&bodies, 1, g, softening, &longer_domain, b"hi");
+        assert_eq!(a, b);
     }
 }
