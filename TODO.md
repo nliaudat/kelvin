@@ -139,8 +139,9 @@ real simulator.
 - Done: `find_cycle` / `detect_orbital_period` run Floyd on the real simulator.
 - Done: the Kani harnesses call `find_cycle` (bounded to 6 states); the
   unit-`State` stub is removed.
-- Remaining: run `detect_orbital_period` on real configurations and document the
-  observed periods.
+- Done (2026-11-27): `kelvin-core/tests/period_observed.rs` runs it on the 3-body
+  config: no repeat within 20,000 steps (`None`). This is an observation, not a
+  proof of a long period.
 
 ### 7. Protocol-level proofs (tooling in place)
 - Images: `docker/docker-compose.formal.yml` (ProVerif, Tamarin, CryptoVerif,
