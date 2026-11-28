@@ -49,16 +49,20 @@ fn c6_check_cycle(next: &[u8; C6_STATES], start: u8, cycle: Cycle) {
     let entry = c6_state_at(next, start, mu);
     kani::assert(c6_state_at(next, start, mu + lambda) == entry, "the state repeats");
 
+    // `if`, not `assume`: when no such index exists (`lambda == 1` or
+    // `mu == 0`), an assumption would drop the path and every later check on it.
     let shorter: usize = kani::any();
-    kani::assume(shorter >= 1 && shorter < lambda);
-    kani::assert(c6_state_at(next, start, mu + shorter) != entry, "the period is minimal");
+    if shorter >= 1 && shorter < lambda {
+        kani::assert(c6_state_at(next, start, mu + shorter) != entry, "the period is minimal");
+    }
 
     let earlier: usize = kani::any();
-    kani::assume(earlier < mu);
-    kani::assert(
-        c6_state_at(next, start, earlier + lambda) != c6_state_at(next, start, earlier),
-        "no earlier state belongs to the cycle",
-    );
+    if earlier < mu {
+        kani::assert(
+            c6_state_at(next, start, earlier + lambda) != c6_state_at(next, start, earlier),
+            "no earlier state belongs to the cycle",
+        );
+    }
 }
 
 /// With a budget of at least the number of states, `find_cycle` always finds a
@@ -73,6 +77,8 @@ fn verify_find_cycle_is_complete_and_correct() {
     if let Some(cycle) = result {
         c6_check_cycle(&next, start, cycle);
         kani::cover!(cycle.mu > 0 && cycle.lambda > 1, "tail and long cycle reachable");
+        kani::cover!(cycle.mu > 0 && cycle.lambda == 1, "tail into a fixed point reachable");
+        kani::cover!(cycle.mu == 0, "start on the cycle reachable");
     }
 }
 

@@ -120,27 +120,48 @@ fn set_contents(data: &Bound<'_, PyByteArray>, contents: &[u8]) -> PyResult<()> 
     Ok(())
 }
 
-/// Seal `data`, growing it by the version byte and tag.
+/// Seal `data`, growing it by the version byte and tag. `data` is left
+/// unchanged on failure.
+///
+/// The buffer is resized first: while a `memoryview` of it exists, that raises
+/// `BufferError`, and it must do so before the cipher advances.
 fn seal_in_python(
     data: &Bound<'_, PyByteArray>,
     seal: impl FnOnce(&mut [u8]) -> Result<(), KelvinError>,
 ) -> PyResult<()> {
-    let mut buf = data.to_vec();
-    buf.resize(buf.len() + AUTH_OVERHEAD, 0);
-    seal(&mut buf).map_err(map_error)?;
-    set_contents(data, &buf)
+    let original = data.to_vec();
+    let mut buf = original.clone();
+    buf.resize(original.len() + AUTH_OVERHEAD, 0);
+    data.resize(buf.len())?;
+    if let Err(e) = seal(&mut buf) {
+        set_contents(data, &original)?;
+        return Err(map_error(e));
+    }
+    get_mut_slice(data).copy_from_slice(&buf);
+    Ok(())
 }
 
 /// Verify and open `data`, removing the version byte and tag. `data` is left
 /// unchanged on failure.
+///
+/// As in `seal_in_python`, the buffer is resized before the cipher advances.
 fn open_in_python(
     data: &Bound<'_, PyByteArray>,
     open: impl FnOnce(&mut [u8]) -> Result<(), KelvinError>,
 ) -> PyResult<()> {
-    let mut buf = data.to_vec();
-    open(&mut buf).map_err(map_error)?;
-    buf.truncate(buf.len() - AUTH_OVERHEAD);
-    set_contents(data, &buf)
+    let original = data.to_vec();
+    let mut buf = original.clone();
+    let Some(opened_len) = original.len().checked_sub(AUTH_OVERHEAD) else {
+        // Too short to hold a tag: `open` reports the error.
+        return open(&mut buf).map_err(map_error);
+    };
+    data.resize(opened_len)?;
+    if let Err(e) = open(&mut buf) {
+        set_contents(data, &original)?;
+        return Err(map_error(e));
+    }
+    get_mut_slice(data).copy_from_slice(&buf[..opened_len]);
+    Ok(())
 }
 
 // ============================================================================

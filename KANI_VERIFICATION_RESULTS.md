@@ -165,3 +165,5 @@ Update, 2026-11-27: `verify_c1_preimage_bound` was rewritten to assert that adja
 Update, 2026-11-27: the three `verify_chunk_*` harnesses were added and run individually with `-Z stubbing`; all succeeded (the slowest in 28 s), and planted bugs made each fail. A full `--all` run of the 46 followed (next entry).
 
 Update, 2026-11-28: a single `--all` run on `dev` at `2f8945b` passed all 46 harnesses (about 1 h 12 min), with every cover property satisfied; details in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md).
+
+Update, 2026-11-28: the two `find_cycle` correctness harnesses used assumptions that dropped paths with period 1 before the cycle-start check, so a wrong start there could pass. They now guard each check with `if`. All three cycle harnesses were re-run individually and succeeded; a planted wrong start passes the old harness and fails the new one. The full 46-harness run above predates this change.

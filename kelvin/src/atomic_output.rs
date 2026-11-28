@@ -1,7 +1,30 @@
 //! All-or-nothing file output.
 
 use std::io::{Error, ErrorKind};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+/// Longest chain of symlinks followed to a destination that does not exist.
+const MAX_LINKS: usize = 40;
+
+/// The path a write to `path` would create, following symlinks whose
+/// destination is missing.
+fn follow_links(path: &Path) -> Result<PathBuf, Error> {
+    let mut target = path.to_path_buf();
+    for _ in 0..MAX_LINKS {
+        match std::fs::symlink_metadata(&target) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                let destination = std::fs::read_link(&target)?;
+                // A relative destination starts at the link's directory.
+                target = match target.parent() {
+                    Some(parent) => parent.join(destination),
+                    None => destination,
+                };
+            },
+            _ => return Ok(target),
+        }
+    }
+    Err(Error::new(ErrorKind::InvalidInput, "too many levels of symbolic links in the output path"))
+}
 
 /// Run `process` against a temporary file next to `output` and rename it into
 /// place only if it succeeds, so that a failed run (for example on a tampered
@@ -25,7 +48,7 @@ pub fn write_atomically<T, E: From<Error>>(
 ) -> Result<T, E> {
     let input = std::fs::canonicalize(input)
         .map_err(|e| Error::new(e.kind(), format!("failed to open input file: {e}")))?;
-    let mut target = output.to_path_buf();
+    let target;
     let mut permissions = None;
     if let Ok(metadata) = std::fs::metadata(output) {
         if !metadata.is_file() {
@@ -41,6 +64,8 @@ pub fn write_atomically<T, E: From<Error>>(
             .into());
         }
         permissions = Some(metadata.permissions());
+    } else {
+        target = follow_links(output)?;
     }
 
     let directory = match target.parent() {
@@ -62,4 +87,49 @@ pub fn write_atomically<T, E: From<Error>>(
     }
     temporary.persist(&target).map_err(|e| e.error)?;
     Ok(value)
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::symlink;
+
+    fn write(input: &Path, output: &Path) -> Result<(), Error> {
+        write_atomically(input, output, |temporary| std::fs::write(temporary, b"result"))
+    }
+
+    fn is_link(path: &Path) -> bool {
+        std::fs::symlink_metadata(path).is_ok_and(|m| m.file_type().is_symlink())
+    }
+
+    #[test]
+    fn dangling_output_symlinks_are_followed_and_kept() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let input = root.join("input");
+        std::fs::write(&input, b"source").unwrap();
+        std::fs::create_dir(root.join("sub")).unwrap();
+        // first -> sub/second -> created (relative to sub), which is missing.
+        symlink("sub/second", root.join("first")).unwrap();
+        symlink("created", root.join("sub/second")).unwrap();
+
+        write(&input, &root.join("first")).unwrap();
+
+        assert!(is_link(&root.join("first")));
+        assert!(is_link(&root.join("sub/second")));
+        assert_eq!(std::fs::read(root.join("sub/created")).unwrap(), b"result");
+    }
+
+    #[test]
+    fn symlink_loops_are_rejected_and_kept() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        let input = root.join("input");
+        std::fs::write(&input, b"source").unwrap();
+        symlink("b", root.join("a")).unwrap();
+        symlink("a", root.join("b")).unwrap();
+
+        assert!(write(&input, &root.join("a")).is_err());
+        assert!(is_link(&root.join("a")) && is_link(&root.join("b")));
+    }
 }
