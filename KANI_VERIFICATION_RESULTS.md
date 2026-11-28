@@ -162,4 +162,6 @@ Update, 2026-11-27: a single `--all` run on `dev` at `326c911` passed all 43 har
 
 Update, 2026-11-27: `verify_c1_preimage_bound` was rewritten to assert that adjacent divisors in the window give distinct quotients. Run individually: successful (45 s); it fails when the division result is truncated.
 
-Update, 2026-11-27: the three `verify_chunk_*` harnesses were added and run individually with `-Z stubbing`; all succeeded (the slowest in 28 s), and planted bugs made each fail. No full `--all` run of the 46 has been made.
+Update, 2026-11-27: the three `verify_chunk_*` harnesses were added and run individually with `-Z stubbing`; all succeeded (the slowest in 28 s), and planted bugs made each fail. A full `--all` run of the 46 followed (next entry).
+
+Update, 2026-11-28: a single `--all` run on `dev` at `2f8945b` passed all 46 harnesses (about 1 h 12 min), with every cover property satisfied; details in [`proofs/kani/RESULTS_2026-11-25.md`](proofs/kani/RESULTS_2026-11-25.md).
